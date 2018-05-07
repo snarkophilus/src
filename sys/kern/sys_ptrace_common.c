@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_ptrace_common.c,v 1.38 2018/04/29 04:28:09 kamil Exp $	*/
+/*	$NetBSD: sys_ptrace_common.c,v 1.40 2018/05/01 16:37:23 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -118,7 +118,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.38 2018/04/29 04:28:09 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.40 2018/05/01 16:37:23 kamil Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_ptrace.h"
@@ -385,7 +385,13 @@ ptrace_allowed(struct lwp *l, int req, struct proc *t, struct proc *p)
 			return EPERM;
 
 		/*
-		 *	(2) the child is already traced.
+		 *	(2) the process is initproc, or
+		 */
+		if (p == initproc)
+			return EPERM;
+
+		/*
+		 *	(3) the child is already traced.
 		 */
 		if (ISSET(p->p_slflag, PSL_TRACED))
 			return EBUSY;
@@ -401,19 +407,25 @@ ptrace_allowed(struct lwp *l, int req, struct proc *t, struct proc *p)
 			return EINVAL;
 
 		/*
-		 *	(2) it's a system process
+		 *	(2) it's a system process,
 		 */
 		if (t->p_flag & PK_SYSTEM)
 			return EPERM;
 
 		/*
-		 *	(3) it's already being traced, or
+		 *	(3) the tracer is initproc,
+		 */
+		if (p == initproc)
+			return EPERM;
+
+		/*
+		 *	(4) it's already being traced, or
 		 */
 		if (ISSET(t->p_slflag, PSL_TRACED))
 			return EBUSY;
 
 		/*
-		 * 	(4) the tracer is chrooted, and its root directory is
+		 * 	(5) the tracer is chrooted, and its root directory is
 		 * 	    not at or above the root directory of the tracee
 		 */
 		mutex_exit(t->p_lock);	/* XXXSMP */
@@ -622,23 +634,22 @@ ptrace_set_event_mask(struct proc *t, void *addr, size_t data)
 		SET(t->p_slflag, PSL_TRACEFORK);
 	else
 		CLR(t->p_slflag, PSL_TRACEFORK);
-#if notyet
+
 	if (pe.pe_set_event & PTRACE_VFORK)
 		SET(t->p_slflag, PSL_TRACEVFORK);
 	else
 		CLR(t->p_slflag, PSL_TRACEVFORK);
-#else
-	if (pe.pe_set_event & PTRACE_VFORK)
-		return ENOTSUP;
-#endif
+
 	if (pe.pe_set_event & PTRACE_VFORK_DONE)
 		SET(t->p_slflag, PSL_TRACEVFORK_DONE);
 	else
 		CLR(t->p_slflag, PSL_TRACEVFORK_DONE);
+
 	if (pe.pe_set_event & PTRACE_LWP_CREATE)
 		SET(t->p_slflag, PSL_TRACELWP_CREATE);
 	else
 		CLR(t->p_slflag, PSL_TRACELWP_CREATE);
+
 	if (pe.pe_set_event & PTRACE_LWP_EXIT)
 		SET(t->p_slflag, PSL_TRACELWP_EXIT);
 	else

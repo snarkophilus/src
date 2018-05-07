@@ -1,10 +1,10 @@
-# $NetBSD: files.fdt,v 1.23 2018/04/03 12:40:20 bouyer Exp $
+# $NetBSD: files.fdt,v 1.25 2018/05/06 10:33:21 jmcneill Exp $
 
 include	"external/bsd/libfdt/conf/files.libfdt"
 
 defflag	opt_fdt.h				FDT: libfdt, ofw_subr
 
-define	fdtbus { } : clk
+define	fdtbus { } : clk, pwm
 
 device	fdt { [pass = 10] } : fdtbus
 attach	fdt at fdtbus
@@ -54,6 +54,7 @@ file	dev/fdt/fdt_intr.c			fdtbus
 file	dev/fdt/fdt_mmc_pwrseq.c		fdtbus
 file	dev/fdt/fdt_phy.c			fdtbus
 file	dev/fdt/fdt_power.c			fdtbus
+file	dev/fdt/fdt_pwm.c			fdtbus
 file	dev/fdt/fdt_regulator.c			fdtbus
 file	dev/fdt/fdt_reset.c			fdtbus
 file	dev/fdt/fdt_rtc.c			fdtbus
@@ -67,5 +68,13 @@ device	mmcpwrseq
 attach	mmcpwrseq at fdt
 file	dev/fdt/mmc_pwrseq_simple.c		mmcpwrseq
 
+device	pwmbacklight
+attach	pwmbacklight at fdt
+file	dev/fdt/pwm_backlight.c			pwmbacklight
+
 define	fdt_display_timing
 file	dev/fdt/display_timing.c		fdt_display_timing
+
+# Designware USB3 XHCI
+attach	xhci at fdt with dwc3_fdt
+file	dev/fdt/dwc3_fdt.c			dwc3_fdt

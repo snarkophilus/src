@@ -1,5 +1,5 @@
 #
-#	$NetBSD: GENERIC64,v 1.4 2018/04/28 20:35:05 jmcneill Exp $
+#	$NetBSD: GENERIC64,v 1.13 2018/05/06 10:36:06 jmcneill Exp $
 #
 #	GENERIC ARM (aarch64) kernel
 #
@@ -35,6 +35,8 @@ makeoptions	DTS="
 	sun50i-h5-orangepi-zero-plus.dts
 	sun50i-h5-orangepi-zero-plus2.dts
 
+	sun50i-h6-pine-h64.dts
+
 	tegra210-p2371-0000.dts
 	tegra210-p2371-2180.dts
 	tegra210-p2571.dts
@@ -46,6 +48,7 @@ options 	SOC_BCM2837
 options 	SOC_TEGRA210
 options 	SOC_SUN50I_A64
 options 	SOC_SUN50I_H5
+options 	SOC_SUN50I_H6
 #options 	MULTIPROCESSOR
 
 pseudo-device 	openfirm	# /dev/openfirm
@@ -102,6 +105,7 @@ bcmicu*		at fdt? pass 1		# Broadcom BCM283x ICU
 tegralic*	at fdt? pass 1		# NVIDIA Tegra LIC
 gic*		at fdt? pass 1		# ARM GIC
 armgic0		at gic?
+sunxinmi*	at fdt? pass 2		# Allwinner NMI / R_INTC
 
 # Memory controller
 tegramc*	at fdt?	pass 4		# NVIDIA Tegra MC
@@ -128,6 +132,9 @@ bcmaux*		at fdt? pass 1		# Broadcom BCM283x Aux Periph Clocks
 sun8ih3ccu*	at fdt? pass 2		# Allwinner H3/H5 CCU
 sun8ih3rccu*	at fdt? pass 2		# Allwinner H3/H5 CCU (PRCM)
 sun50ia64ccu*	at fdt? pass 2		# Allwinner A64 CCU
+sun50ia64rccu*	at fdt? pass 2		# Allwinner A64 CCU (PRCM)
+sun50ih6ccu*	at fdt? pass 2		# Allwinner H6 CCU
+sun50ih6rccu*	at fdt? pass 2		# Allwinner H6 CCU (PRCM)
 sunxiresets*	at fdt? pass 1		# Allwinner misc. resets
 sunxigates*	at fdt? pass 1		# Allwinner misc. gates
 sunxigmacclk*	at fdt? pass 2		# Allwinner GMAC MII/RGMII clock mux
@@ -138,6 +145,9 @@ bcmgpio*	at fdt?			# Broadcom BCM283x GPIO
 sunxigpio*	at fdt? pass 3		# Allwinner GPIO
 tegragpio*	at fdt? pass 2		# NVIDIA Tegra GPIO
 gpio*		at gpiobus?
+
+# PWM controller
+sunxipwm*	at fdt? pass 3		# Allwinner PWM
 
 # MPIO / Pinmux
 tegrapinmux*	at fdt?			# NVIDIA Tegra MPIO
@@ -203,7 +213,10 @@ titemp*		at iic?
 seeprom*	at iic?
 as3722pmic*	at iic?
 as3722reg*	at as3722pmic?
+axppmic*	at iic?			# X-Powers AXP Power Management IC
+axpreg*	at 	axppmic?
 max77620pmic*	at iic?
+pcf8563rtc*	at iic?			# PCF8563 RTC
 tcagpio*	at iic?
 
 # Random number generators
@@ -275,12 +288,16 @@ pseudo-device	wsfont
 # GPU
 #nouveau*	at fdt?			# NVIDIA GPU
 
+# Backlight
+pwmbacklight*	at fdt?			# PWM Backlight controls
+
 # Thermal throttling controller
 sunxithermal*	at fdt?			# Allwinner thermal sensor controller
 tegrasoctherm*	at fdt?			# NVIDIA Tegra SOC_THERM
 
 # USB
 sunxiusbphy*	at fdt? pass 9		# Allwinner USB PHY
+sunxiusb3phy*	at fdt? pass 9		# Allwinner USB3 PHY
 tegrausbphy*	at fdt?			# NVIDIA Tegra USB PHY
 dwctwo*		at fdt?			# Designware USB DRD
 ehci*		at fdt?			# EHCI

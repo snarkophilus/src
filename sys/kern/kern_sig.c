@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sig.c,v 1.340 2018/04/24 18:34:46 kamil Exp $	*/
+/*	$NetBSD: kern_sig.c,v 1.343 2018/05/06 13:40:51 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.340 2018/04/24 18:34:46 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.343 2018/05/06 13:40:51 kamil Exp $");
 
 #include "opt_ptrace.h"
 #include "opt_dtrace.h"
@@ -118,12 +118,12 @@ sigset_t		sigcantmask	__cacheline_aligned;
 
 static void	ksiginfo_exechook(struct proc *, void *);
 static void	proc_stop(struct proc *, int);
+static void	proc_stop_done(struct proc *, int);
 static void	proc_stop_callout(void *);
 static int	sigchecktrace(void);
 static int	sigpost(struct lwp *, sig_t, int, int);
 static int	sigput(sigpend_t *, struct proc *, ksiginfo_t *);
 static int	sigunwait(struct proc *, const ksiginfo_t *);
-static void	sigswitch(int, int);
 
 static void	sigacts_poolpage_free(struct pool *, void *);
 static void	*sigacts_poolpage_alloc(struct pool *, int);
@@ -1528,8 +1528,8 @@ proc_stop_done(struct proc *p, int ppmask)
 /*
  * Stop the current process and switch away when being stopped or traced.
  */
-static void
-sigswitch(int ppmask, int signo)
+void
+sigswitch(int ppmask, int signo, bool relock)
 {
 	struct lwp *l = curlwp;
 	struct proc *p = l->l_proc;
@@ -1555,7 +1555,7 @@ sigswitch(int ppmask, int signo)
 	 * a new signal, then signal the parent.
 	 */
 	if ((p->p_sflag & PS_STOPPING) != 0) {
-		if (!mutex_tryenter(proc_lock)) {
+		if (relock && !mutex_tryenter(proc_lock)) {
 			mutex_exit(p->p_lock);
 			mutex_enter(proc_lock);
 			mutex_enter(p->p_lock);
@@ -1665,7 +1665,7 @@ issignal(struct lwp *l)
 		 * we awaken, check for a signal from the debugger.
 		 */
 		if (p->p_stat == SSTOP || (p->p_sflag & PS_STOPPING) != 0) {
-			sigswitch(PS_NOCLDSTOP, 0);
+			sigswitch(PS_NOCLDSTOP, 0, true);
 			signo = sigchecktrace();
 		} else
 			signo = 0;
@@ -1718,11 +1718,12 @@ issignal(struct lwp *l)
 
 		/*
 		 * If traced, always stop, and stay stopped until released
-		 * by the debugger.  If the our parent process is waiting
-		 * for us, don't hang as we could deadlock.
+		 * by the debugger.  If the our parent is our debugger waiting
+		 * for us and we vforked, don't hang as we could deadlock.
+		 *
+		 * XXX: support PT_TRACE_ME called after vfork(2)
 		 */
-		if ((p->p_slflag & PSL_TRACED) != 0 &&
-		    (p->p_lflag & PL_PPWAIT) == 0 && signo != SIGKILL) {
+		if ((p->p_slflag & PSL_TRACED) != 0 && signo != SIGKILL) {
 			/*
 			 * Take the signal, but don't remove it from the
 			 * siginfo queue, because the debugger can send
@@ -1732,10 +1733,8 @@ issignal(struct lwp *l)
 				sigdelset(&sp->sp_set, signo);
 			p->p_xsig = signo;
 
-			/* Emulation-specific handling of signal trace */
-			if (p->p_emul->e_tracesig == NULL ||
-			    (*p->p_emul->e_tracesig)(p, signo) == 0)
-				sigswitch(0, signo);
+			/* Handling of signal trace */
+			sigswitch(0, signo, true);
 
 			/* Check for a signal from the debugger. */
 			if ((signo = sigchecktrace()) == 0)
@@ -1789,7 +1788,7 @@ issignal(struct lwp *l)
 				p->p_xsig = signo;
 				p->p_sflag &= ~PS_CONTINUED;
 				signo = 0;
-				sigswitch(PS_NOCLDSTOP, p->p_xsig);
+				sigswitch(PS_NOCLDSTOP, p->p_xsig, true);
 			} else if (prop & SA_IGNORE) {
 				/*
 				 * Except for SIGCONT, shouldn't get here.
@@ -2268,21 +2267,45 @@ void
 proc_stoptrace(int trapno)
 {
 	struct lwp *l = curlwp;
-	struct proc *p = l->l_proc, *pp;
+	struct proc *p = l->l_proc;
+	struct sigacts *ps;
+	sigset_t *mask;
+	sig_t action;
+	ksiginfo_t ksi;
+	const int signo = SIGTRAP;
+
+	KASSERT((trapno == TRAP_SCE) || (trapno == TRAP_SCX));
+
+	KSI_INIT_TRAP(&ksi);
+	ksi.ksi_lid = l->l_lid;
+	ksi.ksi_info._signo = signo;
+	ksi.ksi_info._code = trapno;
 
 	mutex_enter(p->p_lock);
-	pp = p->p_pptr;
-	if (pp->p_pid == 1) {
-		CLR(p->p_slflag, PSL_SYSCALL);	/* XXXSMP */
-		mutex_exit(p->p_lock);
-		return;
-	}
 
-	p->p_xsig = SIGTRAP;
-	p->p_sigctx.ps_info._signo = p->p_xsig;
-	p->p_sigctx.ps_info._code = trapno;
-	sigswitch(0, p->p_xsig);
+	/* Needed for ktrace */
+	ps = p->p_sigacts;
+	action = SIGACTION_PS(ps, signo).sa_handler;
+	mask = &l->l_sigmask;
+
+	/* initproc (PID1) cannot became a debugger */
+	KASSERT(p->p_pptr != initproc);
+
+	KASSERT(ISSET(p->p_slflag, PSL_TRACED));
+	KASSERT(ISSET(p->p_slflag, PSL_SYSCALL));
+
+	p->p_xsig = signo;
+	p->p_sigctx.ps_lwp = ksi.ksi_lid;
+	p->p_sigctx.ps_info = ksi.ksi_info;
+	sigswitch(0, signo, true);
 	mutex_exit(p->p_lock);
+
+	if (ktrpoint(KTR_PSIG)) {
+		if (p->p_emul->e_ktrpsig)
+			p->p_emul->e_ktrpsig(signo, action, mask, &ksi);
+		else
+			ktrpsig(signo, action, mask, &ksi);
+	}
 }
 
 static int
