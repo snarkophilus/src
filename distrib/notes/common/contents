@@ -1,4 +1,4 @@
-.\"	$NetBSD: contents,v 1.175 2018/07/26 16:22:49 maxv Exp $
+.\"	$NetBSD: contents,v 1.177 2018/08/02 16:26:09 maxv Exp $
 .\"
 .\" Copyright (c) 1999-2005 The NetBSD Foundation, Inc.
 .\" All rights reserved.
@@ -57,6 +57,7 @@ kernel containing code for everything supported in this release.
 .if \n[amd64] \{\
 .			It Pa netbsd-INSTALL.gz
 The installation kernel.
+.			It Pa netbsd-GENERIC_KASLR.gz
 .			It Pa netbsd-INSTALL_XEN3_DOMU.gz
 .			It Pa netbsd-XEN3_DOM0.gz
 .			It Pa netbsd-XEN3_DOMU.gz
@@ -92,7 +93,7 @@ The monolithic kernel which doesn't use kernel modules.
 .			It Pa netbsd-INSTALL.gz
 The installation kernel.
 .			It Pa netbsd-INSTALL_XEN3PAE_DOMU.gz
-.			It Pa netbsd-INSTALL_XEN3_DOMU.gz
+.			It Pa netbsd-XEN3PAE_DOM0.gz
 .			It Pa netbsd-XEN3PAE_DOMU.gz
 .\}
 .if \n[mac68k] \{\
