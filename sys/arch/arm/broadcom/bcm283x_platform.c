@@ -1,4 +1,4 @@
-/*	$NetBSD: bcm283x_platform.c,v 1.4 2018/04/01 04:35:03 ryo Exp $	*/
+/*	$NetBSD: bcm283x_platform.c,v 1.8 2018/07/16 23:11:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 2017 Jared D. McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bcm283x_platform.c,v 1.4 2018/04/01 04:35:03 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bcm283x_platform.c,v 1.8 2018/07/16 23:11:47 christos Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_bcm283x.h"
@@ -136,6 +136,8 @@ struct bus_space bcm2836_bs_tag;
 struct bus_space bcm2836_a4x_bs_tag;
 
 int bcm283x_bs_map(void *, bus_addr_t, bus_size_t, int, bus_space_handle_t *);
+paddr_t bcm283x_bs_mmap(void *, bus_addr_t, off_t, int, int);
+paddr_t bcm283x_a4x_bs_mmap(void *, bus_addr_t, off_t, int, int);
 
 int
 bcm283x_bs_map(void *t, bus_addr_t ba, bus_size_t size, int flag,
@@ -159,16 +161,45 @@ bcm283x_bs_map(void *t, bus_addr_t ba, bus_size_t size, int flag,
 
 	*bshp = (bus_space_handle_t)(va + (pa - startpa));
 
-	const int pmapflags =
-	    (flag & (BUS_SPACE_MAP_CACHEABLE|BUS_SPACE_MAP_PREFETCHABLE))
-		? 0
-		: PMAP_NOCACHE;
+	int pmapflags;
+	if (flag & BUS_SPACE_MAP_PREFETCHABLE)
+		pmapflags = PMAP_WRITE_COMBINE;
+	else if (flag & BUS_SPACE_MAP_CACHEABLE)
+		pmapflags = 0;
+	else
+		pmapflags = PMAP_NOCACHE;
 	for (pa = startpa; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE, pmapflags);
 	}
 	pmap_update(pmap_kernel());
 
 	return 0;
+}
+
+paddr_t
+bcm283x_bs_mmap(void *t, bus_addr_t bpa, off_t offset, int prot, int flags)
+{
+	/* Convert BA to PA */
+	const paddr_t pa = bpa & ~BCM2835_BUSADDR_CACHE_MASK;
+	paddr_t bus_flags = 0;
+
+	if (flags & BUS_SPACE_MAP_PREFETCHABLE)
+		bus_flags |= ARM_MMAP_WRITECOMBINE;
+
+	return arm_btop(pa + offset) | bus_flags;
+}
+
+paddr_t
+bcm283x_a4x_bs_mmap(void *t, bus_addr_t bpa, off_t offset, int prot, int flags)
+{
+	/* Convert BA to PA */
+	const paddr_t pa = bpa & ~BCM2835_BUSADDR_CACHE_MASK;
+	paddr_t bus_flags = 0;
+
+	if (flags & BUS_SPACE_MAP_PREFETCHABLE)
+		bus_flags |= ARM_MMAP_WRITECOMBINE;
+
+	return arm_btop(pa + 4 * offset) | bus_flags;
 }
 
 int
@@ -585,7 +616,7 @@ bcm283x_uartinit(bus_space_tag_t iot, bus_space_handle_t ioh)
 	uint32_t res;
 
 	bcm2835_mbox_write(iot, ioh, BCMMBOX_CHANARM2VC,
-	    KERN_VTOPHYS(&vb_uart));
+	    KERN_VTOPHYS((vaddr_t)&vb_uart));
 
 	bcm2835_mbox_read(iot, ioh, BCMMBOX_CHANARM2VC, &res);
 
@@ -649,7 +680,8 @@ bcm283x_bootparams(bus_space_tag_t iot, bus_space_handle_t ioh)
 #endif
 	    0) << 4);
 
-	bcm2835_mbox_write(iot, ioh, BCMMBOX_CHANARM2VC, KERN_VTOPHYS(&vb));
+	bcm2835_mbox_write(iot, ioh, BCMMBOX_CHANARM2VC,
+	    KERN_VTOPHYS((vaddr_t)&vb));
 
 	bcm2835_mbox_read(iot, ioh, BCMMBOX_CHANARM2VC, &res);
 
@@ -697,13 +729,13 @@ bcm283x_bootparams(bus_space_tag_t iot, bus_space_handle_t ioh)
 		printf("%s: board model  %x\n", __func__,
 		    vb.vbt_boardmodel.model);
 	if (vcprop_tag_success_p(&vb.vbt_macaddr.tag))
-		printf("%s: mac-address  %llx\n", __func__,
+		printf("%s: mac-address  %" PRIx64 "\n", __func__,
 		    vb.vbt_macaddr.addr);
 	if (vcprop_tag_success_p(&vb.vbt_boardrev.tag))
 		printf("%s: board rev    %x\n", __func__,
 		    vb.vbt_boardrev.rev);
 	if (vcprop_tag_success_p(&vb.vbt_serial.tag))
-		printf("%s: board serial %llx\n", __func__,
+		printf("%s: board serial %" PRIx64 "\n", __func__,
 		    vb.vbt_serial.sn);
 	if (vcprop_tag_success_p(&vb.vbt_dmachan.tag))
 		printf("%s: DMA channel mask 0x%08x\n", __func__,
@@ -743,18 +775,51 @@ bcm2836_bootstrap(void)
 {
 #define RPI_CPU_MAX	4
 
-#ifdef MULTIPROCESSOR
-	extern int cortex_mmuinfo;
-
-	arm_cpu_max = RPI_CPU_MAX;
-	cortex_mmuinfo = armreg_ttbr_read();
 #ifdef VERBOSE_INIT_ARM
-	printf("%s: %d cpus present\n", __func__, arm_cpu_max);
-	printf("%s: cortex_mmuinfo %x\n", __func__, cortex_mmuinfo);
-#endif
+#define DPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define DPRINTF(...)
 #endif
 
-#ifndef __aarch64__
+#ifdef MULTIPROCESSOR
+	arm_cpu_max = RPI_CPU_MAX;
+	DPRINTF("%s: %d cpus present\n", __func__, arm_cpu_max);
+#ifdef __arm__
+	extern int cortex_mmuinfo;
+	cortex_mmuinfo = armreg_ttbr_read();
+	DPRINTF("%s: cortex_mmuinfo %x\n", __func__, cortex_mmuinfo);
+#endif
+#endif /* MULTIPROCESSOR */
+
+#ifdef __aarch64__
+	/*
+	 * XXX: use psci_fdt_bootstrap()
+	 */
+	extern void aarch64_mpstart(void);
+	for (int i = 1; i < RPI_CPU_MAX; i++) {
+		/*
+		 * Reference:
+		 *   armstubs/armstub8.S
+		 *   in https://github.com/raspberrypi/tools
+		 */
+		volatile uint64_t *cpu_release_addr;
+#define RPI3_ARMSTUB8_SPINADDR_BASE	0x000000d8
+		cpu_release_addr = (void *)
+		    AARCH64_PA_TO_KVA(RPI3_ARMSTUB8_SPINADDR_BASE + i * 8);
+		*cpu_release_addr = aarch64_kern_vtophys((vaddr_t)aarch64_mpstart);
+
+		/* need flush cache. secondary processors are cache disabled */
+		cpu_dcache_wb_range((vaddr_t)cpu_release_addr, sizeof(cpu_release_addr));
+		__asm __volatile("sev" ::: "memory");
+
+#if defined(VERBOSE_INIT_ARM) && defined(EARLYCONS)
+		/* wait secondary processor's debug output */
+		gtmr_delay(100000);
+#endif
+	}
+#endif /* __aarch64__ */
+
+#ifdef __arm__
 	/*
 	 * Even if no options MULTIPROCESSOR,
 	 * It is need to initialize the secondary CPU,
@@ -772,6 +837,7 @@ bcm2836_bootstrap(void)
 		    (uint32_t)cortex_mpstart);
 	}
 #endif
+
 #ifdef MULTIPROCESSOR
 	/* Wake up AP in case firmware has placed it in WFE state */
 	__asm __volatile("sev" ::: "memory");
@@ -788,6 +854,10 @@ bcm2836_bootstrap(void)
 			    __func__, i);
 		}
 	}
+#if defined(VERBOSE_INIT_ARM) && defined(EARLYCONS)
+	/* for viewability of secondary processor's debug outputs */
+	printf("\n");
+#endif
 #endif
 }
 
@@ -1163,7 +1233,9 @@ bcm2835_platform_bootstrap(void)
 	bcm2835_a4x_bs_tag = arm_generic_a4x_bs_tag;
 
 	bcm2835_bs_tag.bs_map = bcm2835_bs_map;
+	bcm2835_bs_tag.bs_mmap = bcm283x_bs_mmap;
 	bcm2835_a4x_bs_tag.bs_map = bcm2835_bs_map;
+	bcm2835_a4x_bs_tag.bs_mmap = bcm283x_a4x_bs_mmap;
 
 	fdtbus_set_decoderegprop(false);
 
@@ -1182,7 +1254,9 @@ bcm2836_platform_bootstrap(void)
 	bcm2836_a4x_bs_tag = arm_generic_a4x_bs_tag;
 
 	bcm2836_bs_tag.bs_map = bcm2836_bs_map;
+	bcm2836_bs_tag.bs_mmap = bcm283x_bs_mmap;
 	bcm2836_a4x_bs_tag.bs_map = bcm2836_bs_map;
+	bcm2836_a4x_bs_tag.bs_mmap = bcm283x_a4x_bs_mmap;
 
 	fdtbus_set_decoderegprop(false);
 

@@ -1,7 +1,7 @@
-/* $NetBSD: machdep.h,v 1.21 2017/02/20 17:23:54 skrll Exp $ */
+/* $NetBSD: machdep.h,v 1.23 2018/08/01 13:48:00 skrll Exp $ */
 
-#ifndef _ARM32_BOOT_MACHDEP_H_
-#define _ARM32_BOOT_MACHDEP_H_
+#ifndef _ARM32_MACHDEP_H_
+#define _ARM32_MACHDEP_H_
 
 /* Define various stack sizes in pages */
 #ifndef IRQ_STACK_SIZE
@@ -11,11 +11,7 @@
 #define ABT_STACK_SIZE	1
 #endif
 #ifndef UND_STACK_SIZE
-#ifdef IPKDB
-#define UND_STACK_SIZE	2
-#else
 #define UND_STACK_SIZE	1
-#endif
 #endif
 #ifndef FIQ_STACK_SIZE
 #define FIQ_STACK_SIZE	1

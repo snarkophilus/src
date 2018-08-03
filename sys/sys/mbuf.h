@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.h,v 1.205 2018/05/03 21:37:29 christos Exp $	*/
+/*	$NetBSD: mbuf.h,v 1.208 2018/07/17 05:52:07 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997, 1999, 2001, 2007 The NetBSD Foundation, Inc.
@@ -166,7 +166,7 @@ struct m_hdr {
  *  o For the out-bound direction, the low 16 bits indicates the offset after
  *    the L4 header where the final L4 checksum value is to be stored and the
  *    high 16 bits is the length of the L3 header (the start of the data to
- *    be checksummed):
+ *    be checksummed).
  *
  *  o For the in-bound direction, it is only valid if the M_CSUM_DATA flag is
  *    set. In this case, an L4 checksum has been calculated by hardware and
@@ -227,24 +227,18 @@ struct pkthdr {
     "\11TSOv4\12TSOv6\40NO_PSEUDOHDR"
 
 /*
- * Macros for manipulating csum_data on outgoing packets.  These are
+ * Macros for manipulating csum_data on outgoing packets. These are
  * used to pass information down from the L4/L3 to the L2.
+ *
+ *   _IPHL:   Length of the IPv{4/6} header, plus the options; in other
+ *            words the offset of the UDP/TCP header in the packet.
+ *   _OFFSET: Offset of the checksum field in the UDP/TCP header.
  */
 #define	M_CSUM_DATA_IPv4_IPHL(x)	((x) >> 16)
 #define	M_CSUM_DATA_IPv4_OFFSET(x)	((x) & 0xffff)
-
-/*
- * Macros for M_CSUM_TCPv6 and M_CSUM_UDPv6
- *
- * M_CSUM_DATA_IPv6_HL: length of ip6_hdr + ext header.
- * ie. offset of UDP/TCP header in the packet.
- *
- * M_CSUM_DATA_IPv6_OFFSET: offset of the checksum field in UDP/TCP header.
- */
-
-#define	M_CSUM_DATA_IPv6_HL(x)		((x) >> 16)
-#define	M_CSUM_DATA_IPv6_HL_SET(x, v)	(x) = ((x) & 0xffff) | ((v) << 16)
+#define	M_CSUM_DATA_IPv6_IPHL(x)	((x) >> 16)
 #define	M_CSUM_DATA_IPv6_OFFSET(x)	((x) & 0xffff)
+#define	M_CSUM_DATA_IPv6_SET(x, v)	(x) = ((x) & 0xffff) | ((v) << 16)
 
 /*
  * Max # of pages we can attach to m_ext.  This is carefully chosen
@@ -644,6 +638,31 @@ do {									\
 #define	M_SETCTX(m, c)		((void)((m)->m_pkthdr._rcvif.ctx = (void *)(c)))
 #define	M_CLEARCTX(m)		M_SETCTX((m), NULL)
 
+/*
+ * M_REGION_GET ensures that the "len"-sized region of type "typ" starting
+ * from "off" within "m" is located in a single mbuf, contiguously.
+ *
+ * The pointer to the region will be returned to pointer variable "val".
+ */
+#define M_REGION_GET(val, typ, m, off, len) \
+do {									\
+	struct mbuf *_t;						\
+	int _tmp;							\
+	if ((m)->m_len >= (off) + (len))				\
+		(val) = (typ)(mtod((m), char *) + (off));		\
+	else {								\
+		_t = m_pulldown((m), (off), (len), &_tmp);		\
+		if (_t) {						\
+			if (_t->m_len < _tmp + (len))			\
+				panic("m_pulldown malfunction");	\
+			(val) = (typ)(mtod(_t, char *) + _tmp);	\
+		} else {						\
+			(val) = (typ)NULL;				\
+			(m) = NULL;					\
+		}							\
+	}								\
+} while (/*CONSTCOND*/ 0)
+
 #endif /* defined(_KERNEL) */
 
 /*
@@ -879,6 +898,10 @@ m_copy_rcvif(struct mbuf *m, const struct mbuf *n)
 }
 
 void m_print(const struct mbuf *, const char *, void (*)(const char *, ...)
+    __printflike(1, 2));
+
+/* from uipc_mbufdebug.c */
+void	m_examine(const struct mbuf *, int, const char *, void (*)(const char *, ...)
     __printflike(1, 2));
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.105 2018/05/04 17:01:29 macallan Exp $	*/
+/*	$NetBSD: cpu.h,v 1.107 2018/07/15 05:16:44 maxv Exp $	*/
 
 /*
  * Copyright (C) 1999 Wolfgang Solfrank.
@@ -95,7 +95,7 @@ struct cpu_info {
 #endif
 #define	CI_SAVETEMP	(0*CPUSAVE_LEN)
 #define	CI_SAVEDDB	(1*CPUSAVE_LEN)
-#define	CI_SAVEIPKDB	(2*CPUSAVE_LEN)
+#define	CI_SAVEIPKDB	(2*CPUSAVE_LEN)	/* obsolete */
 #define	CI_SAVEMMU	(3*CPUSAVE_LEN)
 #define	CI_SAVEMAX	(4*CPUSAVE_LEN)
 #define	CPUSAVE_LEN	8
@@ -164,6 +164,7 @@ struct cpu_hatch_data {
 	uint32_t hatch_tbl;
 #if defined(PPC_OEA64_BRIDGE) || defined (_ARCH_PPC64)
 	uint64_t hatch_hid0;
+	uint64_t hatch_hid1;
 	uint64_t hatch_hid4;
 	uint64_t hatch_hid5;
 #else

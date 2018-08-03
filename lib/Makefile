@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.256 2018/05/03 22:27:58 sevan Exp $
+#	$NetBSD: Makefile,v 1.259 2018/07/12 06:52:49 maxv Exp $
 #	from: @(#)Makefile	5.25.1.1 (Berkeley) 5/7/91
 
 .include <bsd.own.mk>
@@ -24,7 +24,7 @@ SUBDIR+=	libarch \
 		libbluetooth libbsdmalloc libbz2 \
 		libcompat libcrypt \
 		libintl libipsec libkvm libm \
-		libossaudio libpci libpmc libposix libprop libpthread \
+		libossaudio libpci libposix libprop libpthread \
 		libpuffs libresolv librmt librpcsvc librt \
 		libtelnet libterminfo \
 		libusbhid libutil libwrap liby libz
@@ -141,7 +141,7 @@ SUBDIR+=	../external/bsd/iscsi/lib	# depends on libpthread
 .endif
 
 .if (${MKZFS} != "no")
-SUBDIR+=        ../external/cddl/osnet/lib/libzfs
+SUBDIR+=        ../external/cddl/osnet/lib/libzfs_core
 SUBDIR+=        ../external/cddl/osnet/lib/libzpool
 .endif
 
@@ -165,7 +165,7 @@ SUBDIR+=	../external/gpl3/${EXTERNAL_GCC_SUBDIR}/lib/libsupc++
 #==================== 2nd library dependency barrier ====================
 SUBDIR+=	.WAIT
 
-.for sanitizer in asan ubsan
+.for sanitizer in asan lsan ubsan
 .if exists(../external/gpl3/${EXTERNAL_GCC_SUBDIR}/lib/lib${sanitizer})
 SUBDIR+= ../external/gpl3/${EXTERNAL_GCC_SUBDIR}/lib/lib${sanitizer}
 .endif
@@ -208,6 +208,10 @@ SUBDIR+=	../external/bsd/fetch/lib	# depends on libssl
 
 .if (${MKLDAP} != "no")
 SUBDIR+=	../external/bsd/openldap/lib	# depends on libcrypto, ...
+.endif
+
+.if (${MKZFS} != "no")
+SUBDIR+=        ../external/cddl/osnet/lib/libzfs
 .endif
 
 SUBDIR+= 	../libexec/httpd/libbozohttpd 	# depends on libssl & libcrypto

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcireg.h,v 1.137 2018/02/01 09:09:14 msaitoh Exp $	*/
+/*	$NetBSD: pcireg.h,v 1.139 2018/07/02 03:52:32 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996, 1999, 2000
@@ -1327,7 +1327,7 @@ typedef u_int8_t pci_intr_line_t;
 #define   PCI_BRIDGE_CONTROL_SERR		(1 <<  1)
 #define   PCI_BRIDGE_CONTROL_ISA		(1 <<  2)
 #define   PCI_BRIDGE_CONTROL_VGA		(1 <<  3)
-#define   PCI_BRIDGE_CONTROL_VGA16		(1 <<  3)
+#define   PCI_BRIDGE_CONTROL_VGA16		(1 <<  4)
 #define   PCI_BRIDGE_CONTROL_MABRT		(1 <<  5)
 #define   PCI_BRIDGE_CONTROL_SECBR		(1 <<  6)
 #define   PCI_BRIDGE_CONTROL_SECFASTB2B		(1 <<  7)
@@ -2029,7 +2029,7 @@ struct pci_rom {
   /* Same */
 #define	PCI_DPC_RPPIO_HLOG 0x20	/* RP PIO Header Log Register */
 #define	PCI_DPC_RPPIO_IMPSLOG 0x30 /* RP PIO ImpSpec Log Register */
-#define	PCI_DPC_RPPIO_TLPPLOG 0x34 /* RP PIO TPL Prefix Log Register */
+#define	PCI_DPC_RPPIO_TLPPLOG 0x34 /* RP PIO TLP Prefix Log Register */
 
 /*
  * Extended capability ID: 0x001e

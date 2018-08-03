@@ -1,4 +1,4 @@
-/* $NetBSD: cpu_fdt.c,v 1.5 2018/04/01 04:35:04 ryo Exp $ */
+/* $NetBSD: cpu_fdt.c,v 1.8 2018/07/02 16:36:49 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2017 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cpu_fdt.c,v 1.5 2018/04/01 04:35:04 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu_fdt.c,v 1.8 2018/07/02 16:36:49 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -59,6 +59,7 @@ struct cpu_fdt_softc {
 static const struct of_compat_data compat_data[] = {
 	{ "arm,arm1176jzf-s",		ARM_CPU_UP },
 
+	{ "arm,arm-v7",			ARM_CPU_ARMV7 },
 	{ "arm,cortex-a5",		ARM_CPU_ARMV7 },
 	{ "arm,cortex-a7",		ARM_CPU_ARMV7 },
 	{ "arm,cortex-a8",		ARM_CPU_ARMV7 },
@@ -67,10 +68,12 @@ static const struct of_compat_data compat_data[] = {
 	{ "arm,cortex-a15",		ARM_CPU_ARMV7 },
 	{ "arm,cortex-a17",		ARM_CPU_ARMV7 },
 
+	{ "arm,arm-v8",			ARM_CPU_ARMV8 },
 	{ "arm,cortex-a53",		ARM_CPU_ARMV8 },
 	{ "arm,cortex-a57",		ARM_CPU_ARMV8 },
 	{ "arm,cortex-a72",		ARM_CPU_ARMV8 },
 	{ "arm,cortex-a73",		ARM_CPU_ARMV8 },
+
 	{ NULL }
 };
 
@@ -143,4 +146,7 @@ cpu_fdt_attach(device_t parent, device_t self, void *aux)
 
 	/* Attach the CPU */
 	cpu_attach(self, cpuid);
+
+	/* Attach CPU frequency scaling provider */
+	config_found(self, faa, NULL);
 }

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.202 2018/02/26 07:29:24 pgoyette Exp $
+#	$NetBSD: Makefile,v 1.207 2018/07/24 09:47:35 maxv Exp $
 
 .include <bsd.own.mk>
 
@@ -47,6 +47,8 @@ SUBDIR+=	gpio
 SUBDIR+=	gpioiic
 SUBDIR+=	gpioow
 SUBDIR+=	gpiosim
+SUBDIR+=	gpioirq
+SUBDIR+=	gpiopps
 SUBDIR+=	hfs
 SUBDIR+=	hythygtemp
 SUBDIR+=	si70xxtemp
@@ -195,8 +197,7 @@ SUBDIR+=	ichsmb
 SUBDIR+=	odcm
 SUBDIR+=	powernow
 SUBDIR+=	tco
-SUBDIR+=	tprof_pmi
-SUBDIR+=	tprof_amdpmi
+SUBDIR+=	tprof_x86
 SUBDIR+=	vmt
 .endif
 
@@ -282,7 +283,6 @@ SUBDIR+=	savagedrm
 SUBDIR+=	sisdrm
 SUBDIR+=	tdfxdrm
 SUBDIR+=	viac7temp
-SUBDIR+=	viadrm
 SUBDIR+=	viadrmums
 .endif
 
@@ -421,6 +421,7 @@ SUBDIR+=	twa
 SUBDIR+=	twe
 SUBDIR+=	viomb
 SUBDIR+=	virtio
+SUBDIR+=	virtio_pci
 SUBDIR+=	vioscsi
 .endif
 

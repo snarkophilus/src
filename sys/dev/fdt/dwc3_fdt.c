@@ -1,4 +1,4 @@
-/* $NetBSD: dwc3_fdt.c,v 1.1 2018/05/01 23:59:15 jmcneill Exp $ */
+/* $NetBSD: dwc3_fdt.c,v 1.5 2018/07/03 16:05:31 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2018 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dwc3_fdt.c,v 1.1 2018/05/01 23:59:15 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dwc3_fdt.c,v 1.5 2018/07/03 16:05:31 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -52,11 +52,29 @@ __KERNEL_RCSID(0, "$NetBSD: dwc3_fdt.c,v 1.1 2018/05/01 23:59:15 jmcneill Exp $"
 #define	  GCTL_PRTCAP_OTG		3
 #define	 GCTL_CORESOFTRESET		__BIT(11)
 
+#define	DWC3_SNPSID			0xc120
+#define	 DWC3_SNPSID_REV		__BITS(15,0)
+
 #define	DWC3_GUSB2PHYCFG(n)		(0xc200 + ((n) * 4))
 #define	 GUSB2PHYCFG_PHYSOFTRST		__BIT(31)
+#define	 GUSB2PHYCFG_U2_FREECLK_EXISTS	__BIT(30)
+#define	 GUSB2PHYCFG_USBTRDTIM		__BITS(13,10)
+#define	 GUSB2PHYCFG_SUSPHY		__BIT(6)
+#define	 GUSB2PHYCFG_PHYIF		__BIT(3)
+#define	 GUSB2PHYCFG_ENBLSLPM		__BIT(0)
 
 #define	DWC3_GUSB3PIPECTL(n)		(0xc2c0 + ((n) * 4))
 #define	 GUSB3PIPECTL_PHYSOFTRST	__BIT(31)
+#define	 GUSB3PIPECTL_UX_EXIT_PX	__BIT(27)
+#define	 GUSB3PIPECTL_SUSPHY		__BIT(17)
+
+#define	DWC3_DCFG			0xc700
+#define	 DCFG_SPEED			__BITS(2,0)
+#define	  DCFG_SPEED_HS			0
+#define	  DCFG_SPEED_FS			1
+#define	  DCFG_SPEED_LS			2
+#define	  DCFG_SPEED_SS			4
+#define	  DCFG_SPEED_SS_PLUS		5
 
 static int	dwc3_fdt_match(device_t, cfdata_t, void *);
 static void	dwc3_fdt_attach(device_t, device_t, void *);
@@ -101,6 +119,58 @@ dwc3_fdt_soft_reset(struct xhci_softc *sc)
 }
 
 static void
+dwc3_fdt_enable_phy(struct xhci_softc *sc, const int phandle)
+{
+	const char *max_speed;
+	u_int phyif_utmi_bits;
+	uint32_t val;
+
+	val = RD4(sc, DWC3_GUSB2PHYCFG(0));
+	if (of_getprop_uint32(phandle, "snps,phyif-utmi-bits", &phyif_utmi_bits) == 0) {
+		if (phyif_utmi_bits == 16) {
+			val |= GUSB2PHYCFG_PHYIF;
+			val &= ~GUSB2PHYCFG_USBTRDTIM;
+			val |= __SHIFTIN(5, GUSB2PHYCFG_USBTRDTIM);
+		} else if (phyif_utmi_bits == 8) {
+			val &= ~GUSB2PHYCFG_PHYIF;
+			val &= ~GUSB2PHYCFG_USBTRDTIM;
+			val |= __SHIFTIN(9, GUSB2PHYCFG_USBTRDTIM);
+		}
+	}
+	if (of_hasprop(phandle, "snps,dis-enblslpm-quirk"))
+		val &= ~GUSB2PHYCFG_ENBLSLPM;
+	if (of_hasprop(phandle, "snps,dis-u2-freeclk-exists-quirk"))
+		val &= ~GUSB2PHYCFG_U2_FREECLK_EXISTS;
+	if (of_hasprop(phandle, "snps,dis_u2_susphy_quirk"))
+		val &= ~GUSB2PHYCFG_SUSPHY;
+	WR4(sc, DWC3_GUSB2PHYCFG(0), val);
+
+	val = RD4(sc, DWC3_GUSB3PIPECTL(0));
+	val &= ~GUSB3PIPECTL_UX_EXIT_PX;
+	if (of_hasprop(phandle, "snps,dis_u3_susphy_quirk"))
+		val &= ~GUSB3PIPECTL_SUSPHY;
+	WR4(sc, DWC3_GUSB3PIPECTL(0), val);
+
+	max_speed = fdtbus_get_string(phandle, "maximum-speed");
+	if (max_speed == NULL)
+		max_speed = "super-speed";
+
+	val = RD4(sc, DWC3_DCFG);
+	val &= ~DCFG_SPEED;
+	if (strcmp(max_speed, "low-speed") == 0)
+		val |= __SHIFTIN(DCFG_SPEED_LS, DCFG_SPEED);
+	else if (strcmp(max_speed, "full-speed") == 0)
+		val |= __SHIFTIN(DCFG_SPEED_FS, DCFG_SPEED);
+	else if (strcmp(max_speed, "high-speed") == 0)
+		val |= __SHIFTIN(DCFG_SPEED_HS, DCFG_SPEED);
+	else if (strcmp(max_speed, "super-speed") == 0)
+		val |= __SHIFTIN(DCFG_SPEED_SS, DCFG_SPEED);
+	else
+		val |= __SHIFTIN(DCFG_SPEED_SS, DCFG_SPEED);	/* default to super speed */
+	WR4(sc, DWC3_DCFG, val);
+}
+
+static void
 dwc3_fdt_set_mode(struct xhci_softc *sc, u_int mode)
 {
 	uint32_t val;
@@ -116,6 +186,8 @@ dwc3_fdt_match(device_t parent, cfdata_t cf, void *aux)
 {
 	const char * const compatible[] = {
 		"allwinner,sun50i-h6-dwc3",
+		"rockchip,rk3328-dwc3",
+		"samsung,exynos5250-dwusb3",
 		NULL
 	};
 	struct fdt_attach_args * const faa = aux;
@@ -166,13 +238,6 @@ dwc3_fdt_attach(device_t parent, device_t self, void *aux)
 			return;
 		}
 
-	/* Enable phy */
-	phy = fdtbus_phy_get(dwc3_phandle, "usb3-phy");
-	if (!phy || fdtbus_phy_enable(phy, true) != 0) {
-		aprint_error(": couldn't enable phy\n");
-		return;
-	}
-
 	/* Get resources */
 	if (fdtbus_get_reg(dwc3_phandle, 0, &addr, &size) != 0) {
 		aprint_error(": couldn't get registers\n");
@@ -189,9 +254,21 @@ dwc3_fdt_attach(device_t parent, device_t self, void *aux)
 	}
 
 	aprint_naive("\n");
-	aprint_normal(": DesignWare USB3 XHCI\n");
+	aprint_normal(": DesignWare USB3 XHCI");
+	const uint32_t snpsid = RD4(sc, DWC3_SNPSID);
+	const u_int rev = __SHIFTOUT(snpsid, DWC3_SNPSID_REV);
+	aprint_normal(" (rev. %d.%03x)\n", rev >> 12, rev & 0xfff);
+
+	/* Enable PHY devices */
+	phy = fdtbus_phy_get(dwc3_phandle, "usb2-phy");
+	if (phy && fdtbus_phy_enable(phy, true) != 0)
+		aprint_error_dev(self, "couldn't enable usb2-phy\n");
+	phy = fdtbus_phy_get(dwc3_phandle, "usb3-phy");
+	if (phy && fdtbus_phy_enable(phy, true) != 0)
+		aprint_error_dev(self, "couldn't enable usb3-phy\n");
 
 	dwc3_fdt_soft_reset(sc);
+	dwc3_fdt_enable_phy(sc, phandle);
 	dwc3_fdt_set_mode(sc, GCTL_PRTCAP_HOST);
 
 	if (!fdtbus_intr_str(dwc3_phandle, 0, intrstr, sizeof(intrstr))) {
@@ -208,6 +285,7 @@ dwc3_fdt_attach(device_t parent, device_t self, void *aux)
 	}
 	aprint_normal_dev(self, "interrupting on %s\n", intrstr);
 
+	sc->sc_bus.ub_revision = USBREV_3_0;
 	error = xhci_init(sc);
 	if (error) {
 		aprint_error_dev(self, "init failed, error = %d\n", error);

@@ -1,4 +1,4 @@
-#	$NetBSD: man.inc,v 1.8 2018/03/07 22:40:26 christos Exp $
+#	$NetBSD: man.inc,v 1.10 2018/05/24 19:03:47 christos Exp $
 
 .PATH:	${.CURDIR}/man
 
@@ -88,7 +88,6 @@ CTLOG_STORE_new.3 \
 CTLOG_new.3 \
 CT_POLICY_EVAL_CTX_new.3 \
 DEFINE_STACK_OF.3 \
-DES_random_key.3 \
 DH_generate_key.3 \
 DH_generate_parameters.3 \
 DH_get0_pqg.3 \
@@ -160,8 +159,8 @@ EVP_PKEY_verify_recover.3 \
 EVP_SealInit.3 \
 EVP_SignInit.3 \
 EVP_VerifyInit.3 \
-HMAC.3 \
-MD5.3 \
+openssl_HMAC.3 \
+openssl_MD5.3 \
 MDC2_Init.3 \
 OBJ_nid2obj.3 \
 OCSP_REQUEST_new.3 \
@@ -452,3 +451,7 @@ openssl_x509.1 \
 openssl_x509.3 \
 openssl_x509v3_config.1 \
 ssl.3
+
+MLINKS += \
+openssl_MD5.3 openssl_MD2.3 \
+openssl_MD5.3 openssl_MD4.3

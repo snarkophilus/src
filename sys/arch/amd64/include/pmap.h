@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.45 2018/02/22 13:27:18 maxv Exp $	*/
+/*	$NetBSD: pmap.h,v 1.48 2018/07/27 07:35:09 maxv Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -158,7 +158,6 @@
  */
 
 #define PTE_BASE	((pt_entry_t *)(L4_SLOT_PTE * NBPD_L4))
-#define KERN_BASE	((pt_entry_t *)(L4_SLOT_KERN * NBPD_L4))
 
 #define L1_BASE	PTE_BASE
 #define L2_BASE	((pd_entry_t *)((char *)L1_BASE + L4_SLOT_PTE * NBPD_L3))
@@ -211,12 +210,6 @@
 /* PG_AVAIL3 not used */
 
 #define	PG_X		0		/* XXX dummy */
-
-/*
- * Number of PTE's per cache line.  8 byte pte, 64-byte cache line
- * Used to avoid false sharing of cache lines.
- */
-#define NPTECL		8
 
 void svs_pmap_sync(struct pmap *, int);
 void svs_lwp_switch(struct lwp *, struct lwp *);
@@ -317,6 +310,20 @@ pmap_pte_flush(void)
 	splx(s);
 }
 #endif
+
+#ifdef __HAVE_DIRECT_MAP
+#define PMAP_DIRECT
+
+static __inline int
+pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
+    int (*process)(void *, size_t, void *), void *arg)
+{
+	vaddr_t va = PMAP_DIRECT_MAP(pa);
+
+	return process((void *)(va + pgoff), len, arg);
+}
+
+#endif /* __HAVE_DIRECT_MAP */
 
 void pmap_changeprot_local(vaddr_t, vm_prot_t);
 

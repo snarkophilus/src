@@ -1,4 +1,4 @@
-/* $NetBSD: copyinout.S,v 1.3 2018/04/01 04:35:03 ryo Exp $ */
+/* $NetBSD: copyinout.S,v 1.7 2018/07/30 09:08:41 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -29,11 +29,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/errno.h>
 #include <aarch64/asm.h>
 #include "assym.h"
 
-RCSID("$NetBSD: copyinout.S,v 1.3 2018/04/01 04:35:03 ryo Exp $");
-
+RCSID("$NetBSD: copyinout.S,v 1.7 2018/07/30 09:08:41 ryo Exp $");
 
 	.macro enter_cpu_onfault
 	stp	fp, lr, [sp, #-16]!	/* save fp, lr */
@@ -49,8 +49,8 @@ RCSID("$NetBSD: copyinout.S,v 1.3 2018/04/01 04:35:03 ryo Exp $");
 	stp	x2, x3, [sp, #-16]!	/* save x2, x3 */
 	bl	cpu_set_onfault
 	ldp	x2, x3, [sp], #16	/* restore x2, x3 */
-	mvn	x8, xzr			/* temporary return value = -1 */
-	cbnz	w0, 9f			/* return if error */
+	mov	x8, x0			/* x8 = cpu_set_onfault() */
+	cbnz	x0, 9f			/* return if error */
 
 	mov	x0, x19			/* x0 = x19 = arg0 */
 	mov	x1, x20			/* x1 = x20 = arg1 */
@@ -261,6 +261,8 @@ END(copyout)
 ENTRY(copyinstr)
 	enter_cpu_onfault
 
+	mov	x8, #0			/* error = 0 */
+
 	mov	x4, xzr			/* i = 0 */
 	cbz	x2, copyinstr_done	/* if (len == 0) goto done */
 copyinstr_loop:
@@ -272,14 +274,12 @@ copyinstr_loop:
 
 	cmp	x4, x2			/* if (i < len) goto loop */
 	bcc	copyinstr_loop
+	mov	x8, #ENAMETOOLONG	/* error = ENAMETOOLONG */
 
 copyinstr_done:
 	cbz	x3, 1f			/* if (done != NULL) *done = i */
 	str	x4, [x3]
 1:
-
-	mov	x8, #0			/* return 0 */
-
 	exit_cpu_onfault
 	ret
 END(copyinstr)
@@ -289,6 +289,8 @@ END(copyinstr)
 
 ENTRY(copyoutstr)
 	enter_cpu_onfault
+
+	mov	x8, #0			/* error = 0 */
 
 	mov	x4, xzr			/* i = 0 */
 	cbz	x2, copyoutstr_done	/* if (len == 0) goto done */
@@ -301,14 +303,12 @@ copyoutstr_loop:
 
 	cmp	x4, x2			/* if (i < len) goto loop */
 	bcc	copyoutstr_loop
+	mov	x8, #ENAMETOOLONG	/* error = ENAMETOOLONG */
 
 copyoutstr_done:
 	cbz	x3, 1f			/* if (done != NULL) *done = i */
 	str	x4, [x3]
 1:
-
-	mov	x8, #0			/* return 0 */
-
 	exit_cpu_onfault
 	ret
 END(copyoutstr)

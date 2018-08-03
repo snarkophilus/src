@@ -1,4 +1,4 @@
-/*	$NetBSD: socketvar.h,v 1.155 2018/05/04 08:35:07 christos Exp $	*/
+/*	$NetBSD: socketvar.h,v 1.158 2018/08/01 23:35:32 rjs Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -160,6 +160,7 @@ struct socket {
 	short		so_qlimit;	/* max number queued connections */
 	short		so_timeo;	/* connection timeout */
 	u_short		so_error;	/* error affecting connection */
+	u_short		so_rerror;	/* error affecting receiving */
 	u_short		so_aborting;	/* references from soabort() */
 	pid_t		so_pgid;	/* pgid for signals */
 	u_long		so_oobmark;	/* chars to oob mark */
@@ -377,6 +378,7 @@ int	do_sys_connect(struct lwp *, int, struct sockaddr *);
 int	do_sys_accept(struct lwp *, int, struct sockaddr *, register_t *,
 	    const sigset_t *, int, int);
 
+int	do_sys_peeloff(struct socket *, void *);
 /*
  * Inline functions for sockets and socket buffering.
  */
@@ -573,6 +575,10 @@ struct	accept_filter *accept_filt_get(char *);
 SYSCTL_DECL(_net_inet_accf);
 #endif
 void	accept_filter_init(void);
+#endif
+#ifdef DDB
+int sofindproc(struct socket *so, int all, void (*pr)(const char *, ...));
+void socket_print(const char *modif, void (*pr)(const char *, ...));
 #endif
 
 #endif /* _KERNEL */

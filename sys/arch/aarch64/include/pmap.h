@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.4 2018/04/27 08:07:08 ryo Exp $ */
+/* $NetBSD: pmap.h,v 1.6 2018/07/27 07:04:04 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -97,6 +97,9 @@ struct vm_page_md {
 #define l3pte_pa(pde)		((paddr_t)((pde) & LX_TBL_PA))
 #define l3pte_executable(pde)	\
     (((pde) & (LX_BLKPAG_UXN|LX_BLKPAG_PXN)) != (LX_BLKPAG_UXN|LX_BLKPAG_PXN))
+#define l3pte_readable(pde)	((pde) & LX_BLKPAG_AF)
+#define l3pte_writable(pde)	\
+    (((pde) & (LX_BLKPAG_AF|LX_BLKPAG_AP)) == (LX_BLKPAG_AF|LX_BLKPAG_AP_RW))
 #define l3pte_index(v)		(((vaddr_t)(v) & L3_ADDR_BITS) >> L3_SHIFT)
 #define l3pte_valid(pde)	(((pde) & LX_VALID) == LX_VALID)
 #define l3pte_is_page(pde)	(((pde) & LX_TYPE) == L3_TYPE_PAG)
@@ -150,10 +153,11 @@ paddr_t pmap_devmap_vtophys(paddr_t);
 #define AARCH64_MMAP_WRITECOMBINE	2UL
 #define AARCH64_MMAP_DEVICE		3UL
 
-#define ARM_MMAP_WRITECOMBINE		AARCH64_MMAP_WRITECOMBINE
-#define ARM_MMAP_WRITEBACK		AARCH64_MMAP_WRITEBACK
-#define ARM_MMAP_NOCACHE		AARCH64_MMAP_NOCACHE
-#define ARM_MMAP_DEVICE			AARCH64_MMAP_DEVICE
+#define ARM_MMAP_MASK			__BITS(63, AARCH64_MMAP_FLAG_SHIFT)
+#define ARM_MMAP_WRITECOMBINE		__SHIFTIN(AARCH64_MMAP_WRITECOMBINE, ARM_MMAP_MASK)
+#define ARM_MMAP_WRITEBACK		__SHIFTIN(AARCH64_MMAP_WRITEBACK, ARM_MMAP_MASK)
+#define ARM_MMAP_NOCACHE		__SHIFTIN(AARCH64_MMAP_NOCACHE, ARM_MMAP_MASK)
+#define ARM_MMAP_DEVICE			__SHIFTIN(AARCH64_MMAP_DEVICE, ARM_MMAP_MASK)
 
 #define	PMAP_PTE			0x10000000 /* kenter_pa */
 #define	PMAP_DEV			0x20000000 /* kenter_pa */

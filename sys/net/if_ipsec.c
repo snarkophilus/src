@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ipsec.c,v 1.13 2018/04/27 09:55:27 knakahara Exp $  */
+/*	$NetBSD: if_ipsec.c,v 1.17 2018/06/26 06:48:02 msaitoh Exp $  */
 
 /*
  * Copyright (c) 2017 Internet Initiative Japan Inc.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ipsec.c,v 1.13 2018/04/27 09:55:27 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ipsec.c,v 1.17 2018/06/26 06:48:02 msaitoh Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -441,7 +441,7 @@ if_ipsec_out_direct(struct ipsec_variant *var, struct mbuf *m, int family)
 	len = m->m_pkthdr.len;
 
 	/* input DLT_NULL frame to BPF */
-	bpf_mtap(ifp, m);
+	bpf_mtap(ifp, m, BPF_D_OUT);
 
 	/* grab and chop off inner af type */
 	/* XXX need pullup? */
@@ -465,7 +465,7 @@ if_ipsec_input(struct mbuf *m, int af, struct ifnet *ifp)
 
 	m_set_rcvif(m, ifp);
 
-	bpf_mtap_af(ifp, af, m);
+	bpf_mtap_af(ifp, af, m, BPF_D_IN);
 
 	if_ipsec_in_enqueue(m, af, ifp);
 
@@ -1574,26 +1574,35 @@ if_ipsec_add_sp0(struct sockaddr *src, in_port_t sport,
 	m_copyback(m, 0, sizeof(msg), &msg);
 
 	if_ipsec_add_mbuf(m, &xsrc, sizeof(xsrc));
-	if_ipsec_add_mbuf_addr_port(m, src, sport, true);
+	/*
+	 * secpolicy.spidx.{src, dst} must not be set port number,
+	 * even if it is used for NAT-T.
+	 */
+	if_ipsec_add_mbuf_addr_port(m, src, 0, true);
 	padlen = PFKEY_UNUNIT64(xsrc.sadb_address_len)
 		- (sizeof(xsrc) + PFKEY_ALIGN8(src->sa_len));
 	if_ipsec_add_pad(m, padlen);
 
 	if_ipsec_add_mbuf(m, &xdst, sizeof(xdst));
-	if_ipsec_add_mbuf_addr_port(m, dst, dport, true);
+	/* ditto */
+	if_ipsec_add_mbuf_addr_port(m, dst, 0, true);
 	padlen = PFKEY_UNUNIT64(xdst.sadb_address_len)
 		- (sizeof(xdst) + PFKEY_ALIGN8(dst->sa_len));
 	if_ipsec_add_pad(m, padlen);
 
 	if_ipsec_add_mbuf(m, &xpl, sizeof(xpl));
+	padlen = PFKEY_UNUNIT64(xpl.sadb_x_policy_len) - sizeof(xpl);
 	if (policy == IPSEC_POLICY_IPSEC) {
 		if_ipsec_add_mbuf(m, &xisr, sizeof(xisr));
+		/*
+		 * secpolicy.req->saidx.{src, dst} must be set port number,
+		 * when it is used for NAT-T.
+		 */
 		if_ipsec_add_mbuf_addr_port(m, src, sport, false);
 		if_ipsec_add_mbuf_addr_port(m, dst, dport, false);
-	}
-	padlen = PFKEY_UNUNIT64(xpl.sadb_x_policy_len) - sizeof(xpl);
-	if (src != NULL && dst != NULL)
+		padlen -= PFKEY_ALIGN8(sizeof(xisr));
 		padlen -= PFKEY_ALIGN8(src->sa_len + dst->sa_len);
+	}
 	if_ipsec_add_pad(m, padlen);
 
 	/* key_kpi_spdadd() has already done KEY_SP_REF(). */

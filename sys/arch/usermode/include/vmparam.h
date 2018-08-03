@@ -1,4 +1,4 @@
-/* $NetBSD: vmparam.h,v 1.17 2013/11/10 19:52:01 jmcneill Exp $ */
+/* $NetBSD: vmparam.h,v 1.19 2018/08/01 12:09:02 reinoud Exp $ */
 
 /*-
  * Copyright (c) 2007 Jared D. McNeill <jmcneill@invisible.ca>

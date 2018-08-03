@@ -1,4 +1,4 @@
-/* $NetBSD: exynos_platform.c,v 1.9 2018/03/17 18:34:09 ryo Exp $ */
+/* $NetBSD: exynos_platform.c,v 1.11 2018/07/31 06:46:25 skrll Exp $ */
 
 /*-
  * Copyright (c) 2017 Jared D. McNeill <jmcneill@invisible.ca>
@@ -26,6 +26,7 @@
  * SUCH DAMAGE.
  */
 
+#include "opt_arm_debug.h"
 #include "opt_exynos.h"
 #include "opt_multiprocessor.h"
 #include "opt_fdt_arm.h"
@@ -33,7 +34,7 @@
 #include "ukbd.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exynos_platform.c,v 1.9 2018/03/17 18:34:09 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exynos_platform.c,v 1.11 2018/07/31 06:46:25 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -50,10 +51,9 @@ __KERNEL_RCSID(0, "$NetBSD: exynos_platform.c,v 1.9 2018/03/17 18:34:09 ryo Exp 
 
 #include <arm/samsung/exynos_reg.h>
 #include <arm/samsung/exynos_var.h>
+#include <arm/samsung/mct_var.h>
 
 #include <evbarm/exynos/platform.h>
-
-#include <arm/cortex/gtmr_var.h>
 
 #include <arm/fdt/arm_fdtvar.h>
 
@@ -123,12 +123,6 @@ exynos5_platform_reset(void)
 	bus_space_write_4(bst, bsh, 0, 1);
 }
 
-static void
-exynos_platform_delay(u_int us)
-{
-	gtmr_delay(us);
-}
-
 static u_int
 exynos_platform_uart_freq(void)
 {
@@ -142,7 +136,7 @@ static const struct arm_platform exynos5_platform = {
 	.early_putchar = exynos_platform_early_putchar,
 	.device_register = exynos_platform_device_register,
 	.reset = exynos5_platform_reset,
-	.delay = exynos_platform_delay,
+	.delay = mct_delay,
 	.uart_freq = exynos_platform_uart_freq,
 };
 

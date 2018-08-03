@@ -1,4 +1,4 @@
-/* $NetBSD: axppmic.c,v 1.5 2018/05/06 14:25:48 jmcneill Exp $ */
+/* $NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $ */
 
 /*-
  * Copyright (c) 2014-2018 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.5 2018/05/06 14:25:48 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,6 +47,7 @@ __KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.5 2018/05/06 14:25:48 jmcneill Exp $")
 #define	AXP_POWER_SOURCE_REG	0x00
 #define	 AXP_POWER_SOURCE_ACIN_PRESENT	__BIT(7)
 #define	 AXP_POWER_SOURCE_VBUS_PRESENT	__BIT(5)
+#define	 AXP_POWER_SOURCE_CHARGE_DIRECTION __BIT(2)
 
 #define	AXP_POWER_MODE_REG	0x01
 #define	 AXP_POWER_MODE_BATT_VALID	__BIT(4)
@@ -61,12 +62,23 @@ __KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.5 2018/05/06 14:25:48 jmcneill Exp $")
 #define	 AXP_IRQ1_ACIN_LOWER	__BIT(5)
 #define	 AXP_IRQ1_VBUS_RAISE	__BIT(3)
 #define	 AXP_IRQ1_VBUS_LOWER	__BIT(2)
-#define	 AXP_IRQ2_POKSIRQ	__BIT(1)
-#define	 AXP_IRQ2_
 #define AXP_IRQ_STATUS_REG(n)	(0x48 + (n) - 1)
+
+#define	AXP_BATSENSE_HI_REG	0x78
+#define	AXP_BATSENSE_LO_REG	0x79
+
+#define	AXP_BATTCHG_HI_REG	0x7a
+#define	AXP_BATTCHG_LO_REG	0x7b
+
+#define	AXP_BATTDISCHG_HI_REG	0x7c
+#define	AXP_BATTDISCHG_LO_REG	0x7d
+
+#define	AXP_ADC_RAW(_hi, _lo)	\
+	(((u_int)(_hi) << 4) | ((lo) & 0xf))
 
 #define	AXP_FUEL_GAUGE_CTRL_REG	0xb8
 #define	 AXP_FUEL_GAUGE_CTRL_EN	__BIT(7)
+
 #define	AXP_BATT_CAP_REG	0xb9
 #define	 AXP_BATT_CAP_VALID	__BIT(7)
 #define	 AXP_BATT_CAP_PERCENT	__BITS(6,0)
@@ -128,11 +140,11 @@ static const struct axppmic_ctrl axp803_ctrls[] = {
 		0x13, __BIT(3), 0x1d, __BITS(3,0)),
 	AXP_CTRL("dcdc1", 1600, 3400, 100,
 		0x10, __BIT(0), 0x20, __BITS(4,0)),
-	AXP_CTRL2("dcdc2", 500, 1300, 10, 71, 20, 5,
+	AXP_CTRL2("dcdc2", 500, 1300, 10, 70, 20, 5,
 		0x10, __BIT(1), 0x21, __BITS(6,0)),
-	AXP_CTRL2("dcdc3", 500, 1300, 10, 71, 20, 5,
+	AXP_CTRL2("dcdc3", 500, 1300, 10, 70, 20, 5,
 		0x10, __BIT(2), 0x22, __BITS(6,0)),
-	AXP_CTRL2("dcdc4", 500, 1300, 10, 71, 20, 5,
+	AXP_CTRL2("dcdc4", 500, 1300, 10, 70, 20, 5,
 		0x10, __BIT(3), 0x23, __BITS(6,0)),
 	AXP_CTRL2("dcdc5", 800, 1840, 10, 33, 20, 36,
 		0x10, __BIT(4), 0x24, __BITS(6,0)),
@@ -179,6 +191,14 @@ static const struct axppmic_ctrl axp805_ctrls[] = {
 		0x11, __BIT(6), 0x26, __BITS(4,0)),
 };
 
+struct axppmic_irq {
+	u_int reg;
+	uint8_t mask;
+};
+
+#define	AXPPMIC_IRQ(_reg, _mask)	\
+	{ .reg = (_reg), .mask = (_mask) }
+
 struct axppmic_config {
 	const char *name;
 	const struct axppmic_ctrl *controls;
@@ -186,8 +206,17 @@ struct axppmic_config {
 	u_int irq_regs;
 	bool has_battery;
 	bool has_fuel_gauge;
-	u_int poksirq_reg;
-	uint8_t poksirq_mask;
+	struct axppmic_irq poklirq;
+	struct axppmic_irq acinirq;
+	struct axppmic_irq vbusirq;
+	struct axppmic_irq battirq;
+	struct axppmic_irq chargeirq;
+	struct axppmic_irq chargestirq;
+	u_int batsense_step;	/* uV */
+	u_int charge_step;	/* uA */
+	u_int discharge_step;	/* uA */
+	u_int maxcap_step;	/* uAh */
+	u_int coulomb_step;	/* uAh */
 };
 
 enum axppmic_sensor {
@@ -196,7 +225,10 @@ enum axppmic_sensor {
 	AXP_SENSOR_BATT_PRESENT,
 	AXP_SENSOR_BATT_CHARGING,
 	AXP_SENSOR_BATT_CHARGE_STATE,
-	AXP_SENSOR_BATT_CAPACITY,
+	AXP_SENSOR_BATT_VOLTAGE,
+	AXP_SENSOR_BATT_CHARGE_CURRENT,
+	AXP_SENSOR_BATT_DISCHARGE_CURRENT,
+	AXP_SENSOR_BATT_CAPACITY_PERCENT,
 	AXP_NSENSORS
 };
 
@@ -206,12 +238,7 @@ struct axppmic_softc {
 	i2c_addr_t	sc_addr;
 	int		sc_phandle;
 
-	bool		sc_has_battery;
-	bool		sc_has_fuel_gauge;
-	u_int		sc_poksirq_reg;
-	uint8_t		sc_poksirq_mask;
-
-	u_int		sc_irq_regs;
+	const struct axppmic_config *sc_conf;
 
 	struct sysmon_pswitch sc_smpsw;
 
@@ -244,8 +271,15 @@ static const struct axppmic_config axp803_config = {
 	.irq_regs = 6,
 	.has_battery = true,
 	.has_fuel_gauge = true,
-	.poksirq_reg = 5,
-	.poksirq_mask = __BIT(4),
+	.batsense_step = 1100,
+	.charge_step = 1000,
+	.discharge_step = 1000,
+	.poklirq = AXPPMIC_IRQ(5, __BIT(3)),
+	.acinirq = AXPPMIC_IRQ(1, __BITS(6,5)),
+	.vbusirq = AXPPMIC_IRQ(1, __BITS(3,2)),
+	.battirq = AXPPMIC_IRQ(2, __BITS(7,6)),
+	.chargeirq = AXPPMIC_IRQ(2, __BITS(3,2)),
+	.chargestirq = AXPPMIC_IRQ(4, __BITS(1,0)),	
 };
 
 static const struct axppmic_config axp805_config = {
@@ -253,15 +287,14 @@ static const struct axppmic_config axp805_config = {
 	.controls = axp805_ctrls,
 	.ncontrols = __arraycount(axp805_ctrls),
 	.irq_regs = 2,
-	.poksirq_reg = 2,
-	.poksirq_mask = __BIT(1),
+	.poklirq = AXPPMIC_IRQ(2, __BIT(0)),
 };
 
-static const struct of_compat_data compat_data[] = {
-	{ "x-powers,axp803",	(uintptr_t)&axp803_config },
-	{ "x-powers,axp805",	(uintptr_t)&axp805_config },
-	{ "x-powers,axp806",	(uintptr_t)&axp805_config },
-	{ NULL }
+static const struct device_compatible_entry compat_data[] = {
+	{ "x-powers,axp803",		(uintptr_t)&axp803_config },
+	{ "x-powers,axp805",		(uintptr_t)&axp805_config },
+	{ "x-powers,axp806",		(uintptr_t)&axp805_config },
+	{ NULL,				0 }
 };
 
 static int
@@ -368,39 +401,20 @@ axppmic_task_shut(void *priv)
 	sysmon_pswitch_event(&sc->sc_smpsw, PSWITCH_EVENT_PRESSED);
 }
 
-static int
-axppmic_intr(void *priv)
-{
-	struct axppmic_softc *sc = priv;
-	const int flags = I2C_F_POLL;
-	u_int n;
-	uint8_t stat;
-
-	iic_acquire_bus(sc->sc_i2c, flags);
-	for (n = 1; n <= sc->sc_irq_regs; n++) {
-		if (axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_IRQ_STATUS_REG(n), &stat, flags) == 0) {
-			if (n == sc->sc_poksirq_reg && (stat & sc->sc_poksirq_mask) != 0)
-				sysmon_task_queue_sched(0, axppmic_task_shut, sc);
-
-			axppmic_write(sc->sc_i2c, sc->sc_addr,
-			    AXP_IRQ_STATUS_REG(sc->sc_poksirq_reg), stat, flags);
-		}
-	}
-	iic_release_bus(sc->sc_i2c, flags);
-
-	return 1;
-}
-
 static void
-axppmic_sensor_refresh(struct sysmon_envsys *sme, envsys_data_t *e)
+axppmic_sensor_update(struct sysmon_envsys *sme, envsys_data_t *e)
 {
 	struct axppmic_softc *sc = sme->sme_cookie;
+	const struct axppmic_config *c = sc->sc_conf;
 	const int flags = I2C_F_POLL;
-	uint8_t val;
+	uint8_t val, lo, hi;
 
 	e->state = ENVSYS_SINVALID;
 
-	iic_acquire_bus(sc->sc_i2c, flags);
+	const bool battery_present =
+	    sc->sc_sensor[AXP_SENSOR_BATT_PRESENT].state == ENVSYS_SVALID &&
+	    sc->sc_sensor[AXP_SENSOR_BATT_PRESENT].value_cur == 1;
+
 	switch (e->private) {
 	case AXP_SENSOR_ACIN_PRESENT:
 		if (axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_POWER_SOURCE_REG, &val, flags) == 0) {
@@ -429,9 +443,7 @@ axppmic_sensor_refresh(struct sysmon_envsys *sme, envsys_data_t *e)
 		}
 		break;
 	case AXP_SENSOR_BATT_CHARGE_STATE:
-		if (axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_POWER_MODE_REG, &val, flags) == 0 &&
-		    (val & AXP_POWER_MODE_BATT_VALID) != 0 &&
-		    (val & AXP_POWER_MODE_BATT_PRESENT) != 0 &&
+		if (battery_present &&
 		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_CAP_REG, &val, flags) == 0 &&
 		    (val & AXP_BATT_CAP_VALID) != 0) {
 			const u_int batt_val = __SHIFTOUT(val, AXP_BATT_CAP_PERCENT);
@@ -447,18 +459,105 @@ axppmic_sensor_refresh(struct sysmon_envsys *sme, envsys_data_t *e)
 			}
 		}
 		break;
-	case AXP_SENSOR_BATT_CAPACITY:
-		if (axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_POWER_MODE_REG, &val, flags) == 0 &&
-		    (val & AXP_POWER_MODE_BATT_VALID) != 0 &&
-		    (val & AXP_POWER_MODE_BATT_PRESENT) != 0 &&
+	case AXP_SENSOR_BATT_CAPACITY_PERCENT:
+		if (battery_present &&
 		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_CAP_REG, &val, flags) == 0 &&
 		    (val & AXP_BATT_CAP_VALID) != 0) {
 			e->state = ENVSYS_SVALID;
 			e->value_cur = __SHIFTOUT(val, AXP_BATT_CAP_PERCENT);
 		}
 		break;
+	case AXP_SENSOR_BATT_VOLTAGE:
+		if (battery_present &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATSENSE_HI_REG, &hi, flags) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATSENSE_LO_REG, &lo, flags) == 0) {
+			e->state = ENVSYS_SVALID;
+			e->value_cur = AXP_ADC_RAW(hi, lo) * c->batsense_step;
+		}
+		break;
+	case AXP_SENSOR_BATT_CHARGE_CURRENT:
+		if (battery_present &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_POWER_SOURCE_REG, &val, flags) == 0 &&
+		    (val & AXP_POWER_SOURCE_CHARGE_DIRECTION) != 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATTCHG_HI_REG, &hi, flags) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATTCHG_LO_REG, &lo, flags) == 0) {
+			e->state = ENVSYS_SVALID;
+			e->value_cur = AXP_ADC_RAW(hi, lo) * c->charge_step;
+		}
+		break;
+	case AXP_SENSOR_BATT_DISCHARGE_CURRENT:
+		if (battery_present &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_POWER_SOURCE_REG, &val, flags) == 0 &&
+		    (val & AXP_POWER_SOURCE_CHARGE_DIRECTION) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATTDISCHG_HI_REG, &hi, flags) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATTDISCHG_LO_REG, &lo, flags) == 0) {
+			e->state = ENVSYS_SVALID;
+			e->value_cur = AXP_ADC_RAW(hi, lo) * c->discharge_step;
+		}
+		break;
+	}
+}
+
+static void
+axppmic_sensor_refresh(struct sysmon_envsys *sme, envsys_data_t *e)
+{
+	struct axppmic_softc *sc = sme->sme_cookie;
+	const int flags = I2C_F_POLL;
+
+	switch (e->private) {
+	case AXP_SENSOR_BATT_CAPACITY_PERCENT:
+	case AXP_SENSOR_BATT_VOLTAGE:
+	case AXP_SENSOR_BATT_CHARGE_CURRENT:
+	case AXP_SENSOR_BATT_DISCHARGE_CURRENT:
+		/* Always update battery capacity and ADCs */
+		iic_acquire_bus(sc->sc_i2c, flags);
+		axppmic_sensor_update(sme, e);
+		iic_release_bus(sc->sc_i2c, flags);
+		break;
+	default:
+		/* Refresh if the sensor is not in valid state */
+		if (e->state != ENVSYS_SVALID) {
+			iic_acquire_bus(sc->sc_i2c, flags);
+			axppmic_sensor_update(sme, e);
+			iic_release_bus(sc->sc_i2c, flags);
+		}
+		break;
+	}
+}
+
+static int
+axppmic_intr(void *priv)
+{
+	struct axppmic_softc *sc = priv;
+	const struct axppmic_config *c = sc->sc_conf;
+	const int flags = I2C_F_POLL;
+	uint8_t stat;
+	u_int n;
+
+	iic_acquire_bus(sc->sc_i2c, flags);
+	for (n = 1; n <= c->irq_regs; n++) {
+		if (axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_IRQ_STATUS_REG(n), &stat, flags) == 0) {
+			if (n == c->poklirq.reg && (stat & c->poklirq.mask) != 0)
+				sysmon_task_queue_sched(0, axppmic_task_shut, sc);
+			if (n == c->acinirq.reg && (stat & c->acinirq.mask) != 0)
+				axppmic_sensor_update(sc->sc_sme, &sc->sc_sensor[AXP_SENSOR_ACIN_PRESENT]);
+			if (n == c->vbusirq.reg && (stat & c->vbusirq.mask) != 0)
+				axppmic_sensor_update(sc->sc_sme, &sc->sc_sensor[AXP_SENSOR_VBUS_PRESENT]);
+			if (n == c->battirq.reg && (stat & c->battirq.mask) != 0)
+				axppmic_sensor_update(sc->sc_sme, &sc->sc_sensor[AXP_SENSOR_BATT_PRESENT]);
+			if (n == c->chargeirq.reg && (stat & c->chargeirq.mask) != 0)
+				axppmic_sensor_update(sc->sc_sme, &sc->sc_sensor[AXP_SENSOR_BATT_CHARGING]);
+			if (n == c->chargestirq.reg && (stat & c->chargestirq.mask) != 0)
+				axppmic_sensor_update(sc->sc_sme, &sc->sc_sensor[AXP_SENSOR_BATT_CHARGE_STATE]);
+
+			if (stat != 0)
+				axppmic_write(sc->sc_i2c, sc->sc_addr,
+				    AXP_IRQ_STATUS_REG(n), stat, flags);
+		}
 	}
 	iic_release_bus(sc->sc_i2c, flags);
+
+	return 1;
 }
 
 static void
@@ -484,6 +583,7 @@ axppmic_attach_acadapter(struct axppmic_softc *sc)
 static void
 axppmic_attach_battery(struct axppmic_softc *sc)
 {
+	const struct axppmic_config *c = sc->sc_conf;
 	envsys_data_t *e;
 	uint8_t val;
 
@@ -512,14 +612,41 @@ axppmic_attach_battery(struct axppmic_softc *sc)
 	e->private = AXP_SENSOR_BATT_CHARGE_STATE;
 	e->units = ENVSYS_BATTERY_CAPACITY;
 	e->flags = ENVSYS_FMONSTCHANGED;
-	e->state = ENVSYS_SVALID;
+	e->state = ENVSYS_SINVALID;
 	e->value_cur = ENVSYS_BATTERY_CAPACITY_NORMAL;
 	strlcpy(e->desc, "charge state", sizeof(e->desc));
 	sysmon_envsys_sensor_attach(sc->sc_sme, e);
 
-	if (sc->sc_has_fuel_gauge) {
-		e = &sc->sc_sensor[AXP_SENSOR_BATT_CAPACITY];
-		e->private = AXP_SENSOR_BATT_CAPACITY;
+	if (c->batsense_step) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_VOLTAGE];
+		e->private = AXP_SENSOR_BATT_VOLTAGE;
+		e->units = ENVSYS_SVOLTS_DC;
+		e->state = ENVSYS_SINVALID;
+		strlcpy(e->desc, "battery voltage", sizeof(e->desc));
+		sysmon_envsys_sensor_attach(sc->sc_sme, e);
+	}
+
+	if (c->charge_step) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_CHARGE_CURRENT];
+		e->private = AXP_SENSOR_BATT_CHARGE_CURRENT;
+		e->units = ENVSYS_SAMPS;
+		e->state = ENVSYS_SINVALID;
+		strlcpy(e->desc, "battery charge current", sizeof(e->desc));
+		sysmon_envsys_sensor_attach(sc->sc_sme, e);
+	}
+
+	if (c->discharge_step) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_DISCHARGE_CURRENT];
+		e->private = AXP_SENSOR_BATT_DISCHARGE_CURRENT;
+		e->units = ENVSYS_SAMPS;
+		e->state = ENVSYS_SINVALID;
+		strlcpy(e->desc, "battery discharge current", sizeof(e->desc));
+		sysmon_envsys_sensor_attach(sc->sc_sme, e);
+	}
+
+	if (c->has_fuel_gauge) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_CAPACITY_PERCENT];
+		e->private = AXP_SENSOR_BATT_CAPACITY_PERCENT;
 		e->units = ENVSYS_INTEGER;
 		e->state = ENVSYS_SINVALID;
 		e->flags = ENVSYS_FPERCENT;
@@ -531,7 +658,7 @@ axppmic_attach_battery(struct axppmic_softc *sc)
 static void
 axppmic_attach_sensors(struct axppmic_softc *sc)
 {
-	if (sc->sc_has_battery) {
+	if (sc->sc_conf->has_battery) {
 		sc->sc_sme = sysmon_envsys_create();
 		sc->sc_sme->sme_name = device_xname(sc->sc_dev);
 		sc->sc_sme->sme_cookie = sc;
@@ -551,21 +678,21 @@ static int
 axppmic_match(device_t parent, cfdata_t match, void *aux)
 {
 	struct i2c_attach_args *ia = aux;
+	int match_result;
 
-	if (ia->ia_name != NULL) {
-		if (ia->ia_cookie)
-			return of_match_compat_data(ia->ia_cookie, compat_data);
-		else
-			return 0;
-	}
+	if (iic_use_direct_match(ia, match, compat_data, &match_result))
+		return match_result;
 
-	return 1;
+	/* This device is direct-config only. */
+
+	return 0;
 }
 
 static void
 axppmic_attach(device_t parent, device_t self, void *aux)
 {
 	struct axppmic_softc *sc = device_private(self);
+	const struct device_compatible_entry *dce = NULL;
 	const struct axppmic_config *c;
 	struct axpreg_attach_args aaa;
 	struct i2c_attach_args *ia = aux;
@@ -573,17 +700,15 @@ axppmic_attach(device_t parent, device_t self, void *aux)
 	uint32_t irq_mask;
 	void *ih;
 
-	c = (void *)of_search_compatible(ia->ia_cookie, compat_data)->data;
+	(void) iic_compatible_match(ia, compat_data, &dce);
+	KASSERT(dce != NULL);
+	c = (void *)dce->data;
 
 	sc->sc_dev = self;
 	sc->sc_i2c = ia->ia_tag;
 	sc->sc_addr = ia->ia_addr;
 	sc->sc_phandle = ia->ia_cookie;
-	sc->sc_has_battery = c->has_battery;
-	sc->sc_has_fuel_gauge = c->has_fuel_gauge;
-	sc->sc_irq_regs = c->irq_regs;
-	sc->sc_poksirq_reg = c->poksirq_reg;
-	sc->sc_poksirq_mask = c->poksirq_mask;
+	sc->sc_conf = c;
 
 	aprint_naive("\n");
 	aprint_normal(": %s\n", c->name);
@@ -595,8 +720,18 @@ axppmic_attach(device_t parent, device_t self, void *aux)
 	iic_acquire_bus(sc->sc_i2c, I2C_F_POLL);
 	for (i = 1; i <= c->irq_regs; i++) {
 		irq_mask = 0;
-		if (i == c->poksirq_reg)
-			irq_mask |= c->poksirq_mask;
+		if (i == c->poklirq.reg)
+			irq_mask |= c->poklirq.mask;
+		if (i == c->acinirq.reg)
+			irq_mask |= c->acinirq.mask;
+		if (i == c->vbusirq.reg)
+			irq_mask |= c->vbusirq.mask;
+		if (i == c->battirq.reg)
+			irq_mask |= c->battirq.mask;
+		if (i == c->chargeirq.reg)
+			irq_mask |= c->chargeirq.mask;
+		if (i == c->chargestirq.reg)
+			irq_mask |= c->chargestirq.mask;
 		axppmic_write(sc->sc_i2c, sc->sc_addr, AXP_IRQ_ENABLE_REG(i), irq_mask, I2C_F_POLL);
 	}
 	iic_release_bus(sc->sc_i2c, I2C_F_POLL);

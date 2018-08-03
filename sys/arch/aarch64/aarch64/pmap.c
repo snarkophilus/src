@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $	*/
+/*	$NetBSD: pmap.c,v 1.16 2018/07/31 07:00:48 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.16 2018/07/31 07:00:48 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
@@ -50,6 +50,11 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $");
 //#define PMAP_DEBUG
 //#define PMAP_PV_DEBUG
 
+#ifdef VERBOSE_INIT_ARM
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	do { } while (/* CONSTCOND */ 0)
+#endif
 
 UVMHIST_DEFINE(pmaphist);
 #ifdef UVMHIST
@@ -189,16 +194,18 @@ pmap_pv_unlock(struct vm_page_md *md)
 	mutex_exit(&md->mdpg_pvlock);
 }
 
-#define PM_LOCKED(pm)				\
-	mutex_owned(&(pm)->pm_lock)
-#define PM_LOCK(pm)				\
-	do {					\
-		mutex_enter(&(pm)->pm_lock);	\
-	} while (0 /*CONSTCOND*/)
-#define PM_UNLOCK(pm)				\
-	do {					\
-		mutex_exit(&(pm)->pm_lock);	\
-	} while (0 /*CONSTCOND*/)
+
+static inline void
+pm_lock(struct pmap *pm)
+{
+	mutex_enter(&pm->pm_lock);
+}
+
+static inline void
+pm_unlock(struct pmap *pm)
+{
+	mutex_exit(&pm->pm_lock);
+}
 
 static void __unused
 pm_addr_check(struct pmap *pm, vaddr_t va, const char *prefix)
@@ -235,7 +242,7 @@ static vsize_t
 _pmap_map_chunk(pd_entry_t *l2, vaddr_t va, paddr_t pa, vsize_t size,
     vm_prot_t prot, u_int flags)
 {
-	pd_entry_t oldpte;
+	pd_entry_t oldpte __debugused;
 	pt_entry_t attr;
 	vsize_t resid;
 
@@ -285,18 +292,14 @@ pmap_devmap_bootstrap(const struct pmap_devmap *table)
 
 	pmap_devmap_register(table);
 
-	l0 = AARCH64_PA_TO_KVA(reg_ttbr1_el1_read());
+	l0 = (void *)AARCH64_PA_TO_KVA(reg_ttbr1_el1_read());
 
-#ifdef VERBOSE_INIT_ARM
-	printf("%s:\n", __func__);
-#endif
+	VPRINTF("%s:\n", __func__);
 	for (i = 0; table[i].pd_size != 0; i++) {
-#ifdef VERBOSE_INIT_ARM
-		printf(" devmap: pa %08lx-%08lx = va %016lx\n",
+		VPRINTF(" devmap: pa %08lx-%08lx = va %016lx\n",
 		    table[i].pd_pa,
 		    table[i].pd_pa + table[i].pd_size - 1,
 		    table[i].pd_va);
-#endif
 		va = table[i].pd_va;
 
 		/* update and check virtual_devmap_addr */
@@ -316,15 +319,15 @@ pmap_devmap_bootstrap(const struct pmap_devmap *table)
 			}
 		}
 
-		l1 = l0pde_pa(l0[l0pde_index(va)]);
+		l1 = (void *)l0pde_pa(l0[l0pde_index(va)]);
 		KASSERT(l1 != NULL);
-		l1 = AARCH64_PA_TO_KVA((paddr_t)l1);
+		l1 = (void *)AARCH64_PA_TO_KVA((paddr_t)l1);
 
-		l2 = l1pde_pa(l1[l1pde_index(va)]);
+		l2 = (void *)l1pde_pa(l1[l1pde_index(va)]);
 		if (l2 == NULL)
 			panic("L2 table for devmap is not allocated");
 
-		l2 = AARCH64_PA_TO_KVA((paddr_t)l2);
+		l2 = (void *)AARCH64_PA_TO_KVA((paddr_t)l2);
 
 		_pmap_map_chunk(l2,
 		    table[i].pd_va,
@@ -406,7 +409,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
 	struct pmap *kpm;
 	pd_entry_t *l0;
-	vaddr_t va;
 	paddr_t l0pa;
 
 	PMAP_HIST_INIT();	/* init once */
@@ -429,9 +431,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 	aarch64_tlbi_all();
 
-	va = vstart;
 	l0pa = reg_ttbr1_el1_read();
-	l0 = AARCH64_PA_TO_KVA(l0pa);
+	l0 = (void *)AARCH64_PA_TO_KVA(l0pa);
 
 	memset(&kernel_pmap, 0, sizeof(kernel_pmap));
 	kpm = pmap_kernel();
@@ -580,7 +581,7 @@ _pmap_alloc_pdp(struct pmap *pm, paddr_t *pap)
 	UVMHIST_LOG(pmaphist, "pa=%llx, va=%llx",
 	    pa, AARCH64_PA_TO_KVA(pa), 0, 0);
 
-	return AARCH64_PA_TO_KVA(pa);
+	return (void *)AARCH64_PA_TO_KVA(pa);
 }
 
 static void
@@ -656,7 +657,7 @@ pmap_extract(struct pmap *pm, vaddr_t va, paddr_t *pap)
 				goto done;
 			}
 
-			l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
+			l1 = (void *)AARCH64_PA_TO_KVA(l0pde_pa(pde));
 			pde = l1[l1pde_index(va)];
 			if (!l1pde_valid(pde)) {
 				found = false;
@@ -670,7 +671,7 @@ pmap_extract(struct pmap *pm, vaddr_t va, paddr_t *pap)
 
 			KASSERT(l1pde_is_table(pde));
 
-			l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
+			l2 = (void *)AARCH64_PA_TO_KVA(l1pde_pa(pde));
 			pde = l2[l2pde_index(va)];
 			if (!l2pde_valid(pde)) {
 				found = false;
@@ -684,7 +685,7 @@ pmap_extract(struct pmap *pm, vaddr_t va, paddr_t *pap)
 
 			KASSERT(l2pde_is_table(pde));
 
-			l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
+			l3 = (void *)AARCH64_PA_TO_KVA(l2pde_pa(pde));
 			pte = l3[l3pte_index(va)];
 
 		} else {
@@ -751,7 +752,7 @@ _pmap_pte_lookup(struct pmap *pm, vaddr_t va)
 		if (!l0pde_valid(pde))
 			return NULL;
 
-		l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
+		l1 = (void *)AARCH64_PA_TO_KVA(l0pde_pa(pde));
 		idx = l1pde_index(va);
 		pde = l1[idx];
 		if (!l1pde_valid(pde))
@@ -760,7 +761,7 @@ _pmap_pte_lookup(struct pmap *pm, vaddr_t va)
 		if (l1pde_is_block(pde))
 			return NULL;
 
-		l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
+		l2 = (void *)AARCH64_PA_TO_KVA(l1pde_pa(pde));
 		idx = l2pde_index(va);
 		pde = l2[idx];
 		if (!l2pde_valid(pde))
@@ -768,7 +769,7 @@ _pmap_pte_lookup(struct pmap *pm, vaddr_t va)
 		if (l2pde_is_block(pde))
 			return NULL;
 
-		l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
+		l3 = (void *)AARCH64_PA_TO_KVA(l2pde_pa(pde));
 		idx = l3pte_index(va);
 		ptep = &l3[idx];	/* as PTE */
 
@@ -852,7 +853,7 @@ _pmap_pte_adjust_cacheflags(pt_entry_t pte, u_int flags)
 	return pte;
 }
 
-static void
+static struct pv_entry *
 _pmap_remove_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va, pt_entry_t pte)
 {
 	struct vm_page_md *md;
@@ -883,7 +884,7 @@ _pmap_remove_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va, pt_entry_t pte)
 
 	pmap_pv_unlock(md);
 
-	pool_cache_put(&_pmap_pv_pool, pv);
+	return pv;
 }
 
 #if defined(PMAP_PV_DEBUG) || defined(DDB)
@@ -950,7 +951,7 @@ pv_dump(struct vm_page_md *md, void (*pr)(const char *, ...))
 #endif /* PMAP_PV_DEBUG & DDB */
 
 static int
-_pmap_enter_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va,
+_pmap_enter_pv(struct vm_page *pg, struct pmap *pm, struct pv_entry **pvp, vaddr_t va,
     pt_entry_t *ptep, paddr_t pa, u_int flags)
 {
 	struct vm_page_md *md;
@@ -976,10 +977,14 @@ _pmap_enter_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va,
 	if (pv == NULL) {
 		pmap_pv_unlock(md);
 
-		/* create and link new pv */
-		pv = pool_cache_get(&_pmap_pv_pool, PR_NOWAIT);
+		/*
+		 * create and link new pv.
+		 * pv is already allocated at beginning of _pmap_enter().
+		 */
+		pv = *pvp;
 		if (pv == NULL)
 			return ENOMEM;
+		*pvp = NULL;
 
 		pv->pv_pmap = pm;
 		pv->pv_va = va;
@@ -1057,7 +1062,7 @@ _pmap_protect_pv(struct vm_page *pg, struct pv_entry *pv, vm_prot_t prot)
 	mdattr = VM_PAGE_TO_MD(pg)->mdpg_flags &
 	    (VM_PROT_READ | VM_PROT_WRITE);
 
-	PM_LOCK(pv->pv_pmap);
+	pm_lock(pv->pv_pmap);
 
 	ptep = pv->pv_ptep;
 	pte = *ptep;
@@ -1081,7 +1086,7 @@ _pmap_protect_pv(struct vm_page *pg, struct pv_entry *pv, vm_prot_t prot)
 	aarch64_tlbi_by_va(pv->pv_va);
 #endif
 
-	PM_UNLOCK(pv->pv_pmap);
+	pm_unlock(pv->pv_pmap);
 }
 
 void
@@ -1111,10 +1116,13 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 	KDASSERT((sva & PAGE_MASK) == 0);
 	KDASSERT((eva & PAGE_MASK) == 0);
 
-	PM_LOCK(pm);
+	pm_lock(pm);
 
 	for (va = sva; va < eva; va += PAGE_SIZE) {
 		pt_entry_t *ptep, pte;
+#ifdef UVMHIST
+		pt_entry_t opte;
+#endif
 		struct vm_page *pg;
 		paddr_t pa;
 		uint32_t mdattr;
@@ -1148,23 +1156,47 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 		}
 
 		pte = *ptep;
+#ifdef UVMHIST
+		opte = pte;
+#endif
 		executable = l3pte_executable(pte);
 		pte = _pmap_pte_adjust_prot(pte, prot, mdattr);
-		atomic_swap_64(ptep, pte);
-
-#if 0
-		aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-		aarch64_tlbi_by_va(va);
-#endif
 
 		if (!executable && (prot & VM_PROT_EXECUTE)) {
 			/* non-exec -> exec */
-			cpu_icache_sync_range(va, PAGE_SIZE);
+			UVMHIST_LOG(pmaphist, "icache_sync: "
+			    "pm=%p, va=%016lx, pte: %016lx -> %016lx",
+			    pm, va, opte, pte);
+			if (!l3pte_writable(pte)) {
+				/*
+				 * require write permission for cleaning dcache
+				 * (cpu_icache_sync_range)
+				 */
+				pt_entry_t tpte;
+
+				tpte = pte & ~(LX_BLKPAG_AF|LX_BLKPAG_AP);
+				tpte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RW);
+				tpte |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);
+				atomic_swap_64(ptep, tpte);
+				aarch64_tlbi_by_va(va);
+
+				cpu_icache_sync_range(va, PAGE_SIZE);
+
+				atomic_swap_64(ptep, pte);
+				aarch64_tlbi_by_va(va);
+			} else {
+				atomic_swap_64(ptep, pte);
+				aarch64_tlbi_by_va(va);
+
+				cpu_icache_sync_range(va, PAGE_SIZE);
+			}
+		} else {
+			atomic_swap_64(ptep, pte);
+			aarch64_tlbi_by_va(va);
 		}
 	}
 
-	PM_UNLOCK(pm);
+	pm_unlock(pm);
 }
 
 void
@@ -1229,10 +1261,10 @@ pmap_create(void)
 	memset(pm, 0, sizeof(*pm));
 	pm->pm_refcnt = 1;
 	pm->pm_asid = -1;
-	pm->pm_l0table = _pmap_alloc_pdp(pm, &pm->pm_l0table_pa);
-	KASSERT(((vaddr_t)pm->pm_l0table & (PAGE_SIZE - 1)) == 0);
 	SLIST_INIT(&pm->pm_vmlist);
 	mutex_init(&pm->pm_lock, MUTEX_DEFAULT, IPL_VM);
+	pm->pm_l0table = _pmap_alloc_pdp(pm, &pm->pm_l0table_pa);
+	KASSERT(((vaddr_t)pm->pm_l0table & (PAGE_SIZE - 1)) == 0);
 
 	UVMHIST_LOG(pmaphist, "pm=%p, pm_l0table=%016lx, pm_l0table_pa=%016lx",
 	    pm, pm->pm_l0table, pm->pm_l0table_pa, 0);
@@ -1277,16 +1309,18 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
     u_int flags, bool kenter)
 {
 	struct vm_page *pg;
+	struct pv_entry *spv, *opv = NULL;
 	pd_entry_t pde;
 	pt_entry_t attr, pte, *ptep;
+#ifdef UVMHIST
+	pt_entry_t opte;
+#endif
 	pd_entry_t *l0, *l1, *l2, *l3;
 	paddr_t pdppa;
 	uint32_t mdattr;
 	unsigned int idx;
 	int error = 0;
-	int pm_locked;
 	const bool user = (pm != pmap_kernel());
-	bool badcolor;
 	bool executable;
 
 	UVMHIST_FUNC(__func__);
@@ -1307,14 +1341,12 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 			PMAP_COUNT(kern_mappings);
 		}
 	} else if (flags & PMAP_WIRED) {
-		badcolor = true;
 		if (user) {
 			PMAP_COUNT(user_mappings_bad_wired);
 		} else {
 			PMAP_COUNT(kern_mappings_bad_wired);
 		}
 	} else {
-		badcolor = true;
 		if (user) {
 			PMAP_COUNT(user_mappings_bad);
 		} else {
@@ -1328,21 +1360,19 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	else
 		pg = PHYS_TO_VM_PAGE(pa);
 
-#ifdef PMAPCOUNTERS
-	if (pg == NULL) {
-		PMAP_COUNT(unmanaged_mappings);
-	} else {
+	if (pg != NULL) {
 		PMAP_COUNT(managed_mappings);
+		/*
+		 * allocate pv in advance of pm_lock() to avoid locking myself.
+		 * pool_cache_get() may call pmap_kenter() internally.
+		 */
+		spv = pool_cache_get(&_pmap_pv_pool, PR_NOWAIT);
+	} else {
+		PMAP_COUNT(unmanaged_mappings);
+		spv = NULL;
 	}
-#endif
 
-	/*
-	 * _pmap_enter() may be called recursively. In case of
-	 * pmap_enter() -> _pmap_enter_pv() -> pool_cache_get() -> pmap_kenter()
-	 */
-	pm_locked = PM_LOCKED(pm);
-	if (!pm_locked)
-		PM_LOCK(pm);
+	pm_lock(pm);
 
 	/*
 	 * traverse L0 -> L1 -> L2 -> L3 table with growing pdp if needed.
@@ -1358,7 +1388,7 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	} else {
 		pdppa = l0pde_pa(pde);
 	}
-	l1 = AARCH64_PA_TO_KVA(pdppa);
+	l1 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l1pde_index(va);
 	pde = l1[idx];
@@ -1369,7 +1399,7 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	} else {
 		pdppa = l1pde_pa(pde);
 	}
-	l2 = AARCH64_PA_TO_KVA(pdppa);
+	l2 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l2pde_index(va);
 	pde = l2[idx];
@@ -1380,12 +1410,15 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	} else {
 		pdppa = l2pde_pa(pde);
 	}
-	l3 = AARCH64_PA_TO_KVA(pdppa);
+	l3 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l3pte_index(va);
 	ptep = &l3[idx];	/* as PTE */
 
 	pte = *ptep;
+#ifdef UVMHIST
+	opte = pte;
+#endif
 	executable = l3pte_executable(pte);
 
 	if (l3pte_valid(pte)) {
@@ -1412,7 +1445,7 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 
 			opg = PHYS_TO_VM_PAGE(l3pte_pa(pte));
 			if (opg != NULL)
-				_pmap_remove_pv(opg, pm, va, pte);
+				opv = _pmap_remove_pv(opg, pm, va, pte);
 		}
 
 		if (pte & LX_BLKPAG_OS_WIRED)
@@ -1420,33 +1453,28 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 		pm->pm_stats.resident_count--;
 	}
 
-	/*
-	 * _pmap_enter_pv() may call pmap_kenter() internally.
-	 * don't allocate pv_entry (don't call _pmap_enter_pv) when kenter mode.
-	 * `pg' have got to be NULL if (kenter).
-	 */
 	mdattr = VM_PROT_READ | VM_PROT_WRITE;
 	if (pg != NULL) {
-		error = _pmap_enter_pv(pg, pm, va, ptep, pa, flags);
+		error = _pmap_enter_pv(pg, pm, &spv, va, ptep, pa, flags);
+
 		if (error != 0) {
+			/*
+			 * If pmap_enter() fails,
+			 * it must not leave behind an existing pmap entry.
+			 */
+			if (!kenter && ((pte & LX_BLKPAG_OS_WIRED) == 0))
+				atomic_swap_64(ptep, 0);
+
 			PMAP_COUNT(pv_entry_cannotalloc);
 			if (flags & PMAP_CANFAIL)
 				goto done;
-			panic(
-			    "pmap_enter: failed to allocate pv_entry");
+			panic("pmap_enter: failed to allocate pv_entry");
 		}
 
-		if (flags & PMAP_WIRED) {
-			/*
-			 * initial value of ref/mod are equal to prot,
-			 * and pte RW are same as prot.
-			 */
-			VM_PAGE_TO_MD(pg)->mdpg_flags |=
-			    (prot & mdattr);
-		} else {
-			/* pte RW will be masked by ref/mod for ref/mod emul */
-			mdattr &= VM_PAGE_TO_MD(pg)->mdpg_flags;
-		}
+		/* update referenced/modified flags */
+		VM_PAGE_TO_MD(pg)->mdpg_flags |=
+		    (flags & (VM_PROT_READ | VM_PROT_WRITE));
+		mdattr &= VM_PAGE_TO_MD(pg)->mdpg_flags;
 	}
 
 #ifdef PMAPCOUNTERS
@@ -1469,18 +1497,39 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 #endif
 
 	pte = pa | attr;
-	atomic_swap_64(ptep, pte);
-
-#if 0
-	/* didn't work??? */
-	aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-	aarch64_tlbi_by_va(va);
-#endif
 
 	if (!executable && (prot & VM_PROT_EXECUTE)) {
 		/* non-exec -> exec */
-		cpu_icache_sync_range(va, PAGE_SIZE);
+		UVMHIST_LOG(pmaphist,
+		    "icache_sync: pm=%p, va=%016lx, pte: %016lx -> %016lx",
+		    pm, va, opte, pte);
+		if (!l3pte_writable(pte)) {
+			/*
+			 * require write permission for cleaning dcache
+			 * (cpu_icache_sync_range)
+			 */
+			pt_entry_t tpte;
+
+			tpte = pte & ~(LX_BLKPAG_AF|LX_BLKPAG_AP);
+			tpte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RW);
+			tpte |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);
+			atomic_swap_64(ptep, tpte);
+			aarch64_tlbi_by_va(va);
+
+			cpu_icache_sync_range(va, PAGE_SIZE);
+
+			atomic_swap_64(ptep, pte);
+			aarch64_tlbi_by_va(va);
+
+		} else {
+			atomic_swap_64(ptep, pte);
+			aarch64_tlbi_by_va(va);
+
+			cpu_icache_sync_range(va, PAGE_SIZE);
+		}
+	} else {
+		atomic_swap_64(ptep, pte);
+		aarch64_tlbi_by_va(va);
 	}
 
 	if (pte & LX_BLKPAG_OS_WIRED)
@@ -1488,8 +1537,15 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	pm->pm_stats.resident_count++;
 
  done:
-	if (!pm_locked)
-		PM_UNLOCK(pm);
+	pm_unlock(pm);
+
+	/* spare pv was not used. discard */
+	if (spv != NULL)
+		pool_cache_put(&_pmap_pv_pool, spv);
+
+	if (opv != NULL)
+		pool_cache_put(&_pmap_pv_pool, opv);
+
 	return error;
 }
 
@@ -1512,6 +1568,7 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 {
 	pt_entry_t pte, *ptep;
 	struct vm_page *pg;
+	struct pv_entry *opv = NULL;
 	paddr_t pa;
 
 
@@ -1521,11 +1578,13 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 	UVMHIST_LOG(pmaphist, "pm=%p, va=%016lx, kremovemode=%d",
 	    pm, va, kremove, 0);
 
+	pm_lock(pm);
+
 	ptep = _pmap_pte_lookup(pm, va);
 	if (ptep != NULL) {
 		pte = *ptep;
 		if (!l3pte_valid(pte))
-			return;
+			goto done;
 
 		pa = l3pte_pa(pte);
 
@@ -1535,7 +1594,7 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 			pg = PHYS_TO_VM_PAGE(pa);
 
 		if (pg != NULL)
-			_pmap_remove_pv(pg, pm, va, pte);
+			opv = _pmap_remove_pv(pg, pm, va, pte);
 
 		atomic_swap_64(ptep, 0);
 #if 0
@@ -1548,6 +1607,11 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 			pm->pm_stats.wired_count--;
 		pm->pm_stats.resident_count--;
 	}
+ done:
+	pm_unlock(pm);
+
+	if (opv != NULL)
+		pool_cache_put(&_pmap_pv_pool, opv);
 }
 
 void
@@ -1557,14 +1621,10 @@ pmap_remove(struct pmap *pm, vaddr_t sva, vaddr_t eva)
 
 	PM_ADDR_CHECK(pm, sva);
 
-	PM_LOCK(pm);
-
 	KASSERT(!IN_KSEG_ADDR(sva));
 
 	for (va = sva; va < eva; va += PAGE_SIZE)
 		_pmap_remove(pm, va, false);
-
-	PM_UNLOCK(pm);
 }
 
 void
@@ -1630,7 +1690,7 @@ pmap_unwire(struct pmap *pm, vaddr_t va)
 
 	PM_ADDR_CHECK(pm, va);
 
-	PM_LOCK(pm);
+	pm_lock(pm);
 	ptep = _pmap_pte_lookup(pm, va);
 	if (ptep != NULL) {
 		pte = *ptep;
@@ -1638,7 +1698,7 @@ pmap_unwire(struct pmap *pm, vaddr_t va)
 		    ((pte & LX_BLKPAG_OS_WIRED) == 0)) {
 			/* invalid pte, or pte is not wired */
 			PMAP_COUNT(unwire_failure);
-			PM_UNLOCK(pm);
+			pm_unlock(pm);
 			return;
 		}
 
@@ -1647,7 +1707,7 @@ pmap_unwire(struct pmap *pm, vaddr_t va)
 
 		pm->pm_stats.wired_count--;
 	}
-	PM_UNLOCK(pm);
+	pm_unlock(pm);
 }
 
 bool
@@ -1658,6 +1718,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	pt_entry_t *ptep, pte;
 	vm_prot_t pmap_prot;
 	paddr_t pa;
+	bool fixed = false;
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
@@ -1681,25 +1742,27 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	}
 #endif
 
+	pm_lock(pm);
+
 	ptep = _pmap_pte_lookup(pm, va);
 	if (ptep == NULL) {
 		UVMHIST_LOG(pmaphist, "pte_lookup failure: va=%016lx",
 		    va, 0, 0, 0);
-		return false;
+		goto done;
 	}
 
 	pte = *ptep;
 	if (!l3pte_valid(pte)) {
 		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
 		    pte, va, 0, 0);
-		return false;
+		goto done;
 	}
 
 	pa = l3pte_pa(*ptep);
 	pg = PHYS_TO_VM_PAGE(pa);
 	if (pg == NULL) {
 		UVMHIST_LOG(pmaphist, "pg not found: va=%016lx", va, 0, 0, 0);
-		return false;
+		goto done;
 	}
 	md = VM_PAGE_TO_MD(pg);
 
@@ -1729,7 +1792,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	/* no permission to read/write/execute for this page */
 	if ((pmap_prot & accessprot) != accessprot) {
 		UVMHIST_LOG(pmaphist, "no permission to access", 0, 0, 0, 0);
-		return false;
+		goto done;
 	}
 
 	if ((pte & LX_BLKPAG_AF) && ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW)) {
@@ -1739,12 +1802,13 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 			 * pte is readable and writable, but occured fault?
 			 * unprivileged load/store, or else ?
 			 */
-			printf("%s: fault: va=%016lx pte=%08llx: pte is rw."
+			printf("%s: fault: va=%016lx pte=%08" PRIx64
+			    ": pte is rw."
 			    " unprivileged load/store ? (onfault=%p)\n",
 			    __func__, va, pte, curlwp->l_md.md_onfault);
 		}
 #endif
-		return false;
+		goto done;
 	}
 	KASSERT(((pte & LX_BLKPAG_AF) == 0) ||
 	    ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO));
@@ -1783,14 +1847,16 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 #else
 	aarch64_tlbi_by_va(va);
 #endif
+	fixed = true;
 
-	return true;
+ done:
+	pm_unlock(pm);
+	return fixed;
 }
 
 bool
 pmap_clear_modify(struct vm_page *pg)
 {
-	struct pmap *pm;
 	struct pv_entry *pv;
 	struct vm_page_md * const md = VM_PAGE_TO_MD(pg);
 	pt_entry_t *ptep, pte, opte;
@@ -1815,7 +1881,6 @@ pmap_clear_modify(struct vm_page *pg)
 	TAILQ_FOREACH(pv, &md->mdpg_pvhead, pv_link) {
 		PMAP_COUNT(clear_modify_pages);
 
-		pm = pv->pv_pmap;
 		va = pv->pv_va;
 
 		ptep = pv->pv_ptep;
@@ -1853,7 +1918,6 @@ pmap_clear_modify(struct vm_page *pg)
 bool
 pmap_clear_reference(struct vm_page *pg)
 {
-	struct pmap *pm;
 	struct pv_entry *pv;
 	struct vm_page_md * const md = VM_PAGE_TO_MD(pg);
 	pt_entry_t *ptep, pte, opte;
@@ -1877,7 +1941,6 @@ pmap_clear_reference(struct vm_page *pg)
 	TAILQ_FOREACH(pv, &md->mdpg_pvhead, pv_link) {
 		PMAP_COUNT(clear_reference_pages);
 
-		pm = pv->pv_pmap;
 		va = pv->pv_va;
 
 		ptep = pv->pv_ptep;
@@ -1931,7 +1994,7 @@ static void
 pmap_db_pte_print(pt_entry_t pte, int level, void (*pr)(const char *, ...))
 {
 	if (pte == 0) {
-		pr("UNUSED\n");
+		pr(" UNUSED\n");
 
 	} else if (level == 0) {
 		/* L0 pde */
@@ -2067,7 +2130,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 	if (!l0pde_valid(pde))
 		return;
 
-	l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
+	l1 = (void *)AARCH64_PA_TO_KVA(l0pde_pa(pde));
 	idx = l1pde_index(va);
 	pde = l1[idx];
 
@@ -2077,7 +2140,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 	if (!l1pde_valid(pde) || l1pde_is_block(pde))
 		return;
 
-	l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
+	l2 = (void *)AARCH64_PA_TO_KVA(l1pde_pa(pde));
 	idx = l2pde_index(va);
 	pde = l2[idx];
 
@@ -2087,7 +2150,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 	if (!l2pde_valid(pde) || l2pde_is_block(pde))
 		return;
 
-	l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
+	l3 = (void *)AARCH64_PA_TO_KVA(l2pde_pa(pde));
 	idx = l3pte_index(va);
 	pte = l3[idx];
 
@@ -2096,7 +2159,9 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 
 	pa = l3pte_pa(pte);
 	pg = PHYS_TO_VM_PAGE(pa);
-	if (pg != NULL) {
+	if (pg == NULL) {
+		pr("No VM_PAGE\n");
+	} else {
 		pg_dump(pg, pr);
 		md = VM_PAGE_TO_MD(pg);
 		pv_dump(md, pr);

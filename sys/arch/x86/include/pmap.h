@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.76 2018/03/04 10:13:08 jdolecek Exp $	*/
+/*	$NetBSD: pmap.h,v 1.81 2018/07/21 06:09:13 maxv Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -149,8 +149,28 @@ struct bootspace {
 	/* Virtual address of the page directory. */
 	vaddr_t pdir;
 
-	/* End of the area dedicated to kernel modules (amd64 only). */
+	/* Area dedicated to kernel modules (amd64 only). */
+	vaddr_t smodule;
 	vaddr_t emodule;
+};
+
+#define SLSPACE_NONE	0
+#define SLAREA_USER	1
+#define SLAREA_PTE	2
+#define SLAREA_MAIN	3
+#define SLAREA_PCPU	4
+#define SLAREA_DMAP	5
+#define SLAREA_KERN	6
+#define SLSPACE_NAREAS	7
+
+struct slotspace {
+	struct {
+		size_t sslot; /* start slot */
+		size_t nslot; /* # of slots */
+		size_t mslot; /* max # of slots */
+		bool active;  /* area is active */
+		bool dropmax; /* !resizable */
+	} area[SLSPACE_NAREAS];
 };
 
 #ifndef MAXGDTSIZ
@@ -163,6 +183,7 @@ struct pcpu_entry {
 	uint8_t ist0[PAGE_SIZE];
 	uint8_t ist1[PAGE_SIZE];
 	uint8_t ist2[PAGE_SIZE];
+	uint8_t ist3[PAGE_SIZE];
 	uint8_t rsp0[2 * PAGE_SIZE];
 } __packed;
 
@@ -316,10 +337,6 @@ void		pmap_ldt_cleanup(struct lwp *);
 void		pmap_ldt_sync(struct pmap *);
 void		pmap_kremove_local(vaddr_t, vsize_t);
 
-void		pmap_emap_enter(vaddr_t, paddr_t, vm_prot_t);
-void		pmap_emap_remove(vaddr_t, vsize_t);
-void		pmap_emap_sync(bool);
-
 #define	__HAVE_PMAP_PV_TRACK	1
 void		pmap_pv_init(void);
 void		pmap_pv_track(paddr_t, psize_t);
@@ -364,8 +381,6 @@ void		pmap_tlb_cpu_init(struct cpu_info *);
 void		pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t, tlbwhy_t);
 void		pmap_tlb_shootnow(void);
 void		pmap_tlb_intr(void);
-
-#define	__HAVE_PMAP_EMAP
 
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 #define PMAP_FORK		/* turn on pmap_fork interface */
