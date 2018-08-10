@@ -1,4 +1,4 @@
-/*	$NetBSD: bcm53xx_machdep.c,v 1.11 2018/07/31 06:46:26 skrll Exp $	*/
+/*	$NetBSD: bcm53xx_machdep.c,v 1.15 2018/08/05 15:28:21 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2012 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 #define IDM_PRIVATE
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bcm53xx_machdep.c,v 1.11 2018/07/31 06:46:26 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bcm53xx_machdep.c,v 1.15 2018/08/05 15:28:21 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_evbarm_boardtype.h"
@@ -94,8 +94,6 @@ static void bcm53xx_system_reset(void);
  * kernel address space.  *Not* for general use.
  */
 #define	KERN_VTOPDIFF	((vaddr_t)KERNEL_BASE_phys - (vaddr_t)KERNEL_BASE_virt)
-#define KERN_VTOPHYS(va) ((paddr_t)((vaddr_t)va + KERN_VTOPDIFF))
-#define KERN_PHYSTOV(pa) ((vaddr_t)((paddr_t)pa - KERN_VTOPDIFF))
 
 #ifndef CONADDR
 #define CONADDR		(BCM53XX_IOREG_PBASE + CCA_UART0_BASE)
@@ -196,6 +194,8 @@ static const struct boot_physmem bp_first256 = {
 u_int
 initarm(void *arg)
 {
+	kern_vtopdiff = KERN_VTOPDIFF;
+
 	pmap_devmap_register(devmap);
 	bcm53xx_bootstrap(KERNEL_IO_IOREG_VBASE);
 
