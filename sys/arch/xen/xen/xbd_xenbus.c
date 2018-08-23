@@ -1,4 +1,4 @@
-/*      $NetBSD: xbd_xenbus.c,v 1.79 2018/06/24 20:28:58 jdolecek Exp $      */
+/*      $NetBSD: xbd_xenbus.c,v 1.86 2018/08/21 18:55:08 jdolecek Exp $      */
 
 /*
  * Copyright (c) 2006 Manuel Bouyer.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.79 2018/06/24 20:28:58 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.86 2018/08/21 18:55:08 jdolecek Exp $");
 
 #include "opt_xen.h"
 
@@ -105,7 +105,6 @@ struct xbd_req {
 		grant_ref_t req_gntref[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 		int req_nr_segments; /* number of segments in this request */
 		struct buf *req_bp; /* buffer associated with this request */
-		void *req_data; /* pointer to the data buffer */
 	    } req_rw;
 	    struct {
 		int s_error;
@@ -116,7 +115,6 @@ struct xbd_req {
 #define req_gntref	u.req_rw.req_gntref
 #define req_nr_segments	u.req_rw.req_nr_segments
 #define req_bp		u.req_rw.req_bp
-#define req_data	u.req_rw.req_data
 #define req_sync	u.req_sync
 
 struct xbd_xenbus_softc {
@@ -170,9 +168,6 @@ static int  xbd_handler(void *);
 static int  xbd_diskstart(device_t, struct buf *);
 static void xbd_backend_changed(void *, XenbusState);
 static void xbd_connect(struct xbd_xenbus_softc *);
-
-static int  xbd_map_align(struct xbd_req *);
-static void xbd_unmap_align(struct xbd_req *);
 
 static void xbdminphys(struct buf *);
 
@@ -338,7 +333,7 @@ xbd_xenbus_detach(device_t dev, int flags)
 	}
 	if ((flags & DETACH_FORCE) == 0) {
 		/* xbd_xenbus_detach already in progress */
-		wakeup(xbd_xenbus_detach);
+		wakeup(xbd_xenbus_detach); /* XXXSMP */
 		splx(s);
 		return EALREADY;
 	}
@@ -519,7 +514,8 @@ abort_transaction:
 	return false;
 }
 
-static void xbd_backend_changed(void *arg, XenbusState new_state)
+static void
+xbd_backend_changed(void *arg, XenbusState new_state)
 {
 	struct xbd_xenbus_softc *sc = device_private((device_t)arg);
 	struct disk_geom *dg;
@@ -665,16 +661,23 @@ again:
 	for (i = sc->sc_ring.rsp_cons; i != resp_prod; i++) {
 		blkif_response_t *rep = RING_GET_RESPONSE(&sc->sc_ring, i);
 		struct xbd_req *xbdreq = &sc->sc_reqs[rep->id];
-		bp = xbdreq->req_bp;
-		DPRINTF(("xbd_handler(%p): b_bcount = %ld\n",
-		    xbdreq->req_bp, (long)bp->b_bcount));
+
 		if (rep->operation == BLKIF_OP_FLUSH_DISKCACHE) {
+			KASSERT(xbdreq->req_bp == NULL);
 			xbdreq->req_sync.s_error = rep->status;
 			xbdreq->req_sync.s_done = 1;
-			wakeup(xbdreq);
+			wakeup(xbdreq); /* XXXSMP */
 			/* caller will free the req */
 			continue;
 		}
+
+		if (rep->operation != BLKIF_OP_READ &&
+		    rep->operation != BLKIF_OP_WRITE) {
+			aprint_error_dev(sc->sc_dksc.sc_dev,
+			    "bad operation %d from backend\n", rep->operation);
+			continue;
+		}
+
 		for (seg = xbdreq->req_nr_segments - 1; seg >= 0; seg--) {
 			if (__predict_false(
 			    xengnt_status(xbdreq->req_gntref[seg]))) {
@@ -687,14 +690,14 @@ again:
 			xengnt_revoke_access(xbdreq->req_gntref[seg]);
 			xbdreq->req_nr_segments--;
 		}
-		if (rep->operation != BLKIF_OP_READ &&
-		    rep->operation != BLKIF_OP_WRITE) {
-			aprint_error_dev(sc->sc_dksc.sc_dev,
-			    "bad operation %d from backend\n", rep->operation);
-			bp->b_error = EIO;
-			bp->b_resid = bp->b_bcount;
-			goto next;
-		}
+		KASSERT(xbdreq->req_nr_segments == 0);
+
+		bp = xbdreq->req_bp;
+		KASSERT(bp != NULL);
+		xbdreq->req_bp = NULL;
+		DPRINTF(("%s(%p): b_bcount = %ld\n", __func__,
+		    bp, (long)bp->b_bcount));
+
 		if (rep->status != BLKIF_RSP_OKAY) {
 			bp->b_error = EIO;
 			bp->b_resid = bp->b_bcount;
@@ -702,9 +705,6 @@ again:
 		}
 		/* b_resid was set in dk_start */
 next:
-		if (bp->b_data != xbdreq->req_data)
-			xbd_unmap_align(xbdreq);
-
 		dk_done(&sc->sc_dksc, bp);
 
 		SLIST_INSERT_HEAD(&sc->sc_xbdreq_head, xbdreq, req_next);
@@ -718,7 +718,7 @@ done:
 		goto again;
 
 	if (sc->sc_xbdreq_wait)
-		wakeup(&sc->sc_xbdreq_wait);
+		wakeup(&sc->sc_xbdreq_wait); /* XXXSMP */
 	else
 		dk_start(&sc->sc_dksc, NULL);
 	return 1;
@@ -881,7 +881,7 @@ xbdioctl(dev_t dev, u_long cmd, void *data, int flag, struct lwp *l)
 			    notify);
 			if (notify)
 				hypervisor_notify_via_evtchn(sc->sc_evtchn);
-			/* request sent, no wait for completion */
+			/* request sent, now wait for completion */
 			while (xbdreq->req_sync.s_done == 0) {
 				/* XXXSMP */
 				tsleep(xbdreq, PRIBIO, "xbdsync", 0);
@@ -931,6 +931,7 @@ xbd_diskstart(device_t self, struct buf *bp)
 	vaddr_t va;
 	int nsects, nbytes, seg;
 	int notify, error = 0;
+	int s;
 
 	DPRINTF(("xbd_diskstart(%p): b_bcount = %ld\n",
 	    bp, (long)bp->b_bcount));
@@ -945,6 +946,8 @@ xbd_diskstart(device_t self, struct buf *bp)
 		error = EINVAL;
 		goto err;
 	}
+
+	s = splbio();	/* XXX SMP */
 
 	if (__predict_false(
 	    sc->sc_backend_status == BLKIF_STATE_SUSPENDED)) {
@@ -968,15 +971,13 @@ xbd_diskstart(device_t self, struct buf *bp)
 		goto out;
 	}
 
-	xbdreq->req_bp = bp;
-	xbdreq->req_data = bp->b_data;
 	if ((vaddr_t)bp->b_data & (XEN_BSIZE - 1)) {
-		if (__predict_false(xbd_map_align(xbdreq) != 0)) {
-			DPRINTF(("xbd_diskstart: no align\n"));
-			error = EAGAIN;
-			goto out;
-		}
+		DPRINTF(("xbd_diskstart: no align\n"));
+		error = EINVAL;
+		goto out;
 	}
+
+	xbdreq->req_bp = bp;
 
 	SLIST_REMOVE_HEAD(&sc->sc_xbdreq_head, req_next);
 	req = RING_GET_REQUEST(&sc->sc_ring, sc->sc_ring.req_prod_pvt);
@@ -986,8 +987,8 @@ xbd_diskstart(device_t self, struct buf *bp)
 	req->sector_number = bp->b_rawblkno;
 	req->handle = sc->sc_handle;
 
-	va = (vaddr_t)xbdreq->req_data & ~PAGE_MASK;
-	off = (vaddr_t)xbdreq->req_data & PAGE_MASK;
+	va = (vaddr_t)bp->b_data & ~PAGE_MASK;
+	off = (vaddr_t)bp->b_data & PAGE_MASK;
 	bcount = bp->b_bcount;
 	bp->b_resid = 0;
 	for (seg = 0; bcount > 0;) {
@@ -1023,36 +1024,7 @@ out:
 	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&sc->sc_ring, notify);
 	if (notify)
 		hypervisor_notify_via_evtchn(sc->sc_evtchn);
+	splx(s);	/* XXXSMP */
 err:
 	return error;
-}
-
-static int
-xbd_map_align(struct xbd_req *req)
-{
-	int s = splvm(); /* XXXSMP - bogus? */
-	int rc;
-
-	rc = uvm_km_kmem_alloc(kmem_va_arena,
-	    req->req_bp->b_bcount, (VM_NOSLEEP | VM_INSTANTFIT),
-	    (vmem_addr_t *)&req->req_data);
-	splx(s);
-	if (__predict_false(rc != 0))
-		return ENOMEM;
-	if ((req->req_bp->b_flags & B_READ) == 0)
-		memcpy(req->req_data, req->req_bp->b_data,
-		    req->req_bp->b_bcount);
-	return 0;
-}
-
-static void
-xbd_unmap_align(struct xbd_req *req)
-{
-	int s;
-	if (req->req_bp->b_flags & B_READ)
-		memcpy(req->req_bp->b_data, req->req_data,
-		    req->req_bp->b_bcount);
-	s = splvm(); /* XXXSMP - bogus? */
-	uvm_km_kmem_free(kmem_va_arena, (vaddr_t)req->req_data, req->req_bp->b_bcount);
-	splx(s);
 }
