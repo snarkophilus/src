@@ -1,4 +1,4 @@
-/*	$NetBSD: boot.c,v 1.3 2018/08/26 21:28:18 jmcneill Exp $	*/
+/*	$NetBSD: boot.c,v 1.6 2018/09/07 17:30:58 jmcneill Exp $	*/
 
 /*-
  * Copyright (c) 2016 Kimihiro Nonaka <nonaka@netbsd.org>
@@ -29,6 +29,7 @@
 
 #include "efiboot.h"
 #include "efiblock.h"
+#include "efifdt.h"
 
 #include <sys/bootblock.h>
 #include <sys/boot_flag.h>
@@ -52,18 +53,21 @@ static const char * const names[][2] = {
 #define	DEFTIMEOUT	5
 
 static char default_device[32];
+static char initrd_path[255];
 
 void	command_boot(char *);
 void	command_dev(char *);
+void	command_initrd(char *);
 void	command_ls(char *);
 void	command_reset(char *);
 void	command_version(char *);
 void	command_quit(char *);
 
 const struct boot_command commands[] = {
-	{ "boot",	command_boot,		"boot [fsN:][filename] [args]\n     (ex. \"fs0:\\netbsd.old -s\"" },
+	{ "boot",	command_boot,		"boot [dev:][filename] [args]\n     (ex. \"hd0a:\\netbsd.old -s\"" },
 	{ "dev",	command_dev,		"dev" },
-	{ "ls",		command_ls,		"ls [hdNn:/path]\n" },
+	{ "initrd",	command_initrd,		"initrd [dev:][filename]" },
+	{ "ls",		command_ls,		"ls [hdNn:/path]" },
 	{ "version",	command_version,	"version" },
 	{ "help",	command_help,		"help|?" },
 	{ "?",		command_help,		NULL },
@@ -99,12 +103,20 @@ command_dev(char *arg)
 		set_default_device(arg);
 	} else {
 		efi_block_show();
+		efi_net_show();
+		efi_pxe_show();
 	}
 
 	if (strlen(default_device) > 0) {
 		printf("\n");
 		printf("default: %s\n", default_device);
 	}
+}
+
+void
+command_initrd(char *arg)
+{
+	set_initrd_path(arg);
 }
 
 void
@@ -129,6 +141,8 @@ command_version(char *arg)
 		    ST->FirmwareRevision & 0xffff);
 		FreePool(ufirmware);
 	}
+
+	efi_fdt_show();
 }
 
 void
@@ -150,6 +164,21 @@ char *
 get_default_device(void)
 {
 	return default_device;
+}
+
+int
+set_initrd_path(char *arg)
+{
+	if (strlen(arg) + 1 > sizeof(initrd_path))
+		return ERANGE;
+	strcpy(initrd_path, arg);
+	return 0;
+}
+
+char *
+get_initrd_path(void)
+{
+	return initrd_path;
 }
 
 void
