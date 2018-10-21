@@ -1,5 +1,5 @@
 #
-#	$NetBSD: GENERIC64,v 1.51 2018/10/17 00:04:06 jmcneill Exp $
+#	$NetBSD: GENERIC64,v 1.54 2018/10/21 12:26:59 jmcneill Exp $
 #
 #	GENERIC ARM (aarch64) kernel
 #
@@ -153,6 +153,7 @@ tegramc*	at fdt?	pass 4		# NVIDIA Tegra MC
 bcmmbox*	at fdt?			# Broadcom VideoCore IV mailbox
 vcmbox*		at bcmmbox?
 qemufwcfg*	at fdt?			# QEMU Firmware Configuration device
+qemufwcfg*	at acpi?
 
 # DMA controller
 bcmdmac*	at fdt?			# Broadcom BCM283x DMA controller
@@ -279,6 +280,8 @@ tcagpio*	at iic?
 
 # Random number generators
 bcmrng*		at fdt?			# Broadcom BCM283x RNG
+amdccp*		at fdt?			# AMD Cryptograhic Coprocessor RNG
+amdccp*		at acpi?
 
 # RTC
 plrtc*		at fdt?			# ARM PrimeCell RTC
@@ -382,6 +385,7 @@ midi*		at midibus?
 
 # Virtio devices
 virtio*		at fdt?			# Virtio MMIO device
+virtio*		at acpi?
 #viomb*		at virtio?		# Virtio memory balloon device
 ld*		at virtio?		# Virtio disk device
 vioif*		at virtio?		# Virtio network device
