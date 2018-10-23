@@ -1,11 +1,11 @@
-/*	$NetBSD: sched.h,v 1.12 2018/10/23 03:56:47 riastradh Exp $	*/
+/* $NetBSD: acpi_event.h,v 1.1 2018/10/22 22:29:35 jmcneill Exp $ */
 
 /*-
- * Copyright (c) 2013 The NetBSD Foundation, Inc.
+ * Copyright (c) 2018 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Taylor R. Campbell.
+ * by Jared McNeill <jmcneill@invisible.ca>.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,65 +29,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _LINUX_SCHED_H_
-#define _LINUX_SCHED_H_
+#ifndef _DEV_ACPI_ACPI_EVENT_H
+#define _DEV_ACPI_ACPI_EVENT_H
 
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/proc.h>
+struct acpi_event;
 
-#include <asm/param.h>
-#include <asm/barrier.h>
-#include <asm/processor.h>
-#include <linux/errno.h>
+ACPI_STATUS	acpi_event_create_gpio(device_t, ACPI_HANDLE,
+		    void (*)(void *, struct acpi_event *, ACPI_RESOURCE_GPIO *), void *);
+ACPI_STATUS	acpi_event_create_int(device_t, ACPI_HANDLE,
+		    void (*)(void *, struct acpi_event *, struct acpi_irq *), void *);
+ACPI_STATUS	acpi_event_notify(struct acpi_event *);
 
-#define	TASK_COMM_LEN	MAXCOMLEN
-
-#define	MAX_SCHEDULE_TIMEOUT	(INT_MAX/2)	/* paranoia */
-
-#define	current	curproc
-
-static inline pid_t
-task_pid_nr(struct proc *p)
-{
-	return p->p_pid;
-}
-
-static inline long
-schedule_timeout_uninterruptible(long timeout)
-{
-	long remain;
-	int start, end;
-
-	if (cold) {
-		unsigned us;
-		if (hz <= 1000) {
-			unsigned ms = hztoms(MIN(timeout, mstohz(INT_MAX)));
-			us = MIN(ms, INT_MAX/1000)*1000;
-		} else if (hz <= 1000000) {
-			us = MIN(timeout, (INT_MAX/1000000)/hz)*hz*1000000;
-		} else {
-			us = timeout/(1000000/hz);
-		}
-		DELAY(us);
-		return 0;
-	}
-
-	start = hardclock_ticks;
-	/* Caller is expected to loop anyway, so no harm in truncating.  */
-	(void)kpause("loonix", false /*!intr*/, MIN(timeout, INT_MAX), NULL);
-	end = hardclock_ticks;
-
-	remain = timeout - (end - start);
-	return remain > 0 ? remain : 0;
-}
-
-static inline void
-cond_resched(void)
-{
-
-	if (curcpu()->ci_schedstate.spc_flags & SPCF_SHOULDYIELD)
-		preempt();
-}
-
-#endif  /* _LINUX_SCHED_H_ */
+#endif /* !_DEV_ACPI_ACPI_EVENT_H */
