@@ -1,4 +1,4 @@
-/*	$NetBSD: socket.c,v 1.22 2018/04/07 22:23:23 christos Exp $	*/
+/*	$NetBSD: socket.c,v 1.24 2018/10/18 14:30:54 he Exp $	*/
 
 /*
  * Copyright (C) 2004-2018  Internet Systems Consortium, Inc. ("ISC")
@@ -258,6 +258,7 @@ typedef enum { poll_idle, poll_active, poll_checking } pollstate_t;
 #define SOFT_ERROR(e)	((e) == EAGAIN || \
 			 (e) == EWOULDBLOCK || \
 			 (e) == EINTR || \
+			 (e) == ENOBUFS || \
 			 (e) == 0)
 
 #define DLVL(x) ISC_LOGCATEGORY_GENERAL, ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(x)
@@ -1547,7 +1548,8 @@ build_msghdr_send(isc__socket_t *sock, isc_socketevent_t *dev,
 
 #if defined(IPV6_USE_MIN_MTU)
 	if ((sock->type == isc_sockettype_udp) &&
-	    ((dev->attributes & ISC_SOCKEVENTATTR_USEMINMTU) != 0))
+	    ((dev->attributes & ISC_SOCKEVENTATTR_USEMINMTU) != 0) &&
+	    (sock->pf == AF_INET6))
 	{
 		int use_min_mtu = 1;	/* -1, 0, 1 */
 
@@ -1920,7 +1922,7 @@ doio_recv(isc__socket_t *sock, isc_socketevent_t *dev) {
 		SOFT_OR_HARD(EHOSTDOWN, ISC_R_HOSTDOWN);
 		/* HPUX 11.11 can return EADDRNOTAVAIL. */
 		SOFT_OR_HARD(EADDRNOTAVAIL, ISC_R_ADDRNOTAVAIL);
-		ALWAYS_HARD(ENOBUFS, ISC_R_NORESOURCES);
+		SOFT_OR_HARD(ENOBUFS, ISC_R_NORESOURCES);
 		/* Should never get this one but it was seen. */
 #ifdef ENOPROTOOPT
 		SOFT_OR_HARD(ENOPROTOOPT, ISC_R_HOSTUNREACH);
@@ -2116,7 +2118,7 @@ doio_send(isc__socket_t *sock, isc_socketevent_t *dev) {
 		ALWAYS_HARD(EHOSTDOWN, ISC_R_HOSTUNREACH);
 #endif
 		ALWAYS_HARD(ENETUNREACH, ISC_R_NETUNREACH);
-		ALWAYS_HARD(ENOBUFS, ISC_R_NORESOURCES);
+		SOFT_OR_HARD(ENOBUFS, ISC_R_NORESOURCES);
 		ALWAYS_HARD(EPERM, ISC_R_HOSTUNREACH);
 		ALWAYS_HARD(EPIPE, ISC_R_NOTCONNECTED);
 		ALWAYS_HARD(ECONNRESET, ISC_R_CONNECTIONRESET);

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.155 2018/04/01 04:35:04 ryo Exp $	*/
+/*	$NetBSD: pmap.h,v 1.156 2018/10/18 09:01:52 skrll Exp $	*/
 
 /*
  * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
@@ -247,6 +247,7 @@ const struct pmap_devmap *pmap_devmap_find_va(vaddr_t, vsize_t);
 void	pmap_map_section(vaddr_t, vaddr_t, paddr_t, int, int);
 void	pmap_map_entry(vaddr_t, vaddr_t, paddr_t, int, int);
 vsize_t	pmap_map_chunk(vaddr_t, vaddr_t, paddr_t, vsize_t, int, int);
+void	pmap_unmap_chunk(vaddr_t, vaddr_t, vsize_t);
 void	pmap_link_l2pt(vaddr_t, vaddr_t, pv_addr_t *);
 void	pmap_devmap_bootstrap(vaddr_t, const struct pmap_devmap *);
 void	pmap_devmap_register(const struct pmap_devmap *);
@@ -264,6 +265,7 @@ bool	pmap_pageidlezero(paddr_t);
  * be direct mapped.
  */
 vaddr_t	pmap_direct_mapped_phys(paddr_t, bool *, vaddr_t);
+#endif
 
 /*
  * used by dumpsys to record the PA of the L1 table
@@ -280,7 +282,6 @@ extern vaddr_t	pmap_curmaxkvaddr;
  */
 extern vaddr_t pmap_directlimit;
 #endif
-
 
 
 
@@ -308,7 +309,6 @@ extern size_t cnptes;
 #define	cpu_cdstp(o)	(cdstp + (o))
 #endif
 #endif
-
 
 
 
@@ -601,8 +601,12 @@ extern void (*pmap_zero_page_func)(paddr_t);
  */
 #define	PMAP_DOMAINS		15	/* 15 'user' domains (1-15) */
 #define	PMAP_DOMAIN_KERNEL	0	/* The kernel pmap uses domain #0 */
+
 #ifdef ARM_MMU_EXTENDED
 #define	PMAP_DOMAIN_USER	1	/* User pmaps use domain #1 */
+#define	DOMAIN_DEFAULT		((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | (DOMAIN_CLIENT << (PMAP_DOMAIN_USER*2)))
+#else
+#define	DOMAIN_DEFAULT		((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)))
 #endif
 
 /*
@@ -977,7 +981,95 @@ extern paddr_t physical_start, physical_end;
 /*
  * Hooks for the pool allocator.
  */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#if 0
 #define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *pmap_md_alloc_poolpage(int);
 #define	PMAP_ALLOC_POOLPAGE	pmap_md_alloc_poolpage
@@ -988,12 +1080,23 @@ paddr_t	pmap_unmap_poolpage(vaddr_t);
 #define	PMAP_MAP_POOLPAGE(pa)	pmap_map_poolpage(pa)
 #define PMAP_UNMAP_POOLPAGE(va)	pmap_unmap_poolpage(va)
 #endif
-#endif
+
+#define __HAVE_PMAP_PV_TRACK	1
 
 void pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define PVLIST_EMPTY(md)	SLIST_EMPTY(&md->pvh_list)
 
+
+
+
+
+
+
+
+
+
+#if 0
 struct pmap_page {
 	SLIST_HEAD(,pv_entry) pvh_list;		/* pv_entry list */
 	int pvh_attrs;				/* page attributes */
@@ -1041,6 +1144,22 @@ do {									\
 	(pg)->mdpage.urw_mappings = 0;					\
 	(pg)->mdpage.k_mappings = 0;					\
 } while (/*CONSTCOND*/0)
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #ifdef ARM_MMU_EXTENDED
 #include <arm/arm32/pmap_v6n.h>
@@ -1081,7 +1200,6 @@ bool pmap_is_page_ro_p(struct pmap *pmap, vaddr_t, uint32_t);
 #define	pte_to_paddr(pte)	MIPS3_PTE_TO_PADDR((pte))
 
 #define	PAGE_IS_RDONLY(pte, va)	MIPS3_PAGE_IS_RDONLY((pte), (va))
-#endif
 
 static __inline paddr_t
 pte_to_paddr(pt_entry_t pte)
@@ -1094,6 +1212,7 @@ pte_valid_p(pt_entry_t pte)
 {
 	return l2pte_valid_p(pte);
 }
+#endif
 
 #endif /* _KERNEL */
 

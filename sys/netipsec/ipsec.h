@@ -1,4 +1,4 @@
-/*	$NetBSD: ipsec.h,v 1.79 2018/04/29 11:51:08 maxv Exp $	*/
+/*	$NetBSD: ipsec.h,v 1.83 2018/09/14 05:09:51 maxv Exp $	*/
 /*	$FreeBSD: ipsec.h,v 1.2.4.2 2004/02/14 22:23:23 bms Exp $	*/
 /*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
 
@@ -61,12 +61,6 @@ struct secpolicyindex {
 	u_int8_t prefs;			/* prefix length in bits for src */
 	u_int8_t prefd;			/* prefix length in bits for dst */
 	u_int16_t ul_proto;		/* upper layer Protocol */
-#ifdef notyet
-	uid_t uids;
-	uid_t uidd;
-	gid_t gids;
-	gid_t gidd;
-#endif
 };
 
 /* Security Policy Data Base */
@@ -262,8 +256,9 @@ void ipsec_invalpcbcacheall(void);
 
 struct inpcb;
 int ipsec4_output(struct mbuf *, struct inpcb *, int, u_long *, bool *, bool *);
-int ipsec4_input(struct mbuf *, int);
-int ipsec4_forward(struct mbuf *, int *);
+
+int ipsec_ip_input(struct mbuf *, bool);
+void ipsec_mtu(struct mbuf *, int *);
 
 struct inpcb;
 int ipsec_init_pcbpolicy(struct socket *so, struct inpcbpolicy **);
@@ -296,7 +291,7 @@ void *ah4_ctlinput(int, const struct sockaddr *, void *);
 
 void ipsec_output_init(void);
 struct m_tag;
-void ipsec4_common_input(struct mbuf *m, ...);
+void ipsec4_common_input(struct mbuf *m, int, int);
 int ipsec4_common_input_cb(struct mbuf *, struct secasvar *, int, int);
 int ipsec4_process_packet(struct mbuf *, const struct ipsecrequest *, u_long *);
 int ipsec_process_done(struct mbuf *, const struct ipsecrequest *,

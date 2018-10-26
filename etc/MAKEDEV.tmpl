@@ -1,5 +1,5 @@
 #!/bin/sh -
-#	$NetBSD: MAKEDEV.tmpl,v 1.189 2018/01/09 03:31:14 christos Exp $
+#	$NetBSD: MAKEDEV.tmpl,v 1.194 2018/09/23 09:20:57 maxv Exp $
 #
 # Copyright (c) 2003,2007,2008 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -45,7 +45,6 @@
 #	lua	Lua device
 #	wscons	make wscons devices
 #	usbs	make USB devices
-#	isdns	make ISDN devices
 #
 # Tapes:
 #	st*	SCSI tapes
@@ -187,14 +186,6 @@
 #	ttyU*	USB modems
 #	ttyY*	USB serial adapters
 #
-# ISDN devices:
-#	isdn	communication between userland isdnd and kernel
-#	isdnctl	control device
-#	isdnbchan* raw b-channel access
-#	isdntel*	telephony device
-#	isdnteld*	telephony dialout device
-#	isdntrc*	trace device
-#
 # Video devices:
 #	bwtwo*	monochromatic frame buffer
 #	cgtwo*	8-bit color frame buffer
@@ -242,6 +233,7 @@
 #	dtv*	Digital TV interface
 #	fb*	PMAX generic framebuffer pseudo-device
 #	fd	file descriptors
+#	gpiopps* 1PPS signals on GPIO pins
 #	grf*	graphics frame buffer device
 #	hdaudio* High Definition audio control device
 #	hdmicec* HDMI CEC devices
@@ -829,6 +821,7 @@ all)
 	makedev atabus0 atabus1 atabus2 atabus3 atabus4 atabus5 atabus6 atabus7
 	makedev tap tap0 tap1 tap2 tap3
 	makedev gpio gpio0 gpio1 gpio2 gpio3 gpio4 gpio5 gpio6 gpio7
+	makedev gpiopps0
 	makedev pad pad0 pad1 pad2 pad3
 	makedev bthub
 	makedev putter
@@ -843,6 +836,7 @@ all)
 	makedev dtrace
 	makedev veriexec
 	makedev autofs
+	makedev fw0 fw1 fw2 fw3
 	makedev local # do this last
 	;;
 
@@ -864,6 +858,11 @@ audio)
 gpio)
 	makedev gpio0 gpio1 gpio2 gpio3 gpio4 gpio5 gpio6 gpio7
 	lndev gpio0 gpio
+	;;
+
+gpiopps)
+	makedev gpiopps0
+	lndev gpiopps0 gpiopps
 	;;
 
 lua)
@@ -919,10 +918,6 @@ usbs)
 	makedev ugen0 ugen1 ugen2 ugen3
 	;;
 
-isdns)
-	makedev isdn isdnctl isdnbchan0 isdnbchan1 isdntel0 isdntel1 isdnteld0 isdnteld1 isdntrc0 isdntrc1
-	;;
-
 std)
 	mkdev		console c %cons_chr% 0	600
 	mkdev		constty c %cons_chr% 1	600
@@ -933,7 +928,7 @@ std)
 	mkdev		full	c %mem_chr% 11	666
 	mkdev		zero	c %mem_chr% 12	666
 	mkdev		klog	c %log_chr% 0	600
-	mkdev		ksyms	c %ksyms_chr% 0 444
+	mkdev		ksyms	c %ksyms_chr% 0 440 $g_kmem
 	mkdev		random	c %rnd_chr% 0	444
 	mkdev		urandom	c %rnd_chr% 1	644
 	if ! $fdesc_mounted; then
@@ -1535,6 +1530,11 @@ gpio[0-9]*)
 	mkdev gpio$unit c %gpio_chr% $unit 664 $g_gpio
 	;;
 
+gpiopps[0-9]*)
+	unit=${i#gpiopps}
+	mkdev gpiopps$unit c %gpiopps_chr% $unit 664 $g_gpio
+	;;
+
 lua[0-9]*)
 	unit=${i#lua}
 	mkdev lua$unit c %lua_chr% $unit 664
@@ -1709,34 +1709,6 @@ altq)
 		mkdev altq/$dev c %altq_chr% $unit 644
 		unit=$(($unit + 1))
 	done
-	;;
-
-isdn)
-	mkdev isdn c %isdn_chr% 0
-	;;
-
-isdnctl)
-	mkdev isdnctl c %isdnctl_chr% 0
-	;;
-
-isdnbchan[0-9]*)
-	unit=${i#isdnbchan}
-	mkdev isdnbchan$unit c %isdnbchan_chr% $unit
-	;;
-
-isdnteld[0-9]*)
-	unit=${i#isdnteld}
-	mkdev isdnteld$unit c %isdntel_chr% $(($unit + 64))
-	;;
-
-isdntel[0-9]*)
-	unit=${i#isdntel}
-	mkdev isdntel$unit c %isdntel_chr% $unit
-	;;
-
-isdntrc[0-9]*)
-	unit=${i#isdntrc}
-	mkdev isdntrc$unit c %isdntrc_chr% $unit
 	;;
 
 wsfont)
@@ -2216,7 +2188,7 @@ nvme[0-9]*ns[0-9]*)
 	unit=${i#nvme}
 	unit=${unit%ns*}
 	subunit=${i#nvme${unit}ns}
-	if [ 0$subunit -le 0 -o 0$subunit -ge 65536 ]; then
+	if [ 0$subunit -le 0 ] || [ 0$subunit -ge 65536 ]; then
 		warn "bad nsid for $i: $subunit"
 		break
 	fi

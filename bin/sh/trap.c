@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.41 2017/07/05 19:47:11 kre Exp $	*/
+/*	$NetBSD: trap.c,v 1.45 2018/08/19 23:50:27 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)trap.c	8.5 (Berkeley) 6/5/95";
 #else
-__RCSID("$NetBSD: trap.c,v 1.41 2017/07/05 19:47:11 kre Exp $");
+__RCSID("$NetBSD: trap.c,v 1.45 2018/08/19 23:50:27 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -324,7 +324,19 @@ clear_traps(int vforked)
 	}
 }
 
+/*
+ * See if there are any defined traps
+ */
+int
+have_traps(void)
+{
+	char **tp;
 
+	for (tp = trap ; tp < &trap[NSIG] ; tp++)
+		if (*tp && **tp)	/* trap not NULL or SIG_IGN */
+			return 1;
+	return 0;
+}
 
 /*
  * Set the signal handler for the specified signal.  The routine figures
@@ -523,9 +535,11 @@ dotrap(void)
 		savestatus=exitstatus;
 		CTRACE(DBG_TRAP|DBG_SIG, ("dotrap %d: \"%s\"\n", i,
 		    trap[i] ? trap[i] : "-NULL-"));
-		tr = savestr(trap[i]);		/* trap code may free trap[i] */
-		evalstring(tr, 0);
-		ckfree(tr);
+		if ((tr = trap[i]) != NULL) {
+			tr = savestr(tr);	/* trap code may free trap[i] */
+			evalstring(tr, 0);
+			ckfree(tr);
+		}
 		exitstatus=savestatus;
 	}
 }

@@ -1,4 +1,4 @@
-.\"	$NetBSD: sysctl.7,v 1.125 2018/04/21 12:38:17 wiz Exp $
+.\"	$NetBSD: sysctl.7,v 1.133 2018/10/06 13:53:58 wiz Exp $
 .\"
 .\" Copyright (c) 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -29,7 +29,7 @@
 .\"
 .\"	@(#)sysctl.3	8.4 (Berkeley) 5/9/95
 .\"
-.Dd February 22, 2018
+.Dd October 5, 2018
 .Dt SYSCTL 7
 .Os
 .Sh NAME
@@ -293,6 +293,7 @@ privilege may change the value.
 .It kern.domainname	string	yes
 .It kern.drivers	struct kinfo_drivers	no
 .It kern.dump_on_panic	integer	yes
+.It kern.expose_address	integer	yes
 .It kern.file	struct file	no
 .It kern.forkfsleep	integer	yes
 .It kern.fscale	integer	no
@@ -513,6 +514,16 @@ field is always a NUL terminated string.
 The
 .Va d_bmajor
 field will be set to \-1 if the driver doesn't have a block device.
+.It Li kern.expose_address
+Expose kernel addresses in
+.Xr sysctl 3
+calls used by
+.Xr fstat 1
+and
+.Xr sockstat 1 .
+Defaults to
+.Dv 0 .
+Turning it on renders KASLR ineffective.
 .It Li kern.dump_on_panic ( Dv KERN_DUMP_ON_PANIC )
 Perform a crash dump on system
 .Xr panic 9 .
@@ -1492,7 +1503,7 @@ This cannot be set to less than 1024 or greater than 65535.
 .It Li ip.checkinterface
 If set to non-zero, the host will reject packets addressed to it
 that arrive on an interface not bound to that address.
-Currently, this must be disabled if ipnat is used to translate the
+Currently, this must be disabled if NAT is used to translate the
 destination address to another local interface, or if addresses
 are added to the loopback interface instead of the interface where
 the packets for those packets are received.
@@ -2041,13 +2052,12 @@ The currently defined variable and names are:
 .It esp_auth	integer	yes
 .It ah_keymin	integer	yes
 .El
-.Pp
 The variables are as follows:
 .Bl -tag -width "123456"
 .It Li debug
 Turn on debugging message from within the kernel.
 The value is a bitmap, as defined in
-.In netkey/key_debug.h .
+.In netipsec/key_debug.h .
 .It Li enabled
 Control processing of IPsec control messages.
 .Bl -tag -width indent
@@ -2059,7 +2069,7 @@ Allow IPsec processing when SPD policies are present.
 Force IPsec processing even when SPD policies are not present.
 .El
 .It Li used
-Based on if IPsec is enabled, and SPD rule existance, show if
+Based on if IPsec is enabled, and SPD rule existence, show if
 IPsec is being used.
 Note that currently once IPsec is being used, it cannot be disabled.
 .It Li spi_try
@@ -2090,6 +2100,66 @@ on ACQUIRE PF_KEY message.
 Minimum AH key length, in bits,
 The value is used when the kernel creates proposal payload
 on ACQUIRE PF_KEY message.
+.El
+.It Li net.local ( Dv PF_LOCAL )
+Get or set various global information about
+.Dv AF_LOCAL
+type sockets.
+For some variables, the third level name is the variable name:
+.Bl -column "Variable" "integer" "Changeable" -offset indent
+.It Sy Variable	Type Ta Sy Changeable
+.It inflight	integer	no
+.It deferred	integer	no
+.El
+The variables are as follows:
+.Bl -tag -width "123456"
+.It Li inflight
+The number of file descriptors currently passed between processes,
+.Qq in flight .
+.It Li deferred
+The number of file descriptors passed between processes that have been
+deferred for cleanup by a kernel task.
+.El
+.Pp
+Other variables are specific to a socket type:
+.Bl -column "seqpacket" "sendspace" "integer" "Changeable" -offset indent
+.It Sy "Socket Type"  	Sy Variable	Type Ta Sy Changeable
+.It dgram	pcblist	struct	no
+.It dgram	recvspace	integer	yes
+.It dgram	sendspace	integer	yes
+.It seqpacket	pcblist	struct	no
+.It stream	pcblist	struct	no
+.It stream	recvspace	integer	yes
+.It stream	sendspace	integer	yes
+.El
+The variables are as follows:
+.Bl -tag -width "123456"
+.It Li dgram.pcblist
+The Protocol Control Block list structure for datagram sockets.
+Parsed by
+.Xr netstat 1
+or
+.Xr sockstat 1 .
+.It Li dgram.recvspace
+The default datagram receive buffer size.
+.It Li dgram.sendspace
+The default datagram send buffer size.
+.It Li seqpacket.pcblist
+The Protocol Control Block list structure for Sequential Packet sockets.
+Parsed by
+.Xr netstat 1
+or
+.Xr sockstat 1 .
+.It Li stream.pcblist
+The Protocol Control Block list structure for stream sockets.
+Parsed by
+.Xr netstat 1
+or
+.Xr sockstat 1 .
+.It Li stream.recvspace
+The default stream receive buffer size.
+.It Li stream.sendspace
+The default stream send buffer size.
 .El
 .El
 .Ss The proc.* subtree
@@ -2548,7 +2618,7 @@ See
 .Xr secmodel 9
 for more information.
 .It Li security.pax
-Settings for PaX -- exploit mitigation features.
+Settings for PaX \(em exploit mitigation features.
 For more information on any of the PaX features, please see
 .Xr paxctl 8
 and

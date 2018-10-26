@@ -272,6 +272,12 @@ vaddr_t memhook;			/* used by mem.c & others */
 kmutex_t memlock __cacheline_aligned;	/* used by mem.c & others */
 extern void *msgbufaddr;
 
+#ifdef VERBOSE_INIT_ARM
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
+
 #ifndef ARM_MMU_EXTENDED
 /*
  * Misc. locking data structures
@@ -714,7 +720,7 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 		     page_size = PAGE_SIZE) {
 			if (l2pte_valid_p(*ptep)) {
 				cpu_icache_sync_range(sva,
-				    min(page_size, eva - sva));
+				    uimin(page_size, eva - sva));
 			}
 		}
 	}
@@ -1234,10 +1240,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	vsize_t size;
 	int nptes, l2idx, l2next = 0;
 
-#ifdef VERBOSE_INIT_ARM
-	printf("kpm ");
-#endif
-
+	VPRINTF("kpm ");
 	/*
 	 * Initialise the kernel pmap object
 	 */
@@ -1245,9 +1248,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 	pmap_impl_bootstrap();
 
-#ifdef VERBOSE_INIT_ARM
-	printf("l1pt (%p)", l1pt);
-#endif
+	VPRINTF("l1pt (%p)", l1pt);
 	/*
 	 * Scan the L1 translation table created by initarm() and create
 	 * the required metadata for all valid mappings found in it.
@@ -1323,9 +1324,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 		}
 	}
 
-#ifdef VERBOSE_INIT_ARM
-	printf("cache(l1pt) ");
-#endif
+	VPRINTF("cache(l1pt) ");
+
 	/*
 	 * Ensure the primary (kernel) L1 has the correct cache mode for
 	 * a page table. Bitch if it is not correctly set.
@@ -1354,9 +1354,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	virtual_avail = vstart;
 	virtual_end = vend;
 
-#ifdef VERBOSE_INIT_ARM
-	printf("specials ");
-#endif
+	VPRINTF("specials ");
 #ifdef PMAP_CACHE_VIPT
 	/*
 	 * If we have a VIPT cache, we need one page/pte per possible alias
@@ -1412,7 +1410,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	if (vector_page < KERNEL_BASE) {
 		pm->pm_pl1vec = pmap_l1_kva(pm) + l1pte_index(vector_page);
 		l2b = pmap_get_l2_bucket(pm, vector_page);
-printf("%s: vector_page %#"PRIxVADDR" l2b %p\n", __func__, vector_page, l2b);
 		KDASSERT(l2b != NULL);
 		pm->pm_l1vec = l2b->l2b_pa | L1_C_PROTO |
 		    L1_C_DOM(pmap_domain(pm));
@@ -1420,9 +1417,8 @@ printf("%s: vector_page %#"PRIxVADDR" l2b %p\n", __func__, vector_page, l2b);
 		pm->pm_pl1vec = NULL;
 #endif
 
-#ifdef VERBOSE_INIT_ARM
-	printf("pools ");
-#endif
+	VPRINTF("pools ");
+
 	pmap_impl_bootstrap_pools();
 
 	/*
@@ -1510,8 +1506,7 @@ pmap_alloc_specials(vaddr_t *availp, int pages, vaddr_t *vap, pt_entry_t **ptep)
 		if (l2b == NULL)
 			panic("pmap_alloc_specials: no l2b for 0x%lx", va);
 
-		if (ptep)
-			*ptep = &l2b->l2b_kva[l2pte_index(va)];
+		*ptep = &l2b->l2b_kva[l2pte_index(va)];
 	}
 
 	*vap = va;
@@ -1607,16 +1602,6 @@ pmap_postinit(void)
 /*
  * Note that the following routines are used by board-specific initialisation
  * code to configure the initial kernel page tables.
- *
- * If ARM32_NEW_VM_LAYOUT is *not* defined, they operate on the assumption that
- * L2 page-table pages are 4KB in size and use 4 L1 slots. This mimics the
- * behaviour of the old pmap, and provides an easy migration path for
- * initial bring-up of the new pmap on existing ports. Fortunately,
- * pmap_bootstrap() compensates for this hackery. This is only a stop-gap and
- * will be deprecated.
- *
- * If ARM32_NEW_VM_LAYOUT *is* defined, these functions deal with 1KB L2 page
- * tables.
  */
 
 /*
@@ -1738,7 +1723,7 @@ pmap_link_l2pt(vaddr_t l1pt, vaddr_t va, pv_addr_t *l2pv)
 	KASSERT((va & ((L1_S_SIZE * (PAGE_SIZE / L2_T_SIZE)) - 1)) == 0);
 	KASSERT((l2pv->pv_pa & PGOFSET) == 0);
 
-	const pd_entry_t npde = L1_S_DOM(PMAP_DOMAIN_KERNEL) | L1_C_PROTO
+	const pd_entry_t npde = L1_C_DOM(PMAP_DOMAIN_KERNEL) | L1_C_PROTO
 	    | l2pv->pv_pa;
 
 	l1pte_set(pdep, npde);
@@ -1767,10 +1752,8 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 	if (l1pt == 0)
 		panic("pmap_map_chunk: no L1 table provided");
 
-#ifdef VERBOSE_INIT_ARM
-	printf("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
+	VPRINTF("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
 	    "prot=0x%x cache=%d\n", pa, va, size, resid, prot, cache);
-#endif
 
 	switch (cache) {
 	case PTE_NOCACHE:
@@ -1797,21 +1780,19 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 
 	while (resid > 0) {
 		const size_t l1slot = l1pte_index(va);
-#if (ARM_MMU_V6 + ARM_MMU_V7) > 0
+#ifdef ARM_MMU_EXTENDED
 		/* See if we can use a supersection mapping. */
 		if (L1_SS_PROTO && L1_SS_MAPPABLE_P(va, pa, resid)) {
 			/* Supersection are always domain 0 */
 			const pd_entry_t npde = L1_SS_PROTO | pa
-#ifdef ARM_MMU_EXTENDED
 			    | ((prot & VM_PROT_EXECUTE) ? 0 : L1_S_V6_XN)
 			    | (va & 0x80000000 ? 0 : L1_S_V6_nG)
-#endif
 			    | L1_S_PROT(PTE_KERNEL, prot) | f1;
-#ifdef VERBOSE_INIT_ARM
-			printf("sS");
-#endif
+			VPRINTF("sS");
 			l1pte_set(&pdep[l1slot], npde);
 			PDE_SYNC_RANGE(&pdep[l1slot], L1_SS_SIZE / L1_S_SIZE);
+//			VPRINTF("\npmap_map_chunk: pa=0x%lx va=0x%lx resid=0x%08lx "
+//			    "npdep=%p pde=0x%x\n", pa, va, resid, &pdep[l1slot], npde);
 			va += L1_SS_SIZE;
 			pa += L1_SS_SIZE;
 			resid -= L1_SS_SIZE;
@@ -1827,11 +1808,11 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 #endif
 			    | L1_S_PROT(PTE_KERNEL, prot) | f1
 			    | L1_S_DOM(PMAP_DOMAIN_KERNEL);
-#ifdef VERBOSE_INIT_ARM
-			printf("S");
-#endif
+			VPRINTF("S");
 			l1pte_set(&pdep[l1slot], npde);
 			PDE_SYNC(&pdep[l1slot]);
+//			VPRINTF("\npmap_map_chunk: pa=0x%lx va=0x%lx resid=0x%08lx "
+//			    "npdep=%p pde=0x%x\n", pa, va, resid, &pdep[l1slot], npde);
 			va += L1_S_SIZE;
 			pa += L1_S_SIZE;
 			resid -= L1_S_SIZE;
@@ -1861,9 +1842,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			    | (va & 0x80000000 ? 0 : L2_XS_nG)
 #endif
 			    | L2_L_PROT(PTE_KERNEL, prot) | f2l;
-#ifdef VERBOSE_INIT_ARM
-			printf("L");
-#endif
+			VPRINTF("L");
 			l2pte_set(ptep, npte, 0);
 			PTE_SYNC_RANGE(ptep, L2_L_SIZE / L2_S_SIZE);
 			va += L2_L_SIZE;
@@ -1872,9 +1851,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			continue;
 		}
 
-#ifdef VERBOSE_INIT_ARM
-		printf("P");
-#endif
+		VPRINTF("P");
 		/* Use a small page mapping. */
 		pt_entry_t npte = L2_S_PROTO | pa
 #ifdef ARM_MMU_EXTENDED
@@ -1891,11 +1868,29 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 		pa += PAGE_SIZE;
 		resid -= PAGE_SIZE;
 	}
-#ifdef VERBOSE_INIT_ARM
-	printf("\n");
-#endif
+	VPRINTF("\n");
 	return (size);
 }
+
+/*
+ * pmap_unmap_chunk:
+ *
+ *	Unmap a chunk of memory that was previously pmap_map_chunk
+ */
+void
+pmap_unmap_chunk(vaddr_t l1pt, vaddr_t va, vsize_t size)
+{
+	pd_entry_t * const pdep = (pd_entry_t *) l1pt;
+	const size_t l1slot = l1pte_index(va);
+
+	KASSERT(size == L1_SS_SIZE || size == L1_S_SIZE);
+
+	l1pte_set(&pdep[l1slot], 0);
+	PDE_SYNC_RANGE(&pdep[l1slot], size / L1_S_SIZE);
+
+	cpu_tlb_flushD_SE(va);
+}
+
 
 /********************** Static device map routines ***************************/
 
@@ -1926,18 +1921,17 @@ pmap_devmap_bootstrap(vaddr_t l1pt, const struct pmap_devmap *table)
 	pmap_devmap_table = table;
 
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
-#ifdef VERBOSE_INIT_ARM
-		printf("devmap: %08lx -> %08lx @ %08lx\n",
-		    pmap_devmap_table[i].pd_pa,
-		    pmap_devmap_table[i].pd_pa +
-			pmap_devmap_table[i].pd_size - 1,
-		    pmap_devmap_table[i].pd_va);
-#endif
-		pmap_map_chunk(l1pt, pmap_devmap_table[i].pd_va,
-		    pmap_devmap_table[i].pd_pa,
-		    pmap_devmap_table[i].pd_size,
-		    pmap_devmap_table[i].pd_prot,
-		    pmap_devmap_table[i].pd_cache);
+		const struct pmap_devmap *pdp = &pmap_devmap_table[i];
+
+		KASSERTMSG(VADDR_MAX - pdp->pd_va >= pdp->pd_size - 1, "va %" PRIxVADDR
+		    " sz %" PRIxPSIZE, pdp->pd_va, pdp->pd_size);
+		KASSERTMSG(PADDR_MAX - pdp->pd_pa >= pdp->pd_size - 1, "pa %" PRIxPADDR
+		    " sz %" PRIxPSIZE, pdp->pd_pa, pdp->pd_size);
+		VPRINTF("devmap: %08lx -> %08lx @ %08lx\n", pdp->pd_pa,
+		    pdp->pd_pa + pdp->pd_size - 1, pdp->pd_va);
+
+		pmap_map_chunk(l1pt, pdp->pd_va, pdp->pd_pa, pdp->pd_size,
+		    pdp->pd_prot, pdp->pd_cache);
 	}
 }
 
@@ -2788,20 +2782,16 @@ SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
 
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *
-pmap_md_alloc_poolpage(int flags)
+arm_pmap_md_alloc_poolpage(int flags)
 {
 	/*
 	 * On some systems, only some pages may be "coherent" for dma and we
 	 * want to prefer those for pool pages (think mbufs) but fallback to
-	 * any page if none is available.  But we can only fallback if we
-	 * aren't direct mapping memory or all of memory can be direct-mapped.
-	 * If that isn't true, pool changes can only come from direct-mapped
-	 * memory.
+	 * any page if none is available.
 	 */
 	if (arm_poolpage_vmfreelist != VM_FREELIST_DEFAULT) {
 		return uvm_pagealloc_strat(NULL, 0, NULL, flags,
-		    UVM_PGA_STRAT_FALLBACK,
-		    arm_poolpage_vmfreelist);
+		    UVM_PGA_STRAT_FALLBACK, arm_poolpage_vmfreelist);
 	}
 
 	return uvm_pagealloc(NULL, 0, NULL, flags);

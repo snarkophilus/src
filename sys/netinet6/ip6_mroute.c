@@ -1,4 +1,4 @@
-/*	$NetBSD: ip6_mroute.c,v 1.126 2018/04/29 07:05:13 maxv Exp $	*/
+/*	$NetBSD: ip6_mroute.c,v 1.129 2018/06/21 10:37:50 knakahara Exp $	*/
 /*	$KAME: ip6_mroute.c,v 1.49 2001/07/25 09:21:18 jinmei Exp $	*/
 
 /*
@@ -117,7 +117,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip6_mroute.c,v 1.126 2018/04/29 07:05:13 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip6_mroute.c,v 1.129 2018/06/21 10:37:50 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -155,8 +155,6 @@ __KERNEL_RCSID(0, "$NetBSD: ip6_mroute.c,v 1.126 2018/04/29 07:05:13 maxv Exp $"
 #include <netinet6/pim6.h>
 #include <netinet6/pim6_var.h>
 #include <netinet6/nd6.h>
-
-#include <net/net_osdep.h>
 
 static int ip6_mdq(struct mbuf *, struct ifnet *, struct mf6c *);
 static void phyint_send(struct ip6_hdr *, struct mif6 *, struct mbuf *);
@@ -687,10 +685,6 @@ add_m6if(struct mif6ctl *mifcp)
 	s = splsoftnet();
 	mifp->m6_flags     = mifcp->mif6c_flags;
 	mifp->m6_ifp       = ifp;
-#ifdef notyet
-	/* scaling up here allows division by 1024 in critical code */
-	mifp->m6_rate_limit = mifcp->mif6c_rate_limit * 1024 / 1000;
-#endif
 	/* initialize per mif pkt counters */
 	mifp->m6_pkt_in    = 0;
 	mifp->m6_pkt_out   = 0;
@@ -1937,6 +1931,11 @@ pim6_input(struct mbuf **mp, int *offp, int proto)
 	 * encapsulated ip6 header.
 	 */
 pim6_input_to_daemon:
+	/*
+	 * Currently, rip6_input() is always called holding softnet_lock
+	 * by ipintr()(!NET_MPSAFE) or PR_INPUT_WRAP()(NET_MPSAFE).
+	 */
+	KASSERT(mutex_owned(softnet_lock));
 	rip6_input(&m, offp, proto);
 	return IPPROTO_DONE;
 }

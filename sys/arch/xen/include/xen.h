@@ -1,4 +1,4 @@
-/*	$NetBSD: xen.h,v 1.37 2016/07/07 06:55:40 msaitoh Exp $	*/
+/*	$NetBSD: xen.h,v 1.41 2018/10/10 04:16:58 cherry Exp $	*/
 
 /*
  *
@@ -44,7 +44,7 @@ struct xen_netinfo {
 };
 
 union xen_cmdline_parseinfo {
-	char			xcp_bootdev[16]; /* sizeof(dv_xname) */
+	char			xcp_bootdev[144];
 	struct xen_netinfo	xcp_netinfo;
 	char			xcp_console[16];
 	char			xcp_pcidevs[64];
@@ -75,12 +75,8 @@ void	idle_block(void);
 /* xen_machdep.c */
 void	sysctl_xen_suspend_setup(void);
 
-#if defined(XENDEBUG) || 1 /* XXX */
 #include <sys/stdarg.h>
-
 void printk(const char *, ...);
-void vprintk(const char *, va_list);
-#endif
 
 #endif
 
@@ -252,7 +248,7 @@ xen_atomic_clearbits_l (volatile XATOMIC_T *ptr, unsigned long bits) {
 static __inline XATOMIC_T
 xen_atomic_test_and_clear_bit(volatile void *ptr, unsigned long bitno)
 {
-	int result;
+	long result;
 
 	__asm volatile(__LOCK_PREFIX
 #ifdef __x86_64__

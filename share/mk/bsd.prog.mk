@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.prog.mk,v 1.312 2018/03/11 09:56:44 mrg Exp $
+#	$NetBSD: bsd.prog.mk,v 1.318 2018/08/12 11:50:51 christos Exp $
 #	@(#)bsd.prog.mk	8.2 (Berkeley) 4/2/94
 
 .ifndef HOSTPROG
@@ -6,6 +6,19 @@
 .include <bsd.init.mk>
 .include <bsd.shlib.mk>
 .include <bsd.gcc.mk>
+
+##### Sanitizer specific flags.
+
+CFLAGS+=	${SANITIZERFLAGS} ${LIBCSANITIZERFLAGS}
+CXXFLAGS+=	${SANITIZERFLAGS} ${LIBCSANITIZERFLAGS}
+LDFLAGS+=	${SANITIZERFLAGS}
+
+# Rename the local function definitions to not conflict with libc/rt/pthread/m.
+.if ${MKSANITIZER:Uno} == "yes" && defined(SANITIZER_RENAME_SYMBOL)
+.	for _symbol in ${SANITIZER_RENAME_SYMBOL}
+CPPFLAGS+=	-D${_symbol}=__mksanitizer_${_symbol}
+.	endfor
+.endif
 
 #
 # Definitions and targets shared among all programs built by a single
@@ -99,7 +112,7 @@ LIBCRTI=	${DESTDIR}/usr/lib/${MLIBDIR:D${MLIBDIR}/}crti.o
 #	etc..
 #	NB:	If you are a library here, add it in bsd.README
 
-.for _lib in \
+_LIBLIST=\
 	archive \
 	asn1 \
 	atf_c \
@@ -121,8 +134,10 @@ LIBCRTI=	${DESTDIR}/usr/lib/${MLIBDIR:D${MLIBDIR}/}crti.o
 	dns \
 	edit \
 	event \
-	expat \
+	event_openssl \
+	event_pthreads \
 	execinfo \
+	expat \
 	fetch \
 	fl \
 	form \
@@ -149,22 +164,24 @@ LIBCRTI=	${DESTDIR}/usr/lib/${MLIBDIR:D${MLIBDIR}/}crti.o
 	ldap \
 	ldap_r \
 	lua \
-	lwres \
+	lutok \
 	m \
 	magic \
 	menu \
 	netpgpverify \
+	ns \
 	objc \
 	ossaudio \
+	panel \
 	pam \
 	pcap \
 	pci \
-	pmc \
 	posix \
 	pthread \
 	puffs \
 	quota \
 	radius \
+	refuse \
 	resolv \
 	rmt \
 	roken \
@@ -193,8 +210,8 @@ LIBCRTI=	${DESTDIR}/usr/lib/${MLIBDIR:D${MLIBDIR}/}crti.o
 	ssh \
 	ssl \
 	ssp \
-	stdcxx \
-	supcxx \
+	stdc++ \
+	supc++ \
 	terminfo \
 	tre \
 	unbound \
@@ -204,6 +221,8 @@ LIBCRTI=	${DESTDIR}/usr/lib/${MLIBDIR:D${MLIBDIR}/}crti.o
 	wrap \
 	y \
 	z 
+
+.for _lib in ${_LIBLIST}
 .ifndef LIB${_lib:tu}
 LIB${_lib:tu}=	${DESTDIR}/usr/lib/lib${_lib:S/xx/++/:S/atf_c/atf-c/}.a
 .MADE:		${LIB${_lib:tu}}	# Note: ${DESTDIR} will be expanded
@@ -462,7 +481,10 @@ PAXCTL_FLAGS.${_P}?= ${PAXCTL_FLAGS}
 _DPADD.${_P}=		${DPADD}    ${DPADD.${_P}}
 _LDADD.${_P}=		${LDADD}    ${LDADD.${_P}}
 _LDFLAGS.${_P}=		${LDFLAGS}  ${LDFLAGS.${_P}}
+.if ${MKSANITIZER} != "yes"
+# Sanitizers don't support static build.
 _LDSTATIC.${_P}=	${LDSTATIC} ${LDSTATIC.${_P}}
+.endif
 
 ##### Build and install rules
 .if !empty(_APPEND_SRCS:M[Yy][Ee][Ss])

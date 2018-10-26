@@ -1,4 +1,4 @@
-/*      $NetBSD: pciback.c,v 1.12 2017/07/16 06:14:24 cherry Exp $      */
+/*      $NetBSD: pciback.c,v 1.15 2018/10/08 05:42:44 cherry Exp $      */
 
 /*
  * Copyright (c) 2009 Manuel Bouyer.
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pciback.c,v 1.12 2017/07/16 06:14:24 cherry Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pciback.c,v 1.15 2018/10/08 05:42:44 cherry Exp $");
 
 #include "opt_xen.h"
 
@@ -79,7 +79,8 @@ struct pciback_pci_dev {
 };
 
 /* list of devices we want to match */
-SLIST_HEAD(pciback_pci_devlist, pciback_pci_dev) pciback_pci_devlist_head  =
+static SLIST_HEAD(pciback_pci_devlist, pciback_pci_dev)
+    pciback_pci_devlist_head  =
     SLIST_HEAD_INITIALIZER(pciback_pci_devlist_head);
 	
 /* PCI-related functions and definitions  */
@@ -128,7 +129,7 @@ static const struct kernfs_fileop pciback_dev_fileops[] = {
 static int  pciback_xenbus_create(struct xenbus_device *);
 static int  pciback_xenbus_destroy(void *);
 static void pciback_xenbus_frontend_changed(void *, XenbusState);
-static struct pb_xenbus_instance * pbxif_lookup(domid_t);
+static bool pbxif_lookup(domid_t);
 static void pciback_xenbus_export_device(struct pb_xenbus_instance *, char *);
 static void pciback_xenbus_export_roots(struct pb_xenbus_instance *);
 
@@ -187,12 +188,14 @@ struct pb_xenbus_instance {
 	struct pciback_pci_devlist pbx_pb_pci_dev; /* list of exported PCI devices */
 	/* communication with the domU */
         unsigned int pbx_evtchn; /* our even channel */
+	struct intrhand *pbx_ih;
         struct xen_pci_sharedinfo *pbx_sh_info;
         struct xen_pci_op op;
         grant_handle_t pbx_shinfo_handle; /* to unmap shared page */
 };
 
-SLIST_HEAD(, pb_xenbus_instance) pb_xenbus_instances;
+static SLIST_HEAD(, pb_xenbus_instance) pb_xenbus_instances;
+static kmutex_t pb_xenbus_lock;
 
 static struct xenbus_backend_driver pci_backend_driver = {
         .xbakd_create = pciback_xenbus_create,
@@ -351,6 +354,7 @@ static struct pciback_pci_dev*
 pciback_pci_lookup(u_int bus, u_int dev, u_int func)
 {
 	struct pciback_pci_dev *pbd;
+	/* Safe without lock, only written during init */
 	SLIST_FOREACH(pbd, &pciback_pci_devlist_head, pb_devlist_next) {
 		if (pbd->pb_bus == bus &&
 		    pbd->pb_device == dev &&
@@ -374,7 +378,7 @@ pciback_pci_init(void)
 	if (strlen(xi.xcp_pcidevs) == 0)
 		return;
 	pcidevs = xi.xcp_pcidevs;
-	for(pcidevs = xi.xcp_pcidevs; *pcidevs != '\0';) {
+	for (pcidevs = xi.xcp_pcidevs; *pcidevs != '\0';) {
 		if (*pcidevs != '(')
 			goto error;
 		pcidevs++;
@@ -384,12 +388,7 @@ pciback_pci_init(void)
 			goto error;
 		*c = '\0';
 		if (pciback_parse_pci(pcidevs, &bus, &dev, &func) == 0) {
-			pb = malloc(sizeof(struct pciback_pci_dev), M_DEVBUF,
-			    M_NOWAIT | M_ZERO);
-			if (pb == NULL) {
-				aprint_error("pciback_pci_init: out or memory\n");
-				return;
-			}
+			pb = kmem_zalloc(sizeof(*pb), KM_SLEEP);
 			pb->pb_bus = bus;
 			pb->pb_device = dev;
 			pb->pb_function = func;
@@ -400,6 +399,10 @@ pciback_pci_init(void)
 		}
 		pcidevs = c + 1;
 	}
+
+	SLIST_INIT(&pb_xenbus_instances);
+	mutex_init(&pb_xenbus_lock, MUTEX_DEFAULT, IPL_NONE);
+
 	xenbus_backend_register(&pci_backend_driver);
 
 	KERNFS_ALLOCENTRY(dkt, M_TEMP, M_WAITOK);
@@ -459,14 +462,10 @@ pciback_xenbus_create(struct xenbus_device *xbusd)
 		return err;
 	}
 
-	if (pbxif_lookup(domid) != NULL) {
+	if (pbxif_lookup(domid)) {
 		return EEXIST;
 	}
-	pbxi = malloc(sizeof(struct pb_xenbus_instance), M_DEVBUF,
-	    M_NOWAIT | M_ZERO);
-	if (pbxi == NULL) {
-		return ENOMEM;
-	}
+	pbxi = kmem_zalloc(sizeof(*pbxi), KM_SLEEP);
 	pbxi->pbx_domid = domid;
 
 	xbusd->xbusd_u.b.b_cookie = pbxi;
@@ -475,7 +474,9 @@ pciback_xenbus_create(struct xenbus_device *xbusd)
 
 	SLIST_INIT(&pbxi->pbx_pb_pci_dev);
 
+	mutex_enter(&pb_xenbus_lock);
 	SLIST_INSERT_HEAD(&pb_xenbus_instances, pbxi, pbx_next);
+	mutex_exit(&pb_xenbus_lock);
 
 	xbusd->xbusd_otherend_changed = pciback_xenbus_frontend_changed;
 
@@ -511,7 +512,7 @@ pciback_xenbus_create(struct xenbus_device *xbusd)
 
 	return 0;
 fail:
-	free(pbxi, M_DEVBUF);
+	kmem_free(pbxi, sizeof(*pbxi));
 	return err;
 }
 
@@ -524,11 +525,11 @@ pciback_xenbus_destroy(void *arg)
 	int err;
 
 	hypervisor_mask_event(pbxi->pbx_evtchn);
-	event_remove_handler(pbxi->pbx_evtchn,
-	    pciback_xenbus_evthandler, pbxi);
-
+	intr_disestablish(pbxi->pbx_ih);
+	mutex_enter(&pb_xenbus_lock);
 	SLIST_REMOVE(&pb_xenbus_instances,
 	    pbxi, pb_xenbus_instance, pbx_next);
+	mutex_exit(&pb_xenbus_lock);
 
 	if (pbxi->pbx_sh_info) {
 		op.host_addr = (vaddr_t)pbxi->pbx_sh_info;
@@ -545,7 +546,7 @@ pciback_xenbus_destroy(void *arg)
 	}
 	uvm_km_free(kernel_map, (vaddr_t)pbxi->pbx_sh_info,
 	    PAGE_SIZE, UVM_KMF_VAONLY);
-	free(pbxi, M_DEVBUF);
+	kmem_free(pbxi, sizeof(*pbxi));
 	return 0;
 }
 
@@ -618,8 +619,9 @@ pciback_xenbus_frontend_changed(void *arg, XenbusState new_state)
 		x86_sfence();
 		xenbus_switch_state(xbusd, NULL, XenbusStateConnected);
 		x86_sfence();
-		event_set_handler(pbxi->pbx_evtchn, pciback_xenbus_evthandler,
-		    pbxi, IPL_BIO, "pciback");
+		pbxi->pbx_ih = intr_establish_xname(0, &xen_pic, pbxi->pbx_evtchn, IST_LEVEL, IPL_BIO,
+		    pciback_xenbus_evthandler, pbxi, true, "pciback");
+		KASSERT(pbxi->pbx_ih != NULL);
 		hypervisor_enable_event(pbxi->pbx_evtchn);
 		hypervisor_notify_via_evtchn(pbxi->pbx_evtchn);
 		break;
@@ -645,16 +647,22 @@ err1:
 }
 
 /* lookup a pbxi based on domain id and interface handle */
-static struct pb_xenbus_instance *
+static bool
 pbxif_lookup(domid_t dom)
 {
 	struct pb_xenbus_instance *pbxi;
+	bool found = false;
 
+	mutex_enter(&pb_xenbus_lock);
 	SLIST_FOREACH(pbxi, &pb_xenbus_instances, pbx_next) {
-		if (pbxi->pbx_domid == dom)
-			return pbxi;
+		if (pbxi->pbx_domid == dom) {
+			found = true;
+			break;
+		}
 	}
-	return NULL;
+	mutex_exit(&pb_xenbus_lock);
+
+	return found;
 }
 
 static void

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.6 2010/01/16 16:10:39 roy Exp $
+#	$NetBSD: Makefile,v 1.8 2018/09/23 08:26:00 maxv Exp $
 
 SUBDIR+=man-adosfs-catman
 SUBDIR+=man-adosfs-man
@@ -24,8 +24,6 @@ SUBDIR+=man-cxx-info
 SUBDIR+=man-debug-catman
 SUBDIR+=man-debug-info
 SUBDIR+=man-debug-man
-SUBDIR+=man-dhclient-catman
-SUBDIR+=man-dhclient-man
 SUBDIR+=man-dhcpd-catman
 SUBDIR+=man-dhcpd-man
 SUBDIR+=man-ext2fs-catman
@@ -45,8 +43,6 @@ SUBDIR+=man-hesiod-man
 SUBDIR+=man-info-share
 SUBDIR+=man-ipf-catman
 SUBDIR+=man-ipf-man
-SUBDIR+=man-isdn-catman
-SUBDIR+=man-isdn-man
 SUBDIR+=man-krb5-catman
 SUBDIR+=man-krb5-info
 SUBDIR+=man-krb5-man

@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_exec.c,v 1.457 2018/04/27 18:33:24 christos Exp $	*/
+/*	$NetBSD: kern_exec.c,v 1.461 2018/09/03 16:29:35 riastradh Exp $	*/
 
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -59,7 +59,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_exec.c,v 1.457 2018/04/27 18:33:24 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_exec.c,v 1.461 2018/09/03 16:29:35 riastradh Exp $");
 
 #include "opt_exec.h"
 #include "opt_execfmt.h"
@@ -209,6 +209,7 @@ struct emul emul_netbsd = {
 	.e_sc_autoload =	netbsd_syscalls_autoload,
 #endif
 	.e_sysent =		sysent,
+	.e_nomodbits =		sysent_nomodbits,
 #ifdef SYSCALL_DEBUG
 	.e_syscallnames =	syscallnames,
 #else
@@ -216,7 +217,6 @@ struct emul emul_netbsd = {
 #endif
 	.e_sendsig =		sendsig,
 	.e_trapsignal =		trapsignal,
-	.e_tracesig =		NULL,
 	.e_sigcode =		NULL,
 	.e_esigcode =		NULL,
 	.e_sigobject =		NULL,
@@ -1270,13 +1270,15 @@ execve_runproc(struct lwp *l, struct execve_data * restrict data,
 	mutex_enter(proc_lock);
 
 	if ((p->p_slflag & (PSL_TRACED|PSL_SYSCALL)) == PSL_TRACED) {
-		ksiginfo_t ksi;
-
-		KSI_INIT_EMPTY(&ksi);
-		ksi.ksi_signo = SIGTRAP;
-		ksi.ksi_code = TRAP_EXEC;
-		ksi.ksi_lid = l->l_lid;
-		kpsignal(p, &ksi, NULL);
+		mutex_enter(p->p_lock);
+		p->p_xsig = SIGTRAP;
+		p->p_sigctx.ps_faked = true; // XXX
+		p->p_sigctx.ps_info._signo = p->p_xsig;
+		p->p_sigctx.ps_info._code = TRAP_EXEC;
+		sigswitch(0, SIGTRAP, false);
+		// XXX ktrpoint(KTR_PSIG)
+		mutex_exit(p->p_lock);
+		mutex_enter(proc_lock);
 	}
 
 	if (p->p_sflag & PS_STOPEXEC) {
@@ -2627,7 +2629,7 @@ sys_posix_spawn(struct lwp *l1, const struct sys_posix_spawn_args *uap,
 
 	/* copy in file_actions struct */
 	if (SCARG(uap, file_actions) != NULL) {
-		max_fileactions = 2 * min(p->p_rlimit[RLIMIT_NOFILE].rlim_cur,
+		max_fileactions = 2 * uimin(p->p_rlimit[RLIMIT_NOFILE].rlim_cur,
 		    maxfiles);
 		error = posix_spawn_fa_alloc(&fa, SCARG(uap, file_actions),
 		    max_fileactions);

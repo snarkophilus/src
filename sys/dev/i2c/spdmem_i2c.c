@@ -1,4 +1,4 @@
-/* $NetBSD: spdmem_i2c.c,v 1.14 2018/03/01 05:47:22 pgoyette Exp $ */
+/* $NetBSD: spdmem_i2c.c,v 1.17 2018/10/20 03:23:05 macallan Exp $ */
 
 /*
  * Copyright (c) 2007 Nicolas Joly
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: spdmem_i2c.c,v 1.14 2018/03/01 05:47:22 pgoyette Exp $");
+__KERNEL_RCSID(0, "$NetBSD: spdmem_i2c.c,v 1.17 2018/10/20 03:23:05 macallan Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -172,11 +172,30 @@ error:
 	return rv;
 }
 
+static const struct device_compatible_entry compat_data[] = {
+	{ "atmel,spd",	 0 },
+	{ "i2c-at34c02", 0 },
+	{ NULL,		 0 }
+};
+
 static int
 spdmem_i2c_match(device_t parent, cfdata_t match, void *aux)
 {
 	struct i2c_attach_args *ia = aux;
 	struct spdmem_i2c_softc sc;
+	int match_result;
+
+	if (iic_use_direct_match(ia, match, compat_data, &match_result))
+		return match_result;
+
+	/*
+	 * XXXJRT
+	 * Should do this with "compatible" strings.  There are also
+	 * other problems with this "match" routine.  Specifically, if
+	 * we are doing direct-config, we know the device is already
+	 * there aren't do need to probe.  I'll leave the logic for
+	 * now and let someone who knows better clean it later.
+	 */
 
 	if (ia->ia_name) {
 		/* add other names as we find more firmware variations */
@@ -201,7 +220,11 @@ spdmem_i2c_match(device_t parent, cfdata_t match, void *aux)
 	if (spdmem_reset_page(&sc) != 0)
 		return 0;
 
-	return spdmem_common_probe(&sc.sc_base);
+	if (spdmem_common_probe(&sc.sc_base)) {
+		return ia->ia_name ? I2C_MATCH_DIRECT_SPECIFIC
+				   : I2C_MATCH_ADDRESS_AND_PROBE;
+	}
+	return 0;
 }
 
 static void

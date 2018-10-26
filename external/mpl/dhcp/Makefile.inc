@@ -1,4 +1,4 @@
-# $NetBSD: Makefile.inc,v 1.1 2018/04/07 22:31:36 christos Exp $
+# $NetBSD: Makefile.inc,v 1.4 2018/08/12 15:39:22 christos Exp $
 
 WARNS?=	1	# XXX -Wshadow -Wcast-qual -Wsign-compare
 
@@ -30,24 +30,28 @@ CPPFLAGS+= -I${BIND}/lib/${dir}/pthreads/include
 CPPFLAGS+= -DLOCALSTATEDIR='"/var"'
 LDADD+= ${COBJDIR}/libdhcp.a
 LDADD+= ${OMOBJDIR}/libomapi.a
-.if defined(PROG) && ${PROG} == "dhclient"
+.if defined(PROG) && ${PROG} == "dhclient" && ${MKSANITIZER:Uno} != "yes"
+# We link the libraries that are in /usr/lib and not in /lib statically
+# because dhclient is in /sbin and is needed before /usr is mounted in
+# some configurations with a split / and /usr. Another way to fix this,
+# would be to install the libraries in /lib...
 LDADD+=-Wl,-Bstatic
 .endif
 LDADD+= -lirs -lisccfg -ldns -lisc
-LDADD+=-lpthread
+LDADD+=-lpthread -lz
 .if (${MKKERBEROS} != "no")
 LDADD+= -lgssapi -lheimntlm ${LIBKRB5_LDADD} ${LIBKRB5_STATIC_LDADD}
 DPADD+= ${LIBKRB5_DPADD} ${LIBHEIMNTLM} ${LIBGSSAPI} ${LIBKRB5_STATIC_DPADD}
 .endif
-.if defined(PROG) && ${PROG} == "dhclient"
+.if defined(PROG) && ${PROG} == "dhclient" && ${MKSANITIZER:Uno} != "yes"
 LDADD+=-Wl,-Bdynamic
 .endif
 LDADD+= -lcrypto -lipsec -lcrypt
 DPADD+= ${LIBCRYPTO} ${LIBIPSEC} ${LIBCRYPT}
-.if defined(PROG) && ${PROG} == "dhclient"
+.if defined(PROG) && ${PROG} == "dhclient" && ${MKSANITIZER:Uno} != "yes"
 LDADD+=-Wl,-Bdynamic
 .endif
 DPADD+= ${COBJDIR}/libdhcp.a
 DPADD+= ${OMOBJDIR}/libomapi.a
 DPADD+=	${LIBDNS} ${LIBISC}
-DPADD+= ${LIBPTHREAD}
+DPADD+= ${LIBPTHREAD} ${LIBZ}

@@ -317,15 +317,15 @@ footbridge_pci_intr_string(void *pcv, pci_intr_handle_t ih, char *buf, size_t le
 	printf("footbridge_pci_intr_string(pcv=%p, ih=0x%lx)\n", pcv, ih);
 #endif
 	if (ih == 0)
-		panic("footbridge_pci_intr_string: bogus handle 0x%lx", ih);
+		panic("footbridge_pci_intr_string: bogus handle 0x%llx", ih);
 
 #if NISA > 0
 	if (ih >= 0x80 && ih <= 0x8f) {
-		snprintf(buf, len, "isairq %ld", (ih & 0x0f));
+		snprintf(buf, len, "isairq %lld", (ih & 0x0f));
 		return buf;
 	}
 #endif
-	snprintf(buf, len, "irq %ld", ih);
+	snprintf(buf, len, "irq %lld", ih);
 	return buf;	
 }
 

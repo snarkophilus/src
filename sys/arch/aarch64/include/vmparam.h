@@ -1,4 +1,4 @@
-/* $NetBSD: vmparam.h,v 1.3 2018/04/01 04:35:03 ryo Exp $ */
+/* $NetBSD: vmparam.h,v 1.7 2018/10/12 01:28:58 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -35,6 +35,11 @@
 #ifdef __aarch64__
 
 #define	__USE_TOPDOWN_VM
+
+/*
+ * Default pager_map of 16MB is small and we have plenty of VA to burn.
+ */
+#define	PAGER_MAP_DEFAULT_SIZE	(512 * 1024 * 1024)
 
 /*
  * AARCH64 supports 3 page sizes: 4KB, 16KB, 64KB.  Each page table can
@@ -92,7 +97,7 @@
 #endif
 
 #ifndef	MAXDSIZ32
-#define	MAXDSIZ32	(1536*1024*1024)	/* max data size */
+#define	MAXDSIZ32	(3U*1024*1024*1024)	/* max data size */
 #endif
 
 #ifndef	MAXSSIZ32
@@ -111,7 +116,7 @@
 #define	VM_MAXUSER_ADDRESS	((vaddr_t) (1L << 48) - PAGE_SIZE)
 #define	VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 
-#define VM_MAXUSER_ADDRESS32	((vaddr_t) 0x7ffff000)
+#define VM_MAXUSER_ADDRESS32	((vaddr_t) 0xfffff000)
 
 /*
  * Give ourselves 64GB of mappable kernel space.  That leaves the rest
@@ -126,10 +131,16 @@
  * see also aarch64/pmap.c:pmap_devmap_*
  */
 #define VM_KERNEL_IO_ADDRESS	0xfffffffff0000000L
+#define VM_KERNEL_IO_SIZE	(VM_MAX_KERNEL_ADDRESS - VM_KERNEL_IO_ADDRESS)
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define USRIOSIZE		(PAGE_SIZE / 8)
 #define VM_PHYS_SIZE		(USRIOSIZE * PAGE_SIZE)
+
+#define VM_DEFAULT_ADDRESS32_TOPDOWN(da, sz) \
+	trunc_page(USRSTACK32 - MAXSSIZ32 - (sz) - user_stack_guard_size)
+#define VM_DEFAULT_ADDRESS32_BOTTOMUP(da, sz) \
+	round_page((vaddr_t)(da) + (vsize_t)MAXDSIZ32)
 
 /*
  * Since we have the address space, we map all of physical memory (RAM)
@@ -145,7 +156,7 @@
 #define AARCH64_KVA_TO_PA(va)	((paddr_t) ((va) & ~AARCH64_KSEG_MASK))
 
 /* */
-#define VM_PHYSSEG_MAX		16              /* XXX */
+#define VM_PHYSSEG_MAX		64              /* XXX */
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
 
 #define VM_NFREELIST		3

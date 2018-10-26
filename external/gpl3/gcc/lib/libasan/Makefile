@@ -1,13 +1,14 @@
-# $NetBSD: Makefile,v 1.22 2018/04/02 22:35:26 mrg Exp $
+# $NetBSD: Makefile,v 1.26 2018/07/01 17:41:49 christos Exp $
 
 UNSUPPORTED_COMPILER.clang=	# defined
+NOSANITIZER=	# defined
 
 .include <bsd.own.mk>
 
 .include "../Makefile.inc"
 .include "../Makefile.sanitizer"
 
-.PATH: ${SANITIZER}/asan
+.PATH: ${SANITIZER}/asan ${SANITIZER}/lsan
 
 ASAN_SRCS= \
 asan_activation.cc \
@@ -36,15 +37,12 @@ asan_win_dll_thunk.cc \
 asan_win_dynamic_runtime_thunk.cc
 
 LIB=	asan
-SRCS+=	${ASAN_SRCS}
+SRCS+=	${ASAN_SRCS} lsan_common.cc lsan_common_linux.cc
 LIBDPLIBS+= rt ${NETBSDSRCDIR}/lib/librt
 
 .if ${MACHINE_ARCH} == "vax"
 COPTS.asan_allocator.cc += -O1
 COPTS.asan_report.cc += -O1
-COPTS.sanitizer_common.cc += -O1
-COPTS.sanitizer_common_libcdep.cc += -O1
-COPTS.sanitizer_posix.cc += -O1
 COPTS.ubsan_diag.cc += -O1
 COPTS.ubsan_init.cc += -O1
 .endif

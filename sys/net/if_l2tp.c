@@ -1,4 +1,4 @@
-/*	$NetBSD: if_l2tp.c,v 1.24 2018/04/27 09:55:27 knakahara Exp $	*/
+/*	$NetBSD: if_l2tp.c,v 1.30 2018/10/19 00:12:56 knakahara Exp $	*/
 
 /*
  * Copyright (c) 2017 Internet Initiative Japan Inc.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_l2tp.c,v 1.24 2018/04/27 09:55:27 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_l2tp.c,v 1.30 2018/10/19 00:12:56 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -91,9 +91,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_l2tp.c,v 1.24 2018/04/27 09:55:27 knakahara Exp $
 #ifdef IP_TCPMSS
 #include <netinet/ip_tcpmss.h>
 #endif
-
-#include <net/bpf.h>
-#include <net/net_osdep.h>
 
 /*
  * l2tp global variable definitions
@@ -246,6 +243,7 @@ l2tp_clone_create(struct if_clone *ifc, int unit)
 
 	sc->l2tp_var = var;
 	mutex_init(&sc->l2tp_lock, MUTEX_DEFAULT, IPL_NONE);
+	sc->l2tp_psz = pserialize_create();
 	PSLIST_ENTRY_INIT(sc, l2tp_hash);
 
 	sc->l2tp_ro_percpu = percpu_alloc(sizeof(struct l2tp_ro));
@@ -340,6 +338,7 @@ l2tp_clone_destroy(struct ifnet *ifp)
 	percpu_free(sc->l2tp_ro_percpu, sizeof(struct l2tp_ro));
 
 	kmem_free(var, sizeof(struct l2tp_variant));
+	pserialize_destroy(sc->l2tp_psz);
 	mutex_destroy(&sc->l2tp_lock);
 	kmem_free(sc, sizeof(struct l2tp_softc));
 
@@ -431,7 +430,7 @@ l2tpintr(struct l2tp_variant *var)
 		if (m == NULL)
 			break;
 		m->m_flags &= ~(M_BCAST|M_MCAST);
-		bpf_mtap(ifp, m);
+		bpf_mtap(ifp, m, BPF_D_OUT);
 		switch (var->lv_psrc->sa_family) {
 #ifdef INET
 		case AF_INET:
@@ -507,7 +506,7 @@ l2tp_input(struct mbuf *m, struct ifnet *ifp)
 			m_freem(m);
 			return;
 		}
-		M_COPY_PKTHDR(m_head, m);
+		M_MOVE_PKTHDR(m_head, m);
 
 		/*
 		 * m_head should be:
@@ -531,12 +530,6 @@ l2tp_input(struct mbuf *m, struct ifnet *ifp)
 		if (m->m_len == 0) {
 			m_head->m_next = m_free(m);
 		} else {
-			/*
-			 * Already copied mtag with M_COPY_PKTHDR.
-			 * but don't delete mtag in case cut off M_PKTHDR flag
-			 */
-			m_tag_delete_chain(m, NULL);
-			m->m_flags &= ~M_PKTHDR;
 			m_head->m_next = m;
 		}
 
@@ -595,7 +588,7 @@ l2tp_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 
 	m->m_flags &= ~(M_BCAST|M_MCAST);
-	bpf_mtap(ifp, m);
+	bpf_mtap(ifp, m, BPF_D_OUT);
 	switch (var->lv_psrc->sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -1203,7 +1196,7 @@ l2tp_variant_update(struct l2tp_softc *sc, struct l2tp_variant *nvar)
 	KASSERT(mutex_owned(&sc->l2tp_lock));
 
 	sc->l2tp_var = nvar;
-	pserialize_perform(l2tp_psz);
+	pserialize_perform(sc->l2tp_psz);
 	psref_target_destroy(&ovar->lv_psref, lv_psref_class);
 
 	/*

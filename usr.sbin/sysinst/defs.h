@@ -1,4 +1,4 @@
-/*	$NetBSD: defs.h,v 1.9 2015/05/11 13:07:57 martin Exp $	*/
+/*	$NetBSD: defs.h,v 1.20 2018/10/06 18:45:37 martin Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -44,12 +44,6 @@
 #include <sys/disk.h>
 
 const char *getfslabelname(uint8_t);
-
-static inline void *
-deconst(const void *p)
-{
-	return (char *)0 + ((const char *)p - (const char *)0);
-}
 
 #include "msg_defs.h"
 #include "menu_defs.h"
@@ -198,6 +192,7 @@ typedef struct arg_rv {
 typedef struct distinfo {
 	const char	*name;
 	uint		set;
+	bool		force_tgz;	/* this set is always in .tgz format */
 	const char	*desc;
 	const char	*marker_file;	/* set assumed installed if exists */
 } distinfo;
@@ -300,6 +295,7 @@ typedef struct pm_devs_t {
     partinfo bsdlabel[MAXPARTITIONS]; /* What we want it to look like */
     int gpt;
     int no_mbr; /* set for raid (etc) */
+    int no_part;	/* can not be partitioned, e.g. dk0 */
     int rootpart; /* partition we install into */
     const char *disktype; /* ST506, SCSI, ... */
     const char *doessf;
@@ -345,20 +341,44 @@ int  clean_xfer_dir;
 #define SYSINST_FTP_HOST	"ftp.NetBSD.org"
 #endif
 
+#if !defined(SYSINST_HTTP_HOST)
+#define SYSINST_HTTP_HOST	"cdn.NetBSD.org"
+#endif
+
 #if !defined(SYSINST_FTP_DIR)
+#if defined(NETBSD_OFFICIAL_RELEASE)
 #define SYSINST_FTP_DIR		"pub/NetBSD/NetBSD-" REL
+#elif defined(REL_PATH)
+#define SYSINST_FTP_DIR		"pub/NetBSD-daily/" REL_PATH "/latest"
+#else
+#define SYSINST_FTP_DIR		"pub/NetBSD/NetBSD-" REL
+#endif
 #endif
 
 #if !defined(SYSINST_PKG_HOST)
-#define SYSINST_PKG_HOST	SYSINST_FTP_HOST
+#define SYSINST_PKG_HOST	"ftp.NetBSD.org"
+#endif
+#if !defined(SYSINST_PKG_HTTP_HOST)
+#define SYSINST_PKG_HTTP_HOST	"cdn.NetBSD.org"
 #endif
 
 #if !defined(SYSINST_PKG_DIR)
 #define SYSINST_PKG_DIR		"pub/pkgsrc/packages/NetBSD"
 #endif
 
+#if !defined(PKG_SUBDIR)
+#define	PKG_SUBDIR		REL
+#endif
+
 #if !defined(SYSINST_PKGSRC_HOST)
 #define SYSINST_PKGSRC_HOST	SYSINST_PKG_HOST
+#endif
+#if !defined(SYSINST_PKGSRC_HTTP_HOST)
+#define SYSINST_PKGSRC_HTTP_HOST	SYSINST_PKG_HTTP_HOST
+#endif
+
+#ifndef SETS_TAR_SUFF
+#define	SETS_TAR_SUFF	 "tgz"
 #endif
 
 /* Abs. path we extract binary sets from */
@@ -385,13 +405,17 @@ char pkgsrc_dir[STRSIZE];
 /* User shell */
 const char *ushell;
 
+#define	XFER_FTP	0
+#define	XFER_HTTP	1
+#define	XFER_MAX	XFER_HTTP
+
 struct ftpinfo {
-    char host[STRSIZE];
+    char xfer_host[XFER_MAX+1][STRSIZE];
     char dir[STRSIZE] ;
     char user[SSTRSIZE];
     char pass[STRSIZE];
     char proxy[STRSIZE];
-    const char *xfer_type;		/* "ftp" or "http" */
+    unsigned int xfer;	/* XFER_FTP for "ftp" or XFER_HTTP for "http" */
 };
 
 /* use the same struct for sets ftp and to build pkgpath */
@@ -414,6 +438,7 @@ char targetroot_mnt[SSTRSIZE];
 int  mnt2_mounted;
 
 char dist_postfix[SSTRSIZE];
+char dist_tgz_postfix[SSTRSIZE];
 
 /* needed prototypes */
 void set_menu_numopts(int, int);
@@ -497,12 +522,13 @@ int	get_real_geom(const char *, struct disklabel *);
 /* from net.c */
 extern int network_up;
 extern char net_namesvr[STRSIZE];
-int	get_via_ftp(const char *);
+int	get_via_ftp(unsigned int);
 int	get_via_nfs(void);
 int	config_network(void);
 void	mnt_net_config(void);
 void	make_url(char *, struct ftpinfo *, const char *);
 int	get_pkgsrc(void);
+const char *url_proto(unsigned int);
 
 /* From run.c */
 int	collect(int, char **, const char *, ...) __printflike(3, 4);
@@ -559,6 +585,8 @@ int	extract_file(distinfo *, int);
 void	do_coloring (unsigned int, unsigned int);
 int set_menu_select(menudesc *, void *);
 const char *safectime(time_t *);
+bool	use_tgz_for_set(const char*);
+const char *set_postfix(const char*);
 
 /* from target.c */
 #if defined(DEBUG)  ||	defined(DEBUG_ROOT)
@@ -593,9 +621,16 @@ void	unwind_mounts(void);
 int	target_mounted(void);
 
 /* from partman.c */
+#ifndef NO_PARTMAN
 int partman(void);
-int pm_partusage(pm_devs_t *, int, int);
 int pm_getrefdev(pm_devs_t *);
+void update_wedges(const char *);
+#else
+static inline int partman(void) { return -1; }
+static inline int pm_getrefdev(pm_devs_t *x __unused) { return -1; }
+#define update_wedges(x) __nothing
+#endif
+int pm_partusage(pm_devs_t *, int, int);
 void pm_setfstype(pm_devs_t *, int, int);
 int pm_editpart(int);
 void pm_rename(pm_devs_t *);
@@ -606,13 +641,16 @@ int pm_cgd_edit(void *, part_entry_t *);
 int pm_gpt_convert(pm_devs_t *);
 void pm_wedges_fill(pm_devs_t *);
 void pm_make_bsd_partitions(pm_devs_t *);
-void update_wedges(const char *);
 
 /* flags whether to offer the respective options (depending on helper
    programs available on install media */
 int have_raid, have_vnd, have_cgd, have_lvm, have_gpt, have_dk;
 /* initialize above variables */
+#ifndef NO_PARTMAN
 void check_available_binaries(void);
+#else
+#define check_available_binaries() __nothing
+#endif
 
 /* from bsddisklabel.c */
 int	make_bsd_partitions(void);

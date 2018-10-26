@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $	*/
+/*	$NetBSD: pmap.c,v 1.31 2018/10/18 09:01:51 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,12 +27,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.31 2018/10/18 09:01:51 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
-#include "opt_uvmhist.h"
+#include "opt_multiprocessor.h"
 #include "opt_pmap.h"
+#include "opt_uvmhist.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -46,10 +47,16 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.5 2018/04/29 12:07:05 ryo Exp $");
 #include <aarch64/pte.h>
 #include <aarch64/armreg.h>
 #include <aarch64/cpufunc.h>
+#include <aarch64/machdep.h>
 
 //#define PMAP_DEBUG
 //#define PMAP_PV_DEBUG
 
+#ifdef VERBOSE_INIT_ARM
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
 
 UVMHIST_DEFINE(pmaphist);
 #ifdef UVMHIST
@@ -136,18 +143,40 @@ PMAP_COUNTER(unwire_failure, "pmap_unwire failure");
 #define PMAP_COUNT(name)		__nothing
 #endif /* PMAPCOUNTERS */
 
-/* saved permission bit for referenced/modified emulation */
-#define LX_BLKPAG_OS_READ	LX_BLKPAG_OS_0
-#define LX_BLKPAG_OS_WRITE	LX_BLKPAG_OS_1
-#define LX_BLKPAG_OS_WIRED	LX_BLKPAG_OS_2
-#define LX_BLKPAG_OS_RWMASK	(LX_BLKPAG_OS_WRITE|LX_BLKPAG_OS_READ)
+/*
+ * invalidate TLB entry for ASID and VA.
+ * `ll' invalidates only the Last Level (usually L3) of TLB entry
+ */
+#define AARCH64_TLBI_BY_ASID_VA(asid, va, ll)				\
+	do {								\
+		if ((ll)) {						\
+			if ((asid) == 0)				\
+				aarch64_tlbi_by_va_ll((va));		\
+			else						\
+				aarch64_tlbi_by_asid_va_ll((asid), (va)); \
+		} else {						\
+			if ((asid) == 0)				\
+				aarch64_tlbi_by_va((va));		\
+			else						\
+				aarch64_tlbi_by_asid_va((asid), (va));	\
+		}							\
+	} while (0/*CONSTCOND*/)
 
-/* memory attributes are configured MAIR_EL1 in locore */
-#define LX_BLKPAG_ATTR_NORMAL_WB	__SHIFTIN(0, LX_BLKPAG_ATTR_INDX)
-#define LX_BLKPAG_ATTR_NORMAL_NC	__SHIFTIN(1, LX_BLKPAG_ATTR_INDX)
-#define LX_BLKPAG_ATTR_NORMAL_WT	__SHIFTIN(2, LX_BLKPAG_ATTR_INDX)
-#define LX_BLKPAG_ATTR_DEVICE_MEM	__SHIFTIN(3, LX_BLKPAG_ATTR_INDX)
-#define LX_BLKPAG_ATTR_MASK		LX_BLKPAG_ATTR_INDX
+/*
+ * aarch64 require write permission in pte to invalidate instruction cache.
+ * changing pte to writable temporarly before cpu_icache_sync_range().
+ * this macro modifies PTE (*ptep). need to update PTE after this.
+ */
+#define PTE_ICACHE_SYNC_PAGE(pte, ptep, pm, va, ll)			\
+	do {								\
+		pt_entry_t tpte;					\
+		tpte = (pte) & ~(LX_BLKPAG_AF|LX_BLKPAG_AP);		\
+		tpte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RW);			\
+		tpte |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);			\
+		atomic_swap_64((ptep), tpte);				\
+		AARCH64_TLBI_BY_ASID_VA((pm)->pm_asid, (va), (ll));	\
+		cpu_icache_sync_range((va), PAGE_SIZE);			\
+	} while (0/*CONSTCOND*/)
 
 struct pv_entry {
 	TAILQ_ENTRY(pv_entry) pv_link;
@@ -157,8 +186,9 @@ struct pv_entry {
 	pt_entry_t *pv_ptep;	/* for fast pte lookup */
 };
 
-static pt_entry_t *_pmap_pte_lookup(struct pmap *, vaddr_t);
-static pt_entry_t _pmap_pte_adjust_prot(pt_entry_t, vm_prot_t, vm_prot_t);
+static pt_entry_t *_pmap_pte_lookup_l3(struct pmap *, vaddr_t);
+static pt_entry_t *_pmap_pte_lookup_bs(struct pmap *, vaddr_t, vsize_t *);
+static pt_entry_t _pmap_pte_adjust_prot(pt_entry_t, vm_prot_t, vm_prot_t, bool);
 static pt_entry_t _pmap_pte_adjust_cacheflags(pt_entry_t, u_int);
 static void _pmap_remove(struct pmap *, vaddr_t, bool);
 static int _pmap_enter(struct pmap *, vaddr_t, paddr_t, vm_prot_t, u_int, bool);
@@ -189,85 +219,71 @@ pmap_pv_unlock(struct vm_page_md *md)
 	mutex_exit(&md->mdpg_pvlock);
 }
 
-#define PM_LOCKED(pm)				\
-	mutex_owned(&(pm)->pm_lock)
-#define PM_LOCK(pm)				\
-	do {					\
-		mutex_enter(&(pm)->pm_lock);	\
-	} while (0 /*CONSTCOND*/)
-#define PM_UNLOCK(pm)				\
-	do {					\
-		mutex_exit(&(pm)->pm_lock);	\
-	} while (0 /*CONSTCOND*/)
 
-static void __unused
-pm_addr_check(struct pmap *pm, vaddr_t va, const char *prefix)
+static inline void
+pm_lock(struct pmap *pm)
 {
-	if (pm == pmap_kernel()) {
-		if (VM_MIN_KERNEL_ADDRESS <= va && va < VM_MAX_KERNEL_ADDRESS) {
-			// ok
-		} else {
-			printf("%s: kernel pm %p:"
-			    " va=%016lx is not kernel address\n",
-			    prefix, pm, va);
-			panic("pm_addr_check");
-		}
-	} else {
-		if (VM_MIN_ADDRESS <= va && va <= VM_MAX_ADDRESS) {
-			// ok
-		} else {
-			printf(
-			    "%s: user pm %p: va=%016lx is not kernel address\n",
-			    prefix, pm, va);
-			panic("pm_addr_check");
-		}
-	}
+	mutex_enter(&pm->pm_lock);
 }
-#define PM_ADDR_CHECK(pm, va)		pm_addr_check(pm, va, __func__)
+
+static inline void
+pm_unlock(struct pmap *pm)
+{
+	mutex_exit(&pm->pm_lock);
+}
+
+#define IN_RANGE(va,sta,end)	(((sta) <= (va)) && ((va) < (end)))
+
 #define IN_KSEG_ADDR(va)	\
-	((AARCH64_KSEG_START <= (va)) && ((va) < AARCH64_KSEG_END))
+	IN_RANGE((va), AARCH64_KSEG_START, AARCH64_KSEG_END)
+
+#define KASSERT_PM_ADDR(pm, va)						\
+	do {								\
+		if ((pm) == pmap_kernel()) {				\
+			KASSERTMSG(IN_RANGE((va), VM_MIN_KERNEL_ADDRESS, \
+			    VM_MAX_KERNEL_ADDRESS),			\
+			    "%s: kernel pm %p: va=%016lx"		\
+			    " is not kernel address\n",			\
+			    __func__, (pm), (va));			\
+		} else {						\
+			KASSERTMSG(IN_RANGE((va),			\
+			    VM_MIN_ADDRESS, VM_MAX_ADDRESS),		\
+			    "%s: user pm %p: va=%016lx"			\
+			    " is not user address\n",			\
+			    __func__, (pm), (va));			\
+		}							\
+	} while (0 /* CONSTCOND */)
 
 
 static const struct pmap_devmap *pmap_devmap_table;
 
-/* XXX: for now, only support for devmap */
 static vsize_t
-_pmap_map_chunk(pd_entry_t *l2, vaddr_t va, paddr_t pa, vsize_t size,
+pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
     vm_prot_t prot, u_int flags)
 {
-	pd_entry_t oldpte;
 	pt_entry_t attr;
-	vsize_t resid;
+	psize_t blocksize;
+	int rc;
 
-	oldpte = l2[l2pde_index(va)];
-	KDASSERT(!l2pde_valid(oldpte));
+	/* devmap always use L2 mapping */
+	blocksize = L2_SIZE;
 
-	attr = _pmap_pte_adjust_prot(L2_BLOCK, prot, VM_PROT_ALL);
+	attr = _pmap_pte_adjust_prot(L2_BLOCK, prot, VM_PROT_ALL, false);
 	attr = _pmap_pte_adjust_cacheflags(attr, flags | PMAP_DEV);
-#ifdef MULTIPROCESSOR
-	attr |= LX_BLKPAG_SH_IS;
-#endif
+	/* user cannot execute, and kernel follows the prot */
+	attr |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);
+	if (prot & VM_PROT_EXECUTE)
+		attr &= ~LX_BLKPAG_PXN;
 
-	resid = (size + (L2_SIZE - 1)) & ~(L2_SIZE - 1);
-	size = resid;
+	rc = pmapboot_enter(va, pa, size, blocksize, attr,
+	    PMAPBOOT_ENTER_NOOVERWRITE, bootpage_alloc, NULL);
+	if (rc != 0)
+		panic("%s: pmapboot_enter failed. %lx is already mapped?\n",
+		    __func__, va);
 
-	while (resid > 0) {
-		pt_entry_t pte;
+	aarch64_tlbi_by_va(va);
 
-		pte = pa | attr;
-
-		atomic_swap_64(&l2[l2pde_index(va)], pte);
-		aarch64_tlbi_by_va(va);
-
-		if (prot & VM_PROT_EXECUTE)
-			cpu_icache_sync_range(va, L2_SIZE);
-
-		va += L2_SIZE;
-		pa += L2_SIZE;
-		resid -= L2_SIZE;
-	}
-
-	return size;
+	return ((va + size + blocksize - 1) & ~(blocksize - 1)) - va;
 }
 
 void
@@ -277,56 +293,31 @@ pmap_devmap_register(const struct pmap_devmap *table)
 }
 
 void
-pmap_devmap_bootstrap(const struct pmap_devmap *table)
+pmap_devmap_bootstrap(vaddr_t l0pt, const struct pmap_devmap *table)
 {
-	pd_entry_t *l0, *l1, *l2;
 	vaddr_t va;
 	int i;
 
 	pmap_devmap_register(table);
 
-	l0 = AARCH64_PA_TO_KVA(reg_ttbr1_el1_read());
-
-#ifdef VERBOSE_INIT_ARM
-	printf("%s:\n", __func__);
-#endif
+	VPRINTF("%s:\n", __func__);
 	for (i = 0; table[i].pd_size != 0; i++) {
-#ifdef VERBOSE_INIT_ARM
-		printf(" devmap: pa %08lx-%08lx = va %016lx\n",
+		VPRINTF(" devmap: pa %08lx-%08lx = va %016lx\n",
 		    table[i].pd_pa,
 		    table[i].pd_pa + table[i].pd_size - 1,
 		    table[i].pd_va);
-#endif
 		va = table[i].pd_va;
+
+		KASSERT((VM_KERNEL_IO_ADDRESS <= va) &&
+		    (va < (VM_KERNEL_IO_ADDRESS + VM_KERNEL_IO_SIZE)));
 
 		/* update and check virtual_devmap_addr */
 		if ((virtual_devmap_addr == 0) ||
 		    (virtual_devmap_addr > va)) {
 			virtual_devmap_addr = va;
-
-			/* XXX: only one L2 table is allocated for devmap  */
-			if ((VM_MAX_KERNEL_ADDRESS - virtual_devmap_addr) >
-			    (L2_SIZE * Ln_ENTRIES)) {
-				panic("devmap va:%016lx out of range."
-				    " available devmap range is %016lx-%016lx",
-				    va,
-				    VM_MAX_KERNEL_ADDRESS -
-				    (L2_SIZE * Ln_ENTRIES),
-				    VM_MAX_KERNEL_ADDRESS);
-			}
 		}
 
-		l1 = l0pde_pa(l0[l0pde_index(va)]);
-		KASSERT(l1 != NULL);
-		l1 = AARCH64_PA_TO_KVA((paddr_t)l1);
-
-		l2 = l1pde_pa(l1[l1pde_index(va)]);
-		if (l2 == NULL)
-			panic("L2 table for devmap is not allocated");
-
-		l2 = AARCH64_PA_TO_KVA((paddr_t)l2);
-
-		_pmap_map_chunk(l2,
+		pmap_map_chunk(
 		    table[i].pd_va,
 		    table[i].pd_pa,
 		    table[i].pd_size,
@@ -406,7 +397,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
 	struct pmap *kpm;
 	pd_entry_t *l0;
-	vaddr_t va;
 	paddr_t l0pa;
 
 	PMAP_HIST_INIT();	/* init once */
@@ -429,9 +419,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 	aarch64_tlbi_all();
 
-	va = vstart;
 	l0pa = reg_ttbr1_el1_read();
-	l0 = AARCH64_PA_TO_KVA(l0pa);
+	l0 = (void *)AARCH64_PA_TO_KVA(l0pa);
 
 	memset(&kernel_pmap, 0, sizeof(kernel_pmap));
 	kpm = pmap_kernel();
@@ -529,7 +518,9 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 			break;
 	}
 
-	KDASSERT(uvm_physseg_valid_p(bank));
+	if (!uvm_physseg_valid_p(bank)) {
+		panic("%s: no memory", __func__);
+	}
 
 	/* Steal pages */
 	pa = ptoa(uvm_physseg_get_avail_start(bank));
@@ -548,8 +539,8 @@ pmap_reference(struct pmap *pm)
 	atomic_inc_uint(&pm->pm_refcnt);
 }
 
-static pd_entry_t *
-_pmap_alloc_pdp(struct pmap *pm, paddr_t *pap)
+pd_entry_t *
+pmap_alloc_pdp(struct pmap *pm, paddr_t *pap)
 {
 	paddr_t pa;
 
@@ -580,7 +571,7 @@ _pmap_alloc_pdp(struct pmap *pm, paddr_t *pap)
 	UVMHIST_LOG(pmaphist, "pa=%llx, va=%llx",
 	    pa, AARCH64_PA_TO_KVA(pa), 0, 0);
 
-	return AARCH64_PA_TO_KVA(pa);
+	return (void *)AARCH64_PA_TO_KVA(pa);
 }
 
 static void
@@ -623,86 +614,26 @@ pmap_extract(struct pmap *pm, vaddr_t va, paddr_t *pap)
 {
 	static pt_entry_t *ptep;
 	paddr_t pa;
-	bool found;
+	vsize_t blocksize = 0;
+	extern char __kernel_text[];
+	extern char _end[];
 
-#if 0
-	PM_ADDR_CHECK(pm, va);
-#else
-	if (((pm == pmap_kernel()) &&
-	    !(VM_MIN_KERNEL_ADDRESS <= va && va < VM_MAX_KERNEL_ADDRESS) &&
-	    !(AARCH64_KSEG_START <= va && va < AARCH64_KSEG_END)) ||
-	    ((pm != pmap_kernel()) &&
-	    !(VM_MIN_ADDRESS <= va && va <= VM_MAX_ADDRESS)))
-		return false;
-#endif
-
-	if (AARCH64_KSEG_START <= va && va < AARCH64_KSEG_END) {
+	if (IN_RANGE(va, (vaddr_t)__kernel_text, (vaddr_t)_end)) {
+		/* fast loookup */
+		pa = KERN_VTOPHYS(va);
+	} else if (IN_KSEG_ADDR(va)) {
+		/* fast loookup. should be used only if actually mapped? */
 		pa = AARCH64_KVA_TO_PA(va);
-		found = true;
 	} else {
-		pt_entry_t pte;
-
-		ptep = _pmap_pte_lookup(pm, va);
-		if (ptep == NULL) {
-			pd_entry_t pde, *l1, *l2, *l3;
-
-			/*
-			 * traverse L0 -> L1 -> L2 -> L3 table
-			 * with considering block
-			 */
-			pde = pm->pm_l0table[l0pde_index(va)];
-			if (!l0pde_valid(pde)) {
-				found = false;
-				goto done;
-			}
-
-			l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
-			pde = l1[l1pde_index(va)];
-			if (!l1pde_valid(pde)) {
-				found = false;
-				goto done;
-			}
-			if (l1pde_is_block(pde)) {
-				pa = l1pde_pa(pde) + (va & L1_OFFSET);
-				found = true;
-				goto done;
-			}
-
-			KASSERT(l1pde_is_table(pde));
-
-			l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
-			pde = l2[l2pde_index(va)];
-			if (!l2pde_valid(pde)) {
-				found = false;
-				goto done;
-			}
-			if (l2pde_is_block(pde)) {
-				pa = l2pde_pa(pde) + (va & L2_OFFSET);
-				found = true;
-				goto done;
-			}
-
-			KASSERT(l2pde_is_table(pde));
-
-			l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
-			pte = l3[l3pte_index(va)];
-
-		} else {
-			pte = *ptep;
-		}
-		if (!l3pte_valid(pte) || !l3pte_is_page(pte)) {
-			found = false;
-			goto done;
-		}
-
-		KASSERT(l3pte_is_page(pte));
-		pa = l3pte_pa(pte) + (va & L3_OFFSET);
-		found = true;
+		ptep = _pmap_pte_lookup_bs(pm, va, &blocksize);
+		if (ptep == NULL)
+			return false;
+		pa = lxpde_pa(*ptep) + (va & (blocksize - 1));
 	}
- done:
-	if (found && (pap != NULL))
+
+	if (pap != NULL)
 		*pap = pa;
-	return found;
+	return true;
 }
 
 paddr_t
@@ -711,77 +642,146 @@ vtophys(vaddr_t va)
 	struct pmap *pm;
 	paddr_t pa;
 
-	if (VM_MIN_KERNEL_ADDRESS <= va && va < VM_MAX_KERNEL_ADDRESS) {
-		if (pmap_extract(pmap_kernel(), va, &pa) == false) {
-			return VTOPHYS_FAILED;
-		}
-	} else if (IN_KSEG_ADDR(va)) {
-		pa = AARCH64_KVA_TO_PA(va);
-	} else if (VM_MIN_ADDRESS <= va && va <= VM_MAX_ADDRESS) {
-		if (curlwp->l_proc == NULL)
-			return VTOPHYS_FAILED;
+	if (va & TTBR_SEL_VA)
+		pm = pmap_kernel();
+	else
 		pm = curlwp->l_proc->p_vmspace->vm_map.pmap;
-		if (pmap_extract(pm, va, &pa) == false) {
-			return VTOPHYS_FAILED;
-		}
-	} else {
+
+	if (pmap_extract(pm, va, &pa) == false)
 		return VTOPHYS_FAILED;
-	}
 	return pa;
 }
 
 static pt_entry_t *
-_pmap_pte_lookup(struct pmap *pm, vaddr_t va)
+_pmap_pte_lookup_bs(struct pmap *pm, vaddr_t va, vsize_t *bs)
 {
-	if (AARCH64_KSEG_START <= va && va < AARCH64_KSEG_END) {
-		panic("page entry is mapped in KSEG");
-	} else {
-		pd_entry_t *l0, *l1, *l2, *l3;
-		pd_entry_t pde;
-		pt_entry_t *ptep;
-		unsigned int idx;
+	pt_entry_t *ptep;
+	pd_entry_t *l0, *l1, *l2, *l3;
+	pd_entry_t pde;
+	vsize_t blocksize;
+	unsigned int idx;
 
-		/*
-		 * traverse L0 -> L1 -> L2 -> L3 table
-		 */
-		l0 = pm->pm_l0table;
-
-		idx = l0pde_index(va);
-		pde = l0[idx];
-		if (!l0pde_valid(pde))
-			return NULL;
-
-		l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
-		idx = l1pde_index(va);
-		pde = l1[idx];
-		if (!l1pde_valid(pde))
-			return NULL;
-
-		if (l1pde_is_block(pde))
-			return NULL;
-
-		l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
-		idx = l2pde_index(va);
-		pde = l2[idx];
-		if (!l2pde_valid(pde))
-			return NULL;
-		if (l2pde_is_block(pde))
-			return NULL;
-
-		l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
-		idx = l3pte_index(va);
-		ptep = &l3[idx];	/* as PTE */
-
-		return ptep;
+	if (((pm == pmap_kernel()) && ((va & TTBR_SEL_VA) == 0)) ||
+	    ((pm != pmap_kernel()) && ((va & TTBR_SEL_VA) != 0))) {
+		blocksize = 0;
+		ptep = NULL;
+		goto done;
 	}
+
+	/*
+	 * traverse L0 -> L1 -> L2 -> L3
+	 */
+	blocksize = L0_SIZE;
+	l0 = pm->pm_l0table;
+	idx = l0pde_index(va);
+	pde = l0[idx];
+	if (!l0pde_valid(pde)) {
+		ptep = NULL;
+		goto done;
+	}
+
+	blocksize = L1_SIZE;
+	l1 = (pd_entry_t *)AARCH64_PA_TO_KVA(l0pde_pa(pde));
+	idx = l1pde_index(va);
+	pde = l1[idx];
+	if (!l1pde_valid(pde)) {
+		ptep = NULL;
+		goto done;
+	}
+	if (l1pde_is_block(pde)) {
+		ptep = &l1[idx];
+		goto done;
+	}
+
+	blocksize = L2_SIZE;
+	l2 = (pd_entry_t *)AARCH64_PA_TO_KVA(l1pde_pa(pde));
+	idx = l2pde_index(va);
+	pde = l2[idx];
+	if (!l2pde_valid(pde)) {
+		ptep = NULL;
+		goto done;
+	}
+	if (l2pde_is_block(pde)) {
+		ptep = &l2[idx];
+		goto done;
+	}
+
+	blocksize = L3_SIZE;
+	l3 = (pd_entry_t *)AARCH64_PA_TO_KVA(l2pde_pa(pde));
+	idx = l3pte_index(va);
+	pde = l3[idx];
+	if (!l3pte_valid(pde)) {
+		ptep = NULL;
+		goto done;
+	}
+	ptep = &l3[idx];
+
+ done:
+	if (bs != NULL)
+		*bs = blocksize;
+	return ptep;
+}
+
+static pt_entry_t *
+_pmap_pte_lookup_l3(struct pmap *pm, vaddr_t va)
+{
+	pt_entry_t *ptep;
+	vsize_t blocksize = 0;
+
+	ptep = _pmap_pte_lookup_bs(pm, va, &blocksize);
+	if ((ptep != NULL) && (blocksize == L3_SIZE))
+		return ptep;
 
 	return NULL;
 }
 
+void
+pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
+{
+	pt_entry_t *ptep, pte;
+	vaddr_t va;
+	vsize_t blocksize = 0;
+
+	pm_lock(pm);
+
+	for (va = sva; va < eva; va += blocksize) {
+		ptep = _pmap_pte_lookup_bs(pm, va, &blocksize);
+		if (blocksize == 0)
+			break;
+		if (ptep != NULL) {
+			vaddr_t eob = (va + blocksize) & ~(blocksize - 1);
+			vsize_t len = ulmin(eva, eob - va);
+
+			pte = *ptep;
+			if (l3pte_writable(pte)) {
+				cpu_icache_sync_range(va, len);
+			} else {
+				/*
+				 * change to writable temporally
+				 * to do cpu_icache_sync_range()
+				 */
+				pt_entry_t opte = pte;
+				pte = pte & ~(LX_BLKPAG_AF|LX_BLKPAG_AP);
+				pte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RW);
+				atomic_swap_64(ptep, pte);
+				AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
+				cpu_icache_sync_range(va, len);
+				atomic_swap_64(ptep, opte);
+				AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
+			}
+			va &= ~(blocksize - 1);
+		}
+	}
+
+	pm_unlock(pm);
+}
+
 static pt_entry_t
-_pmap_pte_adjust_prot(pt_entry_t pte, vm_prot_t prot, vm_prot_t protmask)
+_pmap_pte_adjust_prot(pt_entry_t pte, vm_prot_t prot, vm_prot_t protmask,
+    bool user)
 {
 	vm_prot_t masked;
+	pt_entry_t xn;
 
 	masked = prot & protmask;
 	pte &= ~(LX_BLKPAG_OS_RWMASK|LX_BLKPAG_AF|LX_BLKPAG_AP);
@@ -819,10 +819,12 @@ _pmap_pte_adjust_prot(pt_entry_t pte, vm_prot_t prot, vm_prot_t protmask)
 		break;
 	}
 
-	if ((prot & VM_PROT_EXECUTE) == 0)
-		pte |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);
-	else
-		pte &= ~(LX_BLKPAG_UXN|LX_BLKPAG_PXN);
+	/* executable for kernel or user? first set never exec both */
+	pte |= (LX_BLKPAG_UXN|LX_BLKPAG_PXN);
+	/* and either to executable */
+	xn = user ? LX_BLKPAG_UXN : LX_BLKPAG_PXN;
+	if (prot & VM_PROT_EXECUTE)
+		pte &= ~xn;			
 
 	return pte;
 }
@@ -852,7 +854,7 @@ _pmap_pte_adjust_cacheflags(pt_entry_t pte, u_int flags)
 	return pte;
 }
 
-static void
+static struct pv_entry *
 _pmap_remove_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va, pt_entry_t pte)
 {
 	struct vm_page_md *md;
@@ -883,7 +885,7 @@ _pmap_remove_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va, pt_entry_t pte)
 
 	pmap_pv_unlock(md);
 
-	pool_cache_put(&_pmap_pv_pool, pv);
+	return pv;
 }
 
 #if defined(PMAP_PV_DEBUG) || defined(DDB)
@@ -950,7 +952,7 @@ pv_dump(struct vm_page_md *md, void (*pr)(const char *, ...))
 #endif /* PMAP_PV_DEBUG & DDB */
 
 static int
-_pmap_enter_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va,
+_pmap_enter_pv(struct vm_page *pg, struct pmap *pm, struct pv_entry **pvp, vaddr_t va,
     pt_entry_t *ptep, paddr_t pa, u_int flags)
 {
 	struct vm_page_md *md;
@@ -976,10 +978,14 @@ _pmap_enter_pv(struct vm_page *pg, struct pmap *pm, vaddr_t va,
 	if (pv == NULL) {
 		pmap_pv_unlock(md);
 
-		/* create and link new pv */
-		pv = pool_cache_get(&_pmap_pv_pool, PR_NOWAIT);
+		/*
+		 * create and link new pv.
+		 * pv is already allocated at beginning of _pmap_enter().
+		 */
+		pv = *pvp;
 		if (pv == NULL)
 			return ENOMEM;
+		*pvp = NULL;
 
 		pv->pv_pmap = pm;
 		pv->pv_va = va;
@@ -1007,8 +1013,6 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 {
 	int s;
 
-	KASSERT((prot & VM_PROT_READ) || !(prot & VM_PROT_WRITE));
-
 	s = splvm();
 	_pmap_enter(pmap_kernel(), va, pa, prot, flags | PMAP_WIRED, true);
 	splx(s);
@@ -1029,10 +1033,10 @@ pmap_kremove(vaddr_t va, vsize_t size)
 	KDASSERT((va & PGOFSET) == 0);
 	KDASSERT((size & PGOFSET) == 0);
 
-	KASSERT(!IN_KSEG_ADDR(va));
+	KDASSERT(!IN_KSEG_ADDR(va));
 
 	eva = va + size;
-	KDASSERT(VM_MIN_KERNEL_ADDRESS <= va && eva < VM_MAX_KERNEL_ADDRESS);
+	KDASSERT(IN_RANGE(va, VM_MIN_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS));
 
 	s = splvm();
 	for (; va < eva; va += PAGE_SIZE) {
@@ -1047,6 +1051,7 @@ _pmap_protect_pv(struct vm_page *pg, struct pv_entry *pv, vm_prot_t prot)
 	pt_entry_t *ptep, pte;
 	vm_prot_t pteprot;
 	uint32_t mdattr;
+	const bool user = (pv->pv_pmap != pmap_kernel());
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
@@ -1057,7 +1062,7 @@ _pmap_protect_pv(struct vm_page *pg, struct pv_entry *pv, vm_prot_t prot)
 	mdattr = VM_PAGE_TO_MD(pg)->mdpg_flags &
 	    (VM_PROT_READ | VM_PROT_WRITE);
 
-	PM_LOCK(pv->pv_pmap);
+	pm_lock(pv->pv_pmap);
 
 	ptep = pv->pv_ptep;
 	pte = *ptep;
@@ -1068,26 +1073,22 @@ _pmap_protect_pv(struct vm_page *pg, struct pv_entry *pv, vm_prot_t prot)
 		pteprot |= VM_PROT_READ;
 	if ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW)
 		pteprot |= VM_PROT_WRITE;
-	if ((pte & (LX_BLKPAG_UXN|LX_BLKPAG_PXN)) == 0)
+	if (l3pte_executable(pte, user))
 		pteprot |= VM_PROT_EXECUTE;
 
 	/* new prot = prot & pteprot & mdattr */
-	pte = _pmap_pte_adjust_prot(pte, prot & pteprot, mdattr);
+	pte = _pmap_pte_adjust_prot(pte, prot & pteprot, mdattr, user);
 	atomic_swap_64(ptep, pte);
+	AARCH64_TLBI_BY_ASID_VA(pv->pv_pmap->pm_asid, pv->pv_va, true);
 
-#if 0
-	aarch64_tlbi_by_asid_va(pv->pv_pmap->pm_asid, pv->pv_va);
-#else
-	aarch64_tlbi_by_va(pv->pv_va);
-#endif
-
-	PM_UNLOCK(pv->pv_pmap);
+	pm_unlock(pv->pv_pmap);
 }
 
 void
 pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 {
 	vaddr_t va;
+	const bool user = (pm != pmap_kernel());
 
 	KASSERT((prot & VM_PROT_READ) || !(prot & VM_PROT_WRITE));
 
@@ -1097,8 +1098,7 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 	UVMHIST_LOG(pmaphist, "pm=%p, sva=%016lx, eva=%016lx, prot=%08x",
 	    pm, sva, eva, prot);
 
-	PM_ADDR_CHECK(pm, sva);
-
+	KASSERT_PM_ADDR(pm, sva);
 	KASSERT(!IN_KSEG_ADDR(sva));
 
 	if ((prot & VM_PROT_READ) == VM_PROT_NONE) {
@@ -1111,16 +1111,19 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 	KDASSERT((sva & PAGE_MASK) == 0);
 	KDASSERT((eva & PAGE_MASK) == 0);
 
-	PM_LOCK(pm);
+	pm_lock(pm);
 
 	for (va = sva; va < eva; va += PAGE_SIZE) {
 		pt_entry_t *ptep, pte;
+#ifdef UVMHIST
+		pt_entry_t opte;
+#endif
 		struct vm_page *pg;
 		paddr_t pa;
 		uint32_t mdattr;
 		bool executable;
 
-		ptep = _pmap_pte_lookup(pm, va);
+		ptep = _pmap_pte_lookup_l3(pm, va);
 		if (ptep == NULL) {
 			PMAP_COUNT(protect_none);
 			continue;
@@ -1148,23 +1151,33 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 		}
 
 		pte = *ptep;
-		executable = l3pte_executable(pte);
-		pte = _pmap_pte_adjust_prot(pte, prot, mdattr);
-		atomic_swap_64(ptep, pte);
-
-#if 0
-		aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-		aarch64_tlbi_by_va(va);
+#ifdef UVMHIST
+		opte = pte;
 #endif
+		executable = l3pte_executable(pte, user);
+		pte = _pmap_pte_adjust_prot(pte, prot, mdattr, user);
 
 		if (!executable && (prot & VM_PROT_EXECUTE)) {
 			/* non-exec -> exec */
-			cpu_icache_sync_range(va, PAGE_SIZE);
+			UVMHIST_LOG(pmaphist, "icache_sync: "
+			    "pm=%p, va=%016lx, pte: %016lx -> %016lx",
+			    pm, va, opte, pte);
+			if (!l3pte_writable(pte)) {
+				PTE_ICACHE_SYNC_PAGE(pte, ptep, pm, va, true);
+				atomic_swap_64(ptep, pte);
+				AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
+			} else {
+				atomic_swap_64(ptep, pte);
+				AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
+				cpu_icache_sync_range(va, PAGE_SIZE);
+			}
+		} else {
+			atomic_swap_64(ptep, pte);
+			AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
 		}
 	}
 
-	PM_UNLOCK(pm);
+	pm_unlock(pm);
 }
 
 void
@@ -1229,10 +1242,10 @@ pmap_create(void)
 	memset(pm, 0, sizeof(*pm));
 	pm->pm_refcnt = 1;
 	pm->pm_asid = -1;
-	pm->pm_l0table = _pmap_alloc_pdp(pm, &pm->pm_l0table_pa);
-	KASSERT(((vaddr_t)pm->pm_l0table & (PAGE_SIZE - 1)) == 0);
 	SLIST_INIT(&pm->pm_vmlist);
 	mutex_init(&pm->pm_lock, MUTEX_DEFAULT, IPL_VM);
+	pm->pm_l0table = pmap_alloc_pdp(pm, &pm->pm_l0table_pa);
+	KASSERT(((vaddr_t)pm->pm_l0table & (PAGE_SIZE - 1)) == 0);
 
 	UVMHIST_LOG(pmaphist, "pm=%p, pm_l0table=%016lx, pm_l0table_pa=%016lx",
 	    pm, pm->pm_l0table, pm->pm_l0table_pa, 0);
@@ -1277,17 +1290,20 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
     u_int flags, bool kenter)
 {
 	struct vm_page *pg;
+	struct pv_entry *spv, *opv = NULL;
 	pd_entry_t pde;
 	pt_entry_t attr, pte, *ptep;
+#ifdef UVMHIST
+	pt_entry_t opte;
+#endif
 	pd_entry_t *l0, *l1, *l2, *l3;
 	paddr_t pdppa;
 	uint32_t mdattr;
 	unsigned int idx;
 	int error = 0;
-	int pm_locked;
 	const bool user = (pm != pmap_kernel());
-	bool badcolor;
 	bool executable;
+	bool l3only = true;
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
@@ -1296,7 +1312,8 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	UVMHIST_LOG(pmaphist, "va=%016lx, pa=%016lx, prot=%08x, flags=%08x",
 	    va, pa, prot, flags);
 
-	PM_ADDR_CHECK(pm, va);
+	KASSERT_PM_ADDR(pm, va);
+	KASSERT(!IN_KSEG_ADDR(va));
 
 #ifdef PMAPCOUNTERS
 	PMAP_COUNT(mappings);
@@ -1307,14 +1324,12 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 			PMAP_COUNT(kern_mappings);
 		}
 	} else if (flags & PMAP_WIRED) {
-		badcolor = true;
 		if (user) {
 			PMAP_COUNT(user_mappings_bad_wired);
 		} else {
 			PMAP_COUNT(kern_mappings_bad_wired);
 		}
 	} else {
-		badcolor = true;
 		if (user) {
 			PMAP_COUNT(user_mappings_bad);
 		} else {
@@ -1328,21 +1343,19 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	else
 		pg = PHYS_TO_VM_PAGE(pa);
 
-#ifdef PMAPCOUNTERS
-	if (pg == NULL) {
-		PMAP_COUNT(unmanaged_mappings);
-	} else {
+	if (pg != NULL) {
 		PMAP_COUNT(managed_mappings);
+		/*
+		 * allocate pv in advance of pm_lock() to avoid locking myself.
+		 * pool_cache_get() may call pmap_kenter() internally.
+		 */
+		spv = pool_cache_get(&_pmap_pv_pool, PR_NOWAIT);
+	} else {
+		PMAP_COUNT(unmanaged_mappings);
+		spv = NULL;
 	}
-#endif
 
-	/*
-	 * _pmap_enter() may be called recursively. In case of
-	 * pmap_enter() -> _pmap_enter_pv() -> pool_cache_get() -> pmap_kenter()
-	 */
-	pm_locked = PM_LOCKED(pm);
-	if (!pm_locked)
-		PM_LOCK(pm);
+	pm_lock(pm);
 
 	/*
 	 * traverse L0 -> L1 -> L2 -> L3 table with growing pdp if needed.
@@ -1352,41 +1365,47 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	idx = l0pde_index(va);
 	pde = l0[idx];
 	if (!l0pde_valid(pde)) {
-		_pmap_alloc_pdp(pm, &pdppa);
+		pmap_alloc_pdp(pm, &pdppa);
 		KASSERT(pdppa != POOL_PADDR_INVALID);
 		atomic_swap_64(&l0[idx], pdppa | L0_TABLE);
+		l3only = false;
 	} else {
 		pdppa = l0pde_pa(pde);
 	}
-	l1 = AARCH64_PA_TO_KVA(pdppa);
+	l1 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l1pde_index(va);
 	pde = l1[idx];
 	if (!l1pde_valid(pde)) {
-		_pmap_alloc_pdp(pm, &pdppa);
+		pmap_alloc_pdp(pm, &pdppa);
 		KASSERT(pdppa != POOL_PADDR_INVALID);
 		atomic_swap_64(&l1[idx], pdppa | L1_TABLE);
+		l3only = false;
 	} else {
 		pdppa = l1pde_pa(pde);
 	}
-	l2 = AARCH64_PA_TO_KVA(pdppa);
+	l2 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l2pde_index(va);
 	pde = l2[idx];
 	if (!l2pde_valid(pde)) {
-		_pmap_alloc_pdp(pm, &pdppa);
+		pmap_alloc_pdp(pm, &pdppa);
 		KASSERT(pdppa != POOL_PADDR_INVALID);
 		atomic_swap_64(&l2[idx], pdppa | L2_TABLE);
+		l3only = false;
 	} else {
 		pdppa = l2pde_pa(pde);
 	}
-	l3 = AARCH64_PA_TO_KVA(pdppa);
+	l3 = (void *)AARCH64_PA_TO_KVA(pdppa);
 
 	idx = l3pte_index(va);
 	ptep = &l3[idx];	/* as PTE */
 
 	pte = *ptep;
-	executable = l3pte_executable(pte);
+#ifdef UVMHIST
+	opte = pte;
+#endif
+	executable = l3pte_executable(pte, user);
 
 	if (l3pte_valid(pte)) {
 		KASSERT(!kenter);	/* pmap_kenter_pa() cannot override */
@@ -1412,7 +1431,7 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 
 			opg = PHYS_TO_VM_PAGE(l3pte_pa(pte));
 			if (opg != NULL)
-				_pmap_remove_pv(opg, pm, va, pte);
+				opv = _pmap_remove_pv(opg, pm, va, pte);
 		}
 
 		if (pte & LX_BLKPAG_OS_WIRED)
@@ -1421,32 +1440,35 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	}
 
 	/*
-	 * _pmap_enter_pv() may call pmap_kenter() internally.
-	 * don't allocate pv_entry (don't call _pmap_enter_pv) when kenter mode.
-	 * `pg' have got to be NULL if (kenter).
+	 * read permission is treated as an access permission internally.
+	 * require to add PROT_READ even if only PROT_WRITE or PROT_EXEC
+	 * for wired mapping.
 	 */
+	if ((flags & PMAP_WIRED) && (prot & (VM_PROT_WRITE|VM_PROT_EXECUTE)))
+		prot |= VM_PROT_READ;
+
 	mdattr = VM_PROT_READ | VM_PROT_WRITE;
 	if (pg != NULL) {
-		error = _pmap_enter_pv(pg, pm, va, ptep, pa, flags);
+		error = _pmap_enter_pv(pg, pm, &spv, va, ptep, pa, flags);
+
 		if (error != 0) {
+			/*
+			 * If pmap_enter() fails,
+			 * it must not leave behind an existing pmap entry.
+			 */
+			if (!kenter && ((pte & LX_BLKPAG_OS_WIRED) == 0))
+				atomic_swap_64(ptep, 0);
+
 			PMAP_COUNT(pv_entry_cannotalloc);
 			if (flags & PMAP_CANFAIL)
 				goto done;
-			panic(
-			    "pmap_enter: failed to allocate pv_entry");
+			panic("pmap_enter: failed to allocate pv_entry");
 		}
 
-		if (flags & PMAP_WIRED) {
-			/*
-			 * initial value of ref/mod are equal to prot,
-			 * and pte RW are same as prot.
-			 */
-			VM_PAGE_TO_MD(pg)->mdpg_flags |=
-			    (prot & mdattr);
-		} else {
-			/* pte RW will be masked by ref/mod for ref/mod emul */
-			mdattr &= VM_PAGE_TO_MD(pg)->mdpg_flags;
-		}
+		/* update referenced/modified flags */
+		VM_PAGE_TO_MD(pg)->mdpg_flags |=
+		    (flags & (VM_PROT_READ | VM_PROT_WRITE));
+		mdattr &= VM_PAGE_TO_MD(pg)->mdpg_flags;
 	}
 
 #ifdef PMAPCOUNTERS
@@ -1458,7 +1480,7 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	}
 #endif
 
-	attr = _pmap_pte_adjust_prot(L3_PAGE, prot, mdattr);
+	attr = _pmap_pte_adjust_prot(L3_PAGE, prot, mdattr, user);
 	attr = _pmap_pte_adjust_cacheflags(attr, flags);
 	if (VM_MAXUSER_ADDRESS > va)
 		attr |= LX_BLKPAG_APUSER;
@@ -1469,18 +1491,24 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 #endif
 
 	pte = pa | attr;
-	atomic_swap_64(ptep, pte);
-
-#if 0
-	/* didn't work??? */
-	aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-	aarch64_tlbi_by_va(va);
-#endif
 
 	if (!executable && (prot & VM_PROT_EXECUTE)) {
 		/* non-exec -> exec */
-		cpu_icache_sync_range(va, PAGE_SIZE);
+		UVMHIST_LOG(pmaphist,
+		    "icache_sync: pm=%p, va=%016lx, pte: %016lx -> %016lx",
+		    pm, va, opte, pte);
+		if (!l3pte_writable(pte)) {
+			PTE_ICACHE_SYNC_PAGE(pte, ptep, pm, va, l3only);
+			atomic_swap_64(ptep, pte);
+			AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va ,true);
+		} else {
+			atomic_swap_64(ptep, pte);
+			AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, l3only);
+			cpu_icache_sync_range(va, PAGE_SIZE);
+		}
+	} else {
+		atomic_swap_64(ptep, pte);
+		AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, l3only);
 	}
 
 	if (pte & LX_BLKPAG_OS_WIRED)
@@ -1488,8 +1516,15 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	pm->pm_stats.resident_count++;
 
  done:
-	if (!pm_locked)
-		PM_UNLOCK(pm);
+	pm_unlock(pm);
+
+	/* spare pv was not used. discard */
+	if (spv != NULL)
+		pool_cache_put(&_pmap_pv_pool, spv);
+
+	if (opv != NULL)
+		pool_cache_put(&_pmap_pv_pool, opv);
+
 	return error;
 }
 
@@ -1512,6 +1547,7 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 {
 	pt_entry_t pte, *ptep;
 	struct vm_page *pg;
+	struct pv_entry *opv = NULL;
 	paddr_t pa;
 
 
@@ -1521,11 +1557,13 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 	UVMHIST_LOG(pmaphist, "pm=%p, va=%016lx, kremovemode=%d",
 	    pm, va, kremove, 0);
 
-	ptep = _pmap_pte_lookup(pm, va);
+	pm_lock(pm);
+
+	ptep = _pmap_pte_lookup_l3(pm, va);
 	if (ptep != NULL) {
 		pte = *ptep;
 		if (!l3pte_valid(pte))
-			return;
+			goto done;
 
 		pa = l3pte_pa(pte);
 
@@ -1535,19 +1573,20 @@ _pmap_remove(struct pmap *pm, vaddr_t va, bool kremove)
 			pg = PHYS_TO_VM_PAGE(pa);
 
 		if (pg != NULL)
-			_pmap_remove_pv(pg, pm, va, pte);
+			opv = _pmap_remove_pv(pg, pm, va, pte);
 
 		atomic_swap_64(ptep, 0);
-#if 0
-		aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-		aarch64_tlbi_by_va(va);
-#endif
+		AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
 
 		if ((pte & LX_BLKPAG_OS_WIRED) != 0)
 			pm->pm_stats.wired_count--;
 		pm->pm_stats.resident_count--;
 	}
+ done:
+	pm_unlock(pm);
+
+	if (opv != NULL)
+		pool_cache_put(&_pmap_pv_pool, opv);
 }
 
 void
@@ -1555,16 +1594,11 @@ pmap_remove(struct pmap *pm, vaddr_t sva, vaddr_t eva)
 {
 	vaddr_t va;
 
-	PM_ADDR_CHECK(pm, sva);
-
-	PM_LOCK(pm);
-
+	KASSERT_PM_ADDR(pm, sva);
 	KASSERT(!IN_KSEG_ADDR(sva));
 
 	for (va = sva; va < eva; va += PAGE_SIZE)
 		_pmap_remove(pm, va, false);
-
-	PM_UNLOCK(pm);
 }
 
 void
@@ -1591,12 +1625,9 @@ pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 		TAILQ_FOREACH_SAFE(pv, &md->mdpg_pvhead, pv_link, pvtmp) {
 
 			opte = atomic_swap_64(pv->pv_ptep, 0);
-#if 0
-			aarch64_tlbi_by_asid_va(pv->pv_pmap->pm_asid,
-			    pv->pv_va);
-#else
-			aarch64_tlbi_by_va(pv->pv_va);
-#endif
+			AARCH64_TLBI_BY_ASID_VA(pv->pv_pmap->pm_asid,
+			    pv->pv_va, true);
+
 			if ((opte & LX_BLKPAG_OS_WIRED) != 0)
 				pv->pv_pmap->pm_stats.wired_count--;
 			pv->pv_pmap->pm_stats.resident_count--;
@@ -1628,17 +1659,18 @@ pmap_unwire(struct pmap *pm, vaddr_t va)
 
 	PMAP_COUNT(unwire);
 
-	PM_ADDR_CHECK(pm, va);
+	KASSERT_PM_ADDR(pm, va);
+	KASSERT(!IN_KSEG_ADDR(va));
 
-	PM_LOCK(pm);
-	ptep = _pmap_pte_lookup(pm, va);
+	pm_lock(pm);
+	ptep = _pmap_pte_lookup_l3(pm, va);
 	if (ptep != NULL) {
 		pte = *ptep;
 		if (!l3pte_valid(pte) ||
 		    ((pte & LX_BLKPAG_OS_WIRED) == 0)) {
 			/* invalid pte, or pte is not wired */
 			PMAP_COUNT(unwire_failure);
-			PM_UNLOCK(pm);
+			pm_unlock(pm);
 			return;
 		}
 
@@ -1647,7 +1679,7 @@ pmap_unwire(struct pmap *pm, vaddr_t va)
 
 		pm->pm_stats.wired_count--;
 	}
-	PM_UNLOCK(pm);
+	pm_unlock(pm);
 }
 
 bool
@@ -1658,6 +1690,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	pt_entry_t *ptep, pte;
 	vm_prot_t pmap_prot;
 	paddr_t pa;
+	bool fixed = false;
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
@@ -1667,12 +1700,12 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 
 
 #if 0
-	PM_ADDR_CHECK(pm, va);
+	KASSERT_PM_ADDR(pm, va);
 #else
 	if (((pm == pmap_kernel()) &&
-	    !(VM_MIN_KERNEL_ADDRESS <= va && va < VM_MAX_KERNEL_ADDRESS)) ||
+	    !(IN_RANGE(va, VM_MIN_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS))) ||
 	    ((pm != pmap_kernel()) &&
-	    !(VM_MIN_ADDRESS <= va && va <= VM_MAX_ADDRESS))) {
+	    !(IN_RANGE(va, VM_MIN_ADDRESS, VM_MAX_ADDRESS)))) {
 
 		UVMHIST_LOG(pmaphist,
 		    "pmap space and va mismatch: pm=%s, va=%016lx",
@@ -1681,25 +1714,27 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	}
 #endif
 
-	ptep = _pmap_pte_lookup(pm, va);
+	pm_lock(pm);
+
+	ptep = _pmap_pte_lookup_l3(pm, va);
 	if (ptep == NULL) {
 		UVMHIST_LOG(pmaphist, "pte_lookup failure: va=%016lx",
 		    va, 0, 0, 0);
-		return false;
+		goto done;
 	}
 
 	pte = *ptep;
 	if (!l3pte_valid(pte)) {
 		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
 		    pte, va, 0, 0);
-		return false;
+		goto done;
 	}
 
 	pa = l3pte_pa(*ptep);
 	pg = PHYS_TO_VM_PAGE(pa);
 	if (pg == NULL) {
 		UVMHIST_LOG(pmaphist, "pg not found: va=%016lx", va, 0, 0, 0);
-		return false;
+		goto done;
 	}
 	md = VM_PAGE_TO_MD(pg);
 
@@ -1717,7 +1752,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 		pmap_prot = (VM_PROT_READ|VM_PROT_WRITE);
 		break;
 	}
-	if ((pte & (LX_BLKPAG_UXN|LX_BLKPAG_PXN)) == 0)
+	if (l3pte_executable(pte, pm != pmap_kernel()))
 		pmap_prot |= VM_PROT_EXECUTE;
 
 	UVMHIST_LOG(pmaphist, "va=%016lx, pmapprot=%08x, accessprot=%08x",
@@ -1729,25 +1764,12 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	/* no permission to read/write/execute for this page */
 	if ((pmap_prot & accessprot) != accessprot) {
 		UVMHIST_LOG(pmaphist, "no permission to access", 0, 0, 0, 0);
-		return false;
+		goto done;
 	}
 
-	if ((pte & LX_BLKPAG_AF) && ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW)) {
-#if 1 /* XXX: DEBUG */
-		if (!user) {
-			/*
-			 * pte is readable and writable, but occured fault?
-			 * unprivileged load/store, or else ?
-			 */
-			printf("%s: fault: va=%016lx pte=%08llx: pte is rw."
-			    " unprivileged load/store ? (onfault=%p)\n",
-			    __func__, va, pte, curlwp->l_md.md_onfault);
-		}
-#endif
-		return false;
-	}
-	KASSERT(((pte & LX_BLKPAG_AF) == 0) ||
-	    ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO));
+	/* pte is readable and writable, but occured fault? probably copy(9) */
+	if ((pte & LX_BLKPAG_AF) && ((pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW))
+		goto done;
 
 	pmap_pv_lock(md);
 	if ((pte & LX_BLKPAG_AF) == 0) {
@@ -1777,20 +1799,18 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	pmap_pv_unlock(md);
 
 	atomic_swap_64(ptep, pte);
-#if 0
-	/* didn't work??? */
-	aarch64_tlbi_by_asid_va(pm->pm_asid, va);
-#else
-	aarch64_tlbi_by_va(va);
-#endif
+	AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
 
-	return true;
+	fixed = true;
+
+ done:
+	pm_unlock(pm);
+	return fixed;
 }
 
 bool
 pmap_clear_modify(struct vm_page *pg)
 {
-	struct pmap *pm;
 	struct pv_entry *pv;
 	struct vm_page_md * const md = VM_PAGE_TO_MD(pg);
 	pt_entry_t *ptep, pte, opte;
@@ -1815,7 +1835,6 @@ pmap_clear_modify(struct vm_page *pg)
 	TAILQ_FOREACH(pv, &md->mdpg_pvhead, pv_link) {
 		PMAP_COUNT(clear_modify_pages);
 
-		pm = pv->pv_pmap;
 		va = pv->pv_va;
 
 		ptep = pv->pv_ptep;
@@ -1834,11 +1853,7 @@ pmap_clear_modify(struct vm_page *pg)
 			goto tryagain;
 		}
 
-#if 0
-		aarch64_tlbi_by_asid_va(pv->pv_pmap->pm_asid, va);
-#else
-		aarch64_tlbi_by_va(va);
-#endif
+		AARCH64_TLBI_BY_ASID_VA(pv->pv_pmap->pm_asid, va, true);
 
 		UVMHIST_LOG(pmaphist,
 		    "va=%016llx, ptep=%p, pa=%016lx, RW -> RO",
@@ -1853,7 +1868,6 @@ pmap_clear_modify(struct vm_page *pg)
 bool
 pmap_clear_reference(struct vm_page *pg)
 {
-	struct pmap *pm;
 	struct pv_entry *pv;
 	struct vm_page_md * const md = VM_PAGE_TO_MD(pg);
 	pt_entry_t *ptep, pte, opte;
@@ -1877,7 +1891,6 @@ pmap_clear_reference(struct vm_page *pg)
 	TAILQ_FOREACH(pv, &md->mdpg_pvhead, pv_link) {
 		PMAP_COUNT(clear_reference_pages);
 
-		pm = pv->pv_pmap;
 		va = pv->pv_va;
 
 		ptep = pv->pv_ptep;
@@ -1895,11 +1908,7 @@ pmap_clear_reference(struct vm_page *pg)
 			goto tryagain;
 		}
 
-#if 0
-		aarch64_tlbi_by_asid_va(pv->pv_pmap->pm_asid, va);
-#else
-		aarch64_tlbi_by_va(va);
-#endif
+		AARCH64_TLBI_BY_ASID_VA(pv->pv_pmap->pm_asid, va, true);
 
 		UVMHIST_LOG(pmaphist, "va=%016llx, ptep=%p, pa=%016lx, unse AF",
 		    va, ptep, l3pte_pa(pte), 0);
@@ -1927,46 +1936,107 @@ pmap_is_referenced(struct vm_page *pg)
 }
 
 #ifdef DDB
-static void
-pmap_db_pte_print(pt_entry_t pte, int level, void (*pr)(const char *, ...))
+/* get pointer to kernel segment L2 or L3 table entry */
+pt_entry_t *
+kvtopte(vaddr_t va)
+{
+	KASSERT(IN_RANGE(va, VM_MIN_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS));
+
+	return _pmap_pte_lookup_bs(pmap_kernel(), va, NULL);
+}
+
+/* change attribute of kernel segment */
+pt_entry_t
+pmap_kvattr(vaddr_t va, vm_prot_t prot)
+{
+	pt_entry_t *ptep, pte, opte;
+
+	KASSERT(IN_RANGE(va, VM_MIN_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS));
+
+	ptep = kvtopte(va);
+	if (ptep == NULL)
+		panic("%s: %016lx is not mapped\n", __func__, va);
+
+	opte = pte = *ptep;
+
+	pte &= ~(LX_BLKPAG_AF|LX_BLKPAG_AP);
+	switch (prot & (VM_PROT_READ|VM_PROT_WRITE)) {
+	case 0:
+		break;
+	case VM_PROT_READ:
+		pte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RO);
+		break;
+	case VM_PROT_WRITE:
+	case VM_PROT_READ|VM_PROT_WRITE:
+		pte |= (LX_BLKPAG_AF|LX_BLKPAG_AP_RW);
+		break;
+	}
+
+	if ((prot & VM_PROT_EXECUTE) == 0) {
+		pte |= LX_BLKPAG_PXN;
+	} else {
+		pte |= LX_BLKPAG_AF;
+		pte &= ~LX_BLKPAG_PXN;
+	}
+
+	*ptep = pte;
+
+	return opte;
+}
+
+void
+pmap_db_pte_print(pt_entry_t pte, int level,
+    void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	if (pte == 0) {
-		pr("UNUSED\n");
+		pr(" UNUSED\n");
+		return;
+	}
 
-	} else if (level == 0) {
-		/* L0 pde */
-		pr(", %s",
-		    l1pde_is_table(pte) ? "TABLE" : "***ILLEGAL TYPE***");
-		pr(", %s", l0pde_valid(pte) ? "VALID" : "***INVALID***");
+	pr(" %s", (pte & LX_VALID) ? "VALID" : "**INVALID**");
 
-		pr(", PA=%016lx", l0pde_pa(pte));
+	if ((level == 0) ||
+	    ((level == 1) && l1pde_is_table(pte)) ||
+	    ((level == 2) && l2pde_is_table(pte))) {
+
+		/* L0/L1/L2 TABLE */
+		if ((level == 0) && ((pte & LX_TYPE) != LX_TYPE_TBL))
+			pr(" **ILLEGAL TYPE**"); /* L0 doesn't support block */
+		else
+			pr(" TABLE");
+
+		pr(", PA=%lx", l0pde_pa(pte));
+
+		if (pte & LX_TBL_NSTABLE)
+			pr(", NSTABLE");
+		if (pte & LX_TBL_APTABLE)
+			pr(", APTABLE");
+		if (pte & LX_TBL_UXNTABLE)
+			pr(", UXNTABLE");
+		if (pte & LX_TBL_PXNTABLE)
+			pr(", PXNTABLE");
 
 	} else if (((level == 1) && l1pde_is_block(pte)) ||
 	    ((level == 2) && l2pde_is_block(pte)) ||
-		(level == 3)) {
+	    (level == 3)) {
 
+		/* L1/L2 BLOCK or L3 PAGE */
 		if (level == 3) {
-			pr(", %s",
-			    l3pte_is_page(pte) ? " PAGE" : "**ILLEGAL TYPE**");
-			pr(", %s",
-			    l3pte_valid(pte) ? "VALID" : "**INVALID**");
-		} else {
-			pr(", %s", l1pde_is_table(pte) ? "TABLE" : "BLOCK");
-			pr(", %s",
-			    l1pde_valid(pte) ? "VALID" : "**INVALID**");
-		}
+			pr(" %s", l3pte_is_page(pte) ?
+			    "PAGE" : "**ILLEGAL TYPE**");
+		} else
+			pr(" BLOCK");
 
-		pr(", PA=%016lx", l3pte_pa(pte));
+		pr(", PA=%lx", l3pte_pa(pte));
 
-		/* L[12] block, or L3 pte */
-		pr(", %s", (pte & LX_BLKPAG_UXN) ? "UXN" : "---");
-		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" : "---");
+		pr(", %s", (pte & LX_BLKPAG_UXN) ? "UXN" : "user-exec");
+		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" : "kernel-exec");
 
 		if (pte & LX_BLKPAG_CONTIG)
-			pr(",CONTIG");
+			pr(", CONTIG");
 
-		pr(", %s", (pte & LX_BLKPAG_NG) ? "NG" : "--");
-		pr(", %s", (pte & LX_BLKPAG_AF) ? "AF" : "--");
+		pr(", %s", (pte & LX_BLKPAG_NG) ? "NG" : "global");
+		pr(", %s", (pte & LX_BLKPAG_AF) ? "AF" : "*cannot-access*");
 
 		switch (pte & LX_BLKPAG_SH) {
 		case LX_BLKPAG_SH_NS:
@@ -1985,6 +2055,7 @@ pmap_db_pte_print(pt_entry_t pte, int level, void (*pr)(const char *, ...))
 
 		pr(", %s", (pte & LX_BLKPAG_AP_RO) ? "RO" : "RW");
 		pr(", %s", (pte & LX_BLKPAG_APUSER) ? "EL0" : "EL1");
+		pr(", %s", (pte & LX_BLKPAG_NS) ? "NS" : "secure");
 
 		switch (pte & LX_BLKPAG_ATTR_MASK) {
 		case LX_BLKPAG_ATTR_NORMAL_WB:
@@ -2001,55 +2072,47 @@ pmap_db_pte_print(pt_entry_t pte, int level, void (*pr)(const char *, ...))
 			break;
 		}
 
+		if (pte & LX_BLKPAG_OS_BOOT)
+			pr(", boot");
 		if (pte & LX_BLKPAG_OS_READ)
 			pr(", pmap_read");
 		if (pte & LX_BLKPAG_OS_WRITE)
 			pr(", pmap_write");
-		if ((pte & (LX_BLKPAG_UXN|LX_BLKPAG_PXN)) == 0)
-			pr(", executable");
-
+		if (pte & LX_BLKPAG_OS_WIRED)
+			pr(", pmap_wired");
 	} else {
-		/* L1 and L2 pde */
-		pr(", %s", l1pde_is_table(pte) ? "TABLE" : "BLOCK");
-		pr(", %s", l1pde_valid(pte) ? "VALID" : "**INVALID**");
-		pr(", PA=%016lx", l1pde_pa(pte));
+		pr(" **ILLEGAL TYPE**");
 	}
 	pr("\n");
 }
 
-
 void
 pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 {
-	struct pmap *pm;
 	struct vm_page *pg;
 	bool user;
-
-
-	if (VM_MAXUSER_ADDRESS > va) {
-		pm = curlwp->l_proc->p_vmspace->vm_map.pmap;
-		user = true;
-	} else {
-		pm = pmap_kernel();
-		user = false;
-	}
-
-
 	pd_entry_t *l0, *l1, *l2, *l3;
 	pd_entry_t pde;
 	pt_entry_t pte;
 	struct vm_page_md *md;
+	uint64_t ttbr;
 	paddr_t pa;
 	unsigned int idx;
+
+	if (va & TTBR_SEL_VA) {
+		user = false;
+		ttbr = reg_ttbr1_el1_read();
+	} else {
+		user = true;
+		ttbr = reg_ttbr0_el1_read();
+	}
+	pa = ttbr & TTBR_BADDR;
+	l0 = (pd_entry_t *)AARCH64_PA_TO_KVA(pa);
 
 	/*
 	 * traverse L0 -> L1 -> L2 -> L3 table
 	 */
-
-	l0 = pm->pm_l0table;
-
-	pr("TTBR%d=%016llx (%016llx)", user ? 0 : 1,
-	    pm->pm_l0table_pa, l0);
+	pr("TTBR%d=%016llx, pa=%016lx, va=%016lx", user ? 0 : 1, ttbr, l0);
 	pr(", input-va=%016llx,"
 	    " L0-index=%d, L1-index=%d, L2-index=%d, L3-index=%d\n",
 	    va,
@@ -2061,42 +2124,44 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...))
 	idx = l0pde_index(va);
 	pde = l0[idx];
 
-	pr("L0[%3d]=%016llx", idx, pde);
+	pr("L0[%3d]=%016llx:", idx, pde);
 	pmap_db_pte_print(pde, 0, pr);
 
 	if (!l0pde_valid(pde))
 		return;
 
-	l1 = AARCH64_PA_TO_KVA(l0pde_pa(pde));
+	l1 = (pd_entry_t *)AARCH64_PA_TO_KVA(l0pde_pa(pde));
 	idx = l1pde_index(va);
 	pde = l1[idx];
 
-	pr(" L1[%3d]=%016llx", idx, pde);
+	pr(" L1[%3d]=%016llx:", idx, pde);
 	pmap_db_pte_print(pde, 1, pr);
 
 	if (!l1pde_valid(pde) || l1pde_is_block(pde))
 		return;
 
-	l2 = AARCH64_PA_TO_KVA(l1pde_pa(pde));
+	l2 = (pd_entry_t *)AARCH64_PA_TO_KVA(l1pde_pa(pde));
 	idx = l2pde_index(va);
 	pde = l2[idx];
 
-	pr("  L2[%3d]=%016llx", idx, pde);
+	pr("  L2[%3d]=%016llx:", idx, pde);
 	pmap_db_pte_print(pde, 2, pr);
 
 	if (!l2pde_valid(pde) || l2pde_is_block(pde))
 		return;
 
-	l3 = AARCH64_PA_TO_KVA(l2pde_pa(pde));
+	l3 = (pd_entry_t *)AARCH64_PA_TO_KVA(l2pde_pa(pde));
 	idx = l3pte_index(va);
 	pte = l3[idx];
 
-	pr("   L3[%3d]=%016llx", idx, pte);
+	pr("   L3[%3d]=%016llx:", idx, pte);
 	pmap_db_pte_print(pte, 3, pr);
 
 	pa = l3pte_pa(pte);
 	pg = PHYS_TO_VM_PAGE(pa);
-	if (pg != NULL) {
+	if (pg == NULL) {
+		pr("No VM_PAGE\n");
+	} else {
 		pg_dump(pg, pr);
 		md = VM_PAGE_TO_MD(pg);
 		pv_dump(md, pr);

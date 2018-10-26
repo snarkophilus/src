@@ -68,8 +68,12 @@
 #ifndef	_ARM32_PMAP_ARMV6N_H_
 #define	_ARM32_PMAP_ARMV6N_H_
 
+#if 0
+// if system has too much ram to do direct map then it all turns to pot
+// let's hope we don't need this
 #ifndef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 #error PMAP requires __HAVE_MM_MD_DIRECT_MAPPED_PHYS
+#endif
 #endif
 
 #define PMAP_HWPAGEWALKER		1
@@ -226,6 +230,22 @@ extern bool arm_has_tlbiasid_p;	/* also in <arm/locore.h> */
 
 
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
+
+
+
+static __inline paddr_t
+pte_to_paddr(pt_entry_t pte)
+{
+	return l2pte_pa(pte);
+}
+
+static inline bool
+pte_valid_p(pt_entry_t pte)
+{
+	return l2pte_valid_p(pte);
+}
+
+
 
 static inline int
 pmap_md_pagecolor(struct vm_page *pg)

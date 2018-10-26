@@ -86,6 +86,11 @@
 #define IPDEFTTL 64 /* RFC1340 */
 #endif
 
+/* NetBSD-7 has an incomplete IP_PKTINFO implementation. */
+#if defined(__NetBSD_Version__) && __NetBSD_Version__ < 800000000
+#undef IP_PKTINFO
+#endif
+
 /* Assert the correct structure size for on wire */
 __CTASSERT(sizeof(struct ip)		== 20);
 __CTASSERT(sizeof(struct udphdr)	== 8);
@@ -2101,8 +2106,10 @@ dhcp_arp_probed(struct arp_state *astate)
 	if (ifp->ctx->options & DHCPCD_FORKED)
 		return;
 
+#ifdef IPV4LL
 	/* Stop IPv4LL now we have a working DHCP address */
 	ipv4ll_drop(ifp);
+#endif
 
 	if (ifo->options & DHCPCD_INFORM)
 		dhcp_inform(ifp);
@@ -3265,7 +3272,7 @@ get_udp_data(void *udp, size_t *len)
 	struct bootp_pkt *p;
 
 	p = (struct bootp_pkt *)udp;
-	*len = ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
+	*len = (size_t)ntohs(p->ip.ip_len) - sizeof(p->ip) - sizeof(p->udp);
 	return (char *)udp + offsetof(struct bootp_pkt, bootp);
 }
 
@@ -3276,7 +3283,7 @@ valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
 	struct bootp_pkt *p;
 	uint16_t bytes;
 
-	if (data_len < sizeof(p->ip) + sizeof(p->udp)) {
+	if (data_len < sizeof(p->ip)) {
 		if (from)
 			from->s_addr = INADDR_ANY;
 		errno = ERANGE;
@@ -3291,6 +3298,12 @@ valid_udp_packet(void *data, size_t data_len, struct in_addr *from,
 	}
 
 	bytes = ntohs(p->ip.ip_len);
+	/* Check we have a payload */
+	if (bytes <= sizeof(p->ip) + sizeof(p->udp)) {
+		errno = ERANGE;
+		return -1;
+	}
+	/* Check we don't go beyond the payload */
 	if (bytes > data_len) {
 		errno = ENOBUFS;
 		return -1;
@@ -3334,7 +3347,7 @@ dhcp_handlepacket(struct interface *ifp, uint8_t *data, size_t len)
 			     state->bpf_flags & RAW_PARTIALCSUM) == -1)
 	{
 		if (errno == EINVAL)
-			logerrx("%s: UDP checksum failure from %s",
+			logerrx("%s: checksum failure from %s",
 			  ifp->name, inet_ntoa(from));
 		else
 			logerr("%s: invalid UDP packet from %s",

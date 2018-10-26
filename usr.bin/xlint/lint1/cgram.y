@@ -1,5 +1,5 @@
 %{
-/* $NetBSD: cgram.y,v 1.95 2018/01/15 21:58:54 christos Exp $ */
+/* $NetBSD: cgram.y,v 1.98 2018/09/03 15:16:33 christos Exp $ */
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All Rights Reserved.
@@ -35,7 +35,7 @@
 
 #include <sys/cdefs.h>
 #if defined(__RCSID) && !defined(lint)
-__RCSID("$NetBSD: cgram.y,v 1.95 2018/01/15 21:58:54 christos Exp $");
+__RCSID("$NetBSD: cgram.y,v 1.98 2018/09/03 15:16:33 christos Exp $");
 #endif
 
 #include <stdlib.h>
@@ -214,10 +214,12 @@ anonymize(sym_t *s)
 %token <y_type>		T_AT_FORMAT_SCANF
 %token <y_type>		T_AT_FORMAT_STRFMON
 %token <y_type>		T_AT_FORMAT_STRFTIME
+%token <y_type>		T_AT_FORMAT_SYSLOG
 %token <y_type>		T_AT_GNU_INLINE
 %token <y_type>		T_AT_MAY_ALIAS
 %token <y_type>		T_AT_MINBYTES
 %token <y_type>		T_AT_MODE
+%token <y_type>		T_AT_NOINLINE
 %token <y_type>		T_AT_NONNULL
 %token <y_type>		T_AT_NORETURN
 %token <y_type>		T_AT_NO_INSTRUMENT_FUNCTION
@@ -512,6 +514,7 @@ type_attribute_format_type:
 	| T_AT_FORMAT_SCANF
 	| T_AT_FORMAT_STRFMON
 	| T_AT_FORMAT_STRFTIME
+	| T_AT_FORMAT_SYSLOG
 	;
 
 type_attribute_bounded_type:
@@ -520,8 +523,10 @@ type_attribute_bounded_type:
 	| T_AT_BUFFER
 	;
 
+
 type_attribute_spec:
 	  /* empty */	
+	| T_AT_DEPRECATED T_LPARN string T_RPARN
 	| T_AT_DEPRECATED
 	| T_AT_ALIGNED T_LPARN constant T_RPARN
 	| T_AT_BOUNDED T_LPARN type_attribute_bounded_type
@@ -537,6 +542,7 @@ type_attribute_spec:
 	| T_AT_CONSTRUCTOR 
 	| T_AT_MAY_ALIAS
 	| T_AT_NO_INSTRUMENT_FUNCTION
+	| T_AT_NOINLINE
 	| T_AT_NORETURN
 	| T_AT_COLD
 	| T_AT_RETURNS_TWICE

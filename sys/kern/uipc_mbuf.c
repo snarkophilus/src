@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_mbuf.c,v 1.212 2018/04/28 08:34:45 maxv Exp $	*/
+/*	$NetBSD: uipc_mbuf.c,v 1.220 2018/10/05 05:06:48 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1999, 2001 The NetBSD Foundation, Inc.
@@ -62,12 +62,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_mbuf.c,v 1.212 2018/04/28 08:34:45 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_mbuf.c,v 1.220 2018/10/05 05:06:48 msaitoh Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_mbuftrace.h"
 #include "opt_nmbclusters.h"
 #include "opt_ddb.h"
+#include "ether.h"
 #endif
 
 #include <sys/param.h>
@@ -88,7 +89,7 @@ __KERNEL_RCSID(0, "$NetBSD: uipc_mbuf.c,v 1.212 2018/04/28 08:34:45 maxv Exp $")
 #include <net/if.h>
 
 pool_cache_t mb_cache;	/* mbuf cache */
-pool_cache_t mcl_cache;	/* mbuf cluster cache */
+static pool_cache_t mcl_cache;	/* mbuf cluster cache */
 
 struct mbstat mbstat;
 int max_linkhdr;
@@ -327,7 +328,7 @@ sysctl_kern_mbuf(SYSCTLFN_ARGS)
 
 #ifdef MBUFTRACE
 static void
-mowner_conver_to_user_cb(void *v1, void *v2, struct cpu_info *ci)
+mowner_convert_to_user_cb(void *v1, void *v2, struct cpu_info *ci)
 {
 	struct mowner_counter *mc = v1;
 	struct mowner_user *mo_user = v2;
@@ -347,7 +348,7 @@ mowner_convert_to_user(struct mowner *mo, struct mowner_user *mo_user)
 	CTASSERT(sizeof(mo_user->mo_descr) == sizeof(mo->mo_descr));
 	memcpy(mo_user->mo_name, mo->mo_name, sizeof(mo->mo_name));
 	memcpy(mo_user->mo_descr, mo->mo_descr, sizeof(mo->mo_descr));
-	percpu_foreach(mo->mo_counters, mowner_conver_to_user_cb, mo_user);
+	percpu_foreach(mo->mo_counters, mowner_convert_to_user_cb, mo_user);
 }
 
 static int
@@ -651,7 +652,7 @@ m_dup(struct mbuf *m, int off, int len, int wait)
 static inline int
 m_copylen(int len, int copylen)
 {
-	return (len == M_COPYALL) ? copylen : min(len, copylen);
+	return (len == M_COPYALL) ? copylen : uimin(len, copylen);
 }
 
 static struct mbuf *
@@ -714,7 +715,7 @@ m_copy_internal(struct mbuf *m, int off0, int len, int wait, bool deep)
 				n->m_len = 0;
 				n->m_len = M_TRAILINGSPACE(n);
 				n->m_len = m_copylen(len, n->m_len);
-				n->m_len = min(n->m_len, m->m_len - off);
+				n->m_len = uimin(n->m_len, m->m_len - off);
 				memcpy(mtod(n, void *), mtod(m, char *) + off,
 				    (unsigned)n->m_len);
 			}
@@ -825,7 +826,7 @@ m_copydata(struct mbuf *m, int off, int len, void *cp)
 			    "m=NULL, off=%d (%d), len=%d (%d)",
 			    m0, len0, off0, cp0,
 			    off, off0 - off, len, len0 - len);
-		count = min(m->m_len - off, len);
+		count = uimin(m->m_len - off, len);
 		memcpy(cp, mtod(m, char *) + off, count);
 		len -= count;
 		cp = (char *)cp + count;
@@ -1038,7 +1039,7 @@ m_copyup(struct mbuf *n, int len, int dstoff)
 	m->m_data += dstoff;
 	space = &m->m_dat[MLEN] - (m->m_data + m->m_len);
 	do {
-		count = min(min(max(len, max_protohdr), space), n->m_len);
+		count = uimin(uimin(uimax(len, max_protohdr), space), n->m_len);
 		memcpy(mtod(m, char *) + m->m_len, mtod(n, void *),
 		    (unsigned)count);
 		len -= count;
@@ -1175,7 +1176,7 @@ m_devget(char *buf, int totlen, int off0, struct ifnet *ifp,
 			m->m_len = MLEN;
 		}
 
-		len = min(totlen, epkt - cp);
+		len = uimin(totlen, epkt - cp);
 
 		if (len >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
@@ -1184,7 +1185,7 @@ m_devget(char *buf, int totlen, int off0, struct ifnet *ifp,
 				m_freem(top);
 				return NULL;
 			}
-			m->m_len = len = min(len, MCLBYTES);
+			m->m_len = len = uimin(len, MCLBYTES);
 		} else {
 			/*
 			 * Place initial small packet/header at end of mbuf.
@@ -1336,10 +1337,10 @@ extend:
 			}
 			tspace = M_TRAILINGSPACE(m);
 			if (tspace > 0) {
-				tspace = min(tspace, off + len);
+				tspace = uimin(tspace, off + len);
 				KASSERT(tspace > 0);
 				memset(mtod(m, char *) + m->m_len, 0,
-				    min(off, tspace));
+				    uimin(off, tspace));
 				m->m_len += tspace;
 				off += mlen;
 				totlen -= mlen;
@@ -1358,8 +1359,8 @@ extend:
 			if (n == NULL) {
 				goto out;
 			}
-			n->m_len = min(M_TRAILINGSPACE(n), off + len);
-			memset(mtod(n, char *), 0, min(n->m_len, off));
+			n->m_len = uimin(M_TRAILINGSPACE(n), off + len);
+			memset(mtod(n, char *), 0, uimin(n->m_len, off));
 			m->m_next = n;
 		}
 		mp = &m->m_next;
@@ -1427,7 +1428,7 @@ extend:
 			eatlen = n->m_len;
 			while (m != NULL && M_READONLY(m) &&
 			    n->m_type == m->m_type && eatlen > 0) {
-				mlen = min(eatlen, m->m_len);
+				mlen = uimin(eatlen, m->m_len);
 				if (datap) {
 					m_copydata(m, 0, mlen, datap);
 					datap += mlen;
@@ -1444,7 +1445,7 @@ extend:
 			*mp = m = n;
 			continue;
 		}
-		mlen = min(mlen, len);
+		mlen = uimin(mlen, len);
 		if (flags & CB_COPYBACK) {
 			memcpy(mtod(m, char *) + off, cp, (unsigned)mlen);
 			cp += mlen;
@@ -1534,14 +1535,9 @@ m_defrag(struct mbuf *m, int how)
 }
 
 void
-m_pkthdr_remove(struct mbuf *m)
+m_remove_pkthdr(struct mbuf *m)
 {
 	KASSERT(m->m_flags & M_PKTHDR);
-
-	if (M_READONLY(m)) {
-		/* Nothing we can do. */
-		return;
-	}
 
 	m_tag_delete_chain(m, NULL);
 	m->m_flags &= ~M_PKTHDR;
@@ -1551,19 +1547,21 @@ m_pkthdr_remove(struct mbuf *m)
 void
 m_copy_pkthdr(struct mbuf *to, struct mbuf *from)
 {
+	KASSERT((to->m_flags & M_EXT) == 0);
+	KASSERT((to->m_flags & M_PKTHDR) == 0 || m_tag_first(to) == NULL);
 	KASSERT((from->m_flags & M_PKTHDR) != 0);
 
 	to->m_pkthdr = from->m_pkthdr;
 	to->m_flags = from->m_flags & M_COPYFLAGS;
+	to->m_data = to->m_pktdat;
+
 	SLIST_INIT(&to->m_pkthdr.tags);
 	m_tag_copy_chain(to, from);
-	to->m_data = to->m_pktdat;
 }
 
 void
 m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 {
-
 	KASSERT((to->m_flags & M_EXT) == 0);
 	KASSERT((to->m_flags & M_PKTHDR) == 0 || m_tag_first(to) == NULL);
 	KASSERT((from->m_flags & M_PKTHDR) != 0);
@@ -1599,7 +1597,7 @@ m_apply(struct mbuf *m, int off, int len,
 	}
 	while (len > 0) {
 		KASSERT(m != NULL);
-		count = min(m->m_len - off, len);
+		count = uimin(m->m_len - off, len);
 
 		rval = (*f)(arg, mtod(m, char *) + off, count);
 		if (rval)
@@ -1650,6 +1648,12 @@ m_print(const struct mbuf *m, const char *modif, void (*pr)(const char *, ...))
 {
 	char ch;
 	bool opt_c = false;
+	bool opt_d = false;
+#if NETHER > 0
+	bool opt_v = false;
+	const struct mbuf *m0 = NULL;
+#endif
+	int no = 0;
 	char buf[512];
 
 	while ((ch = *(modif++)) != '\0') {
@@ -1657,14 +1661,39 @@ m_print(const struct mbuf *m, const char *modif, void (*pr)(const char *, ...))
 		case 'c':
 			opt_c = true;
 			break;
+		case 'd':
+			opt_d = true;
+			break;
+#if NETHER > 0
+		case 'v':
+			opt_v = true;
+			m0 = m;
+			break;
+#endif
+		default:
+			break;
 		}
 	}
 
 nextchain:
-	(*pr)("MBUF %p\n", m);
+	(*pr)("MBUF(%d) %p\n", no, m);
 	snprintb(buf, sizeof(buf), M_FLAGS_BITS, (u_int)m->m_flags);
 	(*pr)("  data=%p, len=%d, type=%d, flags=%s\n",
 	    m->m_data, m->m_len, m->m_type, buf);
+	if (opt_d) {
+		int i;
+		unsigned char *p = m->m_data;
+
+		(*pr)("  data:");
+
+		for (i = 0; i < m->m_len; i++) {
+			if (i % 16 == 0)
+				(*pr)("\n");
+			(*pr)(" %02x", p[i]);
+		}
+
+		(*pr)("\n");
+	}
 	(*pr)("  owner=%p, next=%p, nextpkt=%p\n", m->m_owner, m->m_next,
 	    m->m_nextpkt);
 	(*pr)("  leadingspace=%u, trailingspace=%u, readonly=%u\n",
@@ -1700,9 +1729,15 @@ nextchain:
 	if (opt_c) {
 		m = m->m_next;
 		if (m != NULL) {
+			no++;
 			goto nextchain;
 		}
 	}
+
+#if NETHER > 0
+	if (opt_v && m0)
+		m_examine(m0, AF_ETHER, modif, pr);
+#endif
 }
 #endif /* defined(DDB) */
 

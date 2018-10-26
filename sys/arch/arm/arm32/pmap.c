@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.365 2018/04/01 04:35:03 ryo Exp $	*/
+/*	$NetBSD: pmap.c,v 1.370 2018/10/18 09:01:52 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -218,7 +218,7 @@
 #include <arm/locore.h>
 #include <arm/arm32/pmap_common.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.365 2018/04/01 04:35:03 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.370 2018/10/18 09:01:52 skrll Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG
@@ -258,6 +258,13 @@ int pmapdebug = 0;
 #else	/* PMAP_DEBUG */
 #define NPDEBUG(_lev_,_stat_) /* Nothing */
 #endif	/* PMAP_DEBUG */
+
+
+#ifdef VERBOSE_INIT_ARM
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
 
 /*
  * pmap_kernel() points here
@@ -3798,7 +3805,7 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 		     page_size = PAGE_SIZE) {
 			if (l2pte_valid_p(*ptep)) {
 				cpu_icache_sync_range(sva,
-				    min(page_size, eva - sva));
+				    uimin(page_size, eva - sva));
 			}
 		}
 	}
@@ -4961,8 +4968,6 @@ pmap_init_l1(struct l1_ttable *l1, pd_entry_t *l1pt)
 
 
 
-
-
 void
 pmap_init(void)
 {
@@ -5300,7 +5305,7 @@ SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
 
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *
-arm_pmap_alloc_poolpage(int flags)
+pmap_md_alloc_poolpage(int flags)
 {
 	/*
 	 * On some systems, only some pages may be "coherent" for dma and we

@@ -1,4 +1,4 @@
-/*	$NetBSD: privsep.c,v 1.23 2016/03/11 18:28:43 christos Exp $	*/
+/*	$NetBSD: privsep.c,v 1.25 2018/08/28 09:10:28 christos Exp $	*/
 
 /* Id: privsep.c,v 1.15 2005/08/08 11:23:44 vanhu Exp */
 
@@ -332,7 +332,6 @@ privsep_init(void)
 		struct privsep_com_msg *combuf;
 		struct privsep_com_msg *reply;
 		char *data;
-		size_t *buflen;
 		size_t totallen;
 		char *bufs[PRIVSEP_NBUF_MAX];
 		int i;
@@ -698,7 +697,6 @@ privsep_init(void)
 
 #ifdef ENABLE_HYBRID
 		case PRIVSEP_ACCOUNTING_SYSTEM: {
-			int pool_size;
 			int port;
 			int inout;
 			struct sockaddr *raddr;
@@ -919,7 +917,7 @@ privsep_eay_get_pkcs1privkey(path)
 	memcpy(msg + 1, path, msg->bufs.buflen[0]);
 
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return NULL;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return NULL;
@@ -1036,13 +1034,14 @@ privsep_script_exec(script, name, envp)
 	 * And send it!
 	 */
 	if (privsep_send(privsep_sock[1], msg, msg->hdr.ac_len) != 0)
-		return -1;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return -1;
 
 	if (msg->hdr.ac_errno != 0) {
 		errno = msg->hdr.ac_errno;
+out:
 		racoon_free(msg);
 		return -1;
 	}
@@ -1059,7 +1058,6 @@ privsep_getpsk(str, keylen)
 	vchar_t *psk;
 	struct privsep_com_msg *msg;
 	size_t len;
-	int *keylenp;
 	char *data;
 
 	if (geteuid() == 0)
@@ -1084,7 +1082,7 @@ privsep_getpsk(str, keylen)
 	memcpy(data, &keylen, sizeof(keylen));
 
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return NULL;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return NULL;
@@ -1121,7 +1119,7 @@ privsep_socket(domain, type, protocol)
 	size_t len;
 	char *data;
 	struct socket_args socket_args;
-	int s, saved_errno = 0;
+	int s;
 
 	if (geteuid() == 0)
 		return socket(domain, type, protocol);
@@ -1357,12 +1355,13 @@ privsep_xauth_login_system(usr, pwd)
 	
 	/* frees msg */
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return -1;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return -1;
 
 	if (msg->hdr.ac_errno != 0) {
+out:
 		racoon_free(msg);
 		return -1;
 	}
@@ -1381,7 +1380,6 @@ privsep_accounting_system(port, raddr, usr, inout)
 	struct privsep_com_msg *msg;
 	size_t len;
 	char *data;
-	int result;
 
 	if (geteuid() == 0)
 		return isakmp_cfg_accounting_system(port, raddr,
@@ -1420,7 +1418,7 @@ privsep_accounting_system(port, raddr, usr, inout)
 
 	/* frees msg */
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return -1;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return -1;
@@ -1637,7 +1635,6 @@ privsep_accounting_pam(port, inout)
 	int *port_data;
 	int *inout_data;
 	int *pool_size_data;
-	int result;
 
 	if (geteuid() == 0)
 		return isakmp_cfg_accounting_pam(port, inout);
@@ -1669,7 +1666,7 @@ privsep_accounting_pam(port, inout)
 
 	/* frees msg */
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return -1;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return -1;
@@ -1697,7 +1694,6 @@ privsep_xauth_login_pam(port, raddr, usr, pwd)
 	struct privsep_com_msg *msg;
 	size_t len;
 	char *data;
-	int result;
 
 	if (geteuid() == 0)
 		return xauth_login_pam(port, raddr, usr, pwd);
@@ -1740,7 +1736,7 @@ privsep_xauth_login_pam(port, raddr, usr, pwd)
 
 	/* frees msg */
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return -1;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return -1;
@@ -1765,7 +1761,6 @@ privsep_cleanup_pam(port)
 	struct privsep_com_msg *msg;
 	size_t len;
 	char *data;
-	int result;
 
 	if (geteuid() == 0)
 		return cleanup_pam(port);
@@ -1793,7 +1788,7 @@ privsep_cleanup_pam(port)
 
 	/* frees msg */
 	if (privsep_send(privsep_sock[1], msg, len) != 0)
-		return;
+		goto out;
 
 	if (privsep_recv(privsep_sock[1], &msg, &len) != 0)
 		return;
@@ -1801,6 +1796,7 @@ privsep_cleanup_pam(port)
 	if (msg->hdr.ac_errno != 0)
 		errno = msg->hdr.ac_errno;
 
+out:
 	racoon_free(msg);
 	return;
 }

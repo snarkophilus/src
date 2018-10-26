@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.1058 2018/04/24 23:29:13 christos Exp $
+#	$NetBSD: bsd.own.mk,v 1.1078 2018/10/06 18:52:59 martin Exp $
 
 # This needs to be before bsd.init.mk
 .if defined(BSD_MK_COMPAT_FILE)
@@ -50,12 +50,6 @@ NEED_OWN_INSTALL_TARGET?=	yes
 
 TOOLCHAIN_MISSING?=	no
 
-.if ${MACHINE_CPU} == "aarch64" && !defined(EXTERNAL_TOOLCHAIN) && ${MKLLVM:Uyes} != "no"
-MKLLVM?=	yes
-HAVE_LLVM?=	yes
-MKGCC?=		no
-.endif
-
 #
 # GCC Using platforms.
 #
@@ -64,12 +58,7 @@ MKGCC?=		no
 #
 # What GCC is used?
 #
-.if \
-    ${MACHINE_CPU} == "aarch64"
-HAVE_GCC?=	0
-.else
 HAVE_GCC?=	6
-.endif
 
 #
 # Platforms that can't run a modern GCC natively
@@ -82,8 +71,6 @@ MKGCCCMDS?=	no
 # set to the relevant subdirectory in src/external/gpl3 for his HAVE_GCC.
 #
 .if ${HAVE_GCC} == 6
-EXTERNAL_GCC_SUBDIR?=	gcc
-.elif ${HAVE_GCC} == 5
 EXTERNAL_GCC_SUBDIR?=	gcc.old
 .else
 EXTERNAL_GCC_SUBDIR=?	/does/not/exist
@@ -125,7 +112,7 @@ HAVE_LIBGCC?=	yes
 .endif
 
 
-# ia64 is not support
+# Should libgcc have unwinding code?
 .if ${HAVE_LLVM:Uno} == "yes" || !empty(MACHINE_ARCH:Mearm*)
 HAVE_LIBGCC_EH?=	no
 .else
@@ -282,7 +269,7 @@ STRIP=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-strip
 TOOL_CC.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-gcc
 TOOL_CPP.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-cpp
 TOOL_CXX.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-c++
-TOOL_FC.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-g77
+TOOL_FC.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-gfortran
 TOOL_OBJC.gcc=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-gcc
 
 TOOL_CC.clang=		${EXTERNAL_TOOLCHAIN}/bin/${MACHINE_GNU_PLATFORM}-clang
@@ -308,7 +295,7 @@ STRIP=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-strip
 TOOL_CC.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-gcc
 TOOL_CPP.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-cpp
 TOOL_CXX.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-c++
-TOOL_FC.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-g77
+TOOL_FC.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-gfortran
 TOOL_OBJC.gcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-gcc
 .endif									#  }
 
@@ -322,6 +309,7 @@ TOOL_OBJC.clang=	${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-clang
 TOOL_CC.pcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-pcc
 TOOL_CPP.pcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-pcpp
 TOOL_CXX.pcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-p++
+.endif	# EXTERNAL_TOOLCHAIN						# }
 
 #
 # Make sure DESTDIR is set, so that builds with these tools always
@@ -346,7 +334,6 @@ CPPFLAGS+=	--sysroot=/
 LDFLAGS+=	--sysroot=/
 .  endif
 .endif
-.endif	# EXTERNAL_TOOLCHAIN						# }
 
 DBSYM=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-dbsym
 ELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}m68k-elf2aout
@@ -387,10 +374,15 @@ TOOL_GENASSYM=		${TOOLDIR}/bin/${_TOOL_PREFIX}genassym
 TOOL_GENCAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}gencat
 TOOL_GMAKE=		${TOOLDIR}/bin/${_TOOL_PREFIX}gmake
 TOOL_GPT=		${TOOLDIR}/bin/${_TOOL_PREFIX}gpt
-# grep exists in src/tools, but is not hooked up into the build.
-#TOOL_GREP=		${TOOLDIR}/bin/${_TOOL_PREFIX}grep
-TOOL_GREP=		grep
-TOOL_GROFF=		PATH=${TOOLDIR}/lib/groff:$${PATH} ${TOOLDIR}/bin/${_TOOL_PREFIX}groff
+TOOL_GREP=		${TOOLDIR}/bin/${_TOOL_PREFIX}grep
+GROFF_SHARE_PATH=	${TOOLDIR}/share/groff
+TOOL_GROFF_ENV= \
+    GROFF_ENCODING= \
+    GROFF_BIN_PATH=${TOOLDIR}/lib/groff \
+    GROFF_FONT_PATH=${GROFF_SHARE_PATH}/site-font:${GROFF_SHARE_PATH}/font \
+    GROFF_TMAC_PATH=${GROFF_SHARE_PATH}/site-tmac:${GROFF_SHARE_PATH}/tmac
+TOOL_GROFF=		${TOOL_GROFF_ENV} ${TOOLDIR}/bin/${_TOOL_PREFIX}groff ${GROFF_FLAGS}
+
 TOOL_HEXDUMP=		${TOOLDIR}/bin/${_TOOL_PREFIX}hexdump
 TOOL_HP300MKBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}hp300-mkboot
 TOOL_HPPAMKBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}hppa-mkboot
@@ -428,16 +420,17 @@ TOOL_NCDCS=		${TOOLDIR}/bin/${_TOOL_PREFIX}ibmnws-ncdcs
 TOOL_PAX=		${TOOLDIR}/bin/${_TOOL_PREFIX}pax
 TOOL_PIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}pic
 TOOL_PIGZ=		${TOOLDIR}/bin/${_TOOL_PREFIX}pigz
+TOOL_XZ=		${TOOLDIR}/bin/xz
 TOOL_PKG_CREATE=	${TOOLDIR}/bin/${_TOOL_PREFIX}pkg_create
 TOOL_POWERPCMKBOOTIMAGE=${TOOLDIR}/bin/${_TOOL_PREFIX}powerpc-mkbootimage
 TOOL_PWD_MKDB=		${TOOLDIR}/bin/${_TOOL_PREFIX}pwd_mkdb
 TOOL_REFER=		${TOOLDIR}/bin/${_TOOL_PREFIX}refer
-TOOL_ROFF_ASCII=	PATH=${TOOLDIR}/lib/groff:$${PATH} ${TOOLDIR}/bin/${_TOOL_PREFIX}nroff
+TOOL_ROFF_ASCII=	${TOOL_GROFF_ENV} ${TOOLDIR}/bin/${_TOOL_PREFIX}nroff
 TOOL_ROFF_DOCASCII=	${TOOL_GROFF} -Tascii
 TOOL_ROFF_DOCHTML=	${TOOL_GROFF} -Thtml
-TOOL_ROFF_DVI=		${TOOL_GROFF} -Tdvi
+TOOL_ROFF_DVI=		${TOOL_GROFF} -Tdvi ${ROFF_PAGESIZE}
 TOOL_ROFF_HTML=		${TOOL_GROFF} -Tlatin1 -mdoc2html
-TOOL_ROFF_PS=		${TOOL_GROFF} -Tps
+TOOL_ROFF_PS=		${TOOL_GROFF} -Tps ${ROFF_PAGESIZE}
 TOOL_ROFF_RAW=		${TOOL_GROFF} -Z
 TOOL_RPCGEN=		RPCGEN_CPP=${CPP:Q} ${TOOLDIR}/bin/${_TOOL_PREFIX}rpcgen
 TOOL_SED=		${TOOLDIR}/bin/${_TOOL_PREFIX}sed
@@ -467,7 +460,7 @@ TOOL_OBJC.clang=	clang
 TOOL_CC.gcc=	gcc
 TOOL_CPP.gcc=	cpp
 TOOL_CXX.gcc=	c++
-TOOL_FC.gcc=	g77
+TOOL_FC.gcc=	gfortran
 TOOL_OBJC.gcc=	gcc
 
 # PCC supports C and Fortran
@@ -539,6 +532,7 @@ TOOL_NCDCS=		ncdcs
 TOOL_PAX=		pax
 TOOL_PIC=		pic
 TOOL_PIGZ=		pigz
+TOOL_XZ=		xz
 TOOL_PKG_CREATE=	pkg_create
 TOOL_POWERPCMKBOOTIMAGE=	powerpc-mkbootimage
 TOOL_PWD_MKDB=		pwd_mkdb
@@ -546,9 +540,9 @@ TOOL_REFER=		refer
 TOOL_ROFF_ASCII=	nroff
 TOOL_ROFF_DOCASCII=	${TOOL_GROFF} -Tascii
 TOOL_ROFF_DOCHTML=	${TOOL_GROFF} -Thtml
-TOOL_ROFF_DVI=		${TOOL_GROFF} -Tdvi
+TOOL_ROFF_DVI=		${TOOL_GROFF} -Tdvi ${ROFF_PAGESIZE}
 TOOL_ROFF_HTML=		${TOOL_GROFF} -Tlatin1 -mdoc2html
-TOOL_ROFF_PS=		${TOOL_GROFF} -Tps
+TOOL_ROFF_PS=		${TOOL_GROFF} -Tps ${ROFF_PAGESIZE}
 TOOL_ROFF_RAW=		${TOOL_GROFF} -Z
 TOOL_RPCGEN=		rpcgen
 TOOL_SED=		sed
@@ -583,7 +577,7 @@ TOOL_CXX.false=		false
 TOOL_FC.false=		false
 TOOL_OBJC.false=	false
 
-AVAILABLE_COMPILER?=	${HAVE_PCC:Dpcc} ${HAVE_LLVM:Dclang} ${HAVE_GCC:Dgcc} ${EXTERNAL_TOOLCHAIN:Dgcc} false
+AVAILABLE_COMPILER?=	${HAVE_PCC:Dpcc} ${HAVE_LLVM:Dclang} ${HAVE_GCC:Dgcc} false
 
 .for _t in CC CPP CXX FC OBJC
 ACTIVE_${_t}=	${AVAILABLE_COMPILER:@.c.@ ${ !defined(UNSUPPORTED_COMPILER.${.c.}) && defined(TOOL_${_t}.${.c.}) :? ${.c.} : }@:[1]}
@@ -608,7 +602,7 @@ MACHINES.hppa=		hppa
 MACHINES.m68000=	sun2
 MACHINES.m68k=		amiga atari cesfic hp300 luna68k mac68k \
 			news68k next68k sun3 x68k
-MACHINES.mips=		arc cobalt algor cobalt emips evbmips ews4800mips \
+MACHINES.mips=		algor arc cobalt emips evbmips ews4800mips \
 			hpcmips mipsco newsmips pmax sbmips sgimips
 MACHINES.or1k=		or1k
 MACHINES.powerpc=	amigappc bebox evbppc ibmnws macppc mvmeppc \
@@ -779,8 +773,7 @@ MKGCC:= no
 MKGCC:= no
 .endif
 
-# No GDB support for aarch64
-MKGDB.aarch64=	no
+# No GDB support for aarch64eb
 MKGDB.aarch64eb=no
 MKGDB.or1k=	no
 MKGDB.riscv32=	no
@@ -938,8 +931,9 @@ dependall:	.NOTMAIN realdepend .MAKE
 # including bsd.own.mk.
 #
 .for var in \
-	NOCRYPTO NODOC NOHTML NOINFO NOLINKLIB NOLINT NOMAN NONLS NOOBJ NOPIC \
-	NOPICINSTALL NOPROFILE NOSHARE NOSTATICLIB NODEBUGLIB
+	NOCRYPTO NODOC NOHTML NOINFO NOLIBCSANITIZER NOLINKLIB NOLINT NOMAN \
+	NONLS NOOBJ NOPIC NOPICINSTALL NOPROFILE NOSHARE NOSTATICLIB \
+	NODEBUGLIB NOSANITIZER NORELRO
 .if defined(${var})
 MK${var:S/^NO//}:=	no
 .endif
@@ -1046,8 +1040,8 @@ MKRELRO?=	partial
 MKRELRO?=	no
 .endif
 
-.if ${MACHINE_ARCH} == "x86_64"
-MKSTATICPIE?=	no
+.if ${MACHINE_ARCH} == "x86_64" || ${MACHINE_ARCH} == "i386"
+MKSTATICPIE?=	yes
 .else
 MKSTATICPIE?=	no
 .endif
@@ -1091,6 +1085,18 @@ _MKVARS.yes += MKGCCCMDS
 MKGCCCMDS?=	${MKGCC}
 
 #
+# Sanitizers, only "address" and "undefined" are supported by gcc
+#
+MKSANITIZER?=	no
+USE_SANITIZER?=	address
+
+#
+# Sanitizers implemented in libc, only "undefined" is supported
+#
+MKLIBCSANITIZER?=	no
+USE_LIBCSANITIZER?=	undefined
+
+#
 # Exceptions to the above:
 #
 
@@ -1121,7 +1127,30 @@ MKDYNAMICROOT=	no
 
 .if defined(MKREPRO)
 MKARZERO ?= ${MKREPRO}
+GROFF_FLAGS ?= -dpaper=letter
+ROFF_PAGESIZE ?= -P-pletter
 .endif
+
+# Only install the general firmware on some systems
+MKFIRMWARE.amd64=		yes
+MKFIRMWARE.cobalt=		yes
+MKFIRMWARE.evbarm=		yes
+MKFIRMWARE.evbmips=		yes
+MKFIRMWARE.evbppc=		yes
+MKFIRMWARE.hpcarm=		yes
+MKFIRMWARE.hppa=		yes
+MKFIRMWARE.i386=		yes
+MKFIRMWARE.mac68k=		yes
+MKFIRMWARE.macppc=		yes
+MKFIRMWARE.sandpoint=		yes
+MKFIRMWARE.sparc64=		yes
+
+# Only install the radeon firmware on DRM-happy systems.
+MKRADEONFIRMWARE.x86_64=	yes
+MKRADEONFIRMWARE.i386=		yes
+
+# Only install the tegra firmware on evbarm.
+MKTEGRAFIRMWARE.evbarm=		yes
 
 #
 # MK* options which default to "no".  Note that MKZFS has a different
@@ -1134,6 +1163,7 @@ _MKVARS.no= \
 	MKCATPAGES MKCOMPATTESTS MKCOMPATX11 MKCTF \
 	MKDEBUG MKDEBUGLIB MKDTRACE \
 	MKEXTSRC \
+	MKFIRMWARE \
 	MKGROFFHTMLDOC \
 	MKKYUA \
 	MKLIBCXX MKLLD MKLLDB MKLLVM MKLINT \
@@ -1148,7 +1178,7 @@ _MKVARS.no= \
 	MKX11 MKX11MOTIF MKXORG_SERVER \
 	MKZFS
 .for var in ${_MKVARS.no}
-${var}?=	${${var}.${MACHINE_ARCH}:Uno}
+${var}?=	${${var}.${MACHINE_ARCH}:U${${var}.${MACHINE}:Uno}}
 .endfor
 
 .if ${MACHINE_ARCH} == "i386" || \
@@ -1190,17 +1220,6 @@ MKSLJIT=	yes
     ${MACHINE} == "vax"		|| \
     ${MACHINE} == "zaurus"
 MKXORG_SERVER=yes
-.else
-.endif
-
-# Only install the radeon firmware on DRM-happy systems.
-.if ${MACHINE_ARCH} == "x86_64" || ${MACHINE_ARCH} == "i386"
-MKRADEONFIRMWARE=		yes
-.endif
-
-# Only install the tegra firmware on evbarm.
-.if ${MACHINE} == "evbarm"
-MKTEGRAFIRMWARE=		yes
 .endif
 
 #
@@ -1339,6 +1358,14 @@ ${var}?= yes
 .for var in USE_PIGZGZIP
 ${var}?= no
 .endfor
+
+# Default to USE_XZ_SETS on some 64bit architectures where decompressor
+# memory will likely not be in short supply.
+.if ${MACHINE} == "amd64" || ${MACHINE} == "sparc64" || ${MACHINE} == "alpha"
+USE_XZ_SETS?= yes
+.else
+USE_XZ_SETS?= no
+.endif 
 
 #
 # TOOL_GZIP and friends.  These might refer to TOOL_PIGZ or to the host gzip.

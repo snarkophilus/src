@@ -1,4 +1,4 @@
-# LIST OF CHANGES FROM LAST RELEASE:			<$Revision: 1.2383 $>
+# LIST OF CHANGES FROM LAST RELEASE:			<$Revision: 1.2454 $>
 #
 #
 # [Note: This file does not mention every change made to the NetBSD source tree.
@@ -24,11 +24,11 @@
 # ----------------------------------------------------------------------------
 
 Changes from NetBSD 8.0 to NetBSD 9.0:
- 	byacc: Update to 20170430. [christos 20170605]
- 	vax: Add support for VAXstation 4000 TURBOchannel. [flxd 20170609]
- 	wsbell(4): Added console bell support for all speaker devices, not
+	byacc: Update to 20170430. [christos 20170605]
+	vax: Add support for VAXstation 4000 TURBOchannel. [flxd 20170609]
+	wsbell(4): Added console bell support for all speaker devices, not
 		only those attached at pcppi. [nat 20170612]
- 	bind: Import version 9.10.5-P1. [christos 20170615]
+	bind: Import version 9.10.5-P1. [christos 20170615]
 	dts: Import dts files from Linux 4.11.5. [jmcneill 20170615]
 	amd64: Support 16TB of PA, and 32TB of kernel VA on the architecture
 		side. [maxv 20170617]
@@ -47,6 +47,7 @@ Changes from NetBSD 8.0 to NetBSD 9.0:
 	lm(4): Add support for NCT5174D, NCT6775F, NCT6779D and NCT679[1235]D.
 		[msaitoh 20170711]
 	arm: Add support for NVIDIA Tegra X1 SoC. [jmcneill 20170720]
+	i386: Remove vm86. [maxv 20170812]
 	itesio(4): Add support IT8628E. [hauke 20170814]
 	ichsmb(4): Add support for Intel C3000. [msaitoh 20170817]
 	ismt(4): Add support for Intel C3000. [msaitoh 20170817]
@@ -80,7 +81,6 @@ Changes from NetBSD 8.0 to NetBSD 9.0:
 	kernhist(9): Reworked the export-via-sysctl code to use uintptr_t
 		arguments, PR kern/52639.  Requires contemporaneous update
 		of vmstat(1). [pgoyette 20171028]
-	x86: Add support for XSAVEOPT [maxv 20171104]
 	acpi(4): Updated ACPICA to 20171110. [christos 20171111]
 	sunxinand(4): Add driver for Allwinner NAND Flash Controller.
 		[jmcneill 20171113]
@@ -148,3 +148,95 @@ Changes from NetBSD 8.0 to NetBSD 9.0:
 	puc(4): Add Intel 300 series chipset support. [msaitoh 20180413]
 	file(1): Upgraded to 5.33. [christos 20180415]
 	netpgp(3lua): Add Lua binding for libnetpgp(3). [sevan 20180429]
+	arm: Add support for Allwinner H6 SoC. [jmcneill 20180501]
+	dhcpcd: Import 7.0.4. [roy 20180502]
+	libbozohttpd(3): Add the embeddable version of bozohttpd [sevan 20180503]
+	bozohttpd(3lua): Add Lua binding for libbozohttpd(3lua) [sevan 20180503]
+	tzdata: updated to 2017e [kre 20180504]
+	libc: Update to tzcode2018e. [christos 20180504]
+	acpi(4): Updated ACPICA to 20180427. [christos 20180504]
+	gpio(4): Overhauled interrupt support.  Added GPIO interrupt
+		capability for Broadcom BCM283x SoCs (e.g.
+		Raspberry Pi). [thorpej 20180519]
+	x86: Add SpectreV4 mitigations. [maxv 20180522]
+	macppc: Enable ipsec(4) and ipsecif(4) support in GENERIC kernel by
+		default. [sevan 20180602]
+	dhcpcd: Import 7.0.5b. [roy 20180604]
+	virtio(4): Add MMIO transport and fdt(4) attachment. [jakllsch 20180606]
+	arm: Add support for QEMU ARM Virtual Machine ("virt"). [jmcneill 20180614]
+	arm: Add support for Rockchip RK3328 SoC. [jmcneill 20180615]
+	dhcpcd: Import 7.0.6. [roy 20180621]
+	bpf(4): Add the BPF direction filter (BIOC[GS]DIRECTION).
+		[msaitoh 20180626]
+	gcc: add lsan the Leak Sanitizer [christos 20180626]
+	aarch64: Add support for SMP. [ryo 20180709]
+	viadrm(4): Removed, superseded by viadrmums. [maya 20180710]
+	ssh-agent(1): /usr/pkg/lib* whitelisted by default for PKCS11 related
+		libraries, in place of /usr/local/lib*. [sevan 20180710]
+	x86: Support for -static -pie binaries. [joerg 20180712]
+	kernel: Remove pmc(9) and X86PMC. [maxv 20180714]
+	tprof(4): Revamped. tpfmt(1) merged into tprof(8). [maxv 20180714]
+	kernel: Remove ipkdb(4). [maxv 20180714]
+	arm: Add support for ARMv8 performance event monitoring with tprof(4).
+		[jmcneill 20180715]
+	arm: Add support for ARMv7 performance event monitoring with tprof(4).
+		[jmcneill 20180715]
+	dhcpcd: Import 7.0.7. [roy 20180724]
+	i386: Remove the XEN3_DOM0 and XEN3_DOMU configurations, and drop
+		support for non-PAE-32bit-PV, to leave only PAE-32bit-PV.
+		[maxv 20180726]
+	tea5767radio(4): Add Philips/NXP TEA5767 I2C-controlled stereo FM radio
+		driver. [rkujawa 20180727]
+	UBSan: Imported a clean-room reimplementation of the sanitizer runtime
+		called micro-UBSan. [kamil 20180803]
+	uUBSan: Added support for micro-UBSan (user-UBSan) in MKLIBCSANITIZER.
+		[kamil 20180803]
+	kUBSan: Added support for micro-UBSan (kernel-UBSan) as KUBSAN.
+		[kamil 20180803]
+	lua: Import version 5.3.5. [alnsn 20180804]
+	arm: Add driver for ARM GICv3 interrupt controllers. [jmcneill 20180808]
+	kernel: Remove the n8 driver. [maya 20180808]
+	bind: Import version 9.12.2-P1. [christos 20180812]
+	arm: Add support for Rockchip RK3399 SoC. [jmcneill 20180812]
+	amd64: Randomize by default all the randomizable VM areas in the kernel.
+		[maxv 20180812]
+	mdocml: Import 1.14.4. [christos 20180814]
+	kernel: Remove etherip(4), replaced by l2tp(4). [maxv 20180814]
+	gnu-efi: Import version 3.0.8. [jmcneill 20180816]
+	OpenSSL: Imported 1.1.0i. [christos 20180818]
+	acpi(4): Updated ACPICA to 20180810. [christos 20180818]
+	dhcpcd: Import 7.0.8. [roy 20180820]
+	amd64: Add support for kASan - Kernel Address Sanitizer.
+		[maxv 20180820]
+	arm: Add UEFI boot loader for ARM64 platforms. [jmcneill 20180824]
+	kernel: Remove NDIS. [maxv 20180825]
+	mue(4): Add driver for Microchip LAN75xx/LAN78xx (Raspberry Pi 3 B+)
+		from OpenBSD. [rin 20180825]
+	OpenSSH: Imported 7.8. [christos 20180826]
+	rkpmic(4): Add driver for Rockchip RK808 Power Management IC.
+		[jmcneill 20180901]
+	nsd: Import 4.1.24 [christos 20180903]
+	unbound: Import 1.7.3. [christos 20180803]
+	libpcap: Import 1.9.0. [christos 20180903]
+	mpfr: Updated to version 4.0.1. [mrg 20180904]
+	mpc: Updated to version 1.1.0. [mrg 20180904]
+	kernel: Remove en(4). [maxv 20180906]
+	kernel: Remove the NATM code. [maxv 20180906]
+	libnv: Imported from FreeBSD [christos 20180908]
+	rkpmic(4): Add support for Rockchip RK805 Power Management IC.
+		[jmcneill 20180920]
+	kernel: Remove the ISDN code, including daic(4), iavc(4), isic(4),
+		ifpci(4), ifritz, iwic(4), and all the ISDN-related
+		userland tools. [maxv 20180923]
+	npf: Converted to use libnv [rmind 20180929]
+	ntp: Import ntp 4.2.8p12. [christos 20180929]
+	aarch64: add support for compat_netbsd32(8). [ryo 20181012]
+	newsmips: Add support for NWS-4000.  Based on nonaka@'s porting effort
+		back in 2002.  [tsutsui 20181014]
+	file(1): Upgraded to 5.35. [christos 20181013]
+	arm: Provide generic start code that allows a GENERIC kernel to be used
+		on FDTised boards. [skrll 20181018]
+	tzdata: updated to 2018f [kre 20181019]
+	amdccp(4): Add driver for AMD Cryptographic Coprocessor RNG.
+		[jakllsch 20181019]
+	libc: Update to tzcode2018f. [christos 20181019]

@@ -1,4 +1,4 @@
-/*	$NetBSD: pic.c,v 1.42 2018/04/01 04:35:04 ryo Exp $	*/
+/*	$NetBSD: pic.c,v 1.45 2018/10/12 21:46:32 jmcneill Exp $	*/
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -33,7 +33,7 @@
 #include "opt_multiprocessor.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.42 2018/04/01 04:35:04 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.45 2018/10/12 21:46:32 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/atomic.h>
@@ -44,6 +44,7 @@ __KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.42 2018/04/01 04:35:04 ryo Exp $");
 #include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/once.h>
+#include <sys/interrupt.h>
 #include <sys/xcall.h>
 #include <sys/ipi.h>
 
@@ -201,7 +202,7 @@ intr_ipi_send(const kcpuset_t *kcp, u_long ipi)
 			sent_p = true;
 		}
 	}
-	KASSERT(cold || sent_p || arm_cpu_max == 1);
+	KASSERT(cold || sent_p || ncpu <= 1);
 }
 #endif /* MULTIPROCESSOR */
 
@@ -881,3 +882,44 @@ intr_disestablish(void *ih)
 
 	pic_disestablish_source(is);
 }
+
+const char *
+intr_string(intr_handle_t irq, char *buf, size_t len)
+{
+	for (size_t slot = 0; slot < PIC_MAXPICS; slot++) {
+		struct pic_softc * const pic = pic_list[slot];
+		if (pic == NULL || pic->pic_irqbase < 0)
+			continue;
+		if (pic->pic_irqbase <= irq
+		    && irq < pic->pic_irqbase + pic->pic_maxsources) {
+			struct intrsource * const is = pic->pic_sources[irq - pic->pic_irqbase];
+			snprintf(buf, len, "%s %s", pic->pic_name, is->is_source);
+			return buf;
+		}
+	}
+
+	return NULL;
+}
+
+#ifdef MULTIPROCESSOR
+int
+interrupt_distribute(void *ih, const kcpuset_t *newset, kcpuset_t *oldset)
+{
+	struct intrsource * const is = ih;
+	struct pic_softc * const pic = is->is_pic;
+
+	if (pic == NULL)
+		return EOPNOTSUPP;
+	if (pic->pic_ops->pic_set_affinity == NULL ||
+	    pic->pic_ops->pic_get_affinity == NULL)
+		return EOPNOTSUPP;
+
+	if (!is->is_mpsafe)
+		return EINVAL;
+
+	if (oldset != NULL)
+		pic->pic_ops->pic_get_affinity(pic, is->is_irq, oldset);
+
+	return pic->pic_ops->pic_set_affinity(pic, is->is_irq, newset);
+}
+#endif

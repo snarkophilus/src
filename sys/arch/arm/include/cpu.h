@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.96 2018/04/01 04:35:04 ryo Exp $	*/
+/*	$NetBSD: cpu.h,v 1.98 2018/10/18 09:01:52 skrll Exp $	*/
 
 /*
  * Copyright (c) 1994-1996 Mark Brinicombe.
@@ -60,7 +60,6 @@
 #define	CPU_BOOTED_KERNEL	3	/* string: kernel we booted */
 #define	CPU_CONSDEV		4	/* struct: dev_t of our console */
 #define	CPU_POWERSAVE		5	/* int: use CPU powersave mode */
-#define	CPU_MAXID		6	/* number of valid machdep ids */
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
@@ -235,6 +234,12 @@ extern struct cpu_info *cpu_info[];
 #endif
 
 #if defined(MULTIPROCESSOR)
+
+extern volatile u_int arm_cpu_hatched;
+extern uint64_t cpu_mpidr[];
+
+void cpu_mpstart(void);
+void cpu_init_secondary_processor(int);
 void cpu_boot_secondary_processors(void);
 #endif
 

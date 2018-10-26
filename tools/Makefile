@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.193 2018/02/18 01:06:24 uwe Exp $
+#	$NetBSD: Makefile,v 1.196 2018/09/25 05:42:08 joerg Exp $
 
 .include <bsd.own.mk>
 .include <bsd.endian.mk>
@@ -100,7 +100,8 @@ SUBDIR+= cap_mkdb crunchgen ctags gencat hexdump \
 		makewhatis mtree nbperf .WAIT uudecode
 .endif
 
-SUBDIR+= cat rpcgen join lorder m4 mkdep tsort .WAIT yacc .WAIT awk .WAIT lex
+SUBDIR+= cat rpcgen join lorder m4 mkdep tsort xz-include .WAIT yacc .WAIT awk .WAIT lex
+SUBDIR+= grep xz-lib
 
 .if ${TOOLS_BUILDRUMP} == "no"
 SUBDIR += .WAIT texinfo \
@@ -118,14 +119,17 @@ SUBDIR += .WAIT texinfo \
 		.WAIT installboot \
 		pwd_mkdb strfile sunlabel vgrind zic
 .endif
-SUBDIR+= stat .WAIT config
+SUBDIR+= stat .WAIT config xz-bin
 
 .if ${MKLLVM} != "no"
 SUBDIR+= \
 	llvm .WAIT \
 	llvm-lib/libLLVMDemangle llvm-lib/libLLVMSupport llvm-lib/libLLVMTableGen .WAIT \
-	llvm-tblgen llvm-clang-tblgen .WAIT \
-	llvm-include .WAIT \
+	llvm-tblgen llvm-clang-tblgen
+.endif
+.if ${MKLLVM} != "no" && !defined(EXTERNAL_TOOLCHAIN)
+SUBDIR+= \
+	.WAIT llvm-include .WAIT \
 	llvm-lib .WAIT \
 	llvm-clang
 . if ${MKLLD} != "no"

@@ -1,4 +1,4 @@
-/*	$NetBSD: imx6_board.c,v 1.9 2017/11/09 05:57:23 hkenken Exp $	*/
+/*	$NetBSD: imx6_board.c,v 1.12 2018/10/18 09:01:52 skrll Exp $	*/
 
 /*
  * Copyright (c) 2012  Genetec Corporation.  All rights reserved.
@@ -27,11 +27,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: imx6_board.c,v 1.9 2017/11/09 05:57:23 hkenken Exp $");
+__KERNEL_RCSID(1, "$NetBSD: imx6_board.c,v 1.12 2018/10/18 09:01:52 skrll Exp $");
 
-#include "opt_imx.h"
 #include "arml2cc.h"
 #include "opt_cputypes.h"
+#include "opt_imx.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -219,7 +219,8 @@ imx6_device_register(device_t self, void *aux)
 	 * We need to tell the A9 Global/Watchdog Timer
 	 * what frequency it runs at.
 	 */
-	if (device_is_a(self, "a9tmr") || device_is_a(self, "a9wdt")) {
+	if (device_is_a(self, "arma9tmr") ||
+	    device_is_a(self, "a9wdt")) {
 		prop_dictionary_set_uint32(dict, "frequency",
 		   imx6_armrootclk() / IMX6_PERIPHCLK_N);
 		return;
@@ -233,14 +234,6 @@ imx6_device_register(device_t self, void *aux)
 	}
 #endif
 }
-
-#ifdef MULTIPROCESSOR
-void
-imx6_cpu_hatch(struct cpu_info *ci)
-{
-	a9tmr_init_cpu_clock(ci);
-}
-#endif
 
 void
 imx6_set_gpio(device_t self, const char *name, int32_t *gpio,

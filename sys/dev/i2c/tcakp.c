@@ -1,4 +1,4 @@
-/* $NetBSD: tcakp.c,v 1.6 2018/04/30 20:33:09 jmcneill Exp $ */
+/* $NetBSD: tcakp.c,v 1.10 2018/10/17 16:56:40 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2017 Jared McNeill <jmcneill@invisible.ca>
@@ -29,7 +29,7 @@
 #include "opt_fdt.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcakp.c,v 1.6 2018/04/30 20:33:09 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcakp.c,v 1.10 2018/10/17 16:56:40 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -113,9 +113,9 @@ static int	tcakp_write(struct tcakp_softc *, uint8_t, uint8_t);
 CFATTACH_DECL_NEW(tcakp, sizeof(struct tcakp_softc),
     tcakp_match, tcakp_attach, NULL, NULL);
 
-static const char * tcakp_compats[] = {
-	"ti,tca8418",
-	NULL
+static const struct device_compatible_entry compat_data[] = {
+	{ "ti,tca8418",			0 },
+	{ NULL,				0 }
 };
 
 static u_int
@@ -316,13 +316,15 @@ static int
 tcakp_match(device_t parent, cfdata_t match, void *aux)
 {
 	struct i2c_attach_args *ia = aux;
+	int match_result;
 
-	if (ia->ia_name == NULL) {
-		if (ia->ia_addr == 0x34)
-			return 1;
-		return 0;
-	} else
-		return iic_compat_match(ia, tcakp_compats);
+	if (iic_use_direct_match(ia, match, compat_data, &match_result))
+		return match_result;
+
+	if (ia->ia_addr == 0x34)
+		return I2C_MATCH_ADDRESS_ONLY;
+	
+	return 0;
 }
 
 static void
@@ -362,14 +364,26 @@ tcakp_attach(device_t parent, device_t self, void *aux)
 static int
 tcakp_read(struct tcakp_softc *sc, uint8_t reg, uint8_t *val)
 {
-	return iic_exec(sc->sc_i2c, I2C_OP_READ_WITH_STOP, sc->sc_addr,
+	int error;
+
+	iic_acquire_bus(sc->sc_i2c, I2C_F_POLL);
+	error = iic_exec(sc->sc_i2c, I2C_OP_READ_WITH_STOP, sc->sc_addr,
 	    &reg, 1, val, 1, I2C_F_POLL);
+	iic_release_bus(sc->sc_i2c, I2C_F_POLL);
+
+	return error;
 }
 
 static int
 tcakp_write(struct tcakp_softc *sc, uint8_t reg, uint8_t val)
 {
 	uint8_t buf[2] = { reg, val };
-	return iic_exec(sc->sc_i2c, I2C_OP_WRITE_WITH_STOP, sc->sc_addr,
+	int error;
+
+	iic_acquire_bus(sc->sc_i2c, I2C_F_POLL);
+	error = iic_exec(sc->sc_i2c, I2C_OP_WRITE_WITH_STOP, sc->sc_addr,
 	    NULL, 0, buf, 2, I2C_F_POLL);
+	iic_release_bus(sc->sc_i2c, I2C_F_POLL);
+
+	return error;
 }

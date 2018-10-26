@@ -1,4 +1,4 @@
-/*	$NetBSD: bcm53xx_machdep.c,v 1.9 2015/07/17 20:29:29 matt Exp $	*/
+/*	$NetBSD: bcm53xx_machdep.c,v 1.18 2018/10/18 09:01:53 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2012 The NetBSD Foundation, Inc.
@@ -33,8 +33,10 @@
 #define IDM_PRIVATE
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bcm53xx_machdep.c,v 1.9 2015/07/17 20:29:29 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bcm53xx_machdep.c,v 1.18 2018/10/18 09:01:53 skrll Exp $");
 
+#include "opt_arm_debug.h"
+#include "opt_console.h"
 #include "opt_evbarm_boardtype.h"
 #include "opt_broadcom.h"
 #include "opt_kgdb.h"
@@ -81,19 +83,12 @@ extern int KERNEL_BASE_virt[];
 
 BootConfig bootconfig;
 static char bootargs[MAX_BOOT_STRING];
-char *boot_args = NULL;     
+char *boot_args = NULL;
 
-u_int uboot_args[4] = { 0 };
+/* filled in before cleaning bss. keep in .data */
+u_int uboot_args[4] __attribute__((__section__(".data")));
 
 static void bcm53xx_system_reset(void);
-
-/*
- * Macros to translate between physical and virtual for a subset of the
- * kernel address space.  *Not* for general use.
- */
-#define	KERN_VTOPDIFF	((vaddr_t)KERNEL_BASE_phys - (vaddr_t)KERNEL_BASE_virt)
-#define KERN_VTOPHYS(va) ((paddr_t)((vaddr_t)va + KERN_VTOPDIFF))
-#define KERN_PHYSTOV(pa) ((vaddr_t)((paddr_t)pa - KERN_VTOPDIFF))
 
 #ifndef CONADDR
 #define CONADDR		(BCM53XX_IOREG_PBASE + CCA_UART0_BASE)
@@ -115,6 +110,27 @@ int comcnmode = CONMODE | CLOCAL;
 #ifdef KGDB
 #include <sys/kgdb.h>
 #endif
+
+static dev_type_cnputc(earlyconsputc);
+static dev_type_cngetc(earlyconsgetc);
+
+static struct consdev earlycons = {
+	.cn_putc = earlyconsputc,
+	.cn_getc = earlyconsgetc,
+	.cn_pollc = nullcnpollc,
+};
+
+static void
+earlyconsputc(dev_t dev, int c)
+{
+	uartputc(c);
+}
+
+static int
+earlyconsgetc(dev_t dev)
+{
+	return 0;	/* XXX */
+}
 
 /*
  * Static device mappings. These peripheral registers are mapped at
@@ -194,7 +210,17 @@ static const struct boot_physmem bp_first256 = {
 u_int
 initarm(void *arg)
 {
-	pmap_devmap_register(devmap);
+	/*
+	 * Heads up ... Setup the CPU / MMU / TLB functions
+	 */
+	if (set_cpufuncs())		// starts PMC counter
+		panic("cpu not recognized!");
+
+	cn_tab = &earlycons;
+
+	extern char ARM_BOOTSTRAP_LxPT[];
+	pmap_devmap_bootstrap((vaddr_t)ARM_BOOTSTRAP_LxPT, devmap);
+
 	bcm53xx_bootstrap(KERNEL_IO_IOREG_VBASE);
 
 #ifdef MULTIPROCESSOR
@@ -203,12 +229,6 @@ initarm(void *arg)
 	arm_cpu_max = 1 + (scu_cfg & SCU_CFG_CPUMAX);
 	membar_producer();
 #endif
-	/*
-	 * Heads up ... Setup the CPU / MMU / TLB functions
-	 */
-	if (set_cpufuncs())		// starts PMC counter
-		panic("cpu not recognized!");
-
 	cpu_domains((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | DOMAIN_CLIENT);
 
 	consinit();
@@ -224,7 +244,7 @@ initarm(void *arg)
 #endif
 
 	printf("uboot arg = %#x, %#x, %#x, %#x\n",
-	    uboot_args[0], uboot_args[1], uboot_args[2], uboot_args[3]);      
+	    uboot_args[0], uboot_args[1], uboot_args[2], uboot_args[3]);
 
 	/* Talk to the user */
 	printf("\nNetBSD/evbarm (" ___STRING(EVBARM_BOARDTYPE) ") booting ...\n");
@@ -248,7 +268,7 @@ initarm(void *arg)
 	if ((memsize >> 20) > MEMSIZE)
 		memsize = MEMSIZE*1024*1024;
 #endif
-	const bool bigmem_p = (memsize >> 20) > 256; 
+	const bool bigmem_p = (memsize >> 20) > 256;
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 	const bool mapallmem_p = true;

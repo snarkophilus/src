@@ -1,4 +1,4 @@
-/*	$NetBSD: emul.c,v 1.185 2017/11/21 15:22:06 ozaki-r Exp $	*/
+/*	$NetBSD: emul.c,v 1.188 2018/10/06 00:17:06 christos Exp $	*/
 
 /*
  * Copyright (c) 2007-2011 Antti Kantee.  All Rights Reserved.
@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: emul.c,v 1.185 2017/11/21 15:22:06 ozaki-r Exp $");
+__KERNEL_RCSID(0, "$NetBSD: emul.c,v 1.188 2018/10/06 00:17:06 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/cprng.h>
@@ -119,6 +119,7 @@ struct loadavg averunnable = {
 struct emul emul_netbsd = {
 	.e_name = "netbsd-rump",
 	.e_sysent = rump_sysent,
+	.e_nomodbits = rump_sysent_nomodbits,
 #ifndef __HAVE_MINIMAL_EMUL
 	.e_nsysent = SYS_NSYSENT,
 #endif
@@ -274,6 +275,15 @@ rump_fstrans_start_nowait(struct mount *mp)
 }
 __weak_alias(fstrans_start_nowait,rump_fstrans_start_nowait);
 
+void rump_fstrans_start_lazy(struct mount *);
+void
+rump_fstrans_start_lazy(struct mount *mp)
+{
+
+}
+__weak_alias(fstrans_start_lazy,rump_fstrans_start_lazy);
+
+
 void rump_fstrans_done(struct mount *);
 void
 rump_fstrans_done(struct mount *mp)
@@ -391,4 +401,10 @@ cpu_getmodel(void)
 {
 
 	return "rumpcore (virtual)";
+}
+
+bool
+get_expose_address(struct proc *p)
+{
+	return 1;
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: in6_l2tp.c,v 1.15 2018/04/27 09:55:28 knakahara Exp $	*/
+/*	$NetBSD: in6_l2tp.c,v 1.17 2018/09/03 02:33:31 knakahara Exp $	*/
 
 /*
  * Copyright (c) 2017 Internet Initiative Japan Inc.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: in6_l2tp.c,v 1.15 2018/04/27 09:55:28 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: in6_l2tp.c,v 1.17 2018/09/03 02:33:31 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_l2tp.h"
@@ -267,11 +267,15 @@ in6_l2tp_input(struct mbuf **mp, int *offp, int proto, void *eparg __unused)
 	log(LOG_DEBUG, "%s: sess_id = %" PRIu32 "\n", __func__, sess_id);
 #endif
 	if (sess_id == 0) {
+		int rv;
 		/*
 		 * L2TPv3 control packet received.
 		 * userland daemon(l2tpd?) should process.
 		 */
-		return rip6_input(mp, offp, proto);
+		SOFTNET_LOCK_IF_NET_MPSAFE();
+		rv = rip6_input(mp, offp, proto);
+		SOFTNET_UNLOCK_IF_NET_MPSAFE();
+		return rv;
 	}
 
 	var = l2tp_lookup_session_ref(sess_id, &psref);
@@ -357,16 +361,25 @@ out:
 static int
 in6_l2tp_match(struct mbuf *m, int off, int proto, void *arg)
 {
-	struct l2tp_variant *var = arg;
+	struct l2tp_softc *sc = arg;
+	struct l2tp_variant *var;
+	struct psref psref;
 	uint32_t sess_id;
+	int rv = 0;
 
 	KASSERT(proto == IPPROTO_L2TP);
+
+	var = l2tp_getref_variant(sc, &psref);
+	if (__predict_false(var == NULL))
+		return rv;
 
 	/*
 	 * If the packet contains no session ID it cannot match
 	 */
-	if (m_length(m) < off + sizeof(uint32_t))
-		return 0;
+	if (m_length(m) < off + sizeof(uint32_t)) {
+		rv = 0 ;
+		goto out;
+	}
 
 	/* get L2TP session ID */
 	m_copydata(m, off, sizeof(uint32_t), (void *)&sess_id);
@@ -376,19 +389,26 @@ in6_l2tp_match(struct mbuf *m, int off, int proto, void *arg)
 		 * L2TPv3 control packet received.
 		 * userland daemon(l2tpd?) should process.
 		 */
-		return 128 * 2;
+		rv = 128 * 2;
 	} else if (sess_id == var->lv_my_sess_id)
-		return 128 * 2;
+		rv = 128 * 2;
 	else
-		return 0;
+		rv = 0;
+
+out:
+	l2tp_putref_variant(var, &psref);
+	return rv;
 }
 
 int
 in6_l2tp_attach(struct l2tp_variant *var)
 {
+	struct l2tp_softc *sc = var->lv_softc;
 
+	if (sc == NULL)
+		return EINVAL;
 	var->lv_encap_cookie = encap_attach_func(AF_INET6, IPPROTO_L2TP,
-	    in6_l2tp_match, &in6_l2tp_encapsw, var);
+	    in6_l2tp_match, &in6_l2tp_encapsw, sc);
 	if (var->lv_encap_cookie == NULL)
 		return EEXIST;
 

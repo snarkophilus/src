@@ -253,6 +253,7 @@ ipv6_makestableprivate1(struct in6_addr *addr,
     const struct in6_addr *prefix, int prefix_len,
     const unsigned char *netiface, size_t netiface_len,
     const unsigned char *netid, size_t netid_len,
+    unsigned short vlanid,
     uint32_t *dad_counter,
     const unsigned char *secret, size_t secret_len)
 {
@@ -267,6 +268,8 @@ ipv6_makestableprivate1(struct in6_addr *addr,
 
 	l = (size_t)(ROUNDUP8(prefix_len) / NBBY);
 	len = l + netiface_len + netid_len + sizeof(*dad_counter) + secret_len;
+	if (vlanid != 0)
+		len += sizeof(vlanid);
 	if (len > sizeof(buf)) {
 		errno = ENOBUFS;
 		return -1;
@@ -281,6 +284,12 @@ ipv6_makestableprivate1(struct in6_addr *addr,
 		p += netiface_len;
 		memcpy(p, netid, netid_len);
 		p += netid_len;
+		/* Don't use a vlanid if not set.
+		 * This ensures prior versions have the same unique address. */
+		if (vlanid != 0) {
+			memcpy(p, &vlanid, sizeof(vlanid));
+			p += sizeof(vlanid);
+		}
 		memcpy(p, dad_counter, sizeof(*dad_counter));
 		p += sizeof(*dad_counter);
 		memcpy(p, secret, secret_len);
@@ -333,7 +342,7 @@ ipv6_makestableprivate(struct in6_addr *addr,
 	r = ipv6_makestableprivate1(addr, prefix, prefix_len,
 	    ifp->hwaddr, ifp->hwlen,
 	    ifp->ssid, ifp->ssid_len,
-	    &dad,
+	    ifp->vlanid, &dad,
 	    ifp->ctx->secret, ifp->ctx->secret_len);
 
 	if (r == 0)
@@ -421,7 +430,7 @@ ipv6_mask(struct in6_addr *mask, int len)
 	bits = len % NBBY;
 	for (i = 0; i < bytes; i++)
 		mask->s6_addr[i] = 0xff;
-	if (bits) {
+	if (bits != 0) {
 		/* Coverify false positive.
 		 * bytelen cannot be 16 if bitlen is non zero */
 		/* coverity[overrun-local] */
@@ -558,7 +567,8 @@ ipv6_checkaddrflags(void *arg)
 	alias = NULL;
 #endif
 	if ((flags = if_addrflags6(ia->iface, &ia->addr, alias)) == -1) {
-		logerr("%s: if_addrflags6", ia->iface->name);
+		if (errno != EEXIST && errno != EADDRNOTAVAIL)
+			logerr("%s: if_addrflags6", __func__);
 		return;
 	}
 
@@ -1152,8 +1162,11 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 			}
 #endif
 
-			if (ia->dadcallback)
+			if (ia->dadcallback) {
 				ia->dadcallback(ia);
+				if (ctx->options & DHCPCD_FORKED)
+					goto out;
+			}
 
 			if (IN6_IS_ADDR_LINKLOCAL(&ia->addr) &&
 			    !(ia->addr_flags & IN6_IFF_NOTUSEABLE))
@@ -1168,20 +1181,26 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 					    cb, next);
 					cb->callback(cb->arg);
 					free(cb);
+					if (ctx->options & DHCPCD_FORKED)
+						goto out;
 				}
 			}
 		}
 		break;
 	}
 
-	if (ia != NULL) {
-		ipv6nd_handleifa(cmd, ia, pid);
-		dhcp6_handleifa(cmd, ia, pid);
+	if (ia == NULL)
+		return;
 
-		/* Done with the ia now, so free it. */
-		if (cmd == RTM_DELADDR)
-			ipv6_freeaddr(ia);
-	}
+	ipv6nd_handleifa(cmd, ia, pid);
+#ifdef DHCP6
+	dhcp6_handleifa(cmd, ia, pid);
+#endif
+
+out:
+	/* Done with the ia now, so free it. */
+	if (cmd == RTM_DELADDR)
+		ipv6_freeaddr(ia);
 }
 
 int

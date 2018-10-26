@@ -1,4 +1,4 @@
-/*	$NetBSD: show.c,v 1.47 2017/06/30 23:00:40 kre Exp $	*/
+/*	$NetBSD: show.c,v 1.50 2018/10/18 04:44:27 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -39,7 +39,7 @@
 #if 0
 static char sccsid[] = "@(#)show.c	8.3 (Berkeley) 5/4/95";
 #else
-__RCSID("$NetBSD: show.c,v 1.47 2017/06/30 23:00:40 kre Exp $");
+__RCSID("$NetBSD: show.c,v 1.50 2018/10/18 04:44:27 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -67,21 +67,6 @@ __RCSID("$NetBSD: show.c,v 1.47 2017/06/30 23:00:40 kre Exp $");
 #include "output.h"
 #include "var.h"
 #include "builtins.h"
-
-#if defined(DEBUG) && !defined(DBG_PID)
-/*
- * If this is compiled, it means this is being compiled in a shell that still
- * has an older shell.h (a simpler TRACE() mechanism than is coming soon.)
- *
- * Compensate for as much of that as is missing and is needed here
- * to compile and operate at all.   After the other changes have appeared,
- * this little block can (and should be) deleted (sometime).
- *
- * Try to avoid waiting 22 years...
- */
-#define	DBG_PID		1
-#define	DBG_NEST	2
-#endif
 
 #define DEFINE_NODENAMES
 #include "nodenames.h"		/* does almost nothing if !defined(DEBUG) */
@@ -614,8 +599,12 @@ shredir(union node *np, TFILE *fp, int first)
 			if (np->ndup.vname)
 				sharg(np->ndup.vname, fp);
 			else {
-				sprintf(buf, "%d", np->ndup.dupfd);
-				trace_puts(buf, fp);
+				if (np->ndup.dupfd < 0)
+					trace_puts("-", fp);
+				else {
+					sprintf(buf, "%d", np->ndup.dupfd);
+					trace_puts(buf, fp);
+				}
 			}
 		} else
 		    if (np->nfile.type == NHERE || np->nfile.type == NXHERE) {
@@ -1070,6 +1059,7 @@ static struct debug_flag {
 	{ 'c',	DBG_CMDS	},	/* command searching, ... */
 	{ 'e',	DBG_EVAL	},	/* evaluation of the parse tree */
 	{ 'f',	DBG_REDIR	},	/* file descriptors & redirections */
+	{ 'g',	DBG_MATCH	},	/* pattern matching (glob) */
 	{ 'h',	DBG_HISTORY	},	/* history & cmd line editing */
 	{ 'i',	DBG_INPUT	},	/* shell input routines */
 	{ 'j',	DBG_JOBS	},	/* job control, structures */

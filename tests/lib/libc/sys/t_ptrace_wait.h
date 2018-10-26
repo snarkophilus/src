@@ -1,4 +1,4 @@
-/*	$NetBSD: t_ptrace_wait.h,v 1.3 2018/04/28 17:56:55 kamil Exp $	*/
+/*	$NetBSD: t_ptrace_wait.h,v 1.12 2018/08/13 21:49:37 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2016 The NetBSD Foundation, Inc.
@@ -150,6 +150,17 @@ do {									\
 	if (!ret)							\
 		errx(EXIT_FAILURE, "%s:%d %s(): Assertion failed for: "	\
 		    "%s(%ju) == %s(%ju)", __FILE__, __LINE__, __func__,	\
+		    #x, vx, #y, vy);					\
+} while (/*CONSTCOND*/0)
+
+#define FORKEE_ASSERT_NEQ(x, y)						\
+do {									\
+	uintmax_t vx = (x);						\
+	uintmax_t vy = (y);						\
+	int ret = vx != vy;						\
+	if (!ret)							\
+		errx(EXIT_FAILURE, "%s:%d %s(): Assertion failed for: "	\
+		    "%s(%ju) != %s(%ju)", __FILE__, __LINE__, __func__,	\
 		    #x, vx, #y, vy);					\
 } while (/*CONSTCOND*/0)
 
@@ -364,6 +375,89 @@ await_zombie(pid_t process)
 	await_zombie_raw(process, 1000);
 }
 
+static void __used
+await_stopped(pid_t process)
+{
+	struct kinfo_proc2 p;
+	size_t len = sizeof(p);
+
+	const int name[] = {
+		[0] = CTL_KERN,
+		[1] = KERN_PROC2,
+		[2] = KERN_PROC_PID,
+		[3] = process,
+		[4] = sizeof(p),
+		[5] = 1
+	};
+
+	const size_t namelen = __arraycount(name);
+
+	/* Await the process becoming a zombie */
+	while(1) {
+		ATF_REQUIRE(sysctl(name, namelen, &p, &len, NULL, 0) == 0);
+
+		if (p.p_stat == LSSTOP)
+			break;
+
+		ATF_REQUIRE(usleep(1000) == 0);
+	}
+}
+
+static pid_t __used
+await_stopped_child(pid_t process)
+{
+	struct kinfo_proc2 *p = NULL;
+	size_t i, len;
+	pid_t child = -1;
+
+	int name[] = {
+		[0] = CTL_KERN,
+		[1] = KERN_PROC2,
+		[2] = KERN_PROC_ALL,
+		[3] = 0,
+		[4] = sizeof(struct kinfo_proc2),
+		[5] = 0
+	};
+
+	const size_t namelen = __arraycount(name);
+
+	/* Await the process becoming a zombie */
+	while(1) {
+		name[5] = 0;
+
+		FORKEE_ASSERT_EQ(sysctl(name, namelen, 0, &len, NULL, 0), 0);
+
+		FORKEE_ASSERT_EQ(reallocarr(&p,
+		                            len,
+		                            sizeof(struct kinfo_proc2)), 0);
+
+		name[5] = len;
+
+		FORKEE_ASSERT_EQ(sysctl(name, namelen, p, &len, NULL, 0), 0);
+
+		for (i = 0; i < len/sizeof(struct kinfo_proc2); i++) {
+			if (p[i].p_pid == getpid())
+				continue;
+			if (p[i].p_ppid != process)
+				continue;
+			if (p[i].p_stat != LSSTOP)
+				continue;
+			child = p[i].p_pid;
+			break;
+		}
+
+		if (child != -1)
+			break;
+
+		FORKEE_ASSERT_EQ(usleep(1000), 0);
+	}
+
+	/* Free the buffer */
+	FORKEE_ASSERT_EQ(reallocarr(&p, 0, sizeof(struct kinfo_proc2)), 0);
+
+	return child;
+}
+
 /* Happy number sequence -- this function is used to just consume cpu cycles */
 #define	HAPPY_NUMBER	1
 
@@ -407,6 +501,118 @@ check_happy(unsigned n)
 
 		n = total;
 	}
+}
+
+#if defined(HAVE_DBREGS)
+static bool __used
+can_we_set_dbregs(void)
+{
+	static long euid = -1;
+	static int user_set_dbregs  = -1;
+	size_t user_set_dbregs_len = sizeof(user_set_dbregs);
+
+	if (euid == -1)
+		euid = geteuid();
+
+	if (euid == 0)
+		return true;
+
+	if (user_set_dbregs == -1) {
+		if (sysctlbyname("security.models.extensions.user_set_dbregs",
+			&user_set_dbregs, &user_set_dbregs_len, NULL, 0)
+			== -1) {
+			return false;
+		}
+	}
+
+	if (user_set_dbregs > 0)
+		return true;
+	else
+		return false;
+}
+#endif
+
+static bool __used
+can_we_write_to_text(pid_t pid)
+{
+	int mib[3];
+	int paxflags;
+	size_t len = sizeof(int);
+
+	mib[0] = CTL_PROC;
+	mib[1] = pid;
+	mib[2] = PROC_PID_PAXFLAGS;
+
+	if (sysctl(mib, 3, &paxflags, &len, NULL, 0) == -1)
+		return false;
+
+	return !(paxflags & CTL_PROC_PAXFLAGS_MPROTECT);
+}
+
+static void __used
+trigger_trap(void)
+{
+
+	/* Software breakpoint causes CPU trap, translated to SIGTRAP */
+#ifdef PTRACE_BREAKPOINT_ASM
+	PTRACE_BREAKPOINT_ASM;
+#else
+	/* port me */
+#endif
+}
+
+static void __used
+trigger_segv(void)
+{
+	static volatile char *ptr = NULL;
+
+	/* Access to unmapped memory causes CPU trap, translated to SIGSEGV */
+	*ptr = 1;
+}
+
+static void __used
+trigger_ill(void)
+{
+
+	/* Illegal instruction causes CPU trap, translated to SIGILL */
+#ifdef PTRACE_ILLEGAL_ASM
+	PTRACE_ILLEGAL_ASM;
+#else
+	/* port me */
+#endif
+}
+
+static void __used
+trigger_fpe(void)
+{
+	volatile int a = getpid();
+	volatile int b = atoi("0");
+
+	/* Division by zero causes CPU trap, translated to SIGFPE */
+	usleep(a / b);
+}
+
+static void __used
+trigger_bus(void)
+{
+	FILE *fp;
+	char *p;
+
+	/* Open an empty file for writing. */
+	fp = tmpfile();
+	FORKEE_ASSERT_NEQ((uintptr_t)fp, (uintptr_t)NULL);
+
+	/*
+	 * Map an empty file with mmap(2) to a pointer.
+	 *
+	 * PROT_READ handles read-modify-write sequences emitted for
+	 * certain combinations of CPUs and compilers (e.g. Alpha AXP).
+	 */
+	p = mmap(0, 1, PROT_READ|PROT_WRITE, MAP_PRIVATE, fileno(fp), 0);
+	FORKEE_ASSERT_NEQ((uintptr_t)p, (uintptr_t)MAP_FAILED);
+
+	/* Invalid memory access causes CPU trap, translated to SIGBUS */
+	*p = 'a';
 }
 
 #if defined(TWAIT_HAVE_PID)

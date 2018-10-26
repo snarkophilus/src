@@ -1,4 +1,4 @@
-/*	$NetBSD: parser.c,v 1.146 2018/04/21 21:32:14 kre Exp $	*/
+/*	$NetBSD: parser.c,v 1.150 2018/08/19 23:50:27 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)parser.c	8.7 (Berkeley) 5/16/95";
 #else
-__RCSID("$NetBSD: parser.c,v 1.146 2018/04/21 21:32:14 kre Exp $");
+__RCSID("$NetBSD: parser.c,v 1.150 2018/08/19 23:50:27 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -179,7 +179,7 @@ parsecmd(int interact)
 STATIC union node *
 list(int nlflag)
 {
-	union node *n1, *n2, *n3;
+	union node *ntop, *n1, *n2, *n3;
 	int tok;
 
 	CTRACE(DBG_PARSE, ("list(%d): entered @%d\n",nlflag,plinno));
@@ -187,7 +187,7 @@ list(int nlflag)
 	checkkwd = 2;
 	if (nlflag == 0 && tokendlist[peektoken()])
 		return NULL;
-	n1 = NULL;
+	ntop = n1 = NULL;
 	for (;;) {
 		n2 = andor();
 		tok = readtoken();
@@ -205,14 +205,22 @@ list(int nlflag)
 			}
 		}
 
-		if (n1 != NULL) {
+		if (ntop == NULL)
+			ntop = n2;
+		else if (n1 == NULL) {
+			n1 = stalloc(sizeof(struct nbinary));
+			n1->type = NSEMI;
+			n1->nbinary.ch1 = ntop;
+			n1->nbinary.ch2 = n2;
+			ntop = n1;
+		} else {
 			n3 = stalloc(sizeof(struct nbinary));
 			n3->type = NSEMI;
-			n3->nbinary.ch1 = n1;
+			n3->nbinary.ch1 = n1->nbinary.ch2;
 			n3->nbinary.ch2 = n2;
+			n1->nbinary.ch2 = n3;
 			n1 = n3;
-		} else
-			n1 = n2;
+		}
 
 		switch (tok) {
 		case TBACKGND:
@@ -223,24 +231,24 @@ list(int nlflag)
 			if (tok == TNL) {
 				readheredocs();
 				if (nlflag)
-					return n1;
+					return ntop;
 			} else if (tok == TEOF && nlflag)
-				return n1;
+				return ntop;
 			else
 				tokpushback++;
 
 			checkkwd = 2;
 			if (!nlflag && tokendlist[peektoken()])
-				return n1;
+				return ntop;
 			break;
 		case TEOF:
 			pungetc();	/* push back EOF on input */
-			return n1;
+			return ntop;
 		default:
 			if (nlflag)
 				synexpect(-1, 0);
 			tokpushback++;
-			return n1;
+			return ntop;
 		}
 	}
 }
@@ -1506,7 +1514,7 @@ parseredir(const char *out,  int c)
 	union node *np;
 	int fd;
 
-	fd = (*out == '\0') ? -1 : atoi(out);
+	fd = (*out == '\0') ? -1 : number(out);
 
 	np = stalloc(sizeof(struct nfile));
 	if (c == '>') {
@@ -1770,7 +1778,7 @@ readtoken1(int firstc, char const *syn, int magicq)
 	for (c = firstc ;; c = pgetc_macro()) {	/* until of token */
 		if (syntax == ARISYNTAX)
 			out = insert_elided_nl(out);
-		CHECKSTRSPACE(4, out);	/* permit 4 calls to USTPUTC */
+		CHECKSTRSPACE(6, out);	/* permit 6 calls to USTPUTC */
 		switch (syntax[c]) {
 		case CNL:	/* '\n' */
 			if (syntax == BASESYNTAX && varnest == 0)
@@ -1788,6 +1796,7 @@ readtoken1(int firstc, char const *syn, int magicq)
 				out = readcstyleesc(out);
 				continue;
 			}
+			USTPUTC(CTLESC, out);
 			/* FALLTHROUGH */
 		case CWORD:
 			USTPUTC(c, out);
@@ -1816,9 +1825,11 @@ readtoken1(int firstc, char const *syn, int magicq)
 			}
 			quotef = 1;	/* current token is quoted */
 			if (ISDBLQUOTE() && c != '\\' && c != '`' &&
-			    c != '$' && (c != '"' || magicq))
+			    c != '$' && (c != '"' || magicq)) {
+				USTPUTC(CTLESC, out);
 				USTPUTC('\\', out);
-			if (SQSYNTAX[c] == CCTL)
+			}
+			if (SQSYNTAX[c] == CCTL || SQSYNTAX[c] == CSBACK)
 				USTPUTC(CTLESC, out);
 			else if (!magicq) {
 				USTPUTC(CTLQUOTEMARK, out);

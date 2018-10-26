@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.97 2018/02/17 03:02:04 uwe Exp $
+# $NetBSD: Makefile,v 1.99 2018/09/23 07:24:19 maxv Exp $
 
 .include <bsd.own.mk>
 
@@ -18,14 +18,14 @@ CONFIGFILES=\
 		accounting altqd amd apmd automount automountd autounmountd \
 		bluetooth bootconf.sh bootparams \
 		ccd cgd cleartmp cron \
-		devpubd dhclient dhcpcd dhcpd dhcpd6 dhcrelay dmesg \
+		devpubd dhcpcd dhcpd dhcpd6 dhcrelay dmesg \
 		downinterfaces \
 		envsys \
 		fsck fsck_root ftp_proxy ftpd \
 		gpio \
 		hostapd httpd \
 		identd ifwatchd inetd ip6addrctl ipfilter ipfs ipmon ipnat \
-		ipsec irdaattach iscsi_target iscsid isdnd isibootd \
+		ipsec irdaattach iscsi_target iscsid isibootd \
 		kdc \
 		ldconfig ldpd local lpd lvm \
 		makemandb mdnsd mixerctl modules mopd motd mountall \

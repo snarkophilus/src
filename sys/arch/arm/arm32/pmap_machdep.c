@@ -909,6 +909,11 @@ pmap_enter_pv(struct vm_page_md *md, paddr_t pa, struct pv_entry *pv, pmap_t pm,
 	 * for this page, make sure to sync the I-cache.
 	 */
 	if (PV_IS_EXEC_P(flags)) {
+		/*XXX is adding this correct??? */
+		if (!PV_IS_EXEC_P(md->pvh_attrs)) {
+			pmap_syncicache_page(md, pa);
+			PMAPCOUNT(exec_synced_map);
+		}
 		PMAPCOUNT(exec_mappings);
 	}
 #endif
@@ -1101,7 +1106,7 @@ pmap_alloc_l1(pmap_t pm)
 	bool ok __diagused;
 	for (;;) {
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
-		pg = arm_pmap_alloc_poolpage(UVM_PGA_ZERO);
+		pg = pmap_md_alloc_poolpage(UVM_PGA_ZERO);
 #else
 		pg = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
 #endif
@@ -4832,9 +4837,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	KASSERT(pte_l1_s_cache_mode == pte_l1_s_cache_mode_pt);
 	KASSERT(pte_l2_s_cache_mode == pte_l2_s_cache_mode_pt);
 
-#ifdef VERBOSE_INIT_ARM
-	printf("kpm ");
-#endif
+	VPRINTF("kpm ");
 	/*
 	 * Initialise the kernel pmap object
 	 */
@@ -4843,30 +4846,22 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pm->pm_l1_pa = kernel_l1pt.pv_pa;
 
 #ifdef MULTIPROCESSOR
-#ifdef VERBOSE_INIT_ARM
-	printf("kcpusets ");
-#endif
+	VPRINTF("kcpusets ");
 	pm->pm_onproc = kcpuset_running;
 	pm->pm_active = kcpuset_running;
 #endif
 
-#ifdef VERBOSE_INIT_ARM
-	printf("tlb0 ");
-#endif
+	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);
 
 
-#ifdef VERBOSE_INIT_ARM
-	printf("locks ");
-#endif
+	VPRINTF("locks ");
 	mutex_init(&pmap_lock, MUTEX_DEFAULT, IPL_NONE);
 	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_NONE);
 	uvm_obj_init(&pm->pm_obj, NULL, false, 1);
 	uvm_obj_setlock(&pm->pm_obj, &pm->pm_obj_lock);
 
-#ifdef VERBOSE_INIT_ARM
-	printf("l1pt ");
-#endif
+	VPRINTF("l1pt ");
 	/*
 	 * Scan the L1 translation table created by initarm() and create
 	 * the required metadata for all valid mappings found in it.
@@ -4941,9 +4936,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 		}
 	}
 
-#ifdef VERBOSE_INIT_ARM
-	printf("cache(l1pt) ");
-#endif
+	VPRINTF("cache(l1pt) ");
 	/*
 	 * Ensure the primary (kernel) L1 has the correct cache mode for
 	 * a page table. Bitch if it is not correctly set.
@@ -4972,9 +4965,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	virtual_avail = vstart;
 	virtual_end = vend;
 
-#ifdef VERBOSE_INIT_ARM
-	printf("specials ");
-#endif
+	VPRINTF("specials ");
 #ifdef PMAP_CACHE_VIPT
 	/*
 	 * If we have a VIPT cache, we need one page/pte per possible alias
@@ -5034,9 +5025,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 		pm->pm_pl1vec = NULL;
 #endif
 
-#ifdef VERBOSE_INIT_ARM
-	printf("pools ");
-#endif
+	VPRINTF("pools ");
 	/*
 	 * Initialize the pmap cache
 	 */
@@ -5343,10 +5332,8 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 	if (l1pt == 0)
 		panic("pmap_map_chunk: no L1 table provided");
 
-#ifdef VERBOSE_INIT_ARM
-	printf("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
+	VPRINTF("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
 	    "prot=0x%x cache=%d\n", pa, va, size, resid, prot, cache);
-#endif
 
 	switch (cache) {
 	case PTE_NOCACHE:
@@ -5381,9 +5368,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			    | ((prot & VM_PROT_EXECUTE) ? 0 : L1_S_V6_XN)
 			    | (va & 0x80000000 ? 0 : L1_S_V6_nG)
 			    | L1_S_PROT(PTE_KERNEL, prot) | f1;
-#ifdef VERBOSE_INIT_ARM
-			printf("sS");
-#endif
+			VPRINTF("sS");
 			l1pte_set(&pdep[l1slot], npde);
 			PDE_SYNC_RANGE(&pdep[l1slot], L1_SS_SIZE / L1_S_SIZE);
 			va += L1_SS_SIZE;
@@ -5399,9 +5384,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			    | (va & 0x80000000 ? 0 : L1_S_V6_nG)
 			    | L1_S_PROT(PTE_KERNEL, prot) | f1
 			    | L1_S_DOM(PMAP_DOMAIN_KERNEL);
-#ifdef VERBOSE_INIT_ARM
-			printf("S");
-#endif
+			VPRINTF("S");
 			l1pte_set(&pdep[l1slot], npde);
 			PDE_SYNC(&pdep[l1slot]);
 			va += L1_S_SIZE;
@@ -5431,9 +5414,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			    | ((prot & VM_PROT_EXECUTE) ? 0 : L2_XS_L_XN)
 			    | (va & 0x80000000 ? 0 : L2_XS_nG)
 			    | L2_L_PROT(PTE_KERNEL, prot) | f2l;
-#ifdef VERBOSE_INIT_ARM
-			printf("L");
-#endif
+			VPRINTF("L");
 			l2pte_set(ptep, npte, 0);
 			PTE_SYNC_RANGE(ptep, L2_L_SIZE / L2_S_SIZE);
 			va += L2_L_SIZE;
@@ -5442,9 +5423,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 			continue;
 		}
 
-#ifdef VERBOSE_INIT_ARM
-		printf("P");
-#endif
+		VPRINTF("P");
 		/* Use a small page mapping. */
 		pt_entry_t npte = L2_S_PROTO | pa
 		    | ((prot & VM_PROT_EXECUTE) ? 0 : L2_XS_XN)
@@ -5457,9 +5436,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 		pa += PAGE_SIZE;
 		resid -= PAGE_SIZE;
 	}
-#ifdef VERBOSE_INIT_ARM
-	printf("\n");
-#endif
+	VPRINTF("\n");
 	return (size);
 }
 
@@ -5492,13 +5469,11 @@ pmap_devmap_bootstrap(vaddr_t l1pt, const struct pmap_devmap *table)
 	pmap_devmap_table = table;
 
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
-#ifdef VERBOSE_INIT_ARM
-		printf("devmap: %08lx -> %08lx @ %08lx\n",
+		VPRINTF("devmap: %08lx -> %08lx @ %08lx\n",
 		    pmap_devmap_table[i].pd_pa,
 		    pmap_devmap_table[i].pd_pa +
 			pmap_devmap_table[i].pd_size - 1,
 		    pmap_devmap_table[i].pd_va);
-#endif
 		pmap_map_chunk(l1pt, pmap_devmap_table[i].pd_va,
 		    pmap_devmap_table[i].pd_pa,
 		    pmap_devmap_table[i].pd_size,
@@ -6466,7 +6441,7 @@ SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
 
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *
-arm_pmap_alloc_poolpage(int flags)
+pmap_md_alloc_poolpage(int flags)
 {
 	/*
 	 * On some systems, only some pages may be "coherent" for dma and we
@@ -7149,15 +7124,11 @@ pmap_impl_bootstrap(void)
 	pm->pm_l1 = (pd_entry_t *)kernel_l1pt.pv_va;
 	pm->pm_l1_pa = kernel_l1pt.pv_pa;
 
-#ifdef VERBOSE_INIT_ARM
-	printf("tlb0 ");
-#endif
+	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);
 
 #ifdef MULTIPROCESSOR
-#ifdef VERBOSE_INIT_ARM
-	printf("kcpusets ");
-#endif
+	VPRINTF("kcpusets ");
 	pm->pm_onproc = kcpuset_running;
 	pm->pm_active = kcpuset_running;
 #endif

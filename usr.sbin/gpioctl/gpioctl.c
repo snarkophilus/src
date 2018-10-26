@@ -1,4 +1,4 @@
-/* $NetBSD: gpioctl.c,v 1.23 2016/04/05 10:58:04 bouyer Exp $ */
+/* $NetBSD: gpioctl.c,v 1.25 2018/10/19 22:51:13 christos Exp $ */
 
 /*
  * Copyright (c) 2008, 2010, 2011, 2013 Marc Balmer <mbalmer@NetBSD.org>
@@ -16,6 +16,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include <sys/cdefs.h>
+__RCSID("$NetBSD: gpioctl.c,v 1.25 2018/10/19 22:51:13 christos Exp $");
 
 /*
  * Program to control GPIO devices.
@@ -72,9 +74,6 @@ static const struct bitstr {
 	{ GPIO_PIN_ALT5, "alt5" },
 	{ GPIO_PIN_ALT6, "alt6" },
 	{ GPIO_PIN_ALT7, "alt7" },
-	{ GPIO_PIN_EVENTS, "events" },
-	{ GPIO_PIN_LEVEL, "level" },
-	{ GPIO_PIN_FALLING, "falling" },
 	{ GPIO_PIN_USER, "user" },
 	{ 0, NULL },
 };

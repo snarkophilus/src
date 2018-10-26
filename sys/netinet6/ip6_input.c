@@ -1,4 +1,4 @@
-/*	$NetBSD: ip6_input.c,v 1.200 2018/04/26 19:22:17 maxv Exp $	*/
+/*	$NetBSD: ip6_input.c,v 1.204 2018/05/19 06:44:08 maxv Exp $	*/
 /*	$KAME: ip6_input.c,v 1.188 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip6_input.c,v 1.200 2018/04/26 19:22:17 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip6_input.c,v 1.204 2018/05/19 06:44:08 maxv Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_gateway.h"
@@ -122,8 +122,6 @@ __KERNEL_RCSID(0, "$NetBSD: ip6_input.c,v 1.200 2018/04/26 19:22:17 maxv Exp $")
 #include <netinet6/ip6protosw.h>
 
 #include "faith.h"
-
-#include <net/net_osdep.h>
 
 extern struct domain inet6domain;
 
@@ -356,6 +354,7 @@ ip6_input(struct mbuf *m, struct ifnet *rcvif)
 			return;
 		if (m == NULL)
 			return;
+		KASSERT(m->m_len >= sizeof(struct ip6_hdr));
 		ip6 = mtod(m, struct ip6_hdr *);
 		srcrt = !IN6_ARE_ADDR_EQUAL(&odst, &ip6->ip6_dst);
 	}
@@ -744,7 +743,7 @@ hbhcheck:
 			    & PR_LASTHDR) != 0) {
 				int error;
 
-				error = ipsec6_input(m);
+				error = ipsec_ip_input(m, false);
 				if (error)
 					goto bad;
 			}
@@ -1051,17 +1050,6 @@ ip6_unknown_opt(u_int8_t *optp, struct mbuf *m, int off)
 	return (-1);
 }
 
-/*
- * Create the "control" list for this pcb.
- *
- * The routine will be called from upper layer handlers like tcp6_input().
- * Thus the routine assumes that the caller (tcp6_input) have already
- * called IP6_EXTHDR_CHECK() and all the extension headers are located in the
- * very first mbuf on the mbuf chain.
- * We may want to add some infinite loop prevention or sanity checks for safety.
- * (This applies only when you are using KAME mbuf chain restriction, i.e.
- * you are using IP6_EXTHDR_CHECK() not m_pulldown())
- */
 void
 ip6_savecontrol(struct in6pcb *in6p, struct mbuf **mp, 
 	struct ip6_hdr *ip6, struct mbuf *m)

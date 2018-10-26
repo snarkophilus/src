@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.45 2017/12/13 16:30:18 bouyer Exp $	*/
+/*	$NetBSD: intr.h,v 1.49 2018/10/10 02:34:08 cherry Exp $	*/
 /*	NetBSD intr.h,v 1.15 2004/10/31 10:39:34 yamt Exp	*/
 
 /*-
@@ -57,12 +57,11 @@ struct evtsource {
 	struct intrhand *ev_handlers;	/* handler chain */
 	struct evcnt ev_evcnt;		/* interrupt counter */
 	struct cpu_info *ev_cpu;        /* cpu on which this event is bound */
-	char ev_evname[32];		/* event counter name */
+	char ev_intrname[32];		/* interrupt string */
+	char ev_xname[64];		/* handler device list */
 };
 
 extern struct intrstub xenev_stubs[];
-extern int irq2vect[256];
-extern int vect2irq[256];
 extern int irq2port[NR_EVENT_CHANNELS]; /* actually port + 1, so that 0 is invaid */
 
 #ifdef MULTIPROCESSOR
@@ -70,7 +69,8 @@ int xen_intr_biglock_wrapper(void *);
 #endif
 
 #if defined(DOM0OPS) || NPCI > 0
-int xen_pirq_alloc(intr_handle_t *, int);
+int xen_vec_alloc(int);
+int xen_pic_to_gsi(struct pic *, int);
 #endif /* defined(DOM0OPS) || NPCI > 0 */
 
 #ifdef MULTIPROCESSOR

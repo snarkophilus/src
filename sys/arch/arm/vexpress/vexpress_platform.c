@@ -1,4 +1,4 @@
-/* $NetBSD: vexpress_platform.c,v 1.7 2018/03/17 18:34:09 ryo Exp $ */
+/* $NetBSD: vexpress_platform.c,v 1.11 2018/10/18 09:01:53 skrll Exp $ */
 
 /*-
  * Copyright (c) 2017 Jared McNeill <jmcneill@invisible.ca>
@@ -27,10 +27,10 @@
  */
 
 #include "opt_multiprocessor.h"
-#include "opt_fdt_arm.h"
+#include "opt_console.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vexpress_platform.c,v 1.7 2018/03/17 18:34:09 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vexpress_platform.c,v 1.11 2018/10/18 09:01:53 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -51,7 +51,8 @@ __KERNEL_RCSID(0, "$NetBSD: vexpress_platform.c,v 1.7 2018/03/17 18:34:09 ryo Ex
 
 #include <arm/cortex/gic_reg.h>
 
-#include <evbarm/dev/plcomvar.h>
+#include <evbarm/dev/plcomreg.h>
+#include <evbarm/fdt/machdep.h>
 
 #include <arm/vexpress/vexpress_platform.h>
 
@@ -91,11 +92,12 @@ static bus_space_handle_t sysreg_bsh;
 #define	SYSREG_WRITE(o, v)	\
 	bus_space_write_4(sysreg_bst, sysreg_bsh, (o), (v))
 
+void vexpress_platform_early_putchar(char);
 
 static void
 vexpress_a15_smp_init(void)
 {
-	extern void cortex_mpstart(void);
+#ifdef MULTIPROCESSOR
 	bus_space_tag_t gicd_bst = &armv7_generic_bs_tag;
 	bus_space_handle_t gicd_bsh;
 	int started = 0;
@@ -106,7 +108,7 @@ vexpress_a15_smp_init(void)
 
 	/* Write init vec to SYS_FLAGS register */
 	SYSREG_WRITE(SYS_FLAGSCLR, 0xffffffff);
-	SYSREG_WRITE(SYS_FLAGS, (uint32_t)cortex_mpstart);
+	SYSREG_WRITE(SYS_FLAGS, KERN_VTOPHYS((vaddr_t)cpu_mpstart));
 
 	/* Map GIC distributor */
 	bus_space_map(gicd_bst, VEXPRESS_GIC_PBASE + GICD_BASE,
@@ -129,6 +131,7 @@ vexpress_a15_smp_init(void)
 
 	/* Disable GIC distributor */
 	bus_space_write_4(gicd_bst, gicd_bsh, GICD_CTRL, 0);
+#endif
 }
 
 
@@ -154,9 +157,9 @@ vexpress_platform_bootstrap(void)
 	bus_space_map(sysreg_bst, SYSREG_BASE, SYSREG_SIZE, 0,
 	    &sysreg_bsh);
 
+#ifdef MULTIPROCESSOR
 	arm_cpu_max = 1 + __SHIFTOUT(armreg_l2ctrl_read(), L2CTRL_NUMCPU);
-
-	vexpress_a15_smp_init();
+#endif
 
 	if (match_bootconf_option(boot_args, "console", "fb")) {
 		void *fdt_data = __UNCONST(fdtbus_get_data());
@@ -175,9 +178,24 @@ vexpress_platform_init_attach_args(struct fdt_attach_args *faa)
 	faa->faa_dmat = &arm_generic_dma_tag;
 }
 
-static void
+void
 vexpress_platform_early_putchar(char c)
 {
+#ifdef CONSADDR
+#define CONSADDR_VA ((CONSADDR - VEXPRESS_CORE_PBASE) + VEXPRESS_CORE_VBASE)
+	volatile uint32_t *uartaddr = cpu_earlydevice_va_p() ?
+	    (volatile uint32_t *)CONSADDR_VA :
+	    (volatile uint32_t *)CONSADDR;
+
+	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFF) != 0)
+		continue;
+
+	uartaddr[PL01XCOM_DR / 4] = htole32(c);
+	arm_dsb();
+
+	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFE) == 0)
+		continue;
+#endif
 }
 
 static void
@@ -204,14 +222,15 @@ vexpress_platform_uart_freq(void)
 }
 
 static const struct arm_platform vexpress_platform = {
-	.devmap = vexpress_platform_devmap,
-	.bootstrap = vexpress_platform_bootstrap,
-	.init_attach_args = vexpress_platform_init_attach_args,
-	.early_putchar = vexpress_platform_early_putchar,
-	.device_register = vexpress_platform_device_register,
-	.reset = vexpress_platform_reset,
-	.delay = gtmr_delay,
-	.uart_freq = vexpress_platform_uart_freq,
+	.ap_devmap = vexpress_platform_devmap,
+	.ap_bootstrap = vexpress_platform_bootstrap,
+	.ap_mpstart = vexpress_a15_smp_init,
+	.ap_init_attach_args = vexpress_platform_init_attach_args,
+	.ap_early_putchar = vexpress_platform_early_putchar,
+	.ap_device_register = vexpress_platform_device_register,
+	.ap_reset = vexpress_platform_reset,
+	.ap_delay = gtmr_delay,
+	.ap_uart_freq = vexpress_platform_uart_freq,
 };
 
 ARM_PLATFORM(vexpress, "arm,vexpress", &vexpress_platform);

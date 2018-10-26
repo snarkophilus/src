@@ -1,4 +1,4 @@
-/*	$NetBSD: msg.mi.es,v 1.6 2015/05/17 10:13:24 martin Exp $	*/
+/*	$NetBSD: msg.mi.es,v 1.8 2018/09/11 08:05:18 martin Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -954,6 +954,7 @@ message Base_dir {Directorio base}
 message Set_dir_src {Directorio de conjuntos binary} /* fix XLAT */
 message Set_dir_bin {Directorio de conjuntos source} /* fix XLAT */
 message Xfer_dir {Directorio a transferir a}
+message transfer_method {Download via}
 message User {Usuario}
 message Password {Contraseña}
 message Proxy {Proxy}
@@ -1241,4 +1242,14 @@ message addusername {8 character username to add}
 message addusertowheel {Do you wish to add this user to group wheel?}
 message Delete_partition
 {Borrar partición}
+
+
+message No_filesystem_newfs
+{The selected partition does not seem to have a valid file system. 
+Do you want to newfs (format) it?}
+
+message Auto_add_swap_part
+{A swap partition (named %s) seems to exist on %s. 
+Do you want to use that?}
+
 

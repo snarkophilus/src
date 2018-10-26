@@ -1,4 +1,4 @@
-/*	$NetBSD: types.h,v 1.34 2017/01/27 17:21:51 christos Exp $	*/
+/*	$NetBSD: types.h,v 1.37 2018/10/18 09:01:52 skrll Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -43,7 +43,7 @@ typedef struct label_t {	/* Used by setjmp & longjmp */
         int val[11];
 } label_t;
 #endif
-         
+
 #if defined(_KERNEL) || defined(_KMEMUSER) || defined(_KERNTYPES) || defined(_STANDALONE)
 typedef unsigned long	paddr_t;
 typedef unsigned long	psize_t;
@@ -56,12 +56,12 @@ typedef unsigned long	vsize_t;
 #define	PRIxVSIZE	"lx"
 #define	PRIuVSIZE	"lu"
 
+#define	VADDR_MAX	ULONG_MAX
+#define	PADDR_MAX	ULONG_MAX
+
 typedef int		register_t, register32_t;
 #define	PRIxREGISTER	"x"
 
-typedef unsigned long	pmc_evid_t;
-#define PMC_INVALID_EVID	(-1)
-typedef unsigned long	pmc_ctr_t;
 typedef unsigned short	tlb_asid_t;
 #endif
 

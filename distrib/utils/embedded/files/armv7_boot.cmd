@@ -1,3 +1,14 @@
+if test "${board}" = "am335x" ; then
+	setenv kernel netbsd-BEAGLEBONE.ub
+	setenv mmcpart 0:1
+	setenv bootargs root=ld0a
+fi
+if test "${soc}" = "exynos" ; then
+	setenv kernel netbsd-EXYNOS.ub
+	setenv bootargs 'root=ld1a'
+	setenv mmcpart 0:1
+	setenv use_fdt 1
+fi
 if test "${soc}" = "sunxi" ; then
 	setenv kernel netbsd-SUNXI.ub
 	setenv bootargs 'root=ld0a'
@@ -18,11 +29,6 @@ if test "${soc}" = "tegra210" ; then
 	setenv fdtfile ${soc}-${board}.dtb
 	# enable PCIe
 	pci enum
-fi
-if test "${board}" = "am335x" ; then
-	setenv kernel netbsd-BEAGLEBONE.ub
-	setenv mmcpart 0:1
-	setenv bootargs root=ld0a
 fi
 
 if test "${kernel}" = "" ; then

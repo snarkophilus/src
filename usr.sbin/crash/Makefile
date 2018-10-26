@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.39 2018/03/04 07:15:37 mlelstv Exp $
+#	$NetBSD: Makefile,v 1.41 2018/09/15 19:47:48 jakllsch Exp $
 
 PROG=		crash
 MAN=		crash.8
@@ -19,6 +19,7 @@ DPADD+=	${LIBUTIL} ${LIBKVM} ${LIBEDIT} ${LIBTERMINFO}
     || ${MACHINE} == "sparc" \
     || ${MACHINE} == "sparc64" \
     || ${MACHINE_CPU} == "arm" \
+    || ${MACHINE_CPU} == "aarch64" \
     || ${MACHINE_ARCH} == "m68k"
 SRCS+=	db_trace.c
 .if ${MACHINE_ARCH} != "m68k"
@@ -68,6 +69,9 @@ MACHINE_FAMILY = ${MACHINE_CPU}
 .PATH:	${S}/arch/arm/arm32
 SRCS+=disassem.c cpufunc_asm.S
 .endif
+.if ${MACHINE_CPU} == "aarch64"
+SRCS+=disasm.c
+.endif
 
 .PATH:	${S}/arch/${MACHINE_FAMILY}/${MACHINE_FAMILY}
 
@@ -84,10 +88,18 @@ SRCS+=	generic.c
 
 COPTS.db_output.c += -Wno-format-nonliteral
 
+.if ${MKREPRO} == "yes"
+.       if ${MKREPRO_TIMESTAMP:U0} != 0
+NVFLAGS+=-r ${MKREPRO_TIMESTAMP}
+.       else
+NVFLAGS+=-R
+.       endif
+.endif
+
 # vers.c
 SRCS+=	vers.c
 vers.c:	${S}/conf/newvers.sh ${_NETBSD_VERSION_DEPENDS}
-	${HOST_SH} ${S}/conf/newvers.sh -r -n
+	${HOST_SH} ${S}/conf/newvers.sh ${NVFLAGS} -n -m ${MACHINE} -i CRASH
 CLEANFILES+=	vers.c version
 
 .else				# } {

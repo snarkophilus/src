@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.8 2017/01/19 11:10:38 maya Exp $
+# $NetBSD: Makefile,v 1.10 2018/09/25 05:42:08 joerg Exp $
 
 .include <bsd.init.mk>
 
@@ -15,8 +15,11 @@ INCS+=	base.h bcj.h block.h check.h container.h delta.h \
 INCSDIR_lzma.h=	/usr/include
 INCSDIR=	/usr/include/lzma
 
+.if ${MKSANITIZER} != "yes"
 LDFLAGS+=	-Wl,-z,defs
+.endif
 
+CPPFLAGS+=	-I${XZSRCDIR}/src/common
 CPPFLAGS+=	-I${XZSRCDIR}/src/liblzma/check
 CPPFLAGS+=	-I${XZSRCDIR}/src/liblzma/common
 CPPFLAGS+=	-I${XZSRCDIR}/src/liblzma/delta
@@ -34,6 +37,10 @@ SRCS+=	tuklib_physmem.c tuklib_cpucores.c
 SRCS+=	check.c crc32_table.c crc64_table.c
 SRCS+=	crc32_fast.c crc64_fast.c
 
+.if defined(HOSTLIB)
+SRCS+=	sha256.c
+.endif
+
 .PATH:	${XZSRCDIR}/src/liblzma/common
 SRCS+=	common.c block_util.c easy_preset.c filter_common.c \
 	hardware_physmem.c hardware_cputhreads.c index.c \
@@ -42,13 +49,17 @@ SRCS+=	common.c block_util.c easy_preset.c filter_common.c \
 	block_header_encoder.c easy_buffer_encoder.c easy_encoder.c \
 	easy_encoder_memusage.c filter_buffer_encoder.c \
 	filter_encoder.c filter_flags_encoder.c index_encoder.c \
-	stream_buffer_encoder.c stream_encoder.c stream_encoder_mt.c \
+	stream_buffer_encoder.c stream_encoder.c \
 	stream_flags_encoder.c vli_encoder.c outqueue.c \
 	alone_decoder.c auto_decoder.c block_buffer_decoder.c \
 	block_decoder.c block_header_decoder.c easy_decoder_memusage.c \
 	filter_buffer_decoder.c filter_decoder.c filter_flags_decoder.c \
 	index_decoder.c index_hash.c stream_buffer_decoder.c \
 	stream_decoder.c stream_flags_decoder.c vli_decoder.c
+
+.if !defined(HOSTLIB)
+SRCS+=	 stream_encoder_mt.c
+.endif
 
 .PATH:	${XZSRCDIR}/src/liblzma/delta
 SRCS+=	delta_common.c delta_encoder.c delta_decoder.c
@@ -79,7 +90,7 @@ liblzma.pc:	${XZSRCDIR}/src/liblzma/liblzma.pc.in
 	    -e 's,@includedir@,/usr/include,' \
 	    -e 's,@PACKAGE_HOMEPAGE@,${XZHOMEPAGE:Q},' \
 	    -e 's,@PACKAGE_VERSION@,${XZVERSION:Q},' \
-	    -e 's,@PTHREAD_CFLAGS@ @PTHREAD_LIBS@,,' \
+	    -e 's,@PTHREAD_CFLAGS@ @PTHREAD_LIBS@,-lpthread,' \
 	    < ${XZSRCDIR}/src/liblzma/liblzma.pc.in \
 	    > ${.TARGET}.tmp && \
 	mv -f ${.TARGET}.tmp ${.TARGET}
@@ -90,6 +101,11 @@ COPTS += ${${ACTIVE_CC} == "gcc":? -Wno-error=psabi :}
 
 CLEANFILES+=	liblzma.pc
 
+.if defined(HOSTLIB)
+HOST_CPPFLAGS+=	${CPPFLAGS:N-Wp,-iremap,*}
+.include <bsd.hostlib.mk>
+.else
 LIBDPLIBS+=	pthread ${NETBSDSRCDIR}/lib/libpthread
-
 .include <bsd.lib.mk>
+.endif
+

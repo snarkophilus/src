@@ -1,4 +1,4 @@
-/*	$NetBSD: t_ptrace_amd64_wait.h,v 1.2 2017/12/14 22:06:54 christos Exp $	*/
+/*	$NetBSD: t_ptrace_amd64_wait.h,v 1.5 2018/05/26 20:27:48 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2016 The NetBSD Foundation, Inc.
@@ -27,6 +27,9 @@
  */
 
 #if defined(__x86_64__)
+
+/// ----------------------------------------------------------------------------
+
 ATF_TC(x86_64_regs1);
 ATF_TC_HEAD(x86_64_regs1, tc)
 {
@@ -107,6 +110,10 @@ ATF_TC_BODY(x86_64_regs1, tc)
 	DPRINTF("Before calling %s() for the child\n", TWAIT_FNAME);
 	TWAIT_REQUIRE_FAILURE(ECHILD, wpid = TWAIT_GENERIC(child, &status, 0));
 }
+
+/// ----------------------------------------------------------------------------
+
+
 #define ATF_TP_ADD_TCS_PTRACE_WAIT_AMD64() \
 	ATF_TP_ADD_TC_HAVE_GPREGS(tp, x86_64_regs1);
 #else

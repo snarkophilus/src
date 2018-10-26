@@ -1,4 +1,6 @@
-/*	$NetBSD: zdump.c,v 1.48 2018/01/25 22:48:42 christos Exp $	*/
+/*	$NetBSD: zdump.c,v 1.50 2018/10/19 23:05:35 christos Exp $	*/
+/* Dump time zone data in a textual format.  */
+
 /*
 ** This file is in the public domain, so clarified as of
 ** 2009-05-17 by Arthur David Olson.
@@ -6,21 +8,11 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: zdump.c,v 1.48 2018/01/25 22:48:42 christos Exp $");
+__RCSID("$NetBSD: zdump.c,v 1.50 2018/10/19 23:05:35 christos Exp $");
 #endif /* !defined lint */
-
-/*
-** This code has been made independent of the rest of the time
-** conversion package to increase confidence in the verification it provides.
-** You can use this code to help in verifying other implementations.
-** To do this, compile with -DUSE_LTZ=0 and link without the tz library.
-*/
 
 #ifndef NETBSD_INSPIRED
 # define NETBSD_INSPIRED 1
-#endif
-#ifndef USE_LTZ
-# define USE_LTZ 1
 #endif
 
 #include <err.h>
@@ -149,7 +141,7 @@ sumsize(size_t a, size_t b)
 
 /* Return a pointer to a newly allocated buffer of size SIZE, exiting
    on failure.  SIZE should be nonzero.  */
-static void *
+static void * ATTRIBUTE_MALLOC
 xmalloc(size_t size)
 {
   void *p = malloc(size);
@@ -392,7 +384,7 @@ __dead static void
 usage(FILE *const stream, const int status)
 {
 	(void) fprintf(stream,
-_("%s: usage: %s OPTIONS ZONENAME ...\n"
+_("%s: usage: %s OPTIONS TIMEZONE ...\n"
   "Options include:\n"
   "  -c [L,]U   Start at year L (default -500), end before year U (default 2500)\n"
   "  -t [L,]U   Start at time L, end before time U (in seconds since 1970)\n"

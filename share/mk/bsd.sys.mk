@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.sys.mk,v 1.275 2018/02/02 01:02:41 mrg Exp $
+#	$NetBSD: bsd.sys.mk,v 1.286 2018/08/03 02:34:31 kamil Exp $
 #
 # Build definitions used for NetBSD source tree builds.
 
@@ -26,12 +26,26 @@ REPROFLAGS+=	-fdebug-prefix-map=\$$DESTDIR=
 CPPFLAGS+=	-Wp,-fno-canonical-system-headers
 CPPFLAGS+=	-Wp,-iremap,${NETBSDSRCDIR}:/usr/src
 CPPFLAGS+=	-Wp,-iremap,${X11SRCDIR}:/usr/xsrc
+
 REPROFLAGS+=	-fdebug-prefix-map=\$$NETBSDSRCDIR=/usr/src
 REPROFLAGS+=	-fdebug-prefix-map=\$$X11SRCDIR=/usr/xsrc
-LINTFLAGS+=	-R${NETBSDSRCDIR}=/usr/src -R${X11SRCDIR}=/usr/xsrc
+.if defined(MAKEOBJDIRPREFIX)
+NETBSDOBJDIR=	${MAKEOBJDIRPREFIX}${NETBSDSRCDIR}
+.endif
 
-REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj.*=/usr/obj/\1'
-REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj.*/(.*)=/usr/obj/\1/\2'
+.if defined(NETBSDOBJDIR)
+.export NETBSDOBJDIR
+REPROFLAGS+=	-fdebug-prefix-map=\$$NETBSDOBJDIR=/usr/obj
+.endif
+
+LINTFLAGS+=	-R${NETBSDSRCDIR}=/usr/src -R${X11SRCDIR}=/usr/xsrc
+LINTFLAGS+=	-R${DESTDIR}=
+
+# XXX: Cannot handle MAKEOBJDIR, yet.
+REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj$$=/usr/obj/\1'
+REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj/(.*)=/usr/obj/\1/\2'
+REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj\..*=/usr/obj/\1'
+REPROFLAGS+=	-fdebug-regex-map='/usr/src/(.*)/obj\..*/(.*)=/usr/obj/\1/\2'
 
 CFLAGS+=	${REPROFLAGS}
 CXXFLAGS+=	${REPROFLAGS}
@@ -65,13 +79,6 @@ CFLAGS+=	${${ACTIVE_CC} == "gcc" :? -Wno-traditional :}
 .if !defined(NOGCCERROR)
 # Set assembler warnings to be fatal
 CFLAGS+=	${${ACTIVE_CC} == "gcc" :? -Wa,--fatal-warnings :}
-.endif
-
-.if ${MKRELRO:Uno} != "no"
-LDFLAGS+=	-Wl,-z,relro
-.endif
-.if ${MKRELRO:Uno} == "full"
-LDFLAGS+=	-Wl,-z,now
 .endif
 
 # Set linker warnings to be fatal
@@ -124,6 +131,26 @@ CFLAGS+=	${${ACTIVE_CC} == "clang":? -Wpointer-sign -Wmissing-noreturn :}
 CFLAGS+=	-Wno-uninitialized
 CFLAGS+=	-Wno-maybe-uninitialized
 .endif
+.endif
+
+.if ${MKRELRO:Uno} != "no"
+LDFLAGS+=	-Wl,-z,relro
+.endif
+.if ${MKRELRO:Uno} == "full"
+LDFLAGS+=	-Wl,-z,now
+.endif
+
+.if ${MKSANITIZER:Uno} == "yes"
+SANITIZERFLAGS:=	-fsanitize=${USE_SANITIZER} ${SANITIZERFLAGS}
+.else
+SANITIZERFLAGS=		# empty
+.endif
+
+.if ${MKLIBCSANITIZER:Uno} == "yes"
+LIBCSANITIZERFLAGS:=	-fsanitize=${USE_LIBCSANITIZER} ${LIBCSANITIZERFLAGS}
+LIBCSANITIZERFLAGS+=	-fno-sanitize=vptr	# Unsupported in micro-UBSan
+.else
+LIBCSANITIZERFLAGS=	# empty
 .endif
 
 CWARNFLAGS+=	${CWARNFLAGS.${ACTIVE_CC}}

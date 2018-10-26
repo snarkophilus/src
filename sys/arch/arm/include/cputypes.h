@@ -1,4 +1,4 @@
-/*	$NetBSD: cputypes.h,v 1.1 2018/03/20 10:14:29 ryo Exp $	*/
+/*	$NetBSD: cputypes.h,v 1.3 2018/10/03 05:43:37 skrll Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Ben Harris
@@ -47,16 +47,18 @@
 /* The high-order byte is always the implementor */
 #define CPU_ID_IMPLEMENTOR_MASK	0xff000000
 #define CPU_ID_ARM_LTD		0x41000000 /* 'A' */
-#define CPU_ID_BROADCMO		0x42000000 /* 'B' */
+#define CPU_ID_BROADCOM		0x42000000 /* 'B' */
 #define CPU_ID_CAVIUM		0x43000000 /* 'C' */
 #define CPU_ID_DEC		0x44000000 /* 'D' */
 #define CPU_ID_INFINEON		0x49000000 /* 'I' */
 #define CPU_ID_MOTOROLA		0x4d000000 /* 'M' */
 #define CPU_ID_NVIDIA		0x4e000000 /* 'N' */
-#define CPU_ID_APPLE		0x50000000 /* 'P' */
+#define CPU_ID_APM		0x50000000 /* 'P' */
 #define CPU_ID_QUALCOMM		0x51000000 /* 'Q' */
+#define CPU_ID_SAMSUNG		0x53000000 /* 'S' */
 #define CPU_ID_TI		0x54000000 /* 'T' */
 #define CPU_ID_MARVELL		0x56000000 /* 'V' */
+#define CPU_ID_APPLE		0x61000000 /* 'a' */
 #define CPU_ID_FARADAY		0x66000000 /* 'f' */
 #define CPU_ID_INTEL		0x69000000 /* 'i' */
 
@@ -174,6 +176,11 @@
 #define CPU_ID_CORTEX_A72_P(n)	((n & 0xff0ff0f0) == 0x410fd080)
 #define CPU_ID_CORTEX_A73_P(n)	((n & 0xff0ff0f0) == 0x410fd090)
 #define CPU_ID_CORTEX_A75_P(n)	((n & 0xff0ff0f0) == 0x410fd0a0)
+
+#define CPU_ID_THUNDERXRX	0x43000a10
+#define CPU_ID_THUNDERX81XXRX	0x43000a20
+#define CPU_ID_THUNDERX83XXRX	0x43000a30
+#define CPU_ID_THUNDERX2RX	0x43000af0
 #define CPU_ID_SA110		0x4401a100
 #define CPU_ID_SA1100		0x4401a110
 #define CPU_ID_TI925T		0x54029250

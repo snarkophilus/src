@@ -1,4 +1,4 @@
-/*	$NetBSD: acpivar.h,v 1.74 2016/06/21 11:33:33 nonaka Exp $	*/
+/*	$NetBSD: acpivar.h,v 1.76 2018/10/12 21:20:54 jmcneill Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -303,6 +303,8 @@ int		acpi_probe(void);
 void		acpi_disable(void);
 int		acpi_check(device_t, const char *);
 
+bool    	acpi_device_present(ACPI_HANDLE);
+
 int		acpi_reset(void);
 
 ACPI_PHYSICAL_ADDRESS	acpi_OsGetRootPointer(void);
@@ -346,6 +348,14 @@ void			acpi_enter_sleep_state(int);
 ACPI_STATUS		acpi_madt_map(void);
 void			acpi_madt_unmap(void);
 void			acpi_madt_walk(ACPI_STATUS (*)(ACPI_SUBTABLE_HEADER *,
+				       void *), void *);
+
+/*
+ * GTDT.
+ */
+ACPI_STATUS		acpi_gtdt_map(void);
+void			acpi_gtdt_unmap(void);
+void			acpi_gtdt_walk(ACPI_STATUS (*)(ACPI_GTDT_HEADER *,
 				       void *), void *);
 
 /*

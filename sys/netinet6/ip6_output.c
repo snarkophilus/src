@@ -1,4 +1,4 @@
-/*	$NetBSD: ip6_output.c,v 1.207 2018/04/29 11:51:08 maxv Exp $	*/
+/*	$NetBSD: ip6_output.c,v 1.212 2018/08/10 06:46:09 maxv Exp $	*/
 /*	$KAME: ip6_output.c,v 1.172 2001/03/25 09:55:56 itojun Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip6_output.c,v 1.207 2018/04/29 11:51:08 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip6_output.c,v 1.212 2018/08/10 06:46:09 maxv Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -105,9 +105,6 @@ __KERNEL_RCSID(0, "$NetBSD: ip6_output.c,v 1.207 2018/04/29 11:51:08 maxv Exp $"
 #include <netipsec/ipsec6.h>
 #include <netipsec/key.h>
 #endif
-
-
-#include <net/net_osdep.h>
 
 extern pfil_head_t *inet6_pfil_hook;	/* XXX */
 
@@ -244,7 +241,7 @@ ip6_output(
 	}
 #endif
 
-	M_CSUM_DATA_IPv6_HL_SET(m->m_pkthdr.csum_data, sizeof(struct ip6_hdr));
+	M_CSUM_DATA_IPv6_SET(m->m_pkthdr.csum_data, sizeof(struct ip6_hdr));
 
 #define MAKE_EXTHDR(hp, mp)						\
     do {								\
@@ -305,7 +302,7 @@ ip6_output(
 
 	if (needipsec &&
 	    (m->m_pkthdr.csum_flags & (M_CSUM_UDPv6|M_CSUM_TCPv6)) != 0) {
-		in6_delayed_cksum(m);
+		in6_undefer_cksum_tcpudp(m);
 		m->m_pkthdr.csum_flags &= ~(M_CSUM_UDPv6|M_CSUM_TCPv6);
 	}
 
@@ -403,7 +400,7 @@ ip6_output(
 		MAKE_CHAIN(exthdrs.ip6e_rthdr, mprev, nexthdrp,
 		    IPPROTO_ROUTING);
 
-		M_CSUM_DATA_IPv6_HL_SET(m->m_pkthdr.csum_data,
+		M_CSUM_DATA_IPv6_SET(m->m_pkthdr.csum_data,
 		    sizeof(struct ip6_hdr) + optlen);
 	}
 
@@ -839,7 +836,7 @@ ip6_output(
 		if ((sw_csum & (M_CSUM_UDPv6|M_CSUM_TCPv6)) != 0) {
 			if (IN6_NEED_CHECKSUM(ifp,
 			    sw_csum & (M_CSUM_UDPv6|M_CSUM_TCPv6))) {
-				in6_delayed_cksum(m);
+				in6_undefer_cksum_tcpudp(m);
 			}
 			m->m_pkthdr.csum_flags &= ~(M_CSUM_UDPv6|M_CSUM_TCPv6);
 		}
@@ -878,32 +875,9 @@ ip6_output(
 		const int hlen = unfragpartlen;
 		struct ip6_frag *ip6f;
 		u_char nextproto;
-#if 0		/* see below */
-		struct ip6ctlparam ip6cp;
-		u_int32_t mtu32;
-#endif
 
 		if (mtu > IPV6_MAXPACKET)
 			mtu = IPV6_MAXPACKET;
-
-#if 0
-		/*
-		 * It is believed this code is a leftover from the
-		 * development of the IPV6_RECVPATHMTU sockopt and
-		 * associated work to implement RFC3542.
-		 * It's not entirely clear what the intent of the API
-		 * is at this point, so disable this code for now.
-		 * The IPV6_RECVPATHMTU sockopt and/or IPV6_DONTFRAG
-		 * will send notifications if the application requests.
-		 */
-
-		/* Notify a proper path MTU to applications. */
-		mtu32 = (u_int32_t)mtu;
-		memset(&ip6cp, 0, sizeof(ip6cp));
-		ip6cp.ip6c_cmdarg = (void *)&mtu32;
-		pfctlinput2(PRC_MSGSIZE,
-		    rtcache_getdst(ro_pmtu), &ip6cp);
-#endif
 
 		/*
 		 * Must be able to put at least 8 bytes per fragment.
@@ -940,7 +914,7 @@ ip6_output(
 			if (IN6_NEED_CHECKSUM(ifp,
 			    m->m_pkthdr.csum_flags &
 			    (M_CSUM_UDPv6|M_CSUM_TCPv6))) {
-				in6_delayed_cksum(m);
+				in6_undefer_cksum_tcpudp(m);
 			}
 			m->m_pkthdr.csum_flags &= ~(M_CSUM_UDPv6|M_CSUM_TCPv6);
 		}
@@ -1095,33 +1069,6 @@ ip6_copyexthdr(struct mbuf **mp, void *hdr, int hlen)
 
 	*mp = m;
 	return 0;
-}
-
-/*
- * Process a delayed payload checksum calculation.
- */
-void
-in6_delayed_cksum(struct mbuf *m)
-{
-	uint16_t csum, offset;
-
-	KASSERT((m->m_pkthdr.csum_flags & (M_CSUM_UDPv6|M_CSUM_TCPv6)) != 0);
-	KASSERT((~m->m_pkthdr.csum_flags & (M_CSUM_UDPv6|M_CSUM_TCPv6)) != 0);
-	KASSERT((m->m_pkthdr.csum_flags
-	    & (M_CSUM_UDPv4|M_CSUM_TCPv4|M_CSUM_TSOv4)) == 0);
-
-	offset = M_CSUM_DATA_IPv6_HL(m->m_pkthdr.csum_data);
-	csum = in6_cksum(m, 0, offset, m->m_pkthdr.len - offset);
-	if (csum == 0 && (m->m_pkthdr.csum_flags & M_CSUM_UDPv6) != 0) {
-		csum = 0xffff;
-	}
-
-	offset += M_CSUM_DATA_IPv6_OFFSET(m->m_pkthdr.csum_data);
-	if ((offset + sizeof(csum)) > m->m_len) {
-		m_copyback(m, offset, sizeof(csum), &csum);
-	} else {
-		*(uint16_t *)(mtod(m, char *) + offset) = csum;
-	}
 }
 
 /*
@@ -3260,7 +3207,7 @@ ip6_mloopback(struct ifnet *ifp, struct mbuf *m,
 	struct mbuf *copym;
 	struct ip6_hdr *ip6;
 
-	copym = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
+	copym = m_copypacket(m, M_DONTWAIT);
 	if (copym == NULL)
 		return;
 

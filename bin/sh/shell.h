@@ -1,4 +1,4 @@
-/*	$NetBSD: shell.h,v 1.25 2017/07/26 03:44:43 kre Exp $	*/
+/*	$NetBSD: shell.h,v 1.27 2018/10/18 05:28:45 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -101,21 +101,10 @@ extern	int		ShNest;
 #define	DBG_EXTRAS(n)	((DBG_VBOSE_SHIFT * 2) + (n))
 
 /*
- * Unconditional tracing for compatibility with old tracing setup.
- */
-#define TRACE(param)		do {					\
-					trace param;			\
-				} while (/*CONSTCOND*/ 0)
-#define TRACEV(param)		do {					\
-					tracev param;			\
-				} while (/*CONSTCOND*/ 0)
-
-/*
- * and the newer conditional tracing, so the mainainer can control
+ * Macros to enable tracing, so the mainainer can control
  * just how much debug output is dumped to the trace file
- * (once the rest of the shell is converted to use it).
  *
- * in the X forms, "xtra" can be any legal C statement(s) without (bare) commas
+ * In the X forms, "xtra" can be any legal C statement(s) without (bare) commas
  * executed if the relevant debug flag is enabled, after any tracing output.
  */
 #define CTRACE(when, param)	do {					\
@@ -189,10 +178,11 @@ extern	int		ShNest;
 #define	DBG_ARITH	(1LL << 15)		/* a */
 #define	DBG_HISTORY	(1LL << 16)		/* h */
 #define	DBG_SIG		(1LL << 17)		/* s */
+#define	DBG_MATCH	(1LL << 18)		/* g (glob) */
 
 /*
  * reserved extras: b=builtins l=alias
- * still free:  d g k n q u y
+ * still free:  d k n q u y
  */
 
 	/* use VTRACE(DBG_ALWAYS, (...)) to test this one */

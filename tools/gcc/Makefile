@@ -1,6 +1,6 @@
-#	$NetBSD: Makefile,v 1.85 2018/05/01 00:04:35 christos Exp $
+#	$NetBSD: Makefile,v 1.87 2018/10/19 16:16:21 maya Exp $
 
-.include <bsd.init.mk>
+.include <bsd.hostinit.mk>
 
 GCC_LANGUAGES=c c++ objc
 MODULE=			gcc4
@@ -35,6 +35,7 @@ COMMON_CONFIGURE_ARGS=	--target=${MACHINE_GNU_PLATFORM} \
 			--with-bugurl=http://www.NetBSD.org/Misc/send-pr.html \
 			--with-pkgversion="NetBSD ${NETBSD_GCC_VERSION}" \
 			--with-system-zlib \
+			--without-isl \
 			--disable-libstdcxx-dual-abi \
 			--enable-__cxa_atexit \
 			--enable-libstdcxx-time=rt \

@@ -1,4 +1,4 @@
-#	$NetBSD: NetBSD.dist.tests,v 1.150 2018/01/10 11:06:06 knakahara Exp $
+#	$NetBSD: NetBSD.dist.tests,v 1.153 2018/09/05 21:05:40 kre Exp $
 
 ./usr/libdata/debug/usr/tests
 ./usr/libdata/debug/usr/tests/atf
@@ -83,6 +83,7 @@
 ./usr/libdata/debug/usr/tests/lib/libc/hash
 ./usr/libdata/debug/usr/tests/lib/libc/locale
 ./usr/libdata/debug/usr/tests/lib/libc/inet
+./usr/libdata/debug/usr/tests/lib/libc/misc
 ./usr/libdata/debug/usr/tests/lib/libc/net
 ./usr/libdata/debug/usr/tests/lib/libc/net/getaddrinfo
 ./usr/libdata/debug/usr/tests/lib/libc/regex
@@ -141,6 +142,7 @@
 ./usr/libdata/debug/usr/tests/net/icmp
 ./usr/libdata/debug/usr/tests/net/if
 ./usr/libdata/debug/usr/tests/net/if_loop
+./usr/libdata/debug/usr/tests/net/if_vlan
 ./usr/libdata/debug/usr/tests/net/in_cksum
 ./usr/libdata/debug/usr/tests/net/ipsec
 ./usr/libdata/debug/usr/tests/net/mcast
@@ -265,6 +267,7 @@
 ./usr/tests/lib/libc/hash/data
 ./usr/tests/lib/libc/locale
 ./usr/tests/lib/libc/inet
+./usr/tests/lib/libc/misc
 ./usr/tests/lib/libc/net
 ./usr/tests/lib/libc/net/getaddrinfo
 ./usr/tests/lib/libc/net/getaddrinfo/data
@@ -407,6 +410,7 @@
 ./usr/tests/usr.bin/nbperf
 ./usr/tests/usr.bin/pkill
 ./usr/tests/usr.bin/pr
+./usr/tests/usr.bin/printf
 ./usr/tests/usr.bin/rump_server
 ./usr/tests/usr.bin/sdiff
 ./usr/tests/usr.bin/sed

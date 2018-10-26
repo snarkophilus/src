@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.1 2018/02/01 20:50:22 kamil Exp $
+#	$NetBSD: Makefile,v 1.3 2018/08/12 21:48:57 mrg Exp $
 
 .include "../../../Makefile.gcc_path"
 
@@ -19,6 +19,6 @@ INCS+=	tsan_interface_atomic.h
 
 .include <bsd.own.mk>
 
-INCSDIR=	/usr/include/gcc-5/sanitizer
+INCSDIR=	${GCC_INCSDIR}/sanitizer
 
 .include <bsd.prog.mk>

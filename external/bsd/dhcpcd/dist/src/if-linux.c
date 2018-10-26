@@ -430,8 +430,6 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 	memset(rt, 0, sizeof(*rt));
 	if (rtm->rtm_type == RTN_UNREACHABLE)
 		rt->rt_flags |= RTF_REJECT;
-	if (rtm->rtm_scope == RT_SCOPE_HOST)
-		rt->rt_flags |= RTF_HOST;
 
 	rta = (struct rtattr *)RTM_RTA(rtm);
 	len = RTM_PAYLOAD(nlm);
@@ -491,6 +489,8 @@ if_copyrt(struct dhcpcd_ctx *ctx, struct rt *rt, struct nlmsghdr *nlm)
 
 	rt->rt_netmask.sa_family = rtm->rtm_family;
 	sa_fromprefix(&rt->rt_netmask, rtm->rtm_dst_len);
+	if (sa_is_allones(&rt->rt_netmask))
+		rt->rt_flags |= RTF_HOST;
 
 	#if 0
 	if (rt->rtp_ifp == NULL && rt->src.s_addr != INADDR_ANY) {
@@ -652,23 +652,6 @@ l2addr_len(unsigned short if_type)
 	return 0;
 }
 
-static int
-handle_rename(struct dhcpcd_ctx *ctx, unsigned int ifindex, const char *ifname)
-{
-	struct interface *ifp;
-
-	TAILQ_FOREACH(ifp, ctx->ifaces, next) {
-		if (ifp->index == ifindex && strcmp(ifp->name, ifname)) {
-			dhcpcd_handleinterface(ctx, -1, ifp->name);
-			/* Let dev announce the interface for renaming */
-			if (!dev_listening(ctx))
-				dhcpcd_handleinterface(ctx, 1, ifname);
-			return 1;
-		}
-	}
-	return 0;
-}
-
 #ifdef INET6
 static int
 link_neigh(struct dhcpcd_ctx *ctx, __unused struct interface *ifp,
@@ -770,7 +753,10 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 	}
 
 	if (nlm->nlmsg_type == RTM_DELLINK) {
-		dhcpcd_handleinterface(ctx, -1, ifn);
+		/* If are listening to a dev manager, let that remove
+		 * the interface rather than the kernel. */
+		if (dev_listening(ctx) < 1)
+			dhcpcd_handleinterface(ctx, -1, ifn);
 		return 0;
 	}
 
@@ -783,16 +769,20 @@ link_netlink(struct dhcpcd_ctx *ctx, struct interface *ifp,
 		return 0;
 	}
 
-	/* Check for interface name change */
-	if (handle_rename(ctx, (unsigned int)ifi->ifi_index, ifn))
-		return 0;
-
 	/* Check for a new interface */
-	if ((ifp = if_find(ctx->ifaces, ifn)) == NULL) {
+	ifp = if_findindex(ctx->ifaces, (unsigned int)ifi->ifi_index);
+	if (ifp == NULL) {
 		/* If are listening to a dev manager, let that announce
 		 * the interface rather than the kernel. */
 		if (dev_listening(ctx) < 1)
 			dhcpcd_handleinterface(ctx, 1, ifn);
+		return 0;
+	}
+
+	/* Handle interface being renamed */
+	if (strcmp(ifp->name, ifn) != 0) {
+		dhcpcd_handleinterface(ctx, -1, ifn);
+		dhcpcd_handleinterface(ctx, 1, ifn);
 		return 0;
 	}
 
@@ -1238,7 +1228,7 @@ if_route(unsigned char cmd, const struct rt *rt)
 			nlm.rt.rtm_protocol = RTPROT_BOOT;
 		if (rt->rt_ifp->flags & IFF_LOOPBACK)
 			nlm.rt.rtm_scope = RT_SCOPE_HOST;
-		else if (gateway_unspec || sa_is_allones(&rt->rt_netmask))
+		else if (gateway_unspec)
 			nlm.rt.rtm_scope = RT_SCOPE_LINK;
 		else
 			nlm.rt.rtm_scope = RT_SCOPE_UNIVERSE;

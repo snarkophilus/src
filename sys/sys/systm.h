@@ -1,4 +1,4 @@
-/*	$NetBSD: systm.h,v 1.275 2018/02/04 17:31:51 maxv Exp $	*/
+/*	$NetBSD: systm.h,v 1.279 2018/10/05 22:12:37 christos Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1988, 1991, 1993
@@ -127,6 +127,7 @@ extern struct sysent {		/* system call table */
 	uint32_t sy_return;	/* DTrace return ID for systrace. */
 } sysent[];
 extern int nsysent;
+extern const uint32_t sysent_nomodbits[];
 #endif
 
 #if	BYTE_ORDER == BIG_ENDIAN
@@ -183,6 +184,14 @@ enum hashtype {
 };
 
 #ifdef _KERNEL
+#define COND_SET_VALUE(dst, src, allow)	\
+	do {				\
+		if (allow)		\
+			dst = src;	\
+	} while (/*CONSTCOND*/0);
+
+
+bool	get_expose_address(struct proc *);
 void	*hashinit(u_int, enum hashtype, bool, u_long *);
 void	hashdone(void *, enum hashtype, u_long);
 int	seltrue(dev_t, int, struct lwp *);
@@ -195,13 +204,13 @@ void	aprint_naive(const char *, ...) __printflike(1, 2);
 void	aprint_verbose(const char *, ...) __printflike(1, 2);
 void	aprint_debug(const char *, ...) __printflike(1, 2);
 
-void	device_printf(device_t, const char *fmt, ...) __printflike(2, 3);
-
 void	aprint_normal_dev(device_t, const char *, ...) __printflike(2, 3);
 void	aprint_error_dev(device_t, const char *, ...) __printflike(2, 3);
 void	aprint_naive_dev(device_t, const char *, ...) __printflike(2, 3);
 void	aprint_verbose_dev(device_t, const char *, ...) __printflike(2, 3);
 void	aprint_debug_dev(device_t, const char *, ...) __printflike(2, 3);
+
+void	device_printf(device_t, const char *fmt, ...) __printflike(2, 3);
 
 struct ifnet;
 
@@ -267,6 +276,7 @@ typedef int	(*copyout_t)(const void *, void *, size_t);
 
 int	copyin_proc(struct proc *, const void *, void *, size_t);
 int	copyout_proc(struct proc *, const void *, void *, size_t);
+int	copyin_pid(pid_t, const void *, void *, size_t);
 int	copyin_vmspace(struct vmspace *, const void *, void *, size_t);
 int	copyout_vmspace(struct vmspace *, const void *, void *, size_t);
 

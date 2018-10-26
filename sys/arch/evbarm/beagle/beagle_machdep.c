@@ -1,4 +1,4 @@
-/*	$NetBSD: beagle_machdep.c,v 1.68 2016/10/20 09:53:08 skrll Exp $ */
+/*	$NetBSD: beagle_machdep.c,v 1.76 2018/10/18 09:01:53 skrll Exp $ */
 
 /*
  * Machine dependent functions for kernel setup for TI OSK5912 board.
@@ -125,14 +125,16 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: beagle_machdep.c,v 1.68 2016/10/20 09:53:08 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: beagle_machdep.c,v 1.76 2018/10/18 09:01:53 skrll Exp $");
 
-#include "opt_machdep.h"
+#include "opt_arm_debug.h"
+#include "opt_console.h"
+#include "opt_com.h"
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
-#include "opt_ipkdb.h"
+#include "opt_machdep.h"
 #include "opt_md.h"
-#include "opt_com.h"
+#include "opt_multiprocessor.h"
 #include "opt_omap.h"
 
 #include "com.h"
@@ -223,7 +225,8 @@ char *boot_file = NULL;
 
 static uint8_t beagle_edid[128];	/* EDID storage */
 
-u_int uboot_args[4] = { 0 };	/* filled in by beagle_start.S (not in bss) */
+/* filled in before cleaning bss. keep in .data */
+u_int uboot_args[4] __attribute__((__section__(".data")));
 
 /* Same things, but for the free (unused by the kernel) memory. */
 
@@ -238,6 +241,22 @@ int use_fb_console = true;
 
 #ifdef CPU_CORTEXA15
 uint32_t omap5_cnt_frq;
+#endif
+
+#ifdef MULTIPROCESSOR
+
+void beagle_cpu_hatch(struct cpu_info *);
+
+void
+beagle_cpu_hatch(struct cpu_info *ci)
+{
+#if defined(CPU_CORTEXA9)
+	a9tmr_init_cpu_clock(ci);
+#elif defined(CPU_CORTEXA7) || defined(CPU_CORTEXA15)
+	gtmr_init_cpu_clock(ci);
+#endif
+}
+
 #endif
 
 /*
@@ -312,7 +331,7 @@ static const struct pmap_devmap devmap[] = {
 	{
 		/*
 		 * Map the all 1MB of the L4 Core area
-		 * this gets us the console UART3, GPT[2-9], WDT1, 
+		 * this gets us the console UART3, GPT[2-9], WDT1,
 		 * and GPIO[2-6].
 		 */
 		.pd_va = _A(OMAP_L4_PERIPHERAL_VBASE),
@@ -439,6 +458,30 @@ beagle_putchar(char c)
 			break;
 	}
 #endif
+}
+
+void beagle_platform_early_putchar(char);
+
+void
+beagle_platform_early_putchar(char c)
+{
+	volatile uint32_t *com0addr = cpu_earlydevice_va_p() ?
+	    (volatile uint32_t *)CONSADDR_VA :
+	    (volatile uint32_t *)CONSADDR;
+
+	int timo = 150000;
+
+	while ((com0addr[com_lsr] & LSR_TXRDY) == 0) {
+		if (--timo == 0)
+			break;
+	}
+
+	com0addr[com_data] = c;
+
+	while ((com0addr[com_lsr] & LSR_TXRDY) == 0) {
+		if (--timo == 0)
+			break;
+	}
 }
 #else
 #define beagle_putchar(c)	((void)0)
@@ -571,7 +614,7 @@ initarm(void *arg)
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 	if (ram_size > KERNEL_VM_BASE - KERNEL_BASE) {
 		printf("%s: dropping RAM size from %luMB to %uMB\n",
-		    __func__, (unsigned long) (ram_size >> 20),     
+		    __func__, (unsigned long) (ram_size >> 20),
 		    (KERNEL_VM_BASE - KERNEL_BASE) >> 20);
 		ram_size = KERNEL_VM_BASE - KERNEL_BASE;
 	}
@@ -801,8 +844,8 @@ omap4_cpu_clk(void)
 	if ((armreg_pfr1_read() & ARM_PFR1_GTIMER_MASK) != 0) {
 		beagle_putchar('0');
 		uint32_t voffset = OMAP_L4_PERIPHERAL_VBASE - OMAP_L4_PERIPHERAL_BASE;
-		uint32_t frac1_reg = OMAP5_PRM_FRAC_INCREMENTER_NUMERATOR; 
-		uint32_t frac2_reg = OMAP5_PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD; 
+		uint32_t frac1_reg = OMAP5_PRM_FRAC_INCREMENTER_NUMERATOR;
+		uint32_t frac2_reg = OMAP5_PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD;
 		uint32_t frac1 = *(volatile uint32_t *)(frac1_reg + voffset);
 		beagle_putchar('1');
 		uint32_t frac2 = *(volatile uint32_t *)(frac2_reg + voffset);
@@ -865,7 +908,7 @@ emif_read_sdram_config(vaddr_t emif_base)
 #endif
 }
 
-static psize_t 
+static psize_t
 emif_memprobe(void)
 {
 	uint32_t sdram_config = emif_read_sdram_config(OMAP_EMIF1_VBASE);
@@ -908,7 +951,7 @@ emif_memprobe(void)
 #if defined(OMAP_3XXX)
 #define SDRC_MCFG(p)		(0x80 + (0x30 * (p)))
 #define SDRC_MCFG_MEMSIZE(m)	((((m) & __BITS(8,17)) >> 8) * 2)
-static psize_t 
+static psize_t
 omap3_memprobe(void)
 {
 	const vaddr_t gpmc_base = OMAP_SDRC_VBASE;
@@ -969,19 +1012,19 @@ beagle_device_register(device_t self, void *aux)
 		 * XXX KLUDGE ALERT XXX
 		 * The iot mainbus supplies is completely wrong since it scales
 		 * addresses by 2.  The simpliest remedy is to replace with our
-		 * bus space used for the armcore registers (which armperiph uses). 
+		 * bus space used for the armcore registers (which armperiph uses).
 		 */
 		struct mainbus_attach_args * const mb = aux;
 		mb->mb_iot = &omap_bs_tag;
 		return;
 	}
- 
+
 #ifdef CPU_CORTEXA9
 	/*
 	 * We need to tell the A9 Global/Watchdog Timer
 	 * what frequency it runs at.
 	 */
-	if (device_is_a(self, "a9tmr") || device_is_a(self, "a9wdt")) {
+	if (device_is_a(self, "arma9tmr") || device_is_a(self, "a9wdt")) {
 		/*
 		 * This clock always runs at (arm_clk div 2) and only goes
 		 * to timers that are part of the A9 MP core subsystem.

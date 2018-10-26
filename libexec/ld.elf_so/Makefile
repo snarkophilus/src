@@ -1,8 +1,8 @@
-#	$NetBSD: Makefile,v 1.137 2017/06/19 11:57:01 joerg Exp $
+#	$NetBSD: Makefile,v 1.139 2018/10/17 23:36:58 joerg Exp $
 #
 # NOTE: when changing ld.so, ensure that ldd still compiles.
 #
-
+NOSANITIZER=	# defined
 WARNS?=4
 
 LDELFSO_MACHINE_ARCH?= ${MACHINE_ARCH}
@@ -72,7 +72,7 @@ CLIBOBJ!=	cd ${NETBSDSRCDIR}/lib/libc && ${PRINTOBJDIR}
 
 SRCS+=		rtld.c reloc.c symbol.c xmalloc.c xprintf.c debug.c \
 		map_object.c load.c search.c headers.c paths.c expand.c \
-		tls.c symver.c diagassert.c
+		tls.c symver.c diagassert.c compat.c
 
 .if ${USE_FORT} == "yes"
 .PATH.c: ${NETBSDSRCDIR}/lib/libc/misc

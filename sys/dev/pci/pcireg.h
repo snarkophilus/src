@@ -1,4 +1,4 @@
-/*	$NetBSD: pcireg.h,v 1.137 2018/02/01 09:09:14 msaitoh Exp $	*/
+/*	$NetBSD: pcireg.h,v 1.142 2018/10/03 06:46:09 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996, 1999, 2000
@@ -1186,8 +1186,8 @@ struct pci_msix_table_entry {
 	uint32_t pci_msix_vector_control;
 };
 #define	PCI_MSIX_VECTCTL_MASK	__BIT(0)
-#define	PCI_MSIX_VECTCTL_STLO	__BITS(23, 16)
-#define	PCI_MSIX_VECTCTL_STUP	__BITS(31, 24)
+#define	PCI_MSIX_VECTCTL_STLO	__BITS(23, 16)	/* ST lower */
+#define	PCI_MSIX_VECTCTL_STUP	__BITS(31, 24)	/* ST upper */
 
  /* Max number of MSI-X vectors. See PCI-SIG specification. */
 #define	PCI_MSIX_MAX_VECTORS	2048
@@ -1327,7 +1327,7 @@ typedef u_int8_t pci_intr_line_t;
 #define   PCI_BRIDGE_CONTROL_SERR		(1 <<  1)
 #define   PCI_BRIDGE_CONTROL_ISA		(1 <<  2)
 #define   PCI_BRIDGE_CONTROL_VGA		(1 <<  3)
-#define   PCI_BRIDGE_CONTROL_VGA16		(1 <<  3)
+#define   PCI_BRIDGE_CONTROL_VGA16		(1 <<  4)
 #define   PCI_BRIDGE_CONTROL_MABRT		(1 <<  5)
 #define   PCI_BRIDGE_CONTROL_SECBR		(1 <<  6)
 #define   PCI_BRIDGE_CONTROL_SECFASTB2B		(1 <<  7)
@@ -1699,7 +1699,10 @@ struct pci_rom {
  * Extended capability ID: 0x0007
  * Root Complex Event Collector Association
  */
-#define	PCI_RCEC_ASSOC_ASSOCBITMAP 0x04
+#define	PCI_RCEC_ASSOC_ASSOCBITMAP 0x04	/* Association Bitmap */
+#define	PCI_RCEC_ASSOC_ASSOCBUSNUM 0x08	/* Associcated Bus Number */
+#define	PCI_RCEC_ASSOCBUSNUM_RCECNEXT __BITS(15, 8)	/* RCEC Next Bus */
+#define	PCI_RCEC_ASSOCBUSNUM_RCECLAST __BITS(23, 16)	/* RCEC Last Bus */
 
 /*
  * Extended capability ID: 0x0008
@@ -1770,6 +1773,7 @@ struct pci_rom {
 #define	PCI_ATS_CAP_INVQDEPTH	__BITS(4, 0)	/* Invalidate Queue Depth */
 #define	PCI_ATS_CAP_PALIGNREQ	__BIT(5)	/* Page Aligned Request */
 #define	PCI_ATS_CAP_GLOBALINVL	__BIT(6)	/* Global Invalidate Support */
+#define	PCI_ATS_CAP_RELAXORD	__BIT(7)	/* Relaxed Ordering */
 #define	PCI_ATS_CTL	0x04	/* Control Register */
 #define	PCI_ATS_CTL_STU		__BITS(20, 16)	/* Smallest Translation Unit */
 #define	PCI_ATS_CTL_EN		__BIT(31)	/* Enable */
@@ -2029,7 +2033,7 @@ struct pci_rom {
   /* Same */
 #define	PCI_DPC_RPPIO_HLOG 0x20	/* RP PIO Header Log Register */
 #define	PCI_DPC_RPPIO_IMPSLOG 0x30 /* RP PIO ImpSpec Log Register */
-#define	PCI_DPC_RPPIO_TLPPLOG 0x34 /* RP PIO TPL Prefix Log Register */
+#define	PCI_DPC_RPPIO_TLPPLOG 0x34 /* RP PIO TLP Prefix Log Register */
 
 /*
  * Extended capability ID: 0x001e

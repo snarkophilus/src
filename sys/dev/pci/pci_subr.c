@@ -1,4 +1,4 @@
-/*	$NetBSD: pci_subr.c,v 1.200 2018/02/01 09:09:14 msaitoh Exp $	*/
+/*	$NetBSD: pci_subr.c,v 1.206 2018/10/04 07:43:12 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1997 Zubin D. Dittia.  All rights reserved.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pci_subr.c,v 1.200 2018/02/01 09:09:14 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci_subr.c,v 1.206 2018/10/04 07:43:12 msaitoh Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_pci.h"
@@ -1172,11 +1172,9 @@ static void
 pci_conf_print_pcipm_cap(const pcireg_t *regs, int capoff)
 {
 	uint16_t caps, pmcsr;
-	pcireg_t reg;
 
 	caps = regs[o2i(capoff)] >> PCI_PMCR_SHIFT;
-	reg = regs[o2i(capoff + PCI_PMCSR)];
-	pmcsr = reg & 0xffff;
+	pmcsr = regs[o2i(capoff + PCI_PMCSR)];
 
 	printf("\n  PCI Power Management Capabilities Register\n");
 
@@ -1195,7 +1193,7 @@ pci_conf_print_pcipm_cap(const pcireg_t *regs, int capoff)
 	onoff("PME# support D3 hot", caps, PCI_PMCR_PME_D3HOT);
 	onoff("PME# support D3 cold", caps, PCI_PMCR_PME_D3COLD);
 
-	printf("    Control/status register: 0x%04x\n", pmcsr);
+	printf("    Control/status register: 0x%08x\n", pmcsr);
 	printf("      Power state: D%d\n", pmcsr & PCI_PMCSR_STATE_MASK);
 	onoff("PCI Express reserved", (pmcsr >> 2), 1);
 	onoff("No soft reset", pmcsr, PCI_PMCSR_NO_SOFTRST);
@@ -1207,11 +1205,11 @@ pci_conf_print_pcipm_cap(const pcireg_t *regs, int capoff)
 	    __SHIFTOUT(pmcsr, PCI_PMCSR_DATASCL_MASK));
 	onoff("PME# status", pmcsr, PCI_PMCSR_PME_STS);
 	printf("    Bridge Support Extensions register: 0x%02x\n",
-	    (reg >> 16) & 0xff);
-	onoff("B2/B3 support", reg, PCI_PMCSR_B2B3_SUPPORT);
-	onoff("Bus Power/Clock Control Enable", reg, PCI_PMCSR_BPCC_EN);
-	printf("    Data register: 0x%02x\n", __SHIFTOUT(reg, PCI_PMCSR_DATA));
-	
+	    (pmcsr >> 16) & 0xff);
+	onoff("B2/B3 support", pmcsr, PCI_PMCSR_B2B3_SUPPORT);
+	onoff("Bus Power/Clock Control Enable", pmcsr, PCI_PMCSR_BPCC_EN);
+	printf("    Data register: 0x%02x\n",
+	       __SHIFTOUT(pmcsr, PCI_PMCSR_DATA));
 }
 
 /* XXX pci_conf_print_vpd_cap */
@@ -3063,6 +3061,18 @@ pci_conf_print_rcec_assoc_cap(const pcireg_t *regs, int extcapoff)
 	reg = regs[o2i(extcapoff + PCI_RCEC_ASSOC_ASSOCBITMAP)];
 	printf("    Association Bitmap for Root Complex Integrated Devices:"
 	    " 0x%08x\n", reg);
+
+	if (PCI_EXTCAPLIST_VERSION(regs[o2i(extcapoff)]) >= 2) {
+		reg = regs[o2i(extcapoff + PCI_RCEC_ASSOC_ASSOCBUSNUM)];
+		printf("    RCEC Associated Bus Numbers register: 0x%08x\n",
+		    reg);
+		printf("      RCEC Next Bus: %u\n",
+		    (unsigned int)__SHIFTOUT(reg,
+			PCI_RCEC_ASSOCBUSNUM_RCECNEXT));
+		printf("      RCEC Last Bus: %u\n",
+		    (unsigned int)__SHIFTOUT(reg,
+			PCI_RCEC_ASSOCBUSNUM_RCECLAST));
+	}
 }
 
 /* XXX pci_conf_print_mfvc_cap */
@@ -3154,6 +3164,7 @@ pci_conf_print_ats_cap(const pcireg_t *regs, int extcapoff)
 	printf("      Invalidate Queue Depth: %u\n", num);
 	onoff("Page Aligned Request", reg, PCI_ATS_CAP_PALIGNREQ);
 	onoff("Global Invalidate", reg, PCI_ATS_CAP_GLOBALINVL);
+	onoff("Relaxed Ordering", reg, PCI_ATS_CAP_RELAXORD);
 
 	printf("    Control register: 0x%04x\n", ctl);
 	printf("      Smallest Translation Unit: %u\n",
@@ -3527,7 +3538,7 @@ static void
 pci_conf_print_tph_req_cap(const pcireg_t *regs, int extcapoff)
 {
 	pcireg_t reg;
-	int size, i, j;
+	int size = 0, i, j;
 	uint8_t sttbloc;
 
 	printf("\n  TPH Requester Extended Capability\n");
@@ -3541,8 +3552,10 @@ pci_conf_print_tph_req_cap(const pcireg_t *regs, int extcapoff)
 	sttbloc = __SHIFTOUT(reg, PCI_TPH_REQ_CAP_STTBLLOC);
 	printf("      ST Table Location: %s\n",
 	    pci_conf_print_tph_req_cap_sttabloc(sttbloc));
-	size = __SHIFTOUT(reg, PCI_TPH_REQ_CAP_STTBLSIZ) + 1;
-	printf("      ST Table Size: %d\n", size);
+	if (sttbloc == PCI_TPH_REQ_STTBLLOC_TPHREQ) {
+		size = __SHIFTOUT(reg, PCI_TPH_REQ_CAP_STTBLSIZ) + 1;
+		printf("      ST Table Size: %d\n", size);
+	}
 
 	reg = regs[o2i(extcapoff + PCI_TPH_REQ_CTL)];
 	printf("    TPH Requester Control register: 0x%08x\n", reg);
@@ -3846,7 +3859,7 @@ pci_conf_print_dpc_cap(const pcireg_t *regs, int extcapoff)
 	    extcapoff + PCI_DPC_RPPIO_HLOG);
 	printf("    RP PIO ImpSpec Log Register: start from 0x%03x\n",
 	    extcapoff + PCI_DPC_RPPIO_IMPSLOG);
-	printf("    RP PIO TPL Prefix Log Register: start from 0x%03x\n",
+	printf("    RP PIO TLP Prefix Log Register: start from 0x%03x\n",
 	    extcapoff + PCI_DPC_RPPIO_TLPPLOG);
 }
 
@@ -4701,19 +4714,19 @@ pci_conf_print(
 	/* device-dependent header */
 	printf("  Device-dependent header:\n");
 	pci_conf_print_regs(regs, endoff, PCI_CONF_SIZE);
-	printf("\n");
 #ifdef _KERNEL
+	printf("\n");
 	if (printfn)
 		(*printfn)(pc, tag, regs);
 	else
 		printf("    Don't know how to pretty-print device-dependent header.\n");
-	printf("\n");
 #endif /* _KERNEL */
 
 	if (regs[o2i(PCI_EXTCAPLIST_BASE)] == 0xffffffff ||
 	    regs[o2i(PCI_EXTCAPLIST_BASE)] == 0)
 		return;
 
+	printf("\n");
 #ifdef _KERNEL
 	pci_conf_print_extcaplist(pc, tag, regs);
 #else

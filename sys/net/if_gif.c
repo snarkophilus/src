@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gif.c,v 1.140 2018/04/27 09:55:27 knakahara Exp $	*/
+/*	$NetBSD: if_gif.c,v 1.144 2018/10/19 00:12:56 knakahara Exp $	*/
 /*	$KAME: if_gif.c,v 1.76 2001/08/20 02:01:02 kjc Exp $	*/
 
 /*
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_gif.c,v 1.140 2018/04/27 09:55:27 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_gif.c,v 1.144 2018/10/19 00:12:56 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -88,8 +88,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_gif.c,v 1.140 2018/04/27 09:55:27 knakahara Exp $
 #include <netinet/ip_encap.h>
 #include <net/if_gif.h>
 
-#include <net/net_osdep.h>
-
 #include "ioconf.h"
 
 #ifdef NET_MPSAFE
@@ -105,7 +103,6 @@ static struct {
 	kmutex_t lock;
 } gif_softcs __cacheline_aligned;
 
-pserialize_t gif_psz __read_mostly;
 struct psref_class *gv_psref_class __read_mostly;
 
 static void	gif_ro_init_pc(void *, void *, struct cpu_info *);
@@ -224,7 +221,6 @@ gifinit(void)
 	LIST_INIT(&gif_softcs.list);
 	if_clone_attach(&gif_cloner);
 
-	gif_psz = pserialize_create();
 	gv_psref_class = psref_class_create("gifvar", IPL_SOFTNET);
 
 	gif_sysctl_setup();
@@ -243,7 +239,6 @@ gifdetach(void)
 
 	if (error == 0) {
 		psref_class_destroy(gv_psref_class);
-		pserialize_destroy(gif_psz);
 
 		if_clone_detach(&gif_cloner);
 		sysctl_teardown(&gif_sysctl);
@@ -275,9 +270,10 @@ gif_clone_create(struct if_clone *ifc, int unit)
 
 	sc->gif_var = var;
 	mutex_init(&sc->gif_lock, MUTEX_DEFAULT, IPL_NONE);
+	sc->gif_psz = pserialize_create();
+
 	sc->gif_ro_percpu = percpu_alloc(sizeof(struct gif_ro));
 	percpu_foreach(sc->gif_ro_percpu, gif_ro_init_pc, NULL);
-
 	mutex_enter(&gif_softcs.lock);
 	LIST_INSERT_HEAD(&gif_softcs.list, sc, gif_list);
 	mutex_exit(&gif_softcs.lock);
@@ -308,9 +304,9 @@ gifattach0(struct gif_softc *sc)
 	if (rv != 0)
 		return rv;
 
-	if_register(&sc->gif_if);
 	if_alloc_sadl(&sc->gif_if);
 	bpf_attach(&sc->gif_if, DLT_NULL, sizeof(u_int));
+	if_register(&sc->gif_if);
 	return 0;
 }
 
@@ -355,6 +351,7 @@ gif_clone_destroy(struct ifnet *ifp)
 	percpu_foreach(sc->gif_ro_percpu, gif_ro_fini_pc, NULL);
 	percpu_free(sc->gif_ro_percpu, sizeof(struct gif_ro));
 
+	pserialize_destroy(sc->gif_psz);
 	mutex_destroy(&sc->gif_lock);
 
 	var = sc->gif_var;
@@ -530,7 +527,7 @@ gif_start(struct ifnet *ifp)
 			}
 		}
 		family = *mtod(m, int *);
-		bpf_mtap(ifp, m);
+		bpf_mtap(ifp, m, BPF_D_OUT);
 		m_adj(m, sizeof(int));
 
 		len = m->m_pkthdr.len;
@@ -588,7 +585,7 @@ gif_transmit_direct(struct gif_variant *var, struct mbuf *m)
 		}
 	}
 	family = *mtod(m, int *);
-	bpf_mtap(ifp, m);
+	bpf_mtap(ifp, m, BPF_D_OUT);
 	m_adj(m, sizeof(int));
 
 	len = m->m_pkthdr.len;
@@ -619,7 +616,7 @@ gif_input(struct mbuf *m, int af, struct ifnet *ifp)
 	m_set_rcvif(m, ifp);
 	pktlen = m->m_pkthdr.len;
 
-	bpf_mtap_af(ifp, af, m);
+	bpf_mtap_af(ifp, af, m, BPF_D_IN);
 
 	/*
 	 * Put the packet to the network layer input queue according to the
@@ -1173,7 +1170,7 @@ gif_update_variant(struct gif_softc *sc, struct gif_variant *nvar)
 	KASSERT(mutex_owned(&sc->gif_lock));
 
 	sc->gif_var = nvar;
-	pserialize_perform(gif_psz);
+	pserialize_perform(sc->gif_psz);
 	psref_target_destroy(&ovar->gv_psref, gv_psref_class);
 
 	if (nvar->gv_psrc != NULL && nvar->gv_pdst != NULL)

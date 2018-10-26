@@ -68,15 +68,64 @@
 #ifndef	_ARM32_PMAP_ARMV3_H_
 #define	_ARM32_PMAP_ARMV3_H_
 
-void	pmap_md_clean_page(struct vm_page_md *, bool);
-
-#define	pmap_copy(dp, sp, da, l, sa)	/* nothing */
-
 struct l1_ttable;
 struct l2_dtable;
 
-#define __HAVE_VM_PAGE_MD
+#define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
+
+
+
+
+struct pmap_page {
+	SLIST_HEAD(,pv_entry) pvh_list;		/* pv_entry list */
+	int pvh_attrs;				/* page attributes */
+	u_int uro_mappings;
+	u_int urw_mappings;
+	union {
+		u_short s_mappings[2];	/* Assume kernel count <= 65535 */
+		u_int i_mappings;
+	} k_u;
+};
+
+/*
+ * pmap-specific data store in the vm_page structure.
+ */
+#define	__HAVE_VM_PAGE_MD
+struct vm_page_md {
+	struct pmap_page pp;
+#define	pvh_list	pp.pvh_list
+#define	pvh_attrs	pp.pvh_attrs
+#define	uro_mappings	pp.uro_mappings
+#define	urw_mappings	pp.urw_mappings
+#define	kro_mappings	pp.k_u.s_mappings[0]
+#define	krw_mappings	pp.k_u.s_mappings[1]
+#define	k_mappings	pp.k_u.i_mappings
+};
+
+#define PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
+
+/*
+ * Set the default color of each page.
+ */
+#if ARM_MMU_V6 > 0
+#define	VM_MDPAGE_PVH_ATTRS_INIT(pg) \
+	(pg)->mdpage.pvh_attrs = (pg)->phys_addr & arm_cache_prefer_mask
+#else
+#define	VM_MDPAGE_PVH_ATTRS_INIT(pg) \
+	(pg)->mdpage.pvh_attrs = 0
+#endif
+
+#define	VM_MDPAGE_INIT(pg)						\
+do {									\
+	SLIST_INIT(&(pg)->mdpage.pvh_list);				\
+	VM_MDPAGE_PVH_ATTRS_INIT(pg);					\
+	(pg)->mdpage.uro_mappings = 0;					\
+	(pg)->mdpage.urw_mappings = 0;					\
+	(pg)->mdpage.k_mappings = 0;					\
+} while (/*CONSTCOND*/0)
+
 #include <uvm/uvm_page.h>
+
 
 /*
  * Flags that indicate attributes of pages or mappings of pages.
@@ -155,6 +204,8 @@ struct l2_dtable;
 void	pmap_procwr(struct proc *, vaddr_t, int);
 void	pmap_remove_all(pmap_t);
 bool	pmap_extract(pmap_t, vaddr_t, paddr_t *);
+
+void	pmap_md_clean_page(struct vm_page_md *, bool);
 
 #define	PMAP_NEED_PROCWR
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
@@ -243,7 +294,6 @@ struct pv_entry {
 	vaddr_t		pv_va;          /* virtual address for mapping */
 	u_int		pv_flags;       /* flags */
 };
-
 
 
 /*

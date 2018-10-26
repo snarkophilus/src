@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.h,v 1.200 2018/04/29 07:13:10 maxv Exp $	*/
+/*	$NetBSD: mbuf.h,v 1.211 2018/10/12 05:49:38 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997, 1999, 2001, 2007 The NetBSD Foundation, Inc.
@@ -166,7 +166,7 @@ struct m_hdr {
  *  o For the out-bound direction, the low 16 bits indicates the offset after
  *    the L4 header where the final L4 checksum value is to be stored and the
  *    high 16 bits is the length of the L3 header (the start of the data to
- *    be checksummed):
+ *    be checksummed).
  *
  *  o For the in-bound direction, it is only valid if the M_CSUM_DATA flag is
  *    set. In this case, an L4 checksum has been calculated by hardware and
@@ -227,24 +227,18 @@ struct pkthdr {
     "\11TSOv4\12TSOv6\40NO_PSEUDOHDR"
 
 /*
- * Macros for manipulating csum_data on outgoing packets.  These are
+ * Macros for manipulating csum_data on outgoing packets. These are
  * used to pass information down from the L4/L3 to the L2.
+ *
+ *   _IPHL:   Length of the IPv{4/6} header, plus the options; in other
+ *            words the offset of the UDP/TCP header in the packet.
+ *   _OFFSET: Offset of the checksum field in the UDP/TCP header.
  */
 #define	M_CSUM_DATA_IPv4_IPHL(x)	((x) >> 16)
 #define	M_CSUM_DATA_IPv4_OFFSET(x)	((x) & 0xffff)
-
-/*
- * Macros for M_CSUM_TCPv6 and M_CSUM_UDPv6
- *
- * M_CSUM_DATA_IPv6_HL: length of ip6_hdr + ext header.
- * ie. offset of UDP/TCP header in the packet.
- *
- * M_CSUM_DATA_IPv6_OFFSET: offset of the checksum field in UDP/TCP header.
- */
-
-#define	M_CSUM_DATA_IPv6_HL(x)		((x) >> 16)
-#define	M_CSUM_DATA_IPv6_HL_SET(x, v)	(x) = ((x) & 0xffff) | ((v) << 16)
+#define	M_CSUM_DATA_IPv6_IPHL(x)	((x) >> 16)
 #define	M_CSUM_DATA_IPv6_OFFSET(x)	((x) & 0xffff)
+#define	M_CSUM_DATA_IPv6_SET(x, v)	(x) = ((x) & 0xffff) | ((v) << 16)
 
 /*
  * Max # of pages we can attach to m_ext.  This is carefully chosen
@@ -329,7 +323,6 @@ MBUF_DEFINE(_mbuf_dummy, 1, 1);
 #define	MHLEN		(MSIZE - offsetof(struct _mbuf_dummy, m_pktdat))
 
 #define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
-#define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
 
 /*
  * The *real* struct mbuf
@@ -345,7 +338,7 @@ MBUF_DEFINE(mbuf, MHLEN, MLEN);
 /* mbuf pkthdr flags, also in m_flags */
 #define	M_AUTHIPHDR	0x00000010	/* authenticated (IPsec) */
 #define	M_DECRYPTED	0x00000020	/* decrypted (IPsec) */
-#define	M_LOOP		0x00000040	/* for Mbuf statistics */
+#define	M_LOOP		0x00000040	/* received on loopback */
 #define	M_BCAST		0x00000100	/* send/received as L2 broadcast */
 #define	M_MCAST		0x00000200	/* send/received as L2 multicast */
 #define	M_CANFASTFWD	0x00000400	/* packet can be fast-forwarded */
@@ -398,7 +391,7 @@ MBUF_DEFINE(mbuf, MHLEN, MLEN);
 #define MT_OOBDATA	7	/* expedited data  */
 
 #ifdef MBUFTYPES
-static const char * const mbuftypes[] = {
+const char * const mbuftypes[] = {
 	"mbfree",
 	"mbdata",
 	"mbheader",
@@ -408,6 +401,8 @@ static const char * const mbuftypes[] = {
 	"mbcontrol",
 	"mboobdata",
 };
+#else
+extern const char * const mbuftypes[];
 #endif
 
 /* flags to m_get/MGET */
@@ -636,15 +631,37 @@ do {									\
 /* The "copy all" special length. */
 #define	M_COPYALL	-1
 
-/* compatibility with 4.3 */
-#define  m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
-
 /*
  * Allow drivers and/or protocols to store private context information.
  */
 #define	M_GETCTX(m, t)		((t)(m)->m_pkthdr._rcvif.ctx)
 #define	M_SETCTX(m, c)		((void)((m)->m_pkthdr._rcvif.ctx = (void *)(c)))
 #define	M_CLEARCTX(m)		M_SETCTX((m), NULL)
+
+/*
+ * M_REGION_GET ensures that the "len"-sized region of type "typ" starting
+ * from "off" within "m" is located in a single mbuf, contiguously.
+ *
+ * The pointer to the region will be returned to pointer variable "val".
+ */
+#define M_REGION_GET(val, typ, m, off, len) \
+do {									\
+	struct mbuf *_t;						\
+	int _tmp;							\
+	if ((m)->m_len >= (off) + (len))				\
+		(val) = (typ)(mtod((m), char *) + (off));		\
+	else {								\
+		_t = m_pulldown((m), (off), (len), &_tmp);		\
+		if (_t) {						\
+			if (_t->m_len < _tmp + (len))			\
+				panic("m_pulldown malfunction");	\
+			(val) = (typ)(mtod(_t, char *) + _tmp);	\
+		} else {						\
+			(val) = (typ)NULL;				\
+			(m) = NULL;					\
+		}							\
+	}								\
+} while (/*CONSTCOND*/ 0)
 
 #endif /* defined(_KERNEL) */
 
@@ -731,18 +748,6 @@ struct mbstat_cpu {
 #define	MBUF_MCLLOWAT		5	/* int: mbuf cluster low water mark */
 #define	MBUF_STATS		6	/* struct: mbstat */
 #define	MBUF_MOWNERS		7	/* struct: m_owner[] */
-#define	MBUF_MAXID		8	/* number of valid MBUF ids */
-
-#define	CTL_MBUF_NAMES {						\
-	{ 0, 0 },							\
-	{ "msize", CTLTYPE_INT },					\
-	{ "mclbytes", CTLTYPE_INT },					\
-	{ "nmbclusters", CTLTYPE_INT },					\
-	{ "mblowat", CTLTYPE_INT },					\
-	{ "mcllowat", CTLTYPE_INT },					\
-	{ 0 /* "stats" */, CTLTYPE_STRUCT },				\
-	{ 0 /* "mowners" */, CTLTYPE_STRUCT },				\
-}
 
 #ifdef	_KERNEL
 extern struct mbstat mbstat;
@@ -756,7 +761,6 @@ extern int max_datalen;		/* MHLEN - max_hdr */
 extern const int msize;			/* mbuf base size */
 extern const int mclbytes;		/* mbuf cluster size */
 extern pool_cache_t mb_cache;
-extern pool_cache_t mcl_cache;
 #ifdef MBUFTRACE
 LIST_HEAD(mownerhead, mowner);
 extern struct mownerhead mowners;
@@ -766,8 +770,6 @@ extern struct mowner revoked_mowner;
 
 MALLOC_DECLARE(M_MBUF);
 MALLOC_DECLARE(M_SONAME);
-
-void	m_pkthdr_remove(struct mbuf *);
 
 struct	mbuf *m_copym(struct mbuf *, int, int, int);
 struct	mbuf *m_copypacket(struct mbuf *, int);
@@ -797,6 +799,7 @@ void	m_verify_packet(struct mbuf *);
 struct	mbuf *m_free(struct mbuf *);
 void	m_freem(struct mbuf *);
 void	mbinit(void);
+void	m_remove_pkthdr(struct mbuf *);
 void	m_copy_pkthdr(struct mbuf *, struct mbuf *);
 void	m_move_pkthdr(struct mbuf *, struct mbuf *);
 
@@ -883,6 +886,34 @@ m_copy_rcvif(struct mbuf *m, const struct mbuf *n)
 
 void m_print(const struct mbuf *, const char *, void (*)(const char *, ...)
     __printflike(1, 2));
+
+/* from uipc_mbufdebug.c */
+void	m_examine(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+
+/* parsers for m_examine() */
+void m_examine_ether(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_pppoe(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_ppp(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_arp(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_ip(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_icmp(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_ip6(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_icmp6(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_tcp(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_udp(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
+void m_examine_hex(const struct mbuf *, int, const char *,
+    void (*)(const char *, ...) __printflike(1, 2));
 
 /*
  * Get rcvif of a mbuf.
