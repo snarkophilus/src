@@ -1210,14 +1210,12 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
  * spread over a number of disparate files/functions.
  *
  * We are passed the following parameters
- *  - kernel_l1pt
- *    This is a pointer to the base of the kernel's L1 translation table.
  *  - vstart
  *    1MB-aligned start of managed kernel virtual memory.
  *  - vend
  *    1MB-aligned end of managed kernel virtual memory.
  *
- * We use the first parameter to build the metadata (struct l1_ttable and
+ * We use kernel_l1pt to build the metadata (struct l1_ttable and
  * struct l2_dtable) necessary to track kernel mappings.
  */
 #define	PMAP_STATIC_L2_SIZE 16
