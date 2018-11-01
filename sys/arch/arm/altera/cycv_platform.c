@@ -1,4 +1,4 @@
-/* $NetBSD: cycv_platform.c,v 1.4 2018/10/20 06:35:34 skrll Exp $ */
+/* $NetBSD: cycv_platform.c,v 1.6 2018/10/30 16:41:52 skrll Exp $ */
 
 /* This file is in the public domain. */
 
@@ -6,7 +6,7 @@
 #include "opt_multiprocessor.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cycv_platform.c,v 1.4 2018/10/20 06:35:34 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cycv_platform.c,v 1.6 2018/10/30 16:41:52 skrll Exp $");
 
 #define	_ARM32_BUS_DMA_PRIVATE
 #include <sys/param.h>
@@ -30,7 +30,20 @@ __KERNEL_RCSID(0, "$NetBSD: cycv_platform.c,v 1.4 2018/10/20 06:35:34 skrll Exp 
 #include <arm/fdt/arm_fdtvar.h>
 #include <dev/fdt/fdtvar.h>
 
-static void cycv_platform_early_putchar(char);
+void cycv_platform_early_putchar(char);
+
+void
+cycv_platform_early_putchar(char c) {
+#ifdef CONSADDR
+#define CONSADDR_VA (CONSADDR - CYCV_PERIPHERAL_BASE + CYCV_PERIPHERAL_VBASE)
+	volatile uint32_t *uartaddr = (volatile uint32_t *) CONSADDR_VA;
+
+	while ((le32toh(uartaddr[com_lsr]) & LSR_TXRDY) == 0)
+		;
+
+	uartaddr[com_data] = htole32(c);
+#endif
+}
 
 static const struct pmap_devmap *
 cycv_platform_devmap(void) {
@@ -79,11 +92,11 @@ cycv_mpstart(void)
 	 * it was unmapped by u-boot in favor of the SDRAM. Plus the dtb is
 	 * stored very low in RAM so we can't re-map the Boot ROM easily.
 	 */
-	pmap_map_chunk(cpu_ttb, CYCV_SDRAM_VBASE, CYCV_SDRAM_BASE, L1_S_SIZE,
-	    VM_PROT_READ|VM_PROT_WRITE, PMAP_NOCACHE);
+	pmap_map_chunk(kernel_l1pt.pv_va, CYCV_SDRAM_VBASE, CYCV_SDRAM_BASE,
+		L1_S_SIZE, VM_PROT_READ|VM_PROT_WRITE, PMAP_NOCACHE);
 	*(volatile uint32_t *) CYCV_SDRAM_VBASE =
 	    htole32(0xea000000 | ((startfunc - 8 - 0x0) >> 2));
-	pmap_unmap_chunk(cpu_ttb, CYCV_SDRAM_BASE, L1_S_SIZE);
+	pmap_unmap_chunk(kernel_l1pt.pv_va, CYCV_SDRAM_VBASE, L1_S_SIZE);
 
 	arm_cpu_max = 2;
 
@@ -97,19 +110,6 @@ cycv_platform_init_attach_args(struct fdt_attach_args *faa) {
 	faa->faa_bst = &armv7_generic_bs_tag;
 	faa->faa_a4x_bst = &armv7_generic_a4x_bs_tag;
 	faa->faa_dmat = &arm_generic_dma_tag;
-}
-
-static void
-cycv_platform_early_putchar(char c) {
-#ifdef CONSADDR
-#define CONSADDR_VA (CONSADDR - CYCV_PERIPHERAL_BASE + CYCV_PERIPHERAL_VBASE)
-	volatile uint32_t *uartaddr = (volatile uint32_t *) CONSADDR_VA;
-
-	while ((le32toh(uartaddr[com_lsr]) & LSR_TXRDY) == 0)
-		;
-
-	uartaddr[com_data] = htole32(c);
-#endif
 }
 
 static void
@@ -143,7 +143,6 @@ static const struct arm_platform cycv_platform = {
 	.ap_devmap = cycv_platform_devmap,
 	.ap_bootstrap = cycv_platform_bootstrap,
 	.ap_init_attach_args = cycv_platform_init_attach_args,
-	.ap_early_putchar = cycv_platform_early_putchar,
 	.ap_device_register = cycv_platform_device_register,
 	.ap_reset = cycv_platform_reset,
 	.ap_delay = a9tmr_delay,

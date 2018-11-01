@@ -1,5 +1,5 @@
 #
-#	$NetBSD: GENERIC64,v 1.54 2018/10/21 12:26:59 jmcneill Exp $
+#	$NetBSD: GENERIC64,v 1.61 2018/10/28 10:21:42 jmcneill Exp $
 #
 #	GENERIC ARM (aarch64) kernel
 #
@@ -93,6 +93,9 @@ config		netbsd		root on ? type ?
 options 	COMPAT_NETBSD32
 options 	EXEC_ELF32
 
+# EFI runtime support
+options 	EFI_RUNTIME
+
 # Device tree support
 armfdt0		at root
 simplebus*	at fdt? pass 0
@@ -100,6 +103,9 @@ simplebus*	at fdt? pass 0
 # ACPI support
 acpifdt*	at fdt? pass 1
 acpi*		at acpifdt?
+acpibut*	at acpi?
+acpiged*	at acpi?
+acpilid*	at acpi?
 
 # CPUs
 cpus*		at fdt? pass 0
@@ -134,6 +140,7 @@ armgtmr0	at gtmr?
 tegratimer*	at fdt?			# Timers
 
 # Watchdog
+sbsawdt*	at acpi?		# ARM SBSA-compliant watchdog
 sunxiwdt*	at fdt?			# Allwinner watchdog
 watchdog*	at fdt?			# Broadcom BCM283x watchdog
 
@@ -144,6 +151,7 @@ gic*		at fdt? pass 1		# ARM GICv2
 gic*		at acpi?
 armgic0		at gic?
 gicvthree*	at fdt? pass 1		# ARM GICv3
+gicvthree*	at acpi?
 sunxinmi*	at fdt? pass 2		# Allwinner NMI / R_INTC
 
 # Memory controller
@@ -373,11 +381,13 @@ tegrausbphy*	at fdt?			# NVIDIA Tegra USB PHY
 dwctwo*		at fdt?			# Designware USB DRD
 ehci*		at fdt?			# EHCI
 ehci*		at pci?			# EHCI
+ehci*		at acpi?		# EHCI
 motg*		at fdt?			# Mentor Graphics USB OTG
 ohci*		at fdt?			# OHCI
 ohci*		at pci?			# OHCI
 xhci*		at fdt?			# XHCI
 xhci*		at pci?			# XHCI
+xhci*		at acpi?		# XHCI
 usb*		at usbus?
 
 include "dev/usb/usbdevices.config"
