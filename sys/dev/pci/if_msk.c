@@ -1,4 +1,4 @@
-/* $NetBSD: if_msk.c,v 1.80 2018/11/13 19:39:04 jdolecek Exp $ */
+/* $NetBSD: if_msk.c,v 1.82 2018/12/27 08:13:50 mrg Exp $ */
 /*	$OpenBSD: if_msk.c,v 1.79 2009/10/15 17:54:56 deraadt Exp $	*/
 
 /*
@@ -52,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_msk.c,v 1.80 2018/11/13 19:39:04 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_msk.c,v 1.82 2018/12/27 08:13:50 mrg Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -429,6 +429,7 @@ msk_init_rx_ring(struct sk_if_softc *sc_if)
 	sc_if->sk_cdata.sk_rx_prod = 0;
 	sc_if->sk_cdata.sk_rx_cons = 0;
 	sc_if->sk_cdata.sk_rx_cnt = 0;
+	sc_if->sk_cdata.sk_rx_hiaddr = 0;
 
 	/* Mark the first ring element to initialize the high address. */
 	sc_if->sk_cdata.sk_rx_hiaddr = 0;
@@ -484,6 +485,7 @@ msk_init_tx_ring(struct sk_if_softc *sc_if)
 	sc_if->sk_cdata.sk_tx_prod = 0;
 	sc_if->sk_cdata.sk_tx_cons = 0;
 	sc_if->sk_cdata.sk_tx_cnt = 0;
+	sc_if->sk_cdata.sk_tx_hiaddr = 0;
 
 	/* Mark the first ring element to initialize the high address. */
 	sc_if->sk_cdata.sk_tx_hiaddr = 0;
@@ -1022,9 +1024,9 @@ mskc_reset(struct sk_softc *sc)
 
 	sk_win_write_2(sc, SK_STAT_BMU_LIDX, MSK_STATUS_RING_CNT - 1);
 	sk_win_write_4(sc, SK_STAT_BMU_ADDRLO,
-	    sc->sk_status_map->dm_segs[0].ds_addr);
+	    MSK_ADDR_LO(sc->sk_status_map->dm_segs[0].ds_addr));
 	sk_win_write_4(sc, SK_STAT_BMU_ADDRHI,
-	    (u_int64_t)sc->sk_status_map->dm_segs[0].ds_addr >> 32);
+	    MSK_ADDR_HI(sc->sk_status_map->dm_segs[0].ds_addr));
 	if (sc->sk_type == SK_YUKON_EC &&
 	    sc->sk_rev == SK_YUKON_EC_REV_A1) {
 		/* WA for dev. #4.3 */
@@ -1299,7 +1301,7 @@ msk_detach(device_t self, int flags)
 	if (sc->sk_if[sc_if->sk_port] == NULL)
 		return (0);
 
-	msk_stop(ifp, 0);
+	msk_stop(ifp, 1);
 
 	if (--sc->rnd_attached == 0)
 		rnd_detach_source(&sc->rnd_source);
@@ -1900,7 +1902,7 @@ msk_encap(struct sk_if_softc *sc_if, struct mbuf *m_head, u_int32_t *txidx)
 
 	*txidx = frag;
 
-	DPRINTFN(2, ("msk_encap: completed successfully\n"));
+	DPRINTFN(2, ("msk_encap: successful: %u entries\n", entries));
 
 	return (0);
 }
@@ -2244,10 +2246,12 @@ msk_intr(void *xsc)
 		switch (cur_st->sk_opcode) {
 		case SK_Y2_STOPC_RXSTAT:
 			sc_if = sc->sk_if[cur_st->sk_link & 0x01];
-			msk_rxeof(sc_if, letoh16(cur_st->sk_len),
-			    letoh32(cur_st->sk_status));
-			if (sc_if->sk_cdata.sk_rx_cnt < (MSK_RX_RING_CNT/3))
-				msk_fill_rx_tick(sc_if);
+			if (sc_if) {
+				msk_rxeof(sc_if, letoh16(cur_st->sk_len),
+				    letoh32(cur_st->sk_status));
+				if (sc_if->sk_cdata.sk_rx_cnt < (MSK_RX_RING_CNT/3))
+					msk_fill_rx_tick(sc_if);
+			}
 			break;
 		case SK_Y2_STOPC_TXSTAT:
 			if (sc_if0)

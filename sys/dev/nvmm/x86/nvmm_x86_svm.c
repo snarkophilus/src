@@ -1,4 +1,4 @@
-/*	$NetBSD: nvmm_x86_svm.c,v 1.6 2018/11/25 14:09:57 maxv Exp $	*/
+/*	$NetBSD: nvmm_x86_svm.c,v 1.9 2019/01/03 08:02:49 maxv Exp $	*/
 
 /*
  * Copyright (c) 2018 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nvmm_x86_svm.c,v 1.6 2018/11/25 14:09:57 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nvmm_x86_svm.c,v 1.9 2019/01/03 08:02:49 maxv Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -803,11 +803,7 @@ svm_exit_io(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 		KASSERT(__SHIFTOUT(info, SVM_EXIT_IO_SEG) < 6);
 		exit->u.io.seg = seg_to_nvmm[__SHIFTOUT(info, SVM_EXIT_IO_SEG)];
 	} else {
-		if (exit->u.io.type == NVMM_EXIT_IO_IN) {
-			exit->u.io.seg = NVMM_X64_SEG_ES;
-		} else {
-			exit->u.io.seg = NVMM_X64_SEG_DS;
-		}
+		exit->u.io.seg = -1;
 	}
 
 	if (info & SVM_EXIT_IO_A64) {
@@ -963,6 +959,7 @@ svm_exit_xsetbv(struct nvmm_machine *mach, struct nvmm_cpu *vcpu,
 
 	state->crs[NVMM_X64_CR_XCR0] = val;
 
+	cpudata->vmcb->state.rip = cpudata->vmcb->ctrl.nrip;
 	return;
 
 error:
@@ -1823,7 +1820,7 @@ svm_vcpu_getstate(struct nvmm_cpu *vcpu, void *data, uint64_t flags)
 		memcpy(&cstate->fpu, cpudata->gfpu.xsh_fxsave,
 		    sizeof(cstate->fpu));
 
-		memcpy(&cstate->fpu, &nstate->fpu, sizeof(cstate->fpu));
+		memcpy(&nstate->fpu, &cstate->fpu, sizeof(cstate->fpu));
 	}
 }
 

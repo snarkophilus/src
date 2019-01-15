@@ -1,4 +1,4 @@
-/*	$NetBSD: if_et.c,v 1.17 2018/06/26 06:48:01 msaitoh Exp $	*/
+/*	$NetBSD: if_et.c,v 1.19 2018/12/22 14:07:53 maxv Exp $	*/
 /*	$OpenBSD: if_et.c,v 1.11 2008/06/08 06:18:07 jsg Exp $	*/
 /*
  * Copyright (c) 2007 The DragonFly Project.  All rights reserved.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_et.c,v 1.17 2018/06/26 06:48:01 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_et.c,v 1.19 2018/12/22 14:07:53 maxv Exp $");
 
 #include "opt_inet.h"
 #include "vlan.h"
@@ -218,7 +218,8 @@ et_attach(device_t parent, device_t self, void *aux)
 	}
 
 	intrstr = pci_intr_string(pc, ih, intrbuf, sizeof(intrbuf));
-	sc->sc_irq_handle = pci_intr_establish(pc, ih, IPL_NET, et_intr, sc);
+	sc->sc_irq_handle = pci_intr_establish_xname(pc, ih, IPL_NET, et_intr,
+	    sc, device_xname(self));
 	if (sc->sc_irq_handle == NULL) {
 		aprint_error_dev(self, "could not establish interrupt");
 		if (intrstr != NULL)
@@ -1825,7 +1826,7 @@ et_encap(struct et_softc *sc, struct mbuf **m0)
 			goto back;
 		}
 
-		M_COPY_PKTHDR(m_new, m);
+		m_copy_pkthdr(m_new, m);
 		if (m->m_pkthdr.len > MHLEN) {
 			MCLGET(m_new, M_DONTWAIT);
 			if (!(m_new->m_flags & M_EXT)) {
