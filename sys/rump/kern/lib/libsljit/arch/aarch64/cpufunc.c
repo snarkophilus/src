@@ -1,7 +1,7 @@
-/*      $NetBSD: cache.c,v 1.3 2019/01/22 01:25:53 alnsn Exp $	*/
+/*	$NetBSD: cpufunc.c,v 1.1 2019/01/21 00:30:14 alnsn Exp $	*/
 
 /*-
- * Copyright (c) 2014 Alexander Nasonov.
+ * Copyright (c) 2019 Alexander Nasonov.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,26 +27,25 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cache.c,v 1.3 2019/01/22 01:25:53 alnsn Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpufunc.c,v 1.1 2019/01/21 00:30:14 alnsn Exp $");
 
 /*
- * Barebone implementation of mips cache routines for rump.
+ * Barebone implementation of arm cpufunc routines for rump.
  */
 
+#include <machine/types.h>
 #include <sys/types.h>
-#include <mips/cache.h>
 
 #include "sljit_rump.h"
 
-static void icache_sync_range(register_t, vsize_t);
+void aarch64_icache_sync_range(vaddr_t, vsize_t);
 
-struct mips_cache_ops mips_cache_ops = {
-	.mco_icache_sync_range = &icache_sync_range
-};
-
-static void
-icache_sync_range(register_t va, vsize_t sz)
+void
+aarch64_icache_sync_range(vaddr_t va, vsize_t sz)
 {
 
-	(void)rumpcomp_sync_icache((void *)(uintptr_t)va, (uint64_t)sz);
+	// XXX MIPS and 32-bit ARM make this call:
+	// (void)rumpcomp_sync_icache((void *)va, (uint64_t)sz);
+	// but it doesn't link. Fix Makefiles to make it link.
+	__builtin___clear_cache((void *)va, (char *)va + sz);
 }

@@ -1,4 +1,4 @@
-/* $NetBSD: amlogic_rtcreg.h,v 1.1 2015/03/22 17:28:22 jmcneill Exp $ */
+/* $NetBSD: meson_rtcreg.h,v 1.1 2019/01/20 17:58:22 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2015 The NetBSD Foundation, Inc.
@@ -26,8 +26,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _ARM_AMLOGIC_RTCREG_H_
-#define _ARM_AMLOGIC_RTCREG_H_
+#ifndef _MESON_RTCREG_H_
+#define _MESON_RTCREG_H_
 
 #define AO_RTC_REG0			0x00
 #define AO_RTC_REG1			0x04
@@ -98,4 +98,4 @@
 #define RTC_SEC_ADJUST_CTRL		__BITS(20,19)
 #define RTC_SEC_ADJUST_COUNTER		__BITS(18,0)
 
-#endif /* _ARM_AMLOGIC_RTCREG_H_ */
+#endif /* _MESON_RTCREG_H_ */
