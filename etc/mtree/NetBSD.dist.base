@@ -1,4 +1,4 @@
-#	$NetBSD: NetBSD.dist.base,v 1.179 2018/10/11 18:04:06 christos Exp $
+#	$NetBSD: NetBSD.dist.base,v 1.185 2019/01/19 13:06:50 mrg Exp $
 #	@(#)4.4BSD.dist	8.1 (Berkeley) 6/13/93
 
 # Do not customize this file as it may be overwritten on upgrades.
@@ -187,10 +187,10 @@
 ./usr/include/g++/tr1
 ./usr/include/g++/tr1_impl
 ./usr/include/g++/tr2
-./usr/include/gcc-5
-./usr/include/gcc-5/sanitizer
 ./usr/include/gcc-6
 ./usr/include/gcc-6/sanitizer
+./usr/include/gcc-7
+./usr/include/gcc-7/sanitizer
 ./usr/include/gssapi
 ./usr/include/isofs
 ./usr/include/isofs/cd9660
@@ -365,8 +365,6 @@
 ./usr/share/examples/emul
 ./usr/share/examples/emul/linux
 ./usr/share/examples/emul/linux/etc
-./usr/share/examples/emul/svr4
-./usr/share/examples/emul/svr4/etc
 ./usr/share/examples/emul/ultrix
 ./usr/share/examples/emul/ultrix/etc
 ./usr/share/examples/fstab
@@ -392,6 +390,7 @@
 ./usr/share/examples/racoon/roadwarrior/client
 ./usr/share/examples/racoon/roadwarrior/server
 ./usr/share/examples/rtadvd
+./usr/share/examples/slip
 ./usr/share/examples/smbfs
 ./usr/share/examples/supfiles
 ./usr/share/examples/syslogd
@@ -1267,7 +1266,6 @@
 ./var/chroot/named/usr/libexec
 ./var/chroot/named/var
 ./var/chroot/named/var/run	mode=0775 gname=named
-./var/chroot/named/var/run/lwresd	mode=0775 gname=named
 ./var/chroot/named/var/run/named	mode=0775 gname=named
 ./var/chroot/named/var/tmp	mode=01775 gname=named
 ./var/chroot/nsd		mode=0755 uname=_nsd gname=_nsd
@@ -1319,7 +1317,6 @@
 ./var/preserve
 ./var/quotas			gname=operator mode=0750
 ./var/run
-./var/run/lwresd		mode=0775 gname=named
 ./var/run/named			mode=0775 gname=named
 ./var/rwho			uname=_rwhod gname=_rwhod
 ./var/shm			mode=01777

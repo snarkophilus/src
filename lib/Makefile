@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.261 2018/09/08 14:11:41 christos Exp $
+#	$NetBSD: Makefile,v 1.266 2018/12/24 22:02:32 mrg Exp $
 #	from: @(#)Makefile	5.25.1.1 (Berkeley) 5/7/91
 
 .include <bsd.own.mk>
@@ -50,6 +50,12 @@ SUBDIR+=	librumpclient
 SUBDIR+=	libskey
 .endif
 
+.if ${MACHINE_ARCH} == "x86_64" && ${MLIBDIR:Unone} != "i386"
+SUBDIR+=	libnvmm
+.endif
+
+SUBDIR+=	../external/public-domain/sqlite/lib
+
 .if (${MKMDNS} != "no")
 SUBDIR+=	../external/apache2/mDNSResponder/lib
 .endif
@@ -77,8 +83,6 @@ SUBDIR+=        ../external/cddl/osnet/lib/libuutil
 .endif
 
 SUBDIR+=	../external/mit/expat/lib
-
-SUBDIR+=	../external/public-domain/sqlite/lib
 
 SUBDIR+=	../external/gpl2/libmalloc
 

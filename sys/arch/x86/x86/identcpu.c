@@ -1,4 +1,4 @@
-/*	$NetBSD: identcpu.c,v 1.79 2018/07/04 07:55:57 maya Exp $	*/
+/*	$NetBSD: identcpu.c,v 1.86 2019/01/13 12:16:58 maxv Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.79 2018/07/04 07:55:57 maya Exp $");
+__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.86 2019/01/13 12:16:58 maxv Exp $");
 
 #include "opt_xen.h"
 
@@ -48,7 +48,6 @@ __KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.79 2018/07/04 07:55:57 maya Exp $");
 #include <x86/cputypes.h>
 #include <x86/cacheinfo.h>
 #include <x86/cpuvar.h>
-#include <x86/cpu_msr.h>
 #include <x86/fpu.h>
 
 #include <x86/x86/vmtreg.h>	/* for vmt_hvcall() */
@@ -355,37 +354,47 @@ cpu_probe_amd_cache(struct cpu_info *ci)
 }
 
 static void
-cpu_probe_k5(struct cpu_info *ci)
+cpu_probe_amd(struct cpu_info *ci)
 {
+	uint64_t val;
 	int flag;
 
-	if (cpu_vendor != CPUVENDOR_AMD ||
-	    CPUID_TO_FAMILY(ci->ci_signature) != 5)
+	if (cpu_vendor != CPUVENDOR_AMD)
+		return;
+	if (CPUID_TO_FAMILY(ci->ci_signature) < 5)
 		return;
 
-	if (CPUID_TO_MODEL(ci->ci_signature) == 0) {
+	switch (CPUID_TO_FAMILY(ci->ci_signature)) {
+	case 0x05: /* K5 */
+		if (CPUID_TO_MODEL(ci->ci_signature) == 0) {
+			/*
+			 * According to the AMD Processor Recognition App Note,
+			 * the AMD-K5 Model 0 uses the wrong bit to indicate
+			 * support for global PTEs, instead using bit 9 (APIC)
+			 * rather than bit 13 (i.e. "0x200" vs. 0x2000").
+			 */
+			flag = ci->ci_feat_val[0];
+			if ((flag & CPUID_APIC) != 0)
+				flag = (flag & ~CPUID_APIC) | CPUID_PGE;
+			ci->ci_feat_val[0] = flag;
+		}
+		break;
+
+	case 0x10: /* Family 10h */
 		/*
-		 * According to the AMD Processor Recognition App Note,
-		 * the AMD-K5 Model 0 uses the wrong bit to indicate
-		 * support for global PTEs, instead using bit 9 (APIC)
-		 * rather than bit 13 (i.e. "0x200" vs. 0x2000".  Oops!).
+		 * On Family 10h, certain BIOSes do not enable WC+ support.
+		 * This causes WC+ to become CD, and degrades guest
+		 * performance at the NPT level.
+		 *
+		 * Explicitly enable WC+ if we're not a guest.
 		 */
-		flag = ci->ci_feat_val[0];
-		if ((flag & CPUID_APIC) != 0)
-			flag = (flag & ~CPUID_APIC) | CPUID_PGE;
-		ci->ci_feat_val[0] = flag;
+		if (!ISSET(ci->ci_feat_val[1], CPUID2_RAZ)) {
+			val = rdmsr(MSR_BU_CFG2);
+			val &= ~BU_CFG2_CWPLUS_DIS;
+			wrmsr(MSR_BU_CFG2, val);
+		}
+		break;
 	}
-
-	cpu_probe_amd_cache(ci);
-}
-
-static void
-cpu_probe_k678(struct cpu_info *ci)
-{
-
-	if (cpu_vendor != CPUVENDOR_AMD ||
-	    CPUID_TO_FAMILY(ci->ci_signature) < 6)
-		return;
 
 	cpu_probe_amd_cache(ci);
 }
@@ -483,32 +492,13 @@ static void
 cpu_probe_winchip(struct cpu_info *ci)
 {
 
-	if (cpu_vendor != CPUVENDOR_IDT)
+	if (cpu_vendor != CPUVENDOR_IDT ||
+	    CPUID_TO_FAMILY(ci->ci_signature) != 5)
 	    	return;
 
-	switch (CPUID_TO_FAMILY(ci->ci_signature)) {
-	case 5:
-		/* WinChip C6 */
-		if (CPUID_TO_MODEL(ci->ci_signature) == 4)
-			ci->ci_feat_val[0] &= ~CPUID_TSC;
-		break;
-	case 6:
-		/*
-		 * VIA Eden ESP 
-		 *
-		 * Quoting from page 3-4 of: "VIA Eden ESP Processor Datasheet"
-		 * http://www.via.com.tw/download/mainboards/6/14/Eden20v115.pdf
-		 * 
-		 * 1. The CMPXCHG8B instruction is provided and always enabled,
-		 *    however, it appears disabled in the corresponding CPUID
-		 *    function bit 0 to avoid a bug in an early version of
-		 *    Windows NT. However, this default can be changed via a
-		 *    bit in the FCR MSR.
-		 */
-		ci->ci_feat_val[0] |= CPUID_CX8;
-		wrmsr(MSR_VIA_FCR, rdmsr(MSR_VIA_FCR) | 0x00000001);
-		break;
-	}
+	/* WinChip C6 */
+	if (CPUID_TO_MODEL(ci->ci_signature) == 4)
+		ci->ci_feat_val[0] &= ~CPUID_TSC;
 }
 
 static void
@@ -529,8 +519,25 @@ cpu_probe_c3(struct cpu_info *ci)
 	x86_cpuid(0x80000000, descs);
 	lfunc = descs[0];
 
+	if (family == 6) {
+		/*
+		 * VIA Eden ESP.
+		 *
+		 * Quoting from page 3-4 of: "VIA Eden ESP Processor Datasheet"
+		 * http://www.via.com.tw/download/mainboards/6/14/Eden20v115.pdf
+		 * 
+		 * 1. The CMPXCHG8B instruction is provided and always enabled,
+		 *    however, it appears disabled in the corresponding CPUID
+		 *    function bit 0 to avoid a bug in an early version of
+		 *    Windows NT. However, this default can be changed via a
+		 *    bit in the FCR MSR.
+		 */
+		ci->ci_feat_val[0] |= CPUID_CX8;
+		wrmsr(MSR_VIA_FCR, rdmsr(MSR_VIA_FCR) | VIA_ACE_ECX8);
+	}
+
 	if (family > 6 || model > 0x9 || (model == 0x9 && stepping >= 3)) {
-		/* Nehemiah or Esther */
+		/* VIA Nehemiah or Esther. */
 		x86_cpuid(0xc0000000, descs);
 		lfunc = descs[0];
 		if (lfunc >= 0xc0000001) {	/* has ACE, RNG */
@@ -599,11 +606,16 @@ cpu_probe_c3(struct cpu_info *ci)
 
 		    if (ace_enable) {
 			msr = rdmsr(MSR_VIA_ACE);
-			wrmsr(MSR_VIA_ACE, msr | MSR_VIA_ACE_ENABLE);
+			wrmsr(MSR_VIA_ACE, msr | VIA_ACE_ENABLE);
 		    }
-
 		}
 	}
+
+	/* Explicitly disable unsafe ALTINST mode. */
+	if (ci->ci_feat_val[4] & CPUID_VIA_DO_ACE) {
+		msr = rdmsr(MSR_VIA_ACE);
+		wrmsr(MSR_VIA_ACE, msr & ~VIA_ACE_ALTINST);
+	} 
 
 	/*
 	 * Determine L1 cache/TLB info.
@@ -826,9 +838,7 @@ cpu_probe_fpu(struct cpu_info *ci)
 	 * supervisor trap. OSXSAVE flag seems to be reliably set according
 	 * to whether XSAVE is actually available.
 	 */
-#ifdef XEN_USE_XSAVE
 	if ((ci->ci_feat_val[1] & CPUID2_OSXSAVE) == 0)
-#endif
 		return;
 #endif
 
@@ -956,8 +966,7 @@ cpu_probe(struct cpu_info *ci)
 	}
 
 	cpu_probe_intel(ci);
-	cpu_probe_k5(ci);
-	cpu_probe_k678(ci);
+	cpu_probe_amd(ci);
 	cpu_probe_cyrix(ci);
 	cpu_probe_winchip(ci);
 	cpu_probe_c3(ci);
@@ -1118,6 +1127,7 @@ identify_hypervisor(void)
 				vm_guest = VM_GUEST_KVM;
 			/* FreeBSD bhyve: "bhyve bhyve " */
 			/* OpenBSD vmm:   "OpenBSDVMM58" */
+			/* NetBSD nvmm:   "___ NVMM ___" */
 		}
 		return;
 	}

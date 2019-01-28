@@ -1,4 +1,4 @@
-/*	$NetBSD: input.c,v 1.63 2018/08/19 23:50:27 kre Exp $	*/
+/*	$NetBSD: input.c,v 1.69 2019/01/16 07:14:17 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)input.c	8.3 (Berkeley) 6/9/95";
 #else
-__RCSID("$NetBSD: input.c,v 1.63 2018/08/19 23:50:27 kre Exp $");
+__RCSID("$NetBSD: input.c,v 1.69 2019/01/16 07:14:17 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -145,14 +145,18 @@ pfgets(char *line, int len)
 
 	while (--nleft > 0) {
 		c = pgetc_macro();
+		if (c == PFAKE)		/* consecutive PFAKEs is impossible */
+			c = pgetc_macro();
 		if (c == PEOF) {
 			if (p == line)
 				return NULL;
 			break;
 		}
 		*p++ = c;
-		if (c == '\n')
+		if (c == '\n') {
+			plinno++;
 			break;
+		}
 	}
 	*p = '\0';
 	return line;
@@ -168,7 +172,12 @@ pfgets(char *line, int len)
 int
 pgetc(void)
 {
-	return pgetc_macro();
+	int c;
+
+	c = pgetc_macro();
+	if (c == PFAKE)
+		c = pgetc_macro();
+	return c;
 }
 
 
@@ -233,7 +242,7 @@ preadfd(void)
  * 1) If a string was pushed back on the input, pop it;
  * 2) If an EOF was pushed back (parsenleft == EOF_NLEFT) or we are reading
  *    from a string so we can't refill the buffer, return EOF.
- * 3) If the is more stuff in this buffer, use it else call read to fill it.
+ * 3) If there is more stuff in this buffer, use it else call read to fill it.
  * 4) Process input up to the next newline, deleting nul characters.
  */
 
@@ -248,6 +257,8 @@ preadbuffer(void)
 	char savec;
 
 	while (parsefile->strpush) {
+		if (parsenleft == -1 && parsefile->strpush->ap != NULL)
+			return PFAKE;
 		popstring();
 		if (--parsenleft >= 0)
 			return (*parsenextc++);
@@ -421,6 +432,15 @@ popstring(void)
 	struct strpush *sp = parsefile->strpush;
 
 	INTOFF;
+	if (sp->ap) {
+		int alen;
+
+		if ((alen = strlen(sp->ap->val)) > 0 &&
+		    (sp->ap->val[alen - 1] == ' ' ||
+		     sp->ap->val[alen - 1] == '\t'))
+			checkkwd |= CHKALIAS;
+		sp->ap->flag &= ~ALIASINUSE;
+	}
 	parsenextc = sp->prevstring;
 	parsenleft = sp->prevnleft;
 	parselleft = sp->prevlleft;
@@ -429,8 +449,6 @@ popstring(void)
 	    sp->ap ? " from alias:'" : "", sp->ap ? sp->ap->name : "",
 	    sp->ap ? "'" : "", parsenleft, parselleft, parsenleft, parsenextc));
 
-	if (sp->ap)
-		sp->ap->flag &= ~ALIASINUSE;
 	parsefile->strpush = sp->prev;
 	if (sp != &(parsefile->basestrpush))
 		ckfree(sp);

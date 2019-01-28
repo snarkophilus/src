@@ -1,4 +1,4 @@
-# $NetBSD: mi,v 1.1192 2018/10/11 15:41:07 christos Exp $
+# $NetBSD: mi,v 1.1199 2019/01/19 13:06:50 mrg Exp $
 #
 # Note:	Don't delete entries from here - mark them as "obsolete" instead,
 #	unless otherwise stated below.
@@ -1173,11 +1173,13 @@
 ./usr/include/g++/tr2				base-cxx-usr
 ./usr/include/gcc-4.1				base-obsolete		obsolete
 ./usr/include/gcc-4.5				base-obsolete		obsolete
-./usr/include/gcc-4.8				base-c-usr		obsolete
-./usr/include/gcc-5				base-c-usr
-./usr/include/gcc-5/sanitizer			base-c-usr
+./usr/include/gcc-4.8				base-obsolete		obsolete
+./usr/include/gcc-5				base-obsolete		obsolete
+./usr/include/gcc-5/sanitizer			base-obsolete		obsolete
 ./usr/include/gcc-6				base-c-usr
 ./usr/include/gcc-6/sanitizer			base-c-usr
+./usr/include/gcc-7				base-c-usr
+./usr/include/gcc-7/sanitizer			base-c-usr
 ./usr/include/gssapi				base-c-usr
 ./usr/include/gssapi/rpc			base-obsolete		obsolete
 ./usr/include/isofs				base-c-usr
@@ -1762,7 +1764,7 @@
 ./usr/sbin/ldpd					base-router-bin
 ./usr/sbin/link					base-sysutil-bin
 ./usr/sbin/linkfarm				base-obsolete		obsolete
-./usr/sbin/lmcconfig				base-netutil-bin
+./usr/sbin/lmcconfig				base-obsolete		obsolete
 ./usr/sbin/lmtp					base-obsolete		obsolete
 ./usr/sbin/lockstat				base-sysutil-bin
 ./usr/sbin/lpc					base-lpr-bin
@@ -2217,8 +2219,8 @@
 ./usr/share/examples/emul			base-sys-examples
 ./usr/share/examples/emul/linux			base-sys-examples
 ./usr/share/examples/emul/linux/etc		base-sys-examples
-./usr/share/examples/emul/svr4			base-sys-examples
-./usr/share/examples/emul/svr4/etc		base-sys-examples
+./usr/share/examples/emul/svr4			base-obsolete	obsolete
+./usr/share/examples/emul/svr4/etc		base-obsolete	obsolete
 ./usr/share/examples/emul/ultrix		base-sys-examples
 ./usr/share/examples/emul/ultrix/etc		base-sys-examples
 ./usr/share/examples/fstab			base-fstab-examples
@@ -2249,6 +2251,7 @@
 ./usr/share/examples/racoon/roadwarrior/client	base-netutil-examples
 ./usr/share/examples/racoon/roadwarrior/server	base-netutil-examples
 ./usr/share/examples/rtadvd			base-router-examples
+./usr/share/examples/slip			base-slip-examples
 ./usr/share/examples/smbfs			base-sysutil-examples
 ./usr/share/examples/supfiles			base-sup-examples
 ./usr/share/examples/syslogd			base-sysutil-examples
@@ -5586,6 +5589,7 @@
 ./usr/share/zoneinfo/Asia/Pontianak		base-sys-share		share
 ./usr/share/zoneinfo/Asia/Pyongyang		base-sys-share		share
 ./usr/share/zoneinfo/Asia/Qatar			base-sys-share		share
+./usr/share/zoneinfo/Asia/Qostanay		base-sys-share		share
 ./usr/share/zoneinfo/Asia/Qyzylorda		base-sys-share		share
 ./usr/share/zoneinfo/Asia/Rangoon		base-sys-share		share
 ./usr/share/zoneinfo/Asia/Riyadh		base-sys-share		share

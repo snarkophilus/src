@@ -1,4 +1,4 @@
-/* $NetBSD: param.h,v 1.4 2018/10/12 01:28:58 ryo Exp $ */
+/* $NetBSD: param.h,v 1.11 2019/01/19 09:11:55 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -33,6 +33,10 @@
 #define _AARCH64_PARAM_H_
 
 #ifdef __aarch64__
+
+#ifdef _KERNEL_OPT
+#include "opt_cputypes.h"
+#endif
 
 /*
  * Machine dependent constants for all ARM processors
@@ -81,20 +85,12 @@
 /* AARCH64-specific macro to align a stack pointer (downwards). */
 #define STACK_ALIGNBYTES	(16 - 1)
 
-#define ALIGNBYTES32		(4 - 1)
+#define ALIGNBYTES32		(8 - 1)
 #define ALIGN32(p)		\
 	(((uintptr_t)(p) + ALIGNBYTES32) & ~ALIGNBYTES32)
 
-#define DEV_BSHIFT		9	/* log2(DEV_BSIZE) */
-#define DEV_BSIZE		(1 << DEV_BSHIFT)
-#define BLKDEV_IOSIZE		2048
-
-#ifndef MAXPHYS
-#define MAXPHYS			65536	/* max I/O transfer size */
-#endif
-
-#define NKMEMPAGES_MAX_DEFAULT	((2048UL * 1024 * 1024) >> PAGE_SHIFT)
-#define NKMEMPAGES_MIN_DEFAULT	((128UL * 1024 * 1024) >> PAGE_SHIFT)
+#define NKMEMPAGES_MIN_DEFAULT		((128UL * 1024 * 1024) >> PAGE_SHIFT)
+#define NKMEMPAGES_MAX_UNLIMITED	1
 
 #ifdef AARCH64_PAGE_SHIFT
 #if (1 << AARCH64_PAGE_SHIFT) & ~0x141000
@@ -127,20 +123,25 @@
 
 
 #ifndef MSGBUFSIZE
-#define MSGBUFSIZE		16384	/* default message buffer size */
+#define MSGBUFSIZE		65536	/* default message buffer size */
 #endif
 
+#define COHERENCY_UNIT		128
+#define CACHE_LINE_SIZE		128
+
 #ifdef _KERNEL
+
+#ifndef __HIDE_DELAY
 void delay(unsigned int);
 #define	DELAY(x)	delay(x)
 #endif
 /*
  * Compatibility /dev/zero mapping.
  */
-#ifdef _KERNEL
 #ifdef COMPAT_16
 #define COMPAT_ZERODEV(x)	(x == makedev(0, _DEV_ZERO_oARM))
 #endif
+
 #endif /* _KERNEL */
 
 #define aarch64_btop(x)		((unsigned long)(x) >> PGSHIFT)

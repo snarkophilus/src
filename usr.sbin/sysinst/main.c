@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.11 2018/10/06 18:45:37 martin Exp $	*/
+/*	$NetBSD: main.c,v 1.15 2018/12/16 11:40:09 martin Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -94,7 +94,7 @@ static const struct f_arg fflagopts[] = {
 	{"ftp host", SYSINST_FTP_HOST, ftp.xfer_host[XFER_FTP], sizeof ftp.xfer_host[XFER_FTP]},
 	{"http host", SYSINST_HTTP_HOST, ftp.xfer_host[XFER_HTTP], sizeof ftp.xfer_host[XFER_HTTP]},
 	{"ftp dir", SYSINST_FTP_DIR, ftp.dir, sizeof ftp.dir},
-	{"ftp prefix", "/" MACH "/binary/sets", set_dir_bin, sizeof set_dir_bin},
+	{"ftp prefix", "/" ARCH_SUBDIR "/binary/sets", set_dir_bin, sizeof set_dir_bin},
 	{"ftp src prefix", "/source/sets", set_dir_src, sizeof set_dir_src},
 	{"ftp user", "ftp", ftp.user, sizeof ftp.user},
 	{"ftp pass", "", ftp.pass, sizeof ftp.pass},
@@ -113,7 +113,7 @@ static const struct f_arg fflagopts[] = {
 	{"pkg host", SYSINST_PKG_HOST, pkg.xfer_host[XFER_FTP], sizeof pkg.xfer_host[XFER_FTP]},
 	{"pkg http host", SYSINST_PKG_HTTP_HOST, pkg.xfer_host[XFER_HTTP], sizeof pkg.xfer_host[XFER_HTTP]},
 	{"pkg dir", SYSINST_PKG_DIR, pkg.dir, sizeof pkg.dir},
-	{"pkg prefix", "/" MACH "/" PKG_SUBDIR "/All", pkg_dir, sizeof pkg_dir},
+	{"pkg prefix", "/" PKG_ARCH_SUBDIR "/" PKG_SUBDIR "/All", pkg_dir, sizeof pkg_dir},
 	{"pkg user", "ftp", pkg.user, sizeof pkg.user},
 	{"pkg pass", "", pkg.pass, sizeof pkg.pass},
 	{"pkg proxy", "", pkg.proxy, sizeof pkg.proxy},
@@ -148,7 +148,7 @@ init(void)
 
 	for (arg = fflagopts; arg->name != NULL; arg++) {
 		if (arg->var == cdrom_dev)
-			strlcpy(arg->var, get_default_cdrom(), arg->size);
+			get_default_cdrom(arg->var, arg->size);
 		else
 			strlcpy(arg->var, arg->dflt, arg->size);
 	}
@@ -420,7 +420,22 @@ static void
 usage(void)
 {
 
-	(void)fprintf(stderr, "%s", msg_string(MSG_usage));
+	(void)fprintf(stderr, "usage: sysinst [-D] [-f definition_file] "
+	    "[-r release] [-C bg:fg]"
+#ifndef NO_PARTMAN
+	    " [-p]"
+#endif
+	    "\n"
+	    "where:\n"
+	    "\t-D\n\t\trun in debug mode\n"
+	    "\t-f definition_file\n\t\toverride built-in defaults from file\n"
+	    "\t-r release\n\t\toverride release name\n"
+	    "\t-C bg:fg\n\t\tuse different color scheme\n"
+#ifndef NO_PARTMAN
+	    "\t-p\n\t\tonly run the partition editor, no installation\n"
+#endif
+	    );
+
 	exit(1);
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.98 2018/10/05 18:51:52 maxv Exp $	*/
+/*	$NetBSD: cpu.h,v 1.101 2018/12/25 06:50:11 cherry Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -94,6 +94,15 @@ struct cpu_tss {
 } __packed;
 
 /*
+ * Arguments to hardclock, softclock and statclock
+ * encapsulate the previous machine state in an opaque
+ * clockframe; for now, use generic intrframe.
+ */
+struct clockframe {
+	struct intrframe cf_if;
+};
+
+/*
  * a bunch of this belongs in cpuvar.h; move it later..
  */
 
@@ -128,7 +137,13 @@ struct cpu_info {
 	uintptr_t ci_pmap_data[128 / sizeof(uintptr_t)];
 
 	struct intrsource *ci_isources[MAX_INTR_SOURCES];
-
+#if defined(XEN)
+	struct intrsource *ci_xsources[NIPL];
+	uint32_t	ci_xmask[NIPL];
+	uint32_t	ci_xunmask[NIPL];
+	uint32_t	ci_xpending; /* XEN doesn't use the cmpxchg8 path */
+#endif
+	
 	volatile int	ci_mtx_count;	/* Negative count of spin mutexes */
 	volatile int	ci_mtx_oldspl;	/* Old SPL at this ci_idepth */
 
@@ -139,7 +154,6 @@ struct cpu_info {
 	} ci_istate __aligned(8);
 #define ci_ipending	ci_istate.ipending
 #define	ci_ilevel	ci_istate.ilevel
-
 	int		ci_idepth;
 	void *		ci_intrstack;
 	uint32_t	ci_imask[NIPL];
@@ -273,6 +287,13 @@ struct cpu_info {
 	/* Xen periodic timer interrupt handle.  */
 	struct intrhand	*ci_xen_timer_intrhand;
 
+	/*
+	 * Clockframe for timer interrupt handler.
+	 * Saved at entry via event callback.
+	 */
+	vaddr_t ci_xen_clockf_pc; /* RIP at last event interrupt */
+	bool ci_xen_clockf_usermode; /* Was the guest in usermode ? */
+
 	/* Event counters for various pathologies that might happen.  */
 	struct evcnt	ci_xen_cpu_tsc_backwards_evcnt;
 	struct evcnt	ci_xen_tsc_delta_negative_evcnt;
@@ -376,15 +397,6 @@ void cpu_speculation_init(struct cpu_info *);
 #define	curcpu()		x86_curcpu()
 #define	curlwp			x86_curlwp()
 #define	curpcb			((struct pcb *)lwp_getpcb(curlwp))
-
-/*
- * Arguments to hardclock, softclock and statclock
- * encapsulate the previous machine state in an opaque
- * clockframe; for now, use generic intrframe.
- */
-struct clockframe {
-	struct intrframe cf_if;
-};
 
 /*
  * Give a profiling tick to the current process when the user profiling

@@ -1,4 +1,4 @@
-#	$NetBSD: files.amd64,v 1.106 2018/08/20 15:04:51 maxv Exp $
+#	$NetBSD: files.amd64,v 1.110 2018/12/22 07:45:58 cherry Exp $
 #
 # new style config file for amd64 architecture
 #
@@ -28,8 +28,7 @@ defflag opt_spectre.h	SPECTRE_V2_GCC_MITIGATION
 #
 
 defflag			USER_LDT
-defflag			KASLR
-defflag eisa.h EISA
+defflag eisa.h		EISA
 
 # Start code
 file	arch/amd64/amd64/locore.S		machdep
@@ -39,7 +38,6 @@ file	arch/amd64/amd64/spl.S			machdep
 
 file	arch/amd64/amd64/amd64func.S		machdep
 file	arch/amd64/amd64/amd64_trap.S		machdep
-file	arch/amd64/amd64/asan.c			kasan
 file	arch/amd64/amd64/autoconf.c		machdep
 file	arch/amd64/amd64/busfunc.S		machdep
 file	arch/amd64/amd64/cpu_in_cksum.S		(inet | inet6) & cpu_in_cksum
@@ -96,7 +94,8 @@ include	"dev/i2o/files.i2o"
 # XXX BIOS32 only if something that uses it is configured!
 device	mainbus: isabus, pcibus, bios32, acpibus, cpubus, ioapicbus, ipmibus
 attach	mainbus at root
-file	arch/amd64/amd64/mainbus.c		mainbus
+file	arch/amd64/amd64/amd64_mainbus.c	mainbus
+file	arch/x86/x86/mainbus.c			mainbus
 
 #
 # PCI-only drivers

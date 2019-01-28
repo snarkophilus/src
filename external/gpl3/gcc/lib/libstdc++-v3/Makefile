@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.33 2018/04/07 22:17:52 mrg Exp $
+#	$NetBSD: Makefile,v 1.35 2019/01/19 17:11:02 mrg Exp $
 
 REQUIRETOOLS=	yes
 NOLINT=		# defined
@@ -134,18 +134,7 @@ BUILDSYMLINKS+=	\
 	${GLIBCXX_SRCDIR}/src/c++11/codecvt.cc c11-codecvt.cc
 SRCS+=	c98-codecvt.cc c11-codecvt.cc
 
-.if ${HAVE_LIBGCC_EH} == "no"
-G_CONFIGLINKS:= ${G_CONFIGLINKS:S,libgcc/config/arm/unwind-arm.h,libgcc/unwind-generic.h,}
-.endif
-
-.if ${MKGCC} != "no"
-.if defined(G_CONFIGLINKS) && !empty(G_CONFIGLINKS)
-BUILDSYMLINKS+=        ${G_CONFIGLINKS}
-.for _src _dst in ${G_CONFIGLINKS}
-DPSRCS+=       ${_dst}
-.endfor
-.endif
-.endif
+.include "../Makefile.gthr"
 
 # XXX Make this either/or, not one, and maybe another
 CXX11_ALWAYS=	localename.cc \
@@ -154,7 +143,8 @@ CXX11_ALWAYS=	localename.cc \
 		compatibility-atomic-c++0x.cc \
 		compatibility-thread-c++0x.cc \
 		compatibility-chrono.cc \
-		compatibility-condvar.cc
+		compatibility-condvar.cc \
+		ios_failure.cc
 .for _s in ${SRCS:M*.cc}
 . if empty(COPTS.${_s}:M-std=*)
 COPTS.${_s}+= -std=gnu++98

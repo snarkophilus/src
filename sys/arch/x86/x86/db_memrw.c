@@ -1,4 +1,4 @@
-/*	$NetBSD: db_memrw.c,v 1.6 2018/03/16 04:48:19 ozaki-r Exp $	*/
+/*	$NetBSD: db_memrw.c,v 1.8 2019/01/19 13:17:32 martin Exp $	*/
 
 /*-
  * Copyright (c) 1996, 2000 The NetBSD Foundation, Inc.
@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_memrw.c,v 1.6 2018/03/16 04:48:19 ozaki-r Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_memrw.c,v 1.8 2019/01/19 13:17:32 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -71,8 +71,7 @@ db_validate_address(vaddr_t addr)
 	struct pmap *pmap;
 
 	if (!p || !p->p_vmspace || !p->p_vmspace->vm_map.pmap ||
-	    addr >= VM_MIN_KERNEL_ADDRESS
-	   )
+	    addr >= VM_MIN_KERNEL_ADDRESS)
 		pmap = pmap_kernel();
 	else
 		pmap = p->p_vmspace->vm_map.pmap;
@@ -91,7 +90,9 @@ db_read_bytes(vaddr_t addr, size_t size, char *data)
 	src = (char *)addr;
 
 	if (db_validate_address((vaddr_t)src)) {
+#ifdef DDB
 		db_printf("address %p is invalid\n", src);
+#endif
 		return;
 	}
 
@@ -112,7 +113,9 @@ db_read_bytes(vaddr_t addr, size_t size, char *data)
 
 	while (size-- > 0) {
 		if (db_validate_address((vaddr_t)src)) {
+#ifdef DDB
 			db_printf("address %p is invalid\n", src);
+#endif
 			return;
 		}
 
@@ -145,7 +148,9 @@ db_write_text(vaddr_t addr, size_t size, const char *data)
 		pte = *ppte;
 
 		if ((pte & PG_V) == 0) {
+#ifdef DDB
 			db_printf(" address %p not a valid page\n", dst);
+#endif
 			return;
 		}
 

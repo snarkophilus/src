@@ -1,4 +1,4 @@
-/*	$NetBSD: init_sysctl.c,v 1.218 2018/10/05 22:12:38 christos Exp $ */
+/*	$NetBSD: init_sysctl.c,v 1.222 2019/01/15 07:11:23 mrg Exp $ */
 
 /*-
  * Copyright (c) 2003, 2007, 2008, 2009 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.218 2018/10/05 22:12:38 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.222 2019/01/15 07:11:23 mrg Exp $");
 
 #include "opt_sysv.h"
 #include "opt_compat_netbsd.h"
@@ -85,8 +85,6 @@ int kern_has_sysvmsg = 0;
 int kern_has_sysvshm = 0;
 int kern_has_sysvsem = 0;
 
-int kern_expose_address = 0;
-
 static const u_int sysctl_lwpprflagmap[] = {
 	LPR_DETACHED, L_DETACHED,
 	0
@@ -110,9 +108,6 @@ dcopyout(struct lwp *l, const void *kaddr, void *uaddr, size_t len)
 	return error;
 }
 
-#ifdef DIAGNOSTIC
-static int sysctl_kern_trigger_panic(SYSCTLFN_PROTO);
-#endif
 static int sysctl_kern_maxvnodes(SYSCTLFN_PROTO);
 static int sysctl_kern_messages(SYSCTLFN_PROTO);
 static int sysctl_kern_rtc_offset(SYSCTLFN_PROTO);
@@ -129,7 +124,6 @@ static int sysctl_kern_root_partition(SYSCTLFN_PROTO);
 static int sysctl_kern_drivers(SYSCTLFN_PROTO);
 static int sysctl_security_setidcore(SYSCTLFN_PROTO);
 static int sysctl_security_setidcorename(SYSCTLFN_PROTO);
-static int sysctl_security_expose_address(SYSCTLFN_PROTO);
 static int sysctl_kern_cpid(SYSCTLFN_PROTO);
 static int sysctl_hw_usermem(SYSCTLFN_PROTO);
 static int sysctl_hw_cnmagic(SYSCTLFN_PROTO);
@@ -502,14 +496,6 @@ SYSCTL_SETUP(sysctl_kern_setup, "sysctl kern subtree setup")
 		       SYSCTL_DESCR("Perform a crash dump on system panic"),
 		       NULL, 0, &dumponpanic, 0,
 		       CTL_KERN, KERN_DUMP_ON_PANIC, CTL_EOL);
-#ifdef DIAGNOSTIC
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "panic_now",
-		       SYSCTL_DESCR("Trigger a panic"),
-		       sysctl_kern_trigger_panic, 0, NULL, 0,
-		       CTL_KERN, CTL_CREATE, CTL_EOL);
-#endif
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT,
 		       CTLTYPE_INT, "root_partition",
@@ -602,12 +588,6 @@ SYSCTL_SETUP(sysctl_kern_setup, "sysctl kern subtree setup")
 			SYSCTL_DESCR("Kernel message verbosity"),
 			sysctl_kern_messages, 0, NULL, 0,
 			CTL_KERN, CTL_CREATE, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-			CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-			CTLTYPE_INT, "expose_address",
-			SYSCTL_DESCR("Expose kernel addresses to userland"),
-			sysctl_security_expose_address, 0, &kern_expose_address,
-			0, CTL_KERN, CTL_CREATE, CTL_EOL);
 }
 
 SYSCTL_SETUP(sysctl_hw_misc_setup, "sysctl hw subtree misc setup")
@@ -711,27 +691,6 @@ SYSCTL_SETUP(sysctl_debug_setup, "sysctl debug subtree setup")
  * section 2: private node-specific helper routines.
  * ********************************************************************
  */
-
-#ifdef DIAGNOSTIC
-static int
-sysctl_kern_trigger_panic(SYSCTLFN_ARGS)
-{
-	int newtrig, error;
-	struct sysctlnode node;
-
-	newtrig = 0;
-	node = *rnode;
-	node.sysctl_data = &newtrig;
-	error = sysctl_lookup(SYSCTLFN_CALL(&node));
-	if (error || newp == NULL)
-		return (error);
-
-	if (newtrig != 0)
-		panic("Panic triggered");
-
-	return (error);
-}
-#endif
 
 /*
  * sysctl helper routine for kern.maxvnodes.  Drain vnodes if
@@ -1349,37 +1308,6 @@ sysctl_security_setidcore(SYSCTLFN_ARGS)
 }
 
 static int
-sysctl_security_expose_address(SYSCTLFN_ARGS)
-{
-	int expose_address, error;
-	struct sysctlnode node;
-
-	node = *rnode;
-	node.sysctl_data = &expose_address;
-	expose_address = *(int *)rnode->sysctl_data;
-	error = sysctl_lookup(SYSCTLFN_CALL(&node));
-	if (error || newp == NULL)
-		return error;
-
-	if (kauth_authorize_system(l->l_cred, KAUTH_SYSTEM_KERNADDR,
-	    0, NULL, NULL, NULL))
-		return (EPERM);
-
-	*(int *)rnode->sysctl_data = expose_address;
-
-	return 0;
-}
-
-bool
-get_expose_address(struct proc *p)
-{
-	/* allow only if sysctl variable is set or privileged */
-	return kern_expose_address || kauth_authorize_process(kauth_cred_get(),
-	    KAUTH_PROCESS_CANSEE, p,
-	    KAUTH_ARG(KAUTH_REQ_PROCESS_CANSEE_KPTR), NULL, NULL) == 0;
-}
-
-static int
 sysctl_security_setidcorename(SYSCTLFN_ARGS)
 {
 	int error;
@@ -1600,6 +1528,7 @@ sysctl_consdev(SYSCTLFN_ARGS)
 static void
 fill_lwp(struct lwp *l, struct kinfo_lwp *kl)
 {
+	const bool allowaddr = get_expose_address(curproc);
 	struct proc *p = l->l_proc;
 	struct timeval tv;
 
@@ -1609,8 +1538,8 @@ fill_lwp(struct lwp *l, struct kinfo_lwp *kl)
 
 	kl->l_forw = 0;
 	kl->l_back = 0;
-	kl->l_laddr = PTRTOUINT64(l);
-	kl->l_addr = PTRTOUINT64(l->l_addr);
+	COND_SET_VALUE(kl->l_laddr, PTRTOUINT64(l), allowaddr);
+	COND_SET_VALUE(kl->l_addr, PTRTOUINT64(l->l_addr), allowaddr);
 	kl->l_stat = l->l_stat;
 	kl->l_lid = l->l_lid;
 	kl->l_flag = L_INMEM;
@@ -1627,7 +1556,7 @@ fill_lwp(struct lwp *l, struct kinfo_lwp *kl)
 	kl->l_usrpri = l->l_priority;
 	if (l->l_wchan)
 		strncpy(kl->l_wmesg, l->l_wmesg, sizeof(kl->l_wmesg));
-	kl->l_wchan = PTRTOUINT64(l->l_wchan);
+	COND_SET_VALUE(kl->l_wchan, PTRTOUINT64(l->l_wchan), allowaddr);
 	kl->l_cpuid = cpu_index(l->l_cpu);
 	bintime2timeval(&l->l_rtime, &tv);
 	kl->l_rtime_sec = tv.tv_sec;

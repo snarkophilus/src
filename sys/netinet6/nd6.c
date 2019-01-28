@@ -1,4 +1,4 @@
-/*	$NetBSD: nd6.c,v 1.250 2018/09/03 16:29:36 riastradh Exp $	*/
+/*	$NetBSD: nd6.c,v 1.252 2018/12/16 08:54:58 roy Exp $	*/
 /*	$KAME: nd6.c,v 1.279 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.250 2018/09/03 16:29:36 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.252 2018/12/16 08:54:58 roy Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_net_mpsafe.h"
@@ -1566,7 +1566,8 @@ nd6_rtrequest(int req, struct rtentry *rt, const struct rt_addrinfo *info)
 				 * that the rt_ifa points to the address instead
 				 * of the loopback address.
 				 */
-				if (ifa != rt->rt_ifa)
+				if (!ISSET(info->rti_flags, RTF_DONTCHANGEIFA)
+				    && ifa != rt->rt_ifa)
 					rt_replace_ifa(rt, ifa);
 			}
 		} else if (rt->rt_flags & RTF_ANNOUNCE) {
@@ -1883,6 +1884,10 @@ nd6_ioctl(u_long cmd, void *data, struct ifnet *ifp)
 			struct in6_ifaddr *ia, *ia_next;
 			int _s;
 
+			/* Only flush prefixes for the given interface. */
+			if (ifp != lo0ifp && ifp != pfx->ndpr_ifp)
+				continue;
+
 			if (IN6_IS_ADDR_LINKLOCAL(&pfx->ndpr_prefix.sin6_addr))
 				continue; /* XXX */
 
@@ -1952,8 +1957,15 @@ nd6_ioctl(u_long cmd, void *data, struct ifnet *ifp)
 		struct nd_defrouter *drtr, *next;
 
 		ND6_WLOCK();
+#if 0
+		/* XXX Is this really needed? */
 		nd6_defrouter_reset();
+#endif
 		ND_DEFROUTER_LIST_FOREACH_SAFE(drtr, next) {
+			/* Only flush routers for the given interface. */
+			if (ifp != lo0ifp && ifp != drtr->ifp)
+				continue;
+
 			nd6_defrtrlist_del(drtr, NULL);
 		}
 		nd6_defrouter_select();

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cas.c,v 1.27 2018/06/26 06:48:01 msaitoh Exp $	*/
+/*	$NetBSD: if_cas.c,v 1.29 2018/12/09 11:14:02 jdolecek Exp $	*/
 /*	$OpenBSD: if_cas.c,v 1.29 2009/11/29 16:19:38 kettenis Exp $	*/
 
 /*
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_cas.c,v 1.27 2018/06/26 06:48:01 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_cas.c,v 1.29 2018/12/09 11:14:02 jdolecek Exp $");
 
 #ifndef _MODULE
 #include "opt_inet.h"
@@ -1289,7 +1289,7 @@ cas_rint(struct cas_softc *sc)
 			    rxs->rxs_dmamap->dm_mapsize, BUS_DMASYNC_POSTREAD);
 
 			cp = rxs->rxs_kva + off * 256 + ETHER_ALIGN;
-			m = m_devget(cp, len, 0, ifp, NULL);
+			m = m_devget(cp, len, 0, ifp);
 		
 			if (word[0] & CAS_RC0_RELEASE_HDR)
 				cas_add_rxbuf(sc, idx);
@@ -1320,7 +1320,7 @@ cas_rint(struct cas_softc *sc)
 
 			/* XXX We should not be copying the packet here. */
 			cp = rxs->rxs_kva + off + ETHER_ALIGN;
-			m = m_devget(cp, len, 0, ifp, NULL);
+			m = m_devget(cp, len, 0, ifp);
 
 			if (word[0] & CAS_RC0_RELEASE_DATA)
 				cas_add_rxbuf(sc, idx);
@@ -1819,8 +1819,8 @@ cas_estintr(struct cas_softc *sc, int what)
 	/* PCI interrupts */
 	if (what & CAS_INTR_PCI) {
 		intrstr = pci_intr_string(sc->sc_pc, sc->sc_handle, intrbuf, sizeof(intrbuf));
-		sc->sc_ih = pci_intr_establish(sc->sc_pc, sc->sc_handle,
-		    IPL_NET, cas_intr, sc);
+		sc->sc_ih = pci_intr_establish_xname(sc->sc_pc, sc->sc_handle,
+		    IPL_NET, cas_intr, sc, device_xname(sc->sc_dev));
 		if (sc->sc_ih == NULL) {
 			aprint_error_dev(sc->sc_dev,
 			    "unable to establish interrupt");

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.161 2018/09/03 16:29:29 riastradh Exp $	*/
+/*	$NetBSD: cpu.c,v 1.164 2018/12/04 19:27:22 cherry Exp $	*/
 
 /*
  * Copyright (c) 2000-2012 NetBSD Foundation, Inc.
@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.161 2018/09/03 16:29:29 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.164 2018/12/04 19:27:22 cherry Exp $");
 
 #include "opt_ddb.h"
 #include "opt_mpbios.h"		/* for MPDEBUG */
@@ -188,10 +188,10 @@ struct cpu_info *cpu_starting;
 void    	cpu_hatch(void *);
 static void    	cpu_boot_secondary(struct cpu_info *ci);
 static void    	cpu_start_secondary(struct cpu_info *ci);
-#endif
 #if NLAPIC > 0
 static void	cpu_copy_trampoline(paddr_t);
 #endif
+#endif /* MULTIPROCESSOR */
 
 /*
  * Runs once per boot once multiprocessor goo has been detected and
@@ -320,7 +320,7 @@ cpu_attach(device_t parent, device_t self, void *aux)
 
 	sc->sc_dev = self;
 
-	if (ncpu == maxcpus) {
+	if (ncpu > maxcpus) {
 #ifndef _LP64
 		aprint_error(": too many CPUs, please use NetBSD/amd64\n");
 #else
@@ -846,6 +846,13 @@ cpu_hatch(void *v)
 	struct pcb *pcb;
 	int s, i;
 
+	/* ------------------------------------------------------------- */
+
+	/*
+	 * This section of code must be compiled with SSP disabled, to
+	 * prevent a race against cpu0. See sys/conf/ssp.mk.
+	 */
+
 	cpu_init_msrs(ci, true);
 	cpu_probe(ci);
 	cpu_speculation_init(ci);
@@ -862,6 +869,8 @@ cpu_hatch(void *v)
 	wbinvd();
 	atomic_or_32(&ci->ci_flags, CPUF_PRESENT);
 	tsc_sync_ap(ci);
+
+	/* ------------------------------------------------------------- */
 
 	/*
 	 * Wait to be brought online.
@@ -978,6 +987,7 @@ cpu_debug_dump(void)
 }
 #endif
 
+#ifdef MULTIPROCESSOR
 #if NLAPIC > 0
 static void
 cpu_copy_trampoline(paddr_t pdir_pa)
@@ -1019,7 +1029,6 @@ cpu_copy_trampoline(paddr_t pdir_pa)
 }
 #endif
 
-#ifdef MULTIPROCESSOR
 int
 mp_cpu_start(struct cpu_info *ci, paddr_t target)
 {

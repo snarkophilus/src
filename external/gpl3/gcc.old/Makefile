@@ -1,11 +1,7 @@
-#	$NetBSD: Makefile,v 1.6 2017/07/23 01:10:50 mrg Exp $
-
-SUBDIR+= lib
+#	$NetBSD: Makefile,v 1.8 2019/01/18 17:31:39 christos Exp $
 
 .include <bsd.own.mk>
 
-.if ${MKGCCCMDS} != "no"
-SUBDIR+= .WAIT usr.bin
-.endif
+SUBDIR+= lib .WAIT usr.bin
 
 .include <bsd.subdir.mk>

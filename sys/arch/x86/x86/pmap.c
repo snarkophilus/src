@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.308 2018/09/29 13:19:38 cherry Exp $	*/
+/*	$NetBSD: pmap.c,v 1.316 2019/01/17 14:24:51 maxv Exp $	*/
 
 /*
  * Copyright (c) 2008, 2010, 2016, 2017 The NetBSD Foundation, Inc.
@@ -130,7 +130,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.308 2018/09/29 13:19:38 cherry Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.316 2019/01/17 14:24:51 maxv Exp $");
 
 #include "opt_user_ldt.h"
 #include "opt_lockdebug.h"
@@ -138,6 +138,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.308 2018/09/29 13:19:38 cherry Exp $");
 #include "opt_xen.h"
 #include "opt_svs.h"
 #include "opt_kasan.h"
+#include "opt_kaslr.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -149,6 +150,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.308 2018/09/29 13:19:38 cherry Exp $");
 #include <sys/intr.h>
 #include <sys/xcall.h>
 #include <sys/kcore.h>
+#include <sys/asan.h>
 
 #include <uvm/uvm.h>
 #include <uvm/pmap/pmap_pvt.h>
@@ -239,6 +241,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.308 2018/09/29 13:19:38 cherry Exp $");
  */
 
 const vaddr_t ptp_masks[] = PTP_MASK_INITIALIZER;
+const vaddr_t ptp_frames[] = PTP_FRAME_INITIALIZER;
 const int ptp_shifts[] = PTP_SHIFT_INITIALIZER;
 const long nkptpmax[] = NKPTPMAX_INITIALIZER;
 const long nbpd[] = NBPD_INITIALIZER;
@@ -1358,6 +1361,9 @@ slotspace_rand(int type, size_t sz, size_t align)
 
 	/* Select a hole. */
 	cpu_earlyrng(&hole, sizeof(hole));
+#ifdef NO_X86_ASLR
+	hole = 0;
+#endif
 	hole %= nholes;
 	startsl = holes[hole].start;
 	endsl = holes[hole].end;
@@ -1365,6 +1371,9 @@ slotspace_rand(int type, size_t sz, size_t align)
 
 	/* Select an area within the hole. */
 	cpu_earlyrng(&va, sizeof(va));
+#ifdef NO_X86_ASLR
+	va = 0;
+#endif
 	winsize = ((endsl - startsl) * NBPD_L4) - sz;
 	va %= winsize;
 	va = rounddown(va, align);
@@ -2168,7 +2177,7 @@ pmap_get_ptp(struct pmap *pmap, vaddr_t va, pd_entry_t * const *pdes, int flags)
 	return ptp;
 
 	/*
-	 * Allocation of a ptp failed, free any others that we just allocated.
+	 * Allocation of a PTP failed, free any others that we just allocated.
 	 */
 fail:
 	for (i = PTP_LEVELS; i > 1; i--) {
@@ -2377,6 +2386,11 @@ pmap_create(void)
 #endif
 	pmap->pm_flags = 0;
 	pmap->pm_gc_ptp = NULL;
+
+	pmap->pm_enter = NULL;
+	pmap->pm_remove = NULL;
+	pmap->pm_tlb_flush = NULL;
+	pmap->pm_data = NULL;
 
 	kcpuset_create(&pmap->pm_cpus, true);
 	kcpuset_create(&pmap->pm_kernel_cpus, true);
@@ -3470,11 +3484,15 @@ pmap_remove(struct pmap *pmap, vaddr_t sva, vaddr_t eva)
 	pd_entry_t * const *pdes;
 	struct pv_entry *pv_tofree = NULL;
 	bool result;
-	int i;
 	paddr_t ptppa;
 	vaddr_t blkendva, va = sva;
 	struct vm_page *ptp;
 	struct pmap *pmap2;
+
+	if (__predict_false(pmap->pm_remove != NULL)) {
+		(*pmap->pm_remove)(pmap, sva, eva);
+		return;
+	}
 
 	kpreempt_disable();
 	pmap_map_ptes(pmap, &pmap2, &ptes, &pdes);	/* locks pmap */
@@ -3518,26 +3536,10 @@ pmap_remove(struct pmap *pmap, vaddr_t sva, vaddr_t eva)
 		if (blkendva > eva)
 			blkendva = eva;
 
-		/*
-		 * Our PTE mappings should never be removed with pmap_remove.
-		 *
-		 * XXXmaxv: still needed?
-		 *
-		 * A long term solution is to move the PTEs out of user address
-		 * space, and into kernel address space. Then we can set
-		 * VM_MAXUSER_ADDRESS to be VM_MAX_ADDRESS.
-		 */
-		for (i = 0; i < PDP_SIZE; i++) {
-			if (pl_i(va, PTP_LEVELS) == PDIR_SLOT_PTE+i)
-				panic("PTE space accessed");
-		}
-
 		lvl = pmap_pdes_invalid(va, pdes, &pde);
 		if (lvl != 0) {
-			/*
-			 * skip a range corresponding to an invalid pde.
-			 */
-			blkendva = (va & ptp_masks[lvl - 1]) + nbpd[lvl - 1];
+			/* Skip a range corresponding to an invalid pde. */
+			blkendva = (va & ptp_frames[lvl - 1]) + nbpd[lvl - 1];
  			continue;
 		}
 
@@ -3557,7 +3559,7 @@ pmap_remove(struct pmap *pmap, vaddr_t sva, vaddr_t eva)
 		pmap_remove_ptes(pmap, ptp, (vaddr_t)&ptes[pl1_i(va)], va,
 		    blkendva, &pv_tofree);
 
-		/* if PTP is no longer being used, free it! */
+		/* If PTP is no longer being used, free it. */
 		if (ptp && ptp->wire_count <= 1) {
 			pmap_free_ptp(pmap, ptp, va, ptes, pdes);
 		}
@@ -3577,8 +3579,7 @@ pmap_remove(struct pmap *pmap, vaddr_t sva, vaddr_t eva)
  * => issues tlb shootdowns if necessary.
  */
 static int
-pmap_sync_pv(struct pv_pte *pvpte, pt_entry_t expect, int clearbits,
-    pt_entry_t *optep)
+pmap_sync_pv(struct pv_pte *pvpte, paddr_t pa, int clearbits, pt_entry_t *optep)
 {
 	struct pmap *pmap;
 	struct vm_page *ptp;
@@ -3586,16 +3587,16 @@ pmap_sync_pv(struct pv_pte *pvpte, pt_entry_t expect, int clearbits,
 	pt_entry_t *ptep;
 	pt_entry_t opte;
 	pt_entry_t npte;
+	pt_entry_t expect;
 	bool need_shootdown;
 
+	expect = pmap_pa2pte(pa) | PG_V;
 	ptp = pvpte->pte_ptp;
 	va = pvpte->pte_va;
 	KASSERT(ptp == NULL || ptp->uobject != NULL);
 	KASSERT(ptp == NULL || ptp_va2o(va, 1) == ptp->offset);
 	pmap = ptp_to_pmap(ptp);
 
-	KASSERT((expect & ~(PG_FRAME | PG_V)) == 0);
-	KASSERT((expect & PG_V) != 0);
 	KASSERT(clearbits == ~0 || (clearbits & ~(PG_M | PG_U | PG_RW)) == 0);
 	KASSERT(kpreempt_disabled());
 
@@ -3606,16 +3607,14 @@ pmap_sync_pv(struct pv_pte *pvpte, pt_entry_t expect, int clearbits,
 		KASSERT((opte & (PG_U | PG_V)) != PG_U);
 		KASSERT(opte == 0 || (opte & PG_V) != 0);
 		if ((opte & (PG_FRAME | PG_V)) != expect) {
-
 			/*
-			 * we lost a race with a V->P operation like
-			 * pmap_remove().  wait for the competitor
+			 * We lost a race with a V->P operation like
+			 * pmap_remove().  Wait for the competitor
 			 * reflecting pte bits into mp_attrs.
 			 *
-			 * issue a redundant TLB shootdown so that
+			 * Issue a redundant TLB shootdown so that
 			 * we can wait for its completion.
 			 */
-
 			pmap_unmap_pte();
 			if (clearbits != 0) {
 				pmap_tlb_shootdown(pmap, va,
@@ -3626,30 +3625,26 @@ pmap_sync_pv(struct pv_pte *pvpte, pt_entry_t expect, int clearbits,
 		}
 
 		/*
-		 * check if there's anything to do on this pte.
+		 * Check if there's anything to do on this PTE.
 		 */
-
 		if ((opte & clearbits) == 0) {
 			need_shootdown = false;
 			break;
 		}
 
 		/*
-		 * we need a shootdown if the pte is cached. (PG_U)
-		 *
-		 * ...unless we are clearing only the PG_RW bit and
-		 * it isn't cached as RW. (PG_M)
+		 * We need a shootdown if the PTE is cached (PG_U) ...
+		 * ... Unless we are clearing only the PG_RW bit and
+		 * it isn't cached as RW (PG_M).
 		 */
-
 		need_shootdown = (opte & PG_U) != 0 &&
 		    !(clearbits == PG_RW && (opte & PG_M) == 0);
 
 		npte = opte & ~clearbits;
 
 		/*
-		 * if we need a shootdown anyway, clear PG_U and PG_M.
+		 * If we need a shootdown anyway, clear PG_U and PG_M.
 		 */
-
 		if (need_shootdown) {
 			npte &= ~(PG_U | PG_M);
 		}
@@ -3673,10 +3668,8 @@ pmap_pp_remove(struct pmap_page *pp, paddr_t pa)
 	struct pv_pte *pvpte;
 	struct pv_entry *killlist = NULL;
 	struct vm_page *ptp;
-	pt_entry_t expect;
 	int count;
 
-	expect = pmap_pa2pte(pa) | PG_V;
 	count = SPINLOCK_BACKOFF_MIN;
 	kpreempt_disable();
 startover:
@@ -3688,17 +3681,16 @@ startover:
 		int error;
 
 		/*
-		 * add a reference to the pmap before clearing the pte.
-		 * otherwise the pmap can disappear behind us.
+		 * Add a reference to the pmap before clearing the pte.
+		 * Otherwise the pmap can disappear behind us.
 		 */
-
 		ptp = pvpte->pte_ptp;
 		pmap = ptp_to_pmap(ptp);
 		if (ptp != NULL) {
 			pmap_reference(pmap);
 		}
 
-		error = pmap_sync_pv(pvpte, expect, ~0, &opte);
+		error = pmap_sync_pv(pvpte, pa, ~0, &opte);
 		if (error == EAGAIN) {
 			int hold_count;
 			KERNEL_UNLOCK_ALL(curlwp, &hold_count);
@@ -3714,7 +3706,7 @@ startover:
 		va = pvpte->pte_va;
 		pve = pmap_remove_pv(pp, ptp, va);
 
-		/* update the PTP reference count.  free if last reference. */
+		/* Update the PTP reference count. Free if last reference. */
 		if (ptp != NULL) {
 			struct pmap *pmap2;
 			pt_entry_t *ptes;
@@ -3796,8 +3788,8 @@ pmap_test_attrs(struct vm_page *pg, unsigned testbits)
 {
 	struct pmap_page *pp;
 	struct pv_pte *pvpte;
-	pt_entry_t expect;
 	u_int result;
+	paddr_t pa;
 
 	KASSERT(uvm_page_locked_p(pg));
 
@@ -3805,7 +3797,7 @@ pmap_test_attrs(struct vm_page *pg, unsigned testbits)
 	if ((pp->pp_attrs & testbits) != 0) {
 		return true;
 	}
-	expect = pmap_pa2pte(VM_PAGE_TO_PHYS(pg)) | PG_V;
+	pa = VM_PAGE_TO_PHYS(pg);
 	kpreempt_disable();
 	for (pvpte = pv_pte_first(pp); pvpte; pvpte = pv_pte_next(pp, pvpte)) {
 		pt_entry_t opte;
@@ -3814,7 +3806,7 @@ pmap_test_attrs(struct vm_page *pg, unsigned testbits)
 		if ((pp->pp_attrs & testbits) != 0) {
 			break;
 		}
-		error = pmap_sync_pv(pvpte, expect, 0, &opte);
+		error = pmap_sync_pv(pvpte, pa, 0, &opte);
 		if (error == 0) {
 			pp->pp_attrs |= opte;
 		}
@@ -3835,10 +3827,8 @@ pmap_pp_clear_attrs(struct pmap_page *pp, paddr_t pa, unsigned clearbits)
 {
 	struct pv_pte *pvpte;
 	u_int result;
-	pt_entry_t expect;
 	int count;
 
-	expect = pmap_pa2pte(pa) | PG_V;
 	count = SPINLOCK_BACKOFF_MIN;
 	kpreempt_disable();
 startover:
@@ -3846,7 +3836,7 @@ startover:
 		pt_entry_t opte;
 		int error;
 
-		error = pmap_sync_pv(pvpte, expect, clearbits, &opte);
+		error = pmap_sync_pv(pvpte, pa, clearbits, &opte);
 		if (error == EAGAIN) {
 			int hold_count;
 			KERNEL_UNLOCK_ALL(curlwp, &hold_count);
@@ -3966,25 +3956,10 @@ pmap_write_protect(struct pmap *pmap, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 
 	for (va = sva ; va < eva; va = blockend) {
 		pt_entry_t *spte, *epte;
-		int i;
 
 		blockend = x86_round_pdr(va + 1);
 		if (blockend > eva)
 			blockend = eva;
-
-		/*
-		 * Our PTE mappings should never be write-protected.
-		 *
-		 * XXXmaxv: still needed?
-		 *
-		 * A long term solution is to move the PTEs out of user address
-		 * space, and into kernel address space. Then we can set
-		 * VM_MAXUSER_ADDRESS to be VM_MAX_ADDRESS.
-		 */
-		for (i = 0; i < PDP_SIZE; i++) {
-			if (pl_i(va, PTP_LEVELS) == PDIR_SLOT_PTE+i)
-				panic("PTE space accessed");
-		}
 
 		/* Is it a valid block? */
 		if (!pmap_pdes_valid(va, pdes, NULL)) {
@@ -4076,6 +4051,10 @@ int
 pmap_enter_default(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot,
     u_int flags)
 {
+	if (__predict_false(pmap->pm_enter != NULL)) {
+		return (*pmap->pm_enter)(pmap, va, pa, prot, flags);
+	}
+
 	return pmap_enter_ma(pmap, va, pa, pa, prot, flags, 0);
 }
 
@@ -4121,8 +4100,6 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	        npte |= PG_W;
 	if (va < VM_MAXUSER_ADDRESS)
 		npte |= PG_u;
-	else if (va < VM_MAX_ADDRESS)
-		panic("PTE space accessed");	/* XXXmaxv: no longer needed? */
 
 	if (pmap == pmap_kernel())
 		npte |= pmap_pg_g;
@@ -4186,10 +4163,9 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	/*
 	 * Check if there is an existing mapping.  If we are now sure that
 	 * we need pves and we failed to allocate them earlier, handle that.
-	 * Caching the value of oldpa here is safe because only the mod/ref bits
-	 * can change while the pmap is locked.
+	 * Caching the value of oldpa here is safe because only the mod/ref
+	 * bits can change while the pmap is locked.
 	 */
-
 	ptep = &ptes[pl1_i(va)];
 	opte = *ptep;
 	bool have_oldpa = pmap_valid_entry(opte);
@@ -4206,9 +4182,8 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	}
 
 	/*
-	 * update the pte.
+	 * Update the pte.
 	 */
-
 	do {
 		opte = *ptep;
 
@@ -4242,9 +4217,8 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	} while (pmap_pte_cas(ptep, opte, npte) != opte);
 
 	/*
-	 * update statistics and PTP's reference count.
+	 * Update statistics and PTP's reference count.
 	 */
-
 	pmap_stats_update_bypte(pmap, npte, opte);
 	if (ptp != NULL && !have_oldpa) {
 		ptp->wire_count++;
@@ -4252,18 +4226,16 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	KASSERT(ptp == NULL || ptp->wire_count > 1);
 
 	/*
-	 * if the same page, we can skip pv_entry handling.
+	 * If the same page, we can skip pv_entry handling.
 	 */
-
 	if (((opte ^ npte) & (PG_FRAME | PG_V)) == 0) {
 		KASSERT(((opte ^ npte) & PG_PVLIST) == 0);
 		goto same_pa;
 	}
 
 	/*
-	 * if old page is pv-tracked, remove pv_entry from its list.
+	 * If old page is pv-tracked, remove pv_entry from its list.
 	 */
-
 	if ((~opte & (PG_V | PG_PVLIST)) == 0) {
 		if ((old_pg = PHYS_TO_VM_PAGE(oldpa)) != NULL) {
 			KASSERT(uvm_page_locked_p(old_pg));
@@ -4280,9 +4252,8 @@ pmap_enter_ma(struct pmap *pmap, vaddr_t va, paddr_t ma, paddr_t pa,
 	}
 
 	/*
-	 * if new page is pv-tracked, insert pv_entry into its list.
+	 * If new page is pv-tracked, insert pv_entry into its list.
 	 */
-
 	if (new_pp) {
 		new_pve = pmap_enter_pv(new_pp, new_pve, &new_sparepve, ptp, va);
 	}
@@ -4494,7 +4465,6 @@ pmap_growkernel(vaddr_t maxkvaddr)
 #endif
 
 #ifdef KASAN
-	void kasan_shadow_map(void *, size_t);
 	kasan_shadow_map((void *)pmap_maxkvaddr,
 	    (size_t)(maxkvaddr - pmap_maxkvaddr));
 #endif

@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.53 2018/03/14 02:13:47 kamil Exp $
+# $NetBSD: Makefile,v 1.55 2018/12/24 16:58:54 thorpej Exp $
 
 NOMAN=		# defined
 
@@ -24,6 +24,9 @@ TESTS_SH+=	t_ps_strings
 TESTS_SH+=	t_trapsignal
 TESTS_SH+=	t_interp
 TESTS_SH+=	t_procpath
+
+SUBDIR+=	threadpool_tester
+TESTS_SH+=	t_threadpool
 
 BINDIR=		${TESTSDIR}
 PROGS=		h_ps_strings1
@@ -66,5 +69,7 @@ t_subr_prf.c: gen_t_subr_prf ${NETBSDSRCDIR}/sys/kern/subr_prf.c
 CPPFLAGS.t_subr_prf.c=	-Wno-pointer-sign	# XXX platform vs kernel SHA2
 
 CLEANFILES+=	t_subr_prf.c
+
+LDADD.h_segv+=	-lm
 
 .include <bsd.test.mk>
