@@ -1,5 +1,5 @@
 #!/bin/sh -
-#	$NetBSD: MAKEDEV.tmpl,v 1.194 2018/09/23 09:20:57 maxv Exp $
+#	$NetBSD: MAKEDEV.tmpl,v 1.199 2019/02/23 10:43:25 mlelstv Exp $
 #
 # Copyright (c) 2003,2007,2008 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -258,6 +258,7 @@
 #	nsmb*	SMB requester
 #	nvme*	Non-Volatile Memory Host Controller Interface device driver
 #	nvme*ns* Non-Volatile Memory namespace
+#	nvmm	NetBSD Virtual Machine Monitor
 #	openfirm OpenFirmware accessor
 #	pad*	Pseudo-audio device driver
 #	pci*	PCI bus access devices
@@ -267,16 +268,17 @@
 #	radio*	radio devices
 #	random	Random number generator
 #	rtc*	RealTimeClock
-#	satlink* PlanetConnect satellite receiver driver
 #	scsibus* SCSI busses
 #	se*	SCSI Ethernet
 #	ses*	SES/SAF-TE SCSI Devices
 #	speaker	PC speaker		(XXX - installed)
+#	spi*	SPI bus device
 #	sram	battery backuped memory (x68k)
 #	ss*	SCSI scanner
 #	stic*	PixelStamp interface chip
 #	sysmon	System Monitoring hardware
 #	tap*	virtual Ethernet device
+#	tprof	task profiler
 #	tun*	network tunnel driver
 #	twa	3ware Apache control interface
 #	twe	3ware Escalade control interface
@@ -1240,6 +1242,10 @@ dk[0-9]*)
 	mkdev $name$unit b $blk  $unit 0640 $g_operator
 	;;
 
+tprof)
+	mkdev tprof c %tprof_chr% 0
+	;;
+
 ttyCY[0-9]*)
 	# Each unit number creates 32 pairs of {tty,dty} device nodes:
 	# ttyCY0 => device nodes [td]tyCY000 to [td]tyCY031;
@@ -1579,6 +1585,12 @@ iic[0-9]*)
 	mkdev iic$unit c %iic_chr% $unit 600
 	;;
 
+spi[0-9]*)
+	unit=${i#spi}
+	: ${unit:-0}
+	mkdev spi$unit c %spi_chr% $unit 600
+	;;
+
 amr[0-9]*)
 	unit=${i#amr}
 	mkdev amr$unit c %amr_chr% $unit
@@ -1593,11 +1605,6 @@ apm)
 		# hpcmips uses `apmdev_chr' instead of `apm_chr'
 	mkdev apm	c %apmdev_chr% 0 644
 	mkdev apmctl	c %apmdev_chr% 8 644
-	;;
-
-satlink[0-9]*)
-	unit=${i#satlink}
-	mkdev satlink$unit c %satlink_chr% $unit 444
 	;;
 
 random)
@@ -2200,9 +2207,17 @@ nvme[0-9]*)
 	mkdev nvme$unit c %nvme_chr% $(($unit * 65536))
 	;;
 
+nvmm)
+	mkdev nvmm c %nvmm_chr% 0
+	;;
+
 autofs)
 	mkdev autofs c %autofs_chr% 0 600
 	;;
+
+kcov)
+        mkdev kcov c %kcov_chr% 0
+        ;;
 
 midevend)
 %MI_DEVICES_END%

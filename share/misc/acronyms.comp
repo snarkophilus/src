@@ -1,4 +1,4 @@
-$NetBSD: acronyms.comp,v 1.216 2018/09/25 20:50:10 sevan Exp $
+$NetBSD: acronyms.comp,v 1.234 2019/03/04 14:31:26 sevan Exp $
 3WHS	three-way handshake
 8VSB	8-state vestigial side band modulation
 AA	anti-aliasing
@@ -14,6 +14,7 @@ ACK	Amsterdam compiler kit
 ACK	acknowledgement
 ACL	access control list
 ACL	active current loop
+ACL	asynchronous connection less
 ACP	auxiliary control {process,program}
 ACPI	advanced configuration and power interface
 ACS	access control set
@@ -179,6 +180,7 @@ BTS	bit test [and] set
 BTS	bug tracking system
 BW	bandwidth
 BWM	block-write mode
+BUAG	big ugly ASCII graphic
 CA	certificate authority
 CAD	computer-aided design
 CAM	computer assisted manufacturing
@@ -218,6 +220,7 @@ CHS	cylinder/head/sector
 CI	continuous integration
 CI	{common,component} interface
 CIDR	Classless Inter-Domain Routing
+CIF	common intermediate format
 CIFS	Common Internet File System
 CIL	common intermediate language
 CIR	carrier-to-interference ratio
@@ -253,10 +256,13 @@ COS	class of service
 COW	copy-on-write
 CP	continuous pilot
 CPB	core performance boost
+CPC	central processor complex
+CPC	cpu performance counters
 CPE	common phase error
 CPE	common platform enumeration
 CPER	common platform error record
 CPG	clock pulse generator
+CPI	cycles per instruction
 CPL	current privilege level
 CPLD	complex programmable logic device
 CPP	C preprocessor
@@ -283,6 +289,7 @@ CSR	control [and] status registers
 CSRG	Computer Systems Research Group
 CSS	cascading style sheets
 CSV	comma-separated values
+CTF	compact c type format
 CTM	close to metal
 CTR	counter [mode]
 CTS	clear to send
@@ -316,6 +323,8 @@ DCC	direct cable connect
 DCD	data carrier detect
 DCE	data control equipment
 DCE	distributed computing environment
+DCIM	data center infrastructure management
+DCIM	digital camera images
 DCL	Digital Command Language
 DCOM	distributed component object model
 DCOP	Desktop COmmunication Protocol
@@ -361,8 +370,10 @@ DMA	direct memory access
 DMI	desktop management interface
 DMS	document management system
 DMT	discrete multitone modulation
+DMU	data management layer
 DNARD	Digital network appliance reference design
 DND	drag and drop
+DNLC	directory name lookup cache
 DNS	Domain Name System
 DNSSEC	DNS Security Extensions
 DOE	distributed object environment
@@ -390,6 +401,7 @@ DSA	digital signature algorithm
 DSAP	destination service access point
 DSB	double-sideband modulation
 DSDT	differentiated system descriptor table
+DSL	dataset and snapshot layer
 DSL	digital subscriber line
 DSL	domain specific language
 DSLAM	digital subscriber line access multiplexer
@@ -458,6 +470,8 @@ EMR	electro-magnetic radiation
 EMACS	Editor MACroS
 EOF	end of file
 EOI	end of interrupt
+EOIS	end of interactive support
+EOL	end of life
 EOL	end of line
 EOT	end of transmission
 EPIC	explicitly parallel instruction computing
@@ -470,7 +484,9 @@ ERE	extended regular expression
 ERST	error record serialization table
 ESAN	Efficiency Sanitizer
 ESB	enterprise service bus
+ESDI	enhanced small disk interface
 ESDRAM	enhanced synchronous dynamic random access memory
+ESI	enclosure services interface
 ESS	electronic switching system
 ESS	extended service set
 ESSID	extended service set identifier
@@ -480,6 +496,7 @@ EU	execution unit
 EULA	end user license agreement
 FAT	file allocation table
 FBRAM	frame buffer random access memory
+FCIF	full common intermediate format
 FCL	fiber channel loop
 FCS	frame check sequence
 FDC	floppy disk controller
@@ -652,6 +669,7 @@ IMC	integrated memory controller
 IMCR	interrupt mode configuration register
 IMR	interrupt mask register
 IMS	information management system
+IMSI	international mobile subscriber identity
 INCITS	InterNational Committee for Information Technology Standards
 IO	input/output
 IOCTL	input/output control
@@ -659,8 +677,10 @@ IOMMU	input/output memory management unit
 IOT	Internet of Things
 IP	Internet Protocol
 IP	intellectual property
+IPC	instructions per cycle
 IPC	interprocess communication
 IPE	integrated programming environment
+IPI	intelligent peripheral interface
 IPI	interprocessor interrupt
 IPL	Initial Program Load
 IPL	Interrupt Priority Level
@@ -731,6 +751,7 @@ LDR	light-dependent resistor
 LDT	local descriptor table
 LE	logical extent
 LED	light emitting diode
+LELL	low energy link layer
 LER	label edge router
 LF	line feed
 LF	low frequency
@@ -758,9 +779,11 @@ LLMNR	link-local multicast name resolution
 LLVM	Low Level Virtual Machine
 LM	long mode
 LMM	link management mode
+LMP	link management protocol
 LNO	loop nest optimization
 LOC	lines of code
 LOM	lights-out management
+LPE	Linux performance events
 LPC	low pin count
 LPS	local positioning system
 LRC	longitudinal redundancy check
@@ -822,6 +845,7 @@ MESI	modified, exclusive, shared, invalid
 MFC	merge from current
 MFC	Microsoft Foundation Classes
 MFM	modified frequency modulation
+MFU	most frequently used
 MI	machine-independent
 MIB	management information base
 MIC	message integrity {check,code}
@@ -895,6 +919,7 @@ MVCC	multiversion concurrency control
 MWE	module width encoding
 MX	mail exchange
 NACK	negative acknowledgement
+NAK	negative acknowledgement
 NAN	not a number
 NAPT	Network Address Port Translation
 NAS	network attached storage
@@ -928,6 +953,7 @@ NOC	network operations center
 NOP	no operation
 NOS	network operating system
 NP	nondeterministic polynomial time
+NRND	not recommended for new designs
 NRZ	non-return to zero
 NSA	nation-state adversary
 NSA	no such agency
@@ -1039,6 +1065,7 @@ PGE	page global enable
 PGP	Pretty Good Privacy
 PHB	PCI host bridge
 PHP	PHP: Hypertext Preprocessor
+PIC	performance instrumentation counters
 PIC	position independent code
 PIC	programmable interrupt controller
 PICNIC	problem in chair, not in computer
@@ -1062,10 +1089,15 @@ PLRU	pseudo LRU
 PLTM	package level thermal management
 PM	power management
 PM	{phase,pulse} modulation
+PMC	performance monitoring counters
 PME	power management event
+PMEG	page map entry group
+PMI	performance monitoring infrastructure
 PMI	platform management interrupt
+PMIC	power management integrated circut
 PMIO	port-mapped input/output
 PMT	photo-multiplier tube
+PMU	performance monitoring units
 PMU	power management unit
 PNG	portable network graphics
 PNP	plug and play
@@ -1110,6 +1142,7 @@ PTLA	pseudo top level aggregator
 PTP	page table page
 PTV	perceived target value
 PU	processing unit
+PUC	personal unblocking code
 PUN	physical unit number
 PV	physical volume
 PVG	physical volume group
@@ -1123,6 +1156,7 @@ QAM	quality assurance management
 QBE	query by example
 QC	quality control
 QDI	quasi delay insensitive
+QCIF	quarter common intermediate format
 QOS	quality of service
 QVL	qualified vendor list
 R/O	read only
@@ -1244,6 +1278,7 @@ SCI	system control interrupt
 SCM	software configuration management
 SCM	source code management
 SCM	storage-class memory
+SCO	synchronous connection orientated
 SCP	secure copy
 SCSI	Small Computer System Interface
 SCTP	Stream Control Transmission Protocol
@@ -1254,12 +1289,14 @@ SDL	Simple Declarative Language
 SDL	Simple Direct-media Layer 
 SDLC	{software,system,systems} development life cycle
 SDN	software defined networking
+SDP	Session Description Protocol
 SDRAM	synchronous dynamic random access memory
 SDS	software defined storage
 SDT	syntax-directed translation
 SEA	synchronous external abort
 SEGV	segmentation violation
 SEO	search engine optimization
+SES	SCSI enclosure services
 SFC	sequential function chart
 SFI	simple firmware interface
 SFI	software fault isolation
@@ -1271,7 +1308,9 @@ SGRAM	synchronous graphics random access memory
 SHA	secure hash algorithm
 SIDH	supersingular isogeny Diffie-Hellman
 SIEM	security information and event management
+SIF	source input format
 SIFS	short inter-frame space
+SIM	subscriber identity module
 SIMD	single instruction, multiple data
 SIMM	single inline memory module
 SIP	Session Initiation Protocol
@@ -1295,6 +1334,7 @@ SMB	Server Message Block
 SMB	system management bus
 SMBIOS	System Management BIOS
 SMC	system management controller
+SMD	storage module device
 SMEP	supervisor mode execution protection
 SMF	single mode fiber
 SMI	structure of management information
@@ -1304,6 +1344,7 @@ SMP	symmetric multiprocessing
 SMT	simultaneous multithreading
 SMTP	Simple Mail Transfer Protocol
 SMU	system management unit
+SNA	systems network architecture
 SNAP	Sub-Network Access Protocol
 SNIA	Storage Networking Industry Association
 SNMP	Simple Network Management Protocol
@@ -1317,6 +1358,7 @@ SOHO	small office/home office
 SOL	serial over LAN
 SP	service pack
 SP	stack pointer
+SPA	storage pool allocator
 SPARC	scalable processor architecture
 SPARQL	SPARQL Protocol and RDF Query Language
 SPD	security policy database
@@ -1330,9 +1372,11 @@ SPMD	single process, multiple data
 SPR	special purpose register
 SPT	sectors per track
 SQA	software quality assurance
+SQCIF	sub quarter common intermediate format
 SQL	Structured Query Language
 SRAM	static random access memory
 SRC	sample rate conversion
+SRP	SCSI RDMA protocol
 SS	self-snoop
 SS	stack segment
 SSA	static single assignment
@@ -1351,6 +1395,7 @@ STD	state transition diagram
 STOMP	Streaming Text Oriented Messaging Protocol
 STP	Spanning Tree Protocol
 STP	shielded twisted pair
+SUN	Stanford University Network
 SUS	Single Unix Specification
 SUT	system under test
 SVG	scalable vector graphics
@@ -1395,6 +1440,7 @@ TKIP	Temporal Key Integrity Protocol
 TLA	top level aggregator
 TLB	translation lookaside buffer
 TLD	top level domain
+TLI	transport layer interface
 TLS	thread local storage
 TLS	transport layer security
 TM	Turing machine
@@ -1438,6 +1484,7 @@ TTM	translation table maps
 TTY	teletype
 TUI	{terminal,text-based,textual} user interface
 TX	{transmit out,transmitter}
+TXG	transaction group
 TZ	time zone
 UAC	user {access,account} control
 UAF	use-after-free
@@ -1455,6 +1502,7 @@ UFS	Unix File System
 UGA	universal graphics adapter
 UI	unit interval
 UI	user interface
+UICC	universal integrated circuit card
 UID	unique identifier
 UID	user identifier
 UL	upload
@@ -1548,6 +1596,7 @@ WS	web services
 WTC	write through caching
 WWAN	wireless wide area network
 WWW	world wide web
+WYSIAYG	what you see is all you get
 WYSIWYG	what you see is what you get
 XBAR	crossbar
 XDMCP	X Display Manager control protocol
@@ -1556,12 +1605,15 @@ XGA	Extended Graphics Array
 XHR	XMLHttpRequest
 XIP	execute in place
 XML	Extensible Markup Language
+XNA	XNA's not acronymed
+XNS	Xerox network systems
 XOR	exclusive or
 XP	extreme programming
 XSI	X/Open System Interface
 XSL	extensible stylesheet language
 XSS	cross site scripting
 XT	extended technology
+XTI	X/Open transport interface
 XUL	XML user interface language
 YACC	yet another compiler compiler
 YAML	YAML ain't markup language
@@ -1569,9 +1621,13 @@ YANG	yet another next generation
 YAWPFAPR	you are welcome; please file a problem report
 YP	Yellow Pages
 YTD	year to date
+ZAP	ZFS attribute processor
 ZBR	zone bit recording
 ZFOD	zero-filled on demand
-ZFS    zettabyte file system
+ZFS	zettabyte file system
 ZIF	zero insertion force
 ZIFS	zero insertion force socket
+ZIL	ZFS intent log
 ZMA	zone multicast address
+ZPL	ZFS Posix layer
+ZVOL	ZFS Volume

@@ -1,4 +1,4 @@
-/* $NetBSD: ix_txrx.c,v 1.50 2018/09/06 08:20:12 msaitoh Exp $ */
+/* $NetBSD: ix_txrx.c,v 1.52 2019/02/22 06:49:15 msaitoh Exp $ */
 
 /******************************************************************************
 
@@ -136,7 +136,7 @@ ixgbe_legacy_start_locked(struct ifnet *ifp, struct tx_ring *txr)
 
 	IXGBE_TX_LOCK_ASSERT(txr);
 
-	if (!adapter->link_active) {
+	if (adapter->link_active != LINK_STATE_UP) {
 		/*
 		 * discard all packets buffered in IFQ to avoid
 		 * sending old packets at next link up timing.
@@ -230,7 +230,7 @@ ixgbe_mq_start(struct ifnet *ifp, struct mbuf *m)
 			i = m->m_pkthdr.flowid % adapter->num_queues;
 	} else
 #endif /* 0 */
-		i = cpu_index(curcpu()) % adapter->num_queues;
+		i = (cpu_index(curcpu()) % ncpu) % adapter->num_queues;
 
 	/* Check for a hung queue and pick alternative */
 	if (((1 << i) & adapter->active_queues) == 0)
@@ -282,7 +282,7 @@ ixgbe_mq_start_locked(struct ifnet *ifp, struct tx_ring *txr)
 	struct mbuf    *next;
 	int            enqueued = 0, err = 0;
 
-	if (!txr->adapter->link_active) {
+	if (txr->adapter->link_active != LINK_STATE_UP) {
 		/*
 		 * discard all packets buffered in txr_interq to avoid
 		 * sending old packets at next link up timing.

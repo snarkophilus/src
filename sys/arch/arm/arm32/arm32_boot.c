@@ -1,4 +1,4 @@
-/*	$NetBSD: arm32_boot.c,v 1.25 2018/10/18 16:44:36 skrll Exp $	*/
+/*	$NetBSD: arm32_boot.c,v 1.33 2019/03/16 10:05:40 skrll Exp $	*/
 
 /*
  * Copyright (c) 2002, 2003, 2005  Genetec Corporation.  All rights reserved.
@@ -122,7 +122,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: arm32_boot.c,v 1.25 2018/10/18 16:44:36 skrll Exp $");
+__KERNEL_RCSID(1, "$NetBSD: arm32_boot.c,v 1.33 2019/03/16 10:05:40 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_cputypes.h"
@@ -263,12 +263,13 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 			uvm_page_physload(start, end, start, end, VM_FREELIST_DEFAULT);
 			continue;
 		}
+		VPRINTF("\n");
 		paddr_t segend = end;
 		for (size_t j = 0; j < nbp; j++ /*, start = segend, segend = end */) {
 			paddr_t bp_start = bp[j].bp_start;
 			paddr_t bp_end = bp_start + bp[j].bp_pages;
 
-			VPRINTF("\n   bp %2zu start %08lx  end %08lx\n",
+			VPRINTF("   bp %2zu start %08lx  end %08lx\n",
 			    j, ptoa(bp_start), ptoa(bp_end));
 			KASSERT(bp_start < bp_end);
 			if (start > bp_end || segend < bp_start)
@@ -286,7 +287,7 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 				uvm_page_physload(start, segend, start, segend,
 				    vm_freelist);
 				VPRINTF("         start %08lx  end %08lx"
-				    "... loading in freelist %d", ptoa(start),
+				    "... loading in freelist %d\n", ptoa(start),
 				    ptoa(segend), vm_freelist);
 				start = segend;
 				segend = end;
@@ -294,7 +295,7 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 		}
 	}
 
-	/* Boot strap pmap telling it where the kernel page table is */
+	/* Boot strap pmap telling it where the managed kernel virtual memory is */
 	VPRINTF("pmap ");
 	pmap_bootstrap(kvm_base, kvm_base + kvm_size);
 
@@ -323,6 +324,12 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 
 #ifdef MULTIPROCESSOR
 	mutex_init(&cpu_hatch_lock, MUTEX_DEFAULT, IPL_NONE);
+
+	/*
+	 * Ensure BP cache is flushed to memory so that APs start cache
+	 * coherency with correct view.
+	 */
+	cpu_dcache_wbinv_all();
 #endif
 
 	VPRINTF("done.\n");
@@ -337,26 +344,31 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
  * of the idlelwp for this cpu.
  */
 void
-cpu_hatch(struct cpu_info *ci, cpuid_t cpuid, void (*md_cpu_init)(struct cpu_info *))
+cpu_hatch(struct cpu_info *ci, u_int cpuindex, void (*md_cpu_init)(struct cpu_info *))
 {
-	KASSERT(cpu_index(ci) == cpuid);
+	KASSERT(cpu_index(ci) == cpuindex);
 
 	/*
 	 * Raise our IPL to the max
 	 */
 	splhigh();
 
-	VPRINTF("%s(%s): ", __func__, ci->ci_data.cpu_name);
+	VPRINTF("%s(%s): ", __func__, cpu_name(ci));
 	ci->ci_ctrl = armreg_sctlr_read();
 	uint32_t mpidr = armreg_mpidr_read();
+	ci->ci_mpidr = mpidr;
 	if (mpidr & MPIDR_MT) {
-		ci->ci_data.cpu_smt_id = mpidr & MPIDR_AFF0;
-		ci->ci_data.cpu_core_id = mpidr & MPIDR_AFF1;
-		ci->ci_data.cpu_package_id = mpidr & MPIDR_AFF2;
+		ci->ci_smt_id = __SHIFTOUT(mpidr, MPIDR_AFF0);
+		ci->ci_core_id = __SHIFTOUT(mpidr, MPIDR_AFF1);
+		ci->ci_package_id = __SHIFTOUT(mpidr, MPIDR_AFF2);
 	} else {
-		ci->ci_data.cpu_core_id = mpidr & MPIDR_AFF0;
-		ci->ci_data.cpu_package_id = mpidr & MPIDR_AFF1;
+		ci->ci_core_id = __SHIFTOUT(mpidr, MPIDR_AFF0);
+		ci->ci_package_id = __SHIFTOUT(mpidr, MPIDR_AFF1);
 	}
+
+	ci->ci_arm_cpuid = cpu_idnum();
+	ci->ci_arm_cputype = ci->ci_arm_cpuid & CPU_ID_CPU_MASK;
+	ci->ci_arm_cpurev = ci->ci_arm_cpuid & CPU_ID_REVISION_MASK;
 
 	/*
 	 * Make sure we have the right vector page.
@@ -422,7 +434,7 @@ cpu_hatch(struct cpu_info *ci, cpuid_t cpuid, void (*md_cpu_init)(struct cpu_inf
 	VPRINTF(" done!\n");
 
 	/* Notify cpu_boot_secondary_processors that we're done */
-	atomic_and_32(&arm_cpu_mbox, ~__BIT(cpuid));
+	atomic_and_32(&arm_cpu_mbox, ~__BIT(cpuindex));
 	membar_producer();
 	__asm __volatile("sev; sev; sev");
 }

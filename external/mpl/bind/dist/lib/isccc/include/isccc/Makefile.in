@@ -18,7 +18,7 @@ VERSION=@BIND9_VERSION@
 # machine generated.  The latter are handled specially in the
 # install target below.
 #
-HEADERS =	alist.h base64.h cc.h ccmsg.h events.h lib.h result.h \
+HEADERS =	alist.h base64.h cc.h ccmsg.h events.h result.h \
 		sexpr.h symtab.h symtype.h types.h util.h version.h
 SUBDIRS =
 TARGETS =
@@ -30,10 +30,10 @@ installdirs:
 
 install:: installdirs
 	for i in ${HEADERS}; do \
-		${INSTALL_DATA} ${srcdir}/$$i ${DESTDIR}${includedir}/isccc ; \
+		${INSTALL_DATA} ${srcdir}/$$i ${DESTDIR}${includedir}/isccc || exit 1; \
 	done
 
 uninstall::
 	for i in ${HEADERS}; do \
-		rm -f ${DESTDIR}${includedir}/isccc/$$i ; \
+		rm -f ${DESTDIR}${includedir}/isccc/$$i || exit 1; \
 	done

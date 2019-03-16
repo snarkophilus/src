@@ -1,4 +1,4 @@
-/*	$NetBSD: ugen.c,v 1.140 2018/09/03 16:29:34 riastradh Exp $	*/
+/*	$NetBSD: ugen.c,v 1.145 2019/03/01 11:06:56 pgoyette Exp $	*/
 
 /*
  * Copyright (c) 1998, 2004 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ugen.c,v 1.140 2018/09/03 16:29:34 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ugen.c,v 1.145 2019/03/01 11:06:56 pgoyette Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
@@ -57,6 +57,7 @@ __KERNEL_RCSID(0, "$NetBSD: ugen.c,v 1.140 2018/09/03 16:29:34 riastradh Exp $")
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
+#include <sys/compat_stub.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -842,7 +843,7 @@ ugenread(dev_t dev, struct uio *uio, int flag)
 
 	mutex_enter(&sc->sc_lock);
 	if (--sc->sc_refcnt < 0)
-		usb_detach_broadcast(sc->sc_dev, &sc->sc_detach_cv);
+		cv_broadcast(&sc->sc_detach_cv);
 	mutex_exit(&sc->sc_lock);
 
 	return error;
@@ -1032,7 +1033,7 @@ ugenwrite(dev_t dev, struct uio *uio, int flag)
 
 	mutex_enter(&sc->sc_lock);
 	if (--sc->sc_refcnt < 0)
-		usb_detach_broadcast(sc->sc_dev, &sc->sc_detach_cv);
+		cv_broadcast(&sc->sc_detach_cv);
 	mutex_exit(&sc->sc_lock);
 
 	return error;
@@ -1079,7 +1080,8 @@ ugen_detach(device_t self, int flags)
 		for (i = 0; i < USB_MAX_ENDPOINTS; i++)
 			cv_signal(&sc->sc_endpoints[i][IN].cv);
 		/* Wait for processes to go away. */
-		usb_detach_wait(sc->sc_dev, &sc->sc_detach_cv, &sc->sc_lock);
+		if (cv_timedwait(&sc->sc_detach_cv, &sc->sc_lock, hz * 60))
+			aprint_error_dev(self, ": didn't detach\n");
 	}
 	mutex_exit(&sc->sc_lock);
 
@@ -1456,6 +1458,7 @@ ugen_do_ioctl(struct ugen_softc *sc, int endpt, u_long cmd,
 	uint8_t conf, alt;
 	int cdesclen;
 	int error;
+	int dir;
 
 	DPRINTFN(5, ("ugenioctl: cmd=%08lx\n", cmd));
 	if (sc->sc_dying)
@@ -1478,14 +1481,13 @@ ugen_do_ioctl(struct ugen_softc *sc, int endpt, u_long cmd,
 			sce->state &= ~UGEN_SHORT_OK;
 		return 0;
 	case USB_SET_TIMEOUT:
-		sce = &sc->sc_endpoints[endpt][IN];
-		if (sce == NULL
-		    /* XXX this shouldn't happen, but the distinction between
-		       input and output pipes isn't clear enough.
-		       || sce->pipeh == NULL */
-			)
-			return EINVAL;
-		sce->timeout = *(int *)addr;
+		for (dir = OUT; dir <= IN; dir++) {
+			sce = &sc->sc_endpoints[endpt][dir];
+			if (sce == NULL)
+				return EINVAL;
+
+			sce->timeout = *(int *)addr;
+		}
 		return 0;
 	case USB_SET_BULK_RA:
 		if (endpt == USB_CONTROL_ENDPOINT)
@@ -1835,13 +1837,17 @@ ugen_do_ioctl(struct ugen_softc *sc, int endpt, u_long cmd,
 		usbd_fill_deviceinfo(sc->sc_udev,
 				     (struct usb_device_info *)addr, 0);
 		break;
-#ifdef COMPAT_30
 	case USB_GET_DEVICEINFO_OLD:
-		usbd_fill_deviceinfo_old(sc->sc_udev,
-					 (struct usb_device_info_old *)addr, 0);
-
-		break;
-#endif
+	{
+		int ret;
+		MODULE_HOOK_CALL(usb_subr_fill_30_hook,
+		    (sc->sc_udev, (struct usb_device_info_old *)addr, 0,
+		      usbd_devinfo_vp, usbd_printBCD),
+		    enosys(), ret);
+		if (ret == 0)
+			return 0;
+		return EINVAL;
+	}
 	default:
 		return EINVAL;
 	}
@@ -1862,7 +1868,7 @@ ugenioctl(dev_t dev, u_long cmd, void *addr, int flag, struct lwp *l)
 	sc->sc_refcnt++;
 	error = ugen_do_ioctl(sc, endpt, cmd, addr, flag, l);
 	if (--sc->sc_refcnt < 0)
-		usb_detach_broadcast(sc->sc_dev, &sc->sc_detach_cv);
+		cv_broadcast(&sc->sc_detach_cv);
 	return error;
 }
 

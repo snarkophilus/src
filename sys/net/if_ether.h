@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ether.h,v 1.75 2018/06/14 08:00:24 yamaguchi Exp $	*/
+/*	$NetBSD: if_ether.h,v 1.77 2019/03/05 08:25:03 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -64,6 +64,14 @@
 #define	EVL_PRIOFTAG(tag)	(((tag) >> 13) & 7)	/* Priority */
 #define	EVL_CFIOFTAG(tag)	(((tag) >> 12) & 1)	/* CFI */
 #define	ETHER_PPPOE_ENCAP_LEN	8	/* length of PPPoE encapsulation */
+
+/*
+ * Mbuf adjust factor to force 32-bit alignment of IP header.
+ * Drivers should do m_adj(m, ETHER_ALIGN) when setting up a
+ * receive so the upper layers get the IP header properly aligned
+ * past the 14-byte Ethernet header.
+ */
+#define	ETHER_ALIGN	2	/* driver adjust for IP hdr alignment */
 
 /*
  * Ethernet address - 6 octets
@@ -187,16 +195,20 @@ struct ethercom {
 #endif
 };
 
-#define	ETHERCAP_VLAN_MTU	0x00000001	/* VLAN-compatible MTU */
-#define	ETHERCAP_VLAN_HWTAGGING	0x00000002	/* hardware VLAN tag support */
-#define	ETHERCAP_JUMBO_MTU	0x00000004	/* 9000 byte MTU supported */
-#define	ETHERCAP_MASK		0x00000007
+#define	ETHERCAP_VLAN_MTU	0x00000001 /* VLAN-compatible MTU */
+#define	ETHERCAP_VLAN_HWTAGGING	0x00000002 /* hardware VLAN tag support */
+#define	ETHERCAP_JUMBO_MTU	0x00000004 /* 9000 byte MTU supported */
+#define	ETHERCAP_VLAN_HWFILTER	0x00000008 /* iface hw can filter vlan tag */
+#define	ETHERCAP_EEE		0x00000010 /* Energy Efficiency Ethernet */
+#define	ETHERCAP_MASK		0x0000001f
 
 #define	ECCAPBITS		\
 	"\020"			\
 	"\1VLAN_MTU"		\
 	"\2VLAN_HWTAGGING"	\
-	"\3JUMBO_MTU"
+	"\3JUMBO_MTU"		\
+	"\4VLAN_HWFILTER"	\
+	"\5EEE"
 
 /* ioctl() for Ethernet capabilities */
 struct eccapreq {

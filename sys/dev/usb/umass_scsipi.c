@@ -1,4 +1,4 @@
-/*	$NetBSD: umass_scsipi.c,v 1.55 2017/10/28 00:37:12 pgoyette Exp $	*/
+/*	$NetBSD: umass_scsipi.c,v 1.60 2019/02/10 19:23:55 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2001, 2003, 2012 The NetBSD Foundation, Inc.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umass_scsipi.c,v 1.55 2017/10/28 00:37:12 pgoyette Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umass_scsipi.c,v 1.60 2019/02/10 19:23:55 jdolecek Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_usb.h"
@@ -41,15 +41,17 @@ __KERNEL_RCSID(0, "$NetBSD: umass_scsipi.c,v 1.55 2017/10/28 00:37:12 pgoyette E
 #include "scsibus.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/conf.h>
 #include <sys/buf.h>
 #include <sys/bufq.h>
+#include <sys/conf.h>
 #include <sys/device.h>
+#include <sys/disk.h>		/* XXX */
 #include <sys/ioctl.h>
+#include <sys/kernel.h>
+#include <sys/kmem.h>
 #include <sys/lwp.h>
 #include <sys/malloc.h>
+#include <sys/systm.h>
 
 /* SCSI & ATAPI */
 #include <sys/scsiio.h>
@@ -64,7 +66,6 @@ __KERNEL_RCSID(0, "$NetBSD: umass_scsipi.c,v 1.55 2017/10/28 00:37:12 pgoyette E
 #include <dev/scsipi/scsi_disk.h>
 #include <dev/scsipi/scsi_changer.h>
 
-#include <sys/disk.h>		/* XXX */
 #include <dev/scsipi/sdvar.h>	/* XXX */
 
 /* USB */
@@ -136,14 +137,28 @@ umass_scsi_attach(struct umass_softc *sc)
 	scbus->sc_channel.chan_id = scbus->sc_channel.chan_ntargets - 1;
 	DPRINTFM(UDMASS_USB, "sc %#jx: SCSI", (uintptr_t)sc, 0, 0, 0);
 
+	mutex_enter(&sc->sc_lock);
 	sc->sc_refcnt++;
+	mutex_exit(&sc->sc_lock);
 	scbus->base.sc_child =
 	    config_found_ia(sc->sc_dev, "scsi", &scbus->sc_channel,
 		scsiprint);
+	mutex_enter(&sc->sc_lock);
 	if (--sc->sc_refcnt < 0)
-		usb_detach_wakeupold(sc->sc_dev);
+		cv_broadcast(&sc->sc_detach_cv);
+	mutex_exit(&sc->sc_lock);
+
 
 	return 0;
+}
+
+void
+umass_scsi_detach(struct umass_softc *sc)
+{
+	struct umass_scsipi_softc *scbus = (struct umass_scsipi_softc *)sc->bus;
+
+	kmem_free(scbus, sizeof(*scbus));
+	sc->bus = NULL;
 }
 #endif
 
@@ -164,14 +179,27 @@ umass_atapi_attach(struct umass_softc *sc)
 	scbus->sc_channel.chan_defquirks |= sc->sc_busquirks;
 	DPRINTFM(UDMASS_USB, "sc %#jxp: ATAPI", (uintptr_t)sc, 0, 0, 0);
 
+	mutex_enter(&sc->sc_lock);
 	sc->sc_refcnt++;
+	mutex_exit(&sc->sc_lock);
 	scbus->base.sc_child =
 	    config_found_ia(sc->sc_dev, "atapi", &scbus->sc_channel,
 		atapiprint);
+	mutex_enter(&sc->sc_lock);
 	if (--sc->sc_refcnt < 0)
-		usb_detach_wakeupold(sc->sc_dev);
+		cv_broadcast(&sc->sc_detach_cv);
+	mutex_exit(&sc->sc_lock);
 
 	return 0;
+}
+
+void
+umass_atapi_detach(struct umass_softc *sc)
+{
+	struct umass_scsipi_softc *scbus = (struct umass_scsipi_softc *)sc->bus;
+
+	kmem_free(scbus, sizeof(*scbus));
+	sc->bus = NULL;
 }
 #endif
 
@@ -180,7 +208,7 @@ umass_scsipi_setup(struct umass_softc *sc)
 {
 	struct umass_scsipi_softc *scbus;
 
-	scbus = malloc(sizeof(*scbus), M_DEVBUF, M_WAITOK | M_ZERO);
+	scbus = kmem_zalloc(sizeof(*scbus), KM_SLEEP);
 	sc->bus = &scbus->base;
 
 	/* Only use big commands for USB SCSI devices. */
@@ -443,6 +471,10 @@ umass_scsipi_cb(struct umass_softc *sc, void *priv, int residue, int status)
 
 	case STATUS_WIRE_FAILED:
 		xs->error = XS_RESET;
+		break;
+
+	case STATUS_TIMEOUT:
+		xs->error = XS_TIMEOUT;
 		break;
 
 	default:

@@ -1,4 +1,4 @@
-/*	$NetBSD: pool.h,v 1.82 2017/12/16 03:13:29 mrg Exp $	*/
+/*	$NetBSD: pool.h,v 1.84 2019/02/10 17:13:33 christos Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2000, 2007 The NetBSD Foundation, Inc.
@@ -149,6 +149,7 @@ struct pool {
 #define	PR_LARGECACHE	0x1000	/* use large cache groups */
 #define	PR_GROWING	0x2000	/* pool_grow in progress */
 #define	PR_GROWINGNOWAIT 0x4000	/* pool_grow in progress by PR_NOWAIT alloc */
+#define	PR_ZERO		0x8000	/* zero data before returning */
 
 	/*
 	 * `pr_lock' protects the pool's data structures when removing
@@ -195,6 +196,7 @@ struct pool {
 	void		*pr_qcache;
 	bool		pr_redzone;
 	size_t		pr_reqsize;
+	size_t		pr_reqsize_with_redzone;
 };
 
 /*

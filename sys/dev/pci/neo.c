@@ -1,4 +1,4 @@
-/*	$NetBSD: neo.c,v 1.50 2014/03/29 19:28:25 christos Exp $	*/
+/*	$NetBSD: neo.c,v 1.52 2019/03/16 12:09:58 isaki Exp $	*/
 
 /*
  * Copyright (c) 1999 Cameron Grant <gandalf@vilnya.demon.co.uk>
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.50 2014/03/29 19:28:25 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: neo.c,v 1.52 2019/03/16 12:09:58 isaki Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -243,34 +243,23 @@ static const struct audio_format neo_formats[NEO_NFORMATS] = {
 /* -------------------------------------------------------------------- */
 
 static const struct audio_hw_if neo_hw_if = {
-	NULL,				/* open */
-	NULL,				/* close */
-	NULL,				/* drain */
-	neo_query_encoding,
-	neo_set_params,
-	neo_round_blocksize,
-	NULL,				/* commit_setting */
-	NULL,				/* init_output */
-	NULL,				/* init_input */
-	NULL,				/* start_output */
-	NULL,				/* start_input */
-	neo_halt_output,
-	neo_halt_input,
-	NULL,				/* speaker_ctl */
-	neo_getdev,
-	NULL,				/* getfd */
-	neo_mixer_set_port,
-	neo_mixer_get_port,
-	neo_query_devinfo,
-	neo_malloc,
-	neo_free,
-	neo_round_buffersize,
-	neo_mappage,
-	neo_get_props,
-	neo_trigger_output,
-	neo_trigger_input,
-	NULL,
-	neo_get_locks,
+	.query_encoding		= neo_query_encoding,
+	.set_params		= neo_set_params,
+	.round_blocksize	= neo_round_blocksize,
+	.halt_output		= neo_halt_output,
+	.halt_input		= neo_halt_input,
+	.getdev			= neo_getdev,
+	.set_port		= neo_mixer_set_port,
+	.get_port		= neo_mixer_get_port,
+	.query_devinfo		= neo_query_devinfo,
+	.allocm			= neo_malloc,
+	.freem			= neo_free,
+	.round_buffersize	= neo_round_buffersize,
+	.mappage		= neo_mappage,
+	.get_props		= neo_get_props,
+	.trigger_output		= neo_trigger_output,
+	.trigger_input		= neo_trigger_input,
+	.get_locks		= neo_get_locks,
 };
 
 /* -------------------------------------------------------------------- */
@@ -610,7 +599,8 @@ neo_attach(device_t parent, device_t self, void *aux)
 	mutex_init(&sc->intr_lock, MUTEX_DEFAULT, IPL_AUDIO);
 
 	intrstr = pci_intr_string(pc, ih, intrbuf, sizeof(intrbuf));
-	sc->ih = pci_intr_establish(pc, ih, IPL_AUDIO, neo_intr, sc);
+	sc->ih = pci_intr_establish_xname(pc, ih, IPL_AUDIO, neo_intr, sc,
+	    device_xname(self));
 
 	if (sc->ih == NULL) {
 		aprint_error_dev(self, "couldn't establish interrupt");

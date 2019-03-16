@@ -1,4 +1,4 @@
-/* $NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $ */
+/* $NetBSD: axppmic.c,v 1.18 2019/01/02 18:38:03 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2014-2018 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.18 2019/01/02 18:38:03 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,7 +74,7 @@ __KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $")
 #define	AXP_BATTDISCHG_LO_REG	0x7d
 
 #define	AXP_ADC_RAW(_hi, _lo)	\
-	(((u_int)(_hi) << 4) | ((lo) & 0xf))
+	(((u_int)(_hi) << 4) | ((_lo) & 0xf))
 
 #define	AXP_FUEL_GAUGE_CTRL_REG	0xb8
 #define	 AXP_FUEL_GAUGE_CTRL_EN	__BIT(7)
@@ -82,6 +82,17 @@ __KERNEL_RCSID(0, "$NetBSD: axppmic.c,v 1.14 2018/06/26 06:03:57 thorpej Exp $")
 #define	AXP_BATT_CAP_REG	0xb9
 #define	 AXP_BATT_CAP_VALID	__BIT(7)
 #define	 AXP_BATT_CAP_PERCENT	__BITS(6,0)
+
+#define	AXP_BATT_MAX_CAP_HI_REG	0xe0
+#define	 AXP_BATT_MAX_CAP_VALID	__BIT(7)
+#define	AXP_BATT_MAX_CAP_LO_REG	0xe1
+
+#define	AXP_BATT_COULOMB_HI_REG	0xe2
+#define	 AXP_BATT_COULOMB_VALID	__BIT(7)
+#define	AXP_BATT_COULOMB_LO_REG	0xe3
+
+#define	AXP_COULOMB_RAW(_hi, _lo)	\
+	(((u_int)(_hi & ~__BIT(7)) << 8) | (_lo))
 
 #define	AXP_BATT_CAP_WARN_REG	0xe6
 #define	 AXP_BATT_CAP_WARN_LV1	__BITS(7,4)
@@ -191,6 +202,47 @@ static const struct axppmic_ctrl axp805_ctrls[] = {
 		0x11, __BIT(6), 0x26, __BITS(4,0)),
 };
 
+static const struct axppmic_ctrl axp813_ctrls[] = {
+	AXP_CTRL("dldo1", 700, 3300, 100,
+		0x12, __BIT(3), 0x15, __BITS(4,0)),
+	AXP_CTRL2("dldo2", 700, 4200, 100, 28, 200, 4,
+		0x12, __BIT(4), 0x16, __BITS(4,0)),
+	AXP_CTRL("dldo3", 700, 3300, 100,
+	 	0x12, __BIT(5), 0x17, __BITS(4,0)),
+	AXP_CTRL("dldo4", 700, 3300, 100,
+		0x12, __BIT(6), 0x18, __BITS(4,0)),
+	AXP_CTRL("eldo1", 700, 1900, 50,
+		0x12, __BIT(0), 0x19, __BITS(4,0)),
+	AXP_CTRL("eldo2", 700, 1900, 50,
+		0x12, __BIT(1), 0x1a, __BITS(4,0)),
+	AXP_CTRL("eldo3", 700, 1900, 50,
+		0x12, __BIT(2), 0x1b, __BITS(4,0)),
+	AXP_CTRL("fldo1", 700, 1450, 50,
+		0x13, __BIT(2), 0x1c, __BITS(3,0)),
+	AXP_CTRL("fldo2", 700, 1450, 50,
+		0x13, __BIT(3), 0x1d, __BITS(3,0)),
+	AXP_CTRL("dcdc1", 1600, 3400, 100,
+		0x10, __BIT(0), 0x20, __BITS(4,0)),
+	AXP_CTRL2("dcdc2", 500, 1300, 10, 70, 20, 5,
+		0x10, __BIT(1), 0x21, __BITS(6,0)),
+	AXP_CTRL2("dcdc3", 500, 1300, 10, 70, 20, 5,
+		0x10, __BIT(2), 0x22, __BITS(6,0)),
+	AXP_CTRL2("dcdc4", 500, 1300, 10, 70, 20, 5,
+		0x10, __BIT(3), 0x23, __BITS(6,0)),
+	AXP_CTRL2("dcdc5", 800, 1840, 10, 33, 20, 36,
+		0x10, __BIT(4), 0x24, __BITS(6,0)),
+	AXP_CTRL2("dcdc6", 600, 1520, 10, 51, 20, 21,
+		0x10, __BIT(5), 0x25, __BITS(6,0)),
+	AXP_CTRL2("dcdc7", 600, 1520, 10, 51, 20, 21,
+		0x10, __BIT(6), 0x26, __BITS(6,0)),
+	AXP_CTRL("aldo1", 700, 3300, 100,
+		0x13, __BIT(5), 0x28, __BITS(4,0)),
+	AXP_CTRL("aldo2", 700, 3300, 100,
+		0x13, __BIT(6), 0x29, __BITS(4,0)),
+	AXP_CTRL("aldo3", 700, 3300, 100,
+		0x13, __BIT(7), 0x2a, __BITS(4,0)),
+};
+
 struct axppmic_irq {
 	u_int reg;
 	uint8_t mask;
@@ -229,6 +281,8 @@ enum axppmic_sensor {
 	AXP_SENSOR_BATT_CHARGE_CURRENT,
 	AXP_SENSOR_BATT_DISCHARGE_CURRENT,
 	AXP_SENSOR_BATT_CAPACITY_PERCENT,
+	AXP_SENSOR_BATT_MAXIMUM_CAPACITY,
+	AXP_SENSOR_BATT_CURRENT_CAPACITY,
 	AXP_NSENSORS
 };
 
@@ -274,6 +328,8 @@ static const struct axppmic_config axp803_config = {
 	.batsense_step = 1100,
 	.charge_step = 1000,
 	.discharge_step = 1000,
+	.maxcap_step = 1456,
+	.coulomb_step = 1456,
 	.poklirq = AXPPMIC_IRQ(5, __BIT(3)),
 	.acinirq = AXPPMIC_IRQ(1, __BITS(6,5)),
 	.vbusirq = AXPPMIC_IRQ(1, __BITS(3,2)),
@@ -290,10 +346,31 @@ static const struct axppmic_config axp805_config = {
 	.poklirq = AXPPMIC_IRQ(2, __BIT(0)),
 };
 
+static const struct axppmic_config axp813_config = {
+	.name = "AXP813",
+	.controls = axp813_ctrls,
+	.ncontrols = __arraycount(axp813_ctrls),
+	.irq_regs = 6,
+	.has_battery = true,
+	.has_fuel_gauge = true,
+	.batsense_step = 1100,
+	.charge_step = 1000,
+	.discharge_step = 1000,
+	.maxcap_step = 1456,
+	.coulomb_step = 1456,
+	.poklirq = AXPPMIC_IRQ(5, __BIT(3)),
+	.acinirq = AXPPMIC_IRQ(1, __BITS(6,5)),
+	.vbusirq = AXPPMIC_IRQ(1, __BITS(3,2)),
+	.battirq = AXPPMIC_IRQ(2, __BITS(7,6)),
+	.chargeirq = AXPPMIC_IRQ(2, __BITS(3,2)),
+	.chargestirq = AXPPMIC_IRQ(4, __BITS(1,0)),	
+};
+
 static const struct device_compatible_entry compat_data[] = {
 	{ "x-powers,axp803",		(uintptr_t)&axp803_config },
 	{ "x-powers,axp805",		(uintptr_t)&axp805_config },
 	{ "x-powers,axp806",		(uintptr_t)&axp805_config },
+	{ "x-powers,axp813",		(uintptr_t)&axp813_config },
 	{ NULL,				0 }
 };
 
@@ -495,6 +572,22 @@ axppmic_sensor_update(struct sysmon_envsys *sme, envsys_data_t *e)
 			e->value_cur = AXP_ADC_RAW(hi, lo) * c->discharge_step;
 		}
 		break;
+	case AXP_SENSOR_BATT_MAXIMUM_CAPACITY:
+		if (battery_present &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_MAX_CAP_HI_REG, &hi, flags) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_MAX_CAP_LO_REG, &lo, flags) == 0) {
+			e->state = (hi & AXP_BATT_MAX_CAP_VALID) ? ENVSYS_SVALID : ENVSYS_SINVALID;
+			e->value_cur = AXP_COULOMB_RAW(hi, lo) * c->maxcap_step;
+		}
+		break;
+	case AXP_SENSOR_BATT_CURRENT_CAPACITY:
+		if (battery_present &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_COULOMB_HI_REG, &hi, flags) == 0 &&
+		    axppmic_read(sc->sc_i2c, sc->sc_addr, AXP_BATT_COULOMB_LO_REG, &lo, flags) == 0) {
+			e->state = (hi & AXP_BATT_COULOMB_VALID) ? ENVSYS_SVALID : ENVSYS_SINVALID;
+			e->value_cur = AXP_COULOMB_RAW(hi, lo) * c->coulomb_step;
+		}
+		break;
 	}
 }
 
@@ -651,6 +744,24 @@ axppmic_attach_battery(struct axppmic_softc *sc)
 		e->state = ENVSYS_SINVALID;
 		e->flags = ENVSYS_FPERCENT;
 		strlcpy(e->desc, "battery percent", sizeof(e->desc));
+		sysmon_envsys_sensor_attach(sc->sc_sme, e);
+	}
+
+	if (c->maxcap_step) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_MAXIMUM_CAPACITY];
+		e->private = AXP_SENSOR_BATT_MAXIMUM_CAPACITY;
+		e->units = ENVSYS_SAMPHOUR;
+		e->state = ENVSYS_SINVALID;
+		strlcpy(e->desc, "battery maximum capacity", sizeof(e->desc));
+		sysmon_envsys_sensor_attach(sc->sc_sme, e);
+	}
+
+	if (c->coulomb_step) {
+		e = &sc->sc_sensor[AXP_SENSOR_BATT_CURRENT_CAPACITY];
+		e->private = AXP_SENSOR_BATT_CURRENT_CAPACITY;
+		e->units = ENVSYS_SAMPHOUR;
+		e->state = ENVSYS_SINVALID;
+		strlcpy(e->desc, "battery current capacity", sizeof(e->desc));
 		sysmon_envsys_sensor_attach(sc->sc_sme, e);
 	}
 }

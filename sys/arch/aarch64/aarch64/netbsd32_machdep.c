@@ -1,4 +1,4 @@
-/*	$NetBSD: netbsd32_machdep.c,v 1.2 2018/10/12 01:28:57 ryo Exp $	*/
+/*	$NetBSD: netbsd32_machdep.c,v 1.5 2019/01/27 19:13:04 alnsn Exp $	*/
 
 /*
  * Copyright (c) 2018 Ryo Shimizu <ryo@nerv.org>
@@ -27,9 +27,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: netbsd32_machdep.c,v 1.2 2018/10/12 01:28:57 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: netbsd32_machdep.c,v 1.5 2019/01/27 19:13:04 alnsn Exp $");
 
+#if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/core.h>
@@ -223,6 +225,8 @@ netbsd32_sendsig_siginfo(const ksiginfo_t *ksi, const sigset_t *mask)
 	fp = (struct netbsd32_sigframe_siginfo *)sp;
 	fp = (struct netbsd32_sigframe_siginfo *)STACK_ALIGN(fp - 1, 8);
 
+	memset(&frame, 0, sizeof(frame));
+
 	/* XXX: netbsd32_ksi_to_si32 */
 	netbsd32_si_to_si32(&frame.sf_si, (const siginfo_t *)&ksi->ksi_info);
 
@@ -231,7 +235,6 @@ netbsd32_sendsig_siginfo(const ksiginfo_t *ksi, const sigset_t *mask)
 	frame.sf_uc.uc_link = (uint32_t)(uintptr_t)l->l_ctxlink;
 	frame.sf_uc.uc_flags |= (l->l_sigstk.ss_flags & SS_ONSTACK) ?
 	    _UC_SETSTACK : _UC_CLRSTACK;
-	memset(&frame.sf_uc.uc_stack, 0, sizeof(frame.sf_uc.uc_stack));
 	sendsig_reset(l, signo);
 
 	mutex_exit(p->p_lock);
@@ -305,7 +308,7 @@ startlwp32(void *arg)
 int
 cpu_mcontext32_validate(struct lwp *l, const mcontext32_t *mcp)
 {
-	struct proc * const p = l->l_proc;
+	struct proc * const p __diagused = l->l_proc;
 	const uint32_t spsr = mcp->__gregs[_REG_CPSR];
 
 	KASSERT(p->p_flag & PK_32);
@@ -535,4 +538,18 @@ netbsd32_vm_default_addr(struct proc *p, vaddr_t base, vsize_t sz,
 		return VM_DEFAULT_ADDRESS32_TOPDOWN(base, sz);
 	else
 		return VM_DEFAULT_ADDRESS32_BOTTOMUP(base, sz);
+}
+
+void  
+netbsd32_machdep_md_init(void)
+{ 
+ 
+	/* nothing to do */
+}
+ 
+void
+netbsd32_machdep_md_fini(void)
+{
+ 
+	/* nothing to do */
 }

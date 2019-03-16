@@ -1,4 +1,4 @@
-/*	$NetBSD: gtmr.c,v 1.36 2018/09/30 10:34:38 skrll Exp $	*/
+/*	$NetBSD: gtmr.c,v 1.39 2019/01/30 02:01:58 jmcneill Exp $	*/
 
 /*-
  * Copyright (c) 2012 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gtmr.c,v 1.36 2018/09/30 10:34:38 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gtmr.c,v 1.39 2019/01/30 02:01:58 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -171,8 +171,8 @@ gtmr_read_cntvct(struct gtmr_softc *sc)
 		u_int bits;
 		do {
 			val = gtmr_cntvct_read();
-			bits = val & __BITS(10,0);
-		} while (bits == 0 || bits == __BITS(10,0));
+			bits = val & __BITS(9,0);
+		} while (bits == 0 || bits == __BITS(9,0));
 		return val;
 	}
 
@@ -272,16 +272,21 @@ gtmr_intr(void *arg)
 	uint64_t delta = now - ci->ci_lastintr;
 
 #ifdef DIAGNOSTIC
-	const uint64_t then = gtmr_cntv_cval_read();
-	struct gtmr_percpu * const pc = percpu_getref(sc->sc_percpu);
-	KASSERTMSG(then <= now, "%"PRId64, now - then);
-	KASSERTMSG(then + pc->pc_delta >= ci->ci_lastintr + sc->sc_autoinc,
-	    "%"PRId64, then + pc->pc_delta - ci->ci_lastintr - sc->sc_autoinc);
+	struct gtmr_percpu *pc = NULL;
+	if (!ISSET(sc->sc_flags, GTMR_FLAG_SUN50I_A64_UNSTABLE_TIMER)) {
+		const uint64_t then = gtmr_cntv_cval_read();
+		pc = percpu_getref(sc->sc_percpu);
+		KASSERTMSG(then <= now, "%"PRId64, now - then);
+		KASSERTMSG(then + pc->pc_delta >= ci->ci_lastintr + sc->sc_autoinc,
+		    "%"PRId64, then + pc->pc_delta - ci->ci_lastintr - sc->sc_autoinc);
+	}
 #endif
 
-	KASSERTMSG(delta > sc->sc_autoinc / 100,
-	    "%s: interrupting too quickly (delta=%"PRIu64") autoinc=%lu",
-	    ci->ci_data.cpu_name, delta, sc->sc_autoinc);
+	if (!ISSET(sc->sc_flags, GTMR_FLAG_SUN50I_A64_UNSTABLE_TIMER)) {
+		KASSERTMSG(delta > sc->sc_autoinc / 100,
+		    "%s: interrupting too quickly (delta=%"PRIu64") autoinc=%lu",
+		    ci->ci_data.cpu_name, delta, sc->sc_autoinc);
+	}
 
 	/*
 	 * If we got interrupted too soon (delta < sc->sc_autoinc)
@@ -293,14 +298,21 @@ gtmr_intr(void *arg)
 	} else {
 		delta = 0;
 	}
-	gtmr_cntv_tval_write(sc->sc_autoinc - delta);
+
+	if (ISSET(sc->sc_flags, GTMR_FLAG_SUN50I_A64_UNSTABLE_TIMER)) {
+		gtmr_cntv_cval_write(now + sc->sc_autoinc - delta);
+	} else {
+		gtmr_cntv_tval_write(sc->sc_autoinc - delta);
+	}
 
 	ci->ci_lastintr = now;
 
 #ifdef DIAGNOSTIC
-	KASSERT(delta == (uint32_t) delta);
-	pc->pc_delta = delta;
-	percpu_putref(sc->sc_percpu);
+	if (!ISSET(sc->sc_flags, GTMR_FLAG_SUN50I_A64_UNSTABLE_TIMER)) {
+		KASSERT(delta == (uint32_t) delta);
+		pc->pc_delta = delta;
+		percpu_putref(sc->sc_percpu);
+	}
 #endif
 
 	hardclock(cf);

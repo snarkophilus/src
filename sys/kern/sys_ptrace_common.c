@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_ptrace_common.c,v 1.45 2018/06/23 03:32:48 christos Exp $	*/
+/*	$NetBSD: sys_ptrace_common.c,v 1.47 2019/02/03 03:19:28 mrg Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -118,7 +118,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.45 2018/06/23 03:32:48 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.47 2019/02/03 03:19:28 mrg Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_ptrace.h"
@@ -240,6 +240,7 @@ ptrace_listener_cb(kauth_cred_t cred, kauth_action_t action, void *cookie,
 			break;
 		}
 #endif
+		/* FALLTHROUGH */
 	case PT_TRACE_ME:
 	case PT_ATTACH:
 	case PT_WRITE_I:
@@ -570,6 +571,7 @@ ptrace_get_siginfo(struct proc *t, struct ptrace_methods *ptm, void *addr,
 {
 	struct ptrace_siginfo psi;
 
+	memset(&psi, 0, sizeof(psi));
 	psi.psi_siginfo._info = t->p_sigctx.ps_info;
 	psi.psi_lwpid = t->p_sigctx.ps_lwp;
 	DPRINTF(("%s: lwp=%d signal=%d\n", __func__, psi.psi_lwpid,
@@ -1294,6 +1296,7 @@ do_ptrace(struct ptrace_methods *ptm, struct lwp *l, int req, pid_t pid,
 	case PT_SETSTEP:
 		write = 1;
 
+		/* FALLTHROUGH */
 	case PT_CLEARSTEP:
 		/* write = 0 done above. */
 		if ((error = ptrace_update_lwp(t, &lt, data)) != 0)

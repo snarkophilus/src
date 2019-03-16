@@ -1,4 +1,4 @@
-/*	$NetBSD: input.c,v 1.63 2018/08/19 23:50:27 kre Exp $	*/
+/*	$NetBSD: input.c,v 1.71 2019/02/09 09:20:47 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)input.c	8.3 (Berkeley) 6/9/95";
 #else
-__RCSID("$NetBSD: input.c,v 1.63 2018/08/19 23:50:27 kre Exp $");
+__RCSID("$NetBSD: input.c,v 1.71 2019/02/09 09:20:47 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -145,14 +145,18 @@ pfgets(char *line, int len)
 
 	while (--nleft > 0) {
 		c = pgetc_macro();
+		if (c == PFAKE)		/* consecutive PFAKEs is impossible */
+			c = pgetc_macro();
 		if (c == PEOF) {
 			if (p == line)
 				return NULL;
 			break;
 		}
 		*p++ = c;
-		if (c == '\n')
+		if (c == '\n') {
+			plinno++;
 			break;
+		}
 	}
 	*p = '\0';
 	return line;
@@ -168,7 +172,12 @@ pfgets(char *line, int len)
 int
 pgetc(void)
 {
-	return pgetc_macro();
+	int c;
+
+	c = pgetc_macro();
+	if (c == PFAKE)
+		c = pgetc_macro();
+	return c;
 }
 
 
@@ -207,22 +216,22 @@ preadfd(void)
 
 
 	if (nr <= 0) {
-                if (nr < 0) {
-                        if (errno == EINTR)
-                                goto retry;
-                        if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
-                                int flags = fcntl(0, F_GETFL, 0);
+		if (nr < 0) {
+			if (errno == EINTR)
+				goto retry;
+			if (parsefile->fd == 0 && errno == EWOULDBLOCK) {
+				int flags = fcntl(0, F_GETFL, 0);
 
-                                if (flags >= 0 && flags & O_NONBLOCK) {
-                                        flags &=~ O_NONBLOCK;
-                                        if (fcntl(0, F_SETFL, flags) >= 0) {
+				if (flags >= 0 && flags & O_NONBLOCK) {
+					flags &=~ O_NONBLOCK;
+					if (fcntl(0, F_SETFL, flags) >= 0) {
 						out2str("sh: turning off NDELAY mode\n");
-                                                goto retry;
-                                        }
-                                }
-                        }
-                }
-                nr = -1;
+						goto retry;
+					}
+				}
+			}
+		}
+		nr = -1;
 	}
 	return nr;
 }
@@ -233,7 +242,7 @@ preadfd(void)
  * 1) If a string was pushed back on the input, pop it;
  * 2) If an EOF was pushed back (parsenleft == EOF_NLEFT) or we are reading
  *    from a string so we can't refill the buffer, return EOF.
- * 3) If the is more stuff in this buffer, use it else call read to fill it.
+ * 3) If there is more stuff in this buffer, use it else call read to fill it.
  * 4) Process input up to the next newline, deleting nul characters.
  */
 
@@ -248,6 +257,8 @@ preadbuffer(void)
 	char savec;
 
 	while (parsefile->strpush) {
+		if (parsenleft == -1 && parsefile->strpush->ap != NULL)
+			return PFAKE;
 		popstring();
 		if (--parsenleft >= 0)
 			return (*parsenextc++);
@@ -421,6 +432,15 @@ popstring(void)
 	struct strpush *sp = parsefile->strpush;
 
 	INTOFF;
+	if (sp->ap) {
+		int alen;
+
+		if ((alen = strlen(sp->ap->val)) > 0 &&
+		    (sp->ap->val[alen - 1] == ' ' ||
+		     sp->ap->val[alen - 1] == '\t'))
+			checkkwd |= CHKALIAS;
+		sp->ap->flag &= ~ALIASINUSE;
+	}
 	parsenextc = sp->prevstring;
 	parsenleft = sp->prevnleft;
 	parselleft = sp->prevlleft;
@@ -429,8 +449,6 @@ popstring(void)
 	    sp->ap ? " from alias:'" : "", sp->ap ? sp->ap->name : "",
 	    sp->ap ? "'" : "", parsenleft, parselleft, parsenleft, parsenextc));
 
-	if (sp->ap)
-		sp->ap->flag &= ~ALIASINUSE;
 	parsefile->strpush = sp->prev;
 	if (sp != &(parsefile->basestrpush))
 		ckfree(sp);
@@ -514,6 +532,7 @@ setinputfd(int fd, int push)
 {
 	VTRACE(DBG_INPUT, ("setinputfd(%d, %spush)\n", fd, push?"":"no"));
 
+	INTOFF;
 	register_sh_fd(fd, input_fd_swap);
 	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 	if (push)
@@ -525,6 +544,7 @@ setinputfd(int fd, int push)
 		parsefile->buf = ckmalloc(BUFSIZ);
 	parselleft = parsenleft = 0;
 	plinno = 1;
+	INTON;
 
 	CTRACE(DBG_INPUT, ("setinputfd(%d, %spush) done; plinno=1\n", fd,
 	    push ? "" : "no"));
@@ -545,11 +565,11 @@ setinputstring(char *string, int push, int line1)
 	parsenextc = string;
 	parselleft = parsenleft = strlen(string);
 	plinno = line1;
+	INTON;
 
 	CTRACE(DBG_INPUT,
 	    ("setinputstring(\"%.20s%s\" (%d), %spush, @ %d)\n", string,
 	    (parsenleft > 20 ? "..." : ""), parsenleft, push?"":"no", line1));
-	INTON;
 }
 
 

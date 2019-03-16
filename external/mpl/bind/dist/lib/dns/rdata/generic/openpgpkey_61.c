@@ -1,4 +1,4 @@
-/*	$NetBSD: openpgpkey_61.c,v 1.2 2018/08/12 13:02:36 christos Exp $	*/
+/*	$NetBSD: openpgpkey_61.c,v 1.4 2019/02/24 20:01:30 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -30,7 +30,7 @@ fromtext_openpgpkey(ARGS_FROMTEXT) {
 	/*
 	 * Keyring.
 	 */
-	return (isc_base64_tobuffer(lexer, target, -1));
+	return (isc_base64_tobuffer(lexer, target, -2));
 }
 
 static inline isc_result_t
@@ -199,7 +199,7 @@ digest_openpgpkey(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_openpgpkey(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_openpgpkey);
@@ -209,10 +209,10 @@ checkowner_openpgpkey(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_openpgpkey(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_openpgpkey);
@@ -221,7 +221,7 @@ checknames_openpgpkey(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int

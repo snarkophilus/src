@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_map.c,v 1.356 2018/09/12 15:58:08 maxv Exp $	*/
+/*	$NetBSD: uvm_map.c,v 1.359 2019/03/14 19:10:04 kre Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -66,7 +66,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_map.c,v 1.356 2018/09/12 15:58:08 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_map.c,v 1.359 2019/03/14 19:10:04 kre Exp $");
 
 #include "opt_ddb.h"
 #include "opt_pax.h"
@@ -3098,7 +3098,7 @@ uvm_map_protect(struct vm_map *map, vaddr_t start, vaddr_t end,
 			/* update pmap! */
 			uvm_map_lock_entry(current);
 			pmap_protect(map->pmap, current->start, current->end,
-			    current->protection & MASK(entry));
+			    current->protection & MASK(current));
 			uvm_map_unlock_entry(current);
 
 			/*
@@ -3124,11 +3124,11 @@ uvm_map_protect(struct vm_map *map, vaddr_t start, vaddr_t end,
 		 */
 
 		if ((map->flags & VM_MAP_WIREFUTURE) != 0 &&
-		    VM_MAPENT_ISWIRED(entry) == 0 &&
+		    VM_MAPENT_ISWIRED(current) == 0 &&
 		    old_prot == VM_PROT_NONE &&
 		    new_prot != VM_PROT_NONE) {
-			if (uvm_map_pageable(map, entry->start,
-			    entry->end, false,
+			if (uvm_map_pageable(map, current->start,
+			    current->end, false,
 			    UVM_LK_ENTER|UVM_LK_EXIT) != 0) {
 
 				/*
@@ -3358,6 +3358,14 @@ uvm_map_pageable(struct vm_map *map, vaddr_t start, vaddr_t end,
 		return EFAULT;
 	}
 	entry = start_entry;
+
+	if (start == end) {		/* nothing required */
+		if ((lockflags & UVM_LK_EXIT) == 0)
+			vm_map_unlock(map);
+
+		UVMHIST_LOG(maphist,"<- done (nothing)",0,0,0,0);
+		return 0;
+	}
 
 	/*
 	 * handle wiring and unwiring separately.
@@ -4963,7 +4971,7 @@ fill_vmentries(struct lwp *l, pid_t pid, u_int elem_size, void *oldp,
 		return EINVAL;
 
 	if (oldp) {
-		if (*oldlenp > 1024 * 1024)
+		if (*oldlenp > 10UL * 1024UL * 1024UL)
 			return E2BIG;
 		count = *oldlenp / elem_size;
 		if (count == 0)

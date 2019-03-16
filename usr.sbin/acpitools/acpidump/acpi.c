@@ -1,4 +1,4 @@
-/* $NetBSD: acpi.c,v 1.38 2018/10/18 05:20:05 msaitoh Exp $ */
+/* $NetBSD: acpi.c,v 1.44 2019/02/09 16:00:41 msaitoh Exp $ */
 
 /*-
  * Copyright (c) 1998 Doug Rabson
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: acpi.c,v 1.38 2018/10/18 05:20:05 msaitoh Exp $");
+__RCSID("$NetBSD: acpi.c,v 1.44 2019/02/09 16:00:41 msaitoh Exp $");
 
 #include <sys/param.h>
 #include <sys/endian.h>
@@ -40,6 +40,7 @@ __RCSID("$NetBSD: acpi.c,v 1.38 2018/10/18 05:20:05 msaitoh Exp $");
 #include <err.h>
 #include <fcntl.h>
 #include <paths.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -53,7 +54,11 @@ __RCSID("$NetBSD: acpi.c,v 1.38 2018/10/18 05:20:05 msaitoh Exp $");
 #define BEGIN_COMMENT	"/*\n"
 #define END_COMMENT	" */\n"
 
+/* Commonly used helper functions */
 static void	acpi_print_string(char *s, size_t length);
+static void	acpi_print_tabs(unsigned int n);
+static void	acpi_dump_bytes(uint8_t *p, uint32_t len, unsigned int ntabs);
+static void	acpi_dump_table(ACPI_TABLE_HEADER *sdp);
 static void	acpi_print_gas(ACPI_GENERIC_ADDRESS *gas);
 static void	acpi_print_pci(uint16_t vendorid, uint16_t deviceid,
 		    uint8_t seg, uint8_t bus, uint8_t device, uint8_t func);
@@ -68,6 +73,8 @@ static void	acpi_print_whea(ACPI_WHEA_HEADER *whea,
 		    void (*print_ins)(ACPI_WHEA_HEADER *),
 		    void (*print_flags)(ACPI_WHEA_HEADER *));
 static uint64_t	acpi_select_address(uint32_t, uint64_t);
+
+/* Handlers for each table */
 static void	acpi_handle_fadt(ACPI_TABLE_HEADER *fadt);
 static void	acpi_print_cpu(u_char cpu_id);
 static void	acpi_print_cpu_uid(uint32_t uid, char *uid_string);
@@ -79,14 +86,17 @@ static void	acpi_print_intr(uint32_t intr, uint16_t mps_flags);
 static void	acpi_print_local_nmi(u_int lint, uint16_t mps_flags);
 static void	acpi_print_madt(ACPI_SUBTABLE_HEADER *mp);
 static void	acpi_handle_bert(ACPI_TABLE_HEADER *sdp);
+static void	acpi_handle_bgrt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_boot(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_cpep(ACPI_TABLE_HEADER *sdp);
+static void	acpi_handle_csrt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_dbgp(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_dbg2(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_einj(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_erst(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_gtdt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_hest(ACPI_TABLE_HEADER *sdp);
+static void	acpi_handle_iort(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_lpit(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_madt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_msct(ACPI_TABLE_HEADER *sdp);
@@ -113,7 +123,6 @@ static void	acpi_handle_wdat(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_wddt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_handle_wdrt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_print_sdt(ACPI_TABLE_HEADER *sdp);
-static void	acpi_dump_bytes(ACPI_TABLE_HEADER *sdp);
 static void	acpi_print_fadt(ACPI_TABLE_HEADER *sdp);
 static void	acpi_print_facs(ACPI_TABLE_FACS *facs);
 static void	acpi_print_dsdt(ACPI_TABLE_HEADER *dsdp);
@@ -206,6 +215,8 @@ acpi_print_string(char *s, size_t length)
 
 	while (length--) {
 		c = *s++;
+		if (c == '\0')
+			return;
 		putchar(c);
 	}
 }
@@ -706,7 +717,7 @@ acpi_print_hest_generic_v2(ACPI_HEST_GENERIC_V2 *data)
 
 	printf("\tError Status Address");
 	acpi_print_gas(&data->ReadAckRegister);
-	printf("\tRead Ack Preserve=0x%016jx\n",
+	printf("\n\tRead Ack Preserve=0x%016jx\n",
 	    (uintmax_t)data->ReadAckPreserve);
 	printf("\tRead Ack Write=0x%016jx\n",
 	    (uintmax_t)data->ReadAckWrite);
@@ -1215,6 +1226,37 @@ acpi_handle_bert(ACPI_TABLE_HEADER *sdp)
 }
 
 static void
+acpi_handle_bgrt(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_TABLE_BGRT *bgrt;
+	unsigned int degree;
+
+	printf(BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	bgrt = (ACPI_TABLE_BGRT *)sdp;
+
+	printf("\tVersion=%hu\n", bgrt->Version);
+	degree = ((unsigned int)(bgrt->Status & ACPI_BGRT_ORIENTATION_OFFSET)
+	    >> 1) * 90;
+	printf("\tDegree=%u\n", degree);
+	printf("\tDisplayed=%u\n", bgrt->Status & ACPI_BGRT_DISPLAYED);
+	printf("\tImage Type=");
+	switch (bgrt->ImageType) {
+	case 0:
+		printf("Bitmap\n");
+		break;
+	default:
+		printf("reserved (0x%hhx)\n", bgrt->ImageType);
+		break;
+	}
+	printf("\tImage Address=0x%"PRIx64"\n", bgrt->ImageAddress);
+	printf("\tImage Offset X=0x%08x\n", bgrt->ImageOffsetX);
+	printf("\tImage Offset Y=0x%08x\n", bgrt->ImageOffsetY);
+
+	printf(END_COMMENT);
+}
+
+static void
 acpi_handle_boot(ACPI_TABLE_HEADER *sdp)
 {
 	ACPI_TABLE_BOOT *boot;
@@ -1245,6 +1287,130 @@ acpi_handle_cpep(ACPI_TABLE_HEADER *sdp)
 		printf("\tPoll Interval=%d msec\n", poll->Interval);
 		cpep_pos += sizeof(ACPI_CPEP_POLLING);
 	}
+	printf(END_COMMENT);
+}
+
+static void
+acpi_print_csrt_resource_group(ACPI_CSRT_GROUP *grp)
+{
+	ACPI_CSRT_DESCRIPTOR *desc;
+
+	printf("\tLength=%u\n", grp->Length);
+	printf("\tVendorId=");
+	acpi_print_string((char *)&grp->VendorId, 4);
+	printf("\n");
+	if (grp->SubvendorId != 0) {
+		printf("\tSubvendorId=");
+		acpi_print_string((char *)&grp->SubvendorId, 4);
+		printf("\n");
+	}
+	printf("\tDeviceId=0x%08x\n", grp->DeviceId);
+	if (grp->SubdeviceId != 0)
+		printf("\tSubdeviceId=0x%08x\n", grp->SubdeviceId);
+	printf("\tRevision=%hu\n", grp->Revision);
+	printf("\tSharedInfoLength=%u\n", grp->SharedInfoLength);
+
+	/* Next is Shared Info */
+	if (grp->SharedInfoLength != 0) {
+		printf("\tShared Info ");
+		acpi_dump_bytes((uint8_t *)(grp + 1),
+		    grp->SharedInfoLength, 1);
+	}
+
+	/* And then, Resource Descriptors */
+	desc = (ACPI_CSRT_DESCRIPTOR *)
+	    ((vaddr_t)(grp + 1) + grp->SharedInfoLength);
+	while (desc < (ACPI_CSRT_DESCRIPTOR *)((vaddr_t)grp + grp->Length)) {
+		bool unknownsubytpe = false;
+		printf("\n\tLength=%u\n", desc->Length);
+		printf("\tResource Type=");
+		switch (desc->Type) {
+		case ACPI_CSRT_TYPE_INTERRUPT:
+			printf("Interrupt");
+			switch (desc->Subtype) {
+			case ACPI_CSRT_XRUPT_LINE:
+				printf("(Interrupt line)\n");
+				break;
+			case ACPI_CSRT_XRUPT_CONTROLLER:
+				printf("(Interrupt controller)\n");
+				break;
+			default:
+				unknownsubytpe = true;
+				break;
+			}
+			break;
+		case ACPI_CSRT_TYPE_TIMER:
+			printf("Timer");
+			switch (desc->Subtype) {
+			case ACPI_CSRT_TIMER:
+				printf("\n");
+				break;
+			default:
+				unknownsubytpe = true;
+				break;
+			}
+			break;
+		case ACPI_CSRT_TYPE_DMA:
+			printf("DMA");
+			switch (desc->Subtype) {
+			case ACPI_CSRT_DMA_CHANNEL:
+				printf("(DMA channel)\n");
+				break;
+			case ACPI_CSRT_DMA_CONTROLLER:
+				printf("(DMA controller)\n");
+				break;
+			default:
+				unknownsubytpe = true;
+				break;
+			}
+			break;
+		case 0x0004: /* XXX Platform Security */
+			printf("Platform Security");
+			switch (desc->Subtype) {
+			case 0x0001:
+				printf("\n");
+				/* Platform Security */
+				break;
+			default:
+				unknownsubytpe = true;
+				break;
+			}
+			break;
+		default:
+			printf("Unknown (%hx)\n", desc->Type);
+			break;
+		}
+		if (unknownsubytpe)
+			printf("(unknown subtype(%hx))\n", desc->Subtype);
+
+		printf("\tUID=0x%08x\n", desc->Uid);
+		printf("\tVendor defined info ");
+		acpi_dump_bytes((uint8_t *)(desc + 1),
+		    desc->Length - sizeof(ACPI_CSRT_DESCRIPTOR), 1);
+
+		/* Next */
+		desc = (ACPI_CSRT_DESCRIPTOR *)((vaddr_t)desc + desc->Length);
+	}
+}
+
+static void
+acpi_handle_csrt(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_CSRT_GROUP *grp;
+	uint totallen = sdp->Length;
+
+	printf(BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	grp = (ACPI_CSRT_GROUP *)(sdp + 1);
+
+	while (grp < (ACPI_CSRT_GROUP *)((vaddr_t)sdp + totallen)) {
+		printf("\n");
+		acpi_print_csrt_resource_group(grp);
+
+		/* Next */
+		grp = (ACPI_CSRT_GROUP *)((vaddr_t)grp + grp->Length);
+	}
+
 	printf(END_COMMENT);
 }
 
@@ -1884,7 +2050,7 @@ acpi_handle_hpet(ACPI_TABLE_HEADER *sdp)
 	printf("\tHPET Number=%d\n", hpet->Sequence);
 	printf("\tADDR=");
 	acpi_print_gas(&hpet->Address);
-	printf("\tHW Rev=0x%x\n", hpet->Id & ACPI_HPET_ID_HARDWARE_REV_ID);
+	printf("\n\tHW Rev=0x%x\n", hpet->Id & ACPI_HPET_ID_HARDWARE_REV_ID);
 	printf("\tComparators=%d\n", (hpet->Id & ACPI_HPET_ID_COMPARATORS) >>
 	    8);
 	printf("\tCounter Size=%d\n", hpet->Id & ACPI_HPET_ID_COUNT_SIZE_CAP ?
@@ -1900,18 +2066,333 @@ acpi_handle_hpet(ACPI_TABLE_HEADER *sdp)
 	printf(END_COMMENT);
 }
 
+/*
+ * IORT
+ * I/O Remapping Table
+ */
+
+static void acpi_print_iort_its_group(ACPI_IORT_NODE *);
+static void acpi_print_iort_named_component(ACPI_IORT_NODE *);
+static void acpi_print_iort_root_complex(ACPI_IORT_NODE *);
+static void acpi_print_iort_smmuv1v2(ACPI_IORT_NODE *);
+static void acpi_print_iort_smmuv3(ACPI_IORT_NODE *);
+
+struct iort_node_list {
+	uint8_t	Type;
+	const char *gname;
+	void (*func)(ACPI_IORT_NODE *);
+} iort_node_list [] = {
+#define NDMAC(name)	ACPI_IORT_NODE_## name
+#define PRFN(name)	acpi_print_iort_## name
+	{ NDMAC(ITS_GROUP),	   "ITS group",       PRFN(its_group)},
+	{ NDMAC(NAMED_COMPONENT),  "Named component", PRFN(named_component)},
+	{ NDMAC(PCI_ROOT_COMPLEX), "Root complex",    PRFN(root_complex)},
+	{ NDMAC(SMMU),		   "SMMUv1 or v2",    PRFN(smmuv1v2)},
+	{ NDMAC(SMMU_V3),	   "SMMUv3",	      PRFN(smmuv3)},
+	{ 255, NULL, NULL},
+#undef NDMAC
+#undef PRFN
+};
+
+static void
+acpi_print_iort_memory_access(ACPI_IORT_MEMORY_ACCESS *memacc)
+{
+
+	printf("\tMemory Access={\n");
+	printf("\t\tCacheCoherency=");
+	switch (memacc->CacheCoherency) {
+	case ACPI_IORT_NODE_COHERENT:
+		printf("Fully coherent\n");
+		break;
+	case ACPI_IORT_NODE_NOT_COHERENT:
+		printf("Not coherent\n");
+		break;
+	default:
+		printf("resrved (%u)\n", memacc->CacheCoherency);
+		break;
+	}
+	printf("\t\tAllocation Hints=");
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_HT_## flag, #flag)
+		PRINTFLAG(memacc->Hints, TRANSIENT);
+		PRINTFLAG(memacc->Hints, WRITE);
+		PRINTFLAG(memacc->Hints, READ);
+		PRINTFLAG(memacc->Hints, OVERRIDE);
+		PRINTFLAG_END();
+#undef PRINTFLAG
+	printf("\t\tMemory Access Flags=");
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_MF_## flag, #flag)
+		PRINTFLAG(memacc->MemoryFlags, COHERENCY);
+		PRINTFLAG(memacc->MemoryFlags, ATTRIBUTES);
+		PRINTFLAG_END();
+#undef PRINTFLAG
+	printf("\t}\n");
+}
+
+static void
+acpi_print_iort_its_group(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_ITS_GROUP *itsg = (ACPI_IORT_ITS_GROUP *)node->NodeData;
+	uint32_t *idp;
+	unsigned int i;
+
+	idp = itsg->Identifiers;
+	for (i = 0; i < itsg->ItsCount; i++)
+		printf("\tGIC ITS ID=%d\n", idp[i]);
+}
+
+static void
+acpi_print_iort_named_component(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_NAMED_COMPONENT *ncomp
+	    = (ACPI_IORT_NAMED_COMPONENT *)node->NodeData;
+
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_NC_## flag, #flag)
+	printf("\tNode Flags={PASID_BITS=%u",
+	    (ncomp->NodeFlags & ACPI_IORT_NC_PASID_BITS) >> 1);
+	pf_sep = ',';
+	PRINTFLAG(ncomp->NodeFlags, STALL_SUPPORTED);
+	PRINTFLAG_END();
+#undef PRINTFLAG
+	acpi_print_iort_memory_access(
+		(ACPI_IORT_MEMORY_ACCESS *)&ncomp->MemoryProperties);
+	printf("\tMemory address size=%hhu\n", ncomp->MemoryAddressLimit);
+	printf("\tDevice object Name=%s\n", ncomp->DeviceName);
+}
+
+static void
+acpi_print_iort_root_complex(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_ROOT_COMPLEX *rcmp
+	    = (ACPI_IORT_ROOT_COMPLEX *)node->NodeData;
+
+	acpi_print_iort_memory_access(
+		(ACPI_IORT_MEMORY_ACCESS *)&rcmp->MemoryProperties);
+	printf("\tATS Attribute=%s\n",
+	    (rcmp->AtsAttribute & ACPI_IORT_ATS_SUPPORTED)
+	    ? "supported" : "not supported");
+	printf("\tPCI Segment=%u\n", rcmp->PciSegmentNumber);
+	printf("\tMemory address size limit=%hhu\n", rcmp->MemoryAddressLimit);
+}
+
+static void
+acpi_print_iort_smmuv1v2_intflags(uint32_t flags)
+{
+
+	printf("{Mode=");
+	if (flags & 0x01)
+		printf("edge");
+	else
+		printf("level");
+	printf("}\n");
+}
+
+static void
+acpi_print_iort_smmuv1v2(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_SMMU *smmu = (ACPI_IORT_SMMU *)node->NodeData;
+	ACPI_IORT_SMMU_GSI *gsi;
+	uint64_t *iarray;
+	unsigned int i;
+
+	printf("\tBase Address=%016jx\n", (uintmax_t)smmu->BaseAddress);
+	printf("\tSpan=%016jx\n", (uintmax_t)smmu->Span);
+	printf("\tModel=");
+	switch (smmu->Model) {
+	case ACPI_IORT_SMMU_V1:
+		printf("Generic SMMUv1\n");
+		break;
+	case ACPI_IORT_SMMU_V2:
+		printf("Generic SMMUv2\n");
+		break;
+	case ACPI_IORT_SMMU_CORELINK_MMU400:
+		printf("Arm Corelink MMU-400\n");
+		break;
+	case ACPI_IORT_SMMU_CORELINK_MMU500:
+		printf("Arm Corelink MMU-500\n");
+		break;
+	case ACPI_IORT_SMMU_CORELINK_MMU401:
+		printf("Arm Corelink MMU-401\n");
+		break;
+	case ACPI_IORT_SMMU_CAVIUM_THUNDERX:
+		printf("Cavium ThunderX SMMUv2\n");
+		break;
+	default:
+		printf("reserved (%u)\n", smmu->Model);
+		break;
+	}
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_SMMU_## flag, #flag)
+	printf("\tFlags=");
+	PRINTFLAG(smmu->Flags, DVM_SUPPORTED);
+	PRINTFLAG(smmu->Flags, COHERENT_WALK);
+	PRINTFLAG_END();
+#undef PRINTFLAG
+
+	gsi = (ACPI_IORT_SMMU_GSI *)((vaddr_t)node
+	    + smmu->GlobalInterruptOffset);
+	printf("\tNSgIrpt=%u\n", gsi->NSgIrpt);
+	printf("\tNSgIrptFlags=");
+	acpi_print_iort_smmuv1v2_intflags(gsi->NSgIrptFlags);
+	printf("\tNSgCfgIrpt=%u\n", gsi->NSgCfgIrpt);
+	printf("\tNSgCfgIrptFlags=");
+	acpi_print_iort_smmuv1v2_intflags(gsi->NSgCfgIrptFlags);
+
+	if (smmu->ContextInterruptCount != 0) {
+		iarray = (uint64_t *)((vaddr_t)node
+		    + smmu->ContextInterruptOffset);
+		printf("\tContext Interrupts={\n");
+		for (i = 0; i < smmu->ContextInterruptCount; i++) {
+			printf("\t\tGSIV=%u\n",
+			    (uint32_t)(iarray[i] & 0xffffffff));
+			printf("\t\tFlags=%u\n", (uint32_t)(iarray[i] >> 32));
+		}
+	}
+	if (smmu->PmuInterruptCount != 0) {
+		iarray = (uint64_t *)((vaddr_t)node
+		    + smmu->PmuInterruptOffset);
+		printf("\tPmu Interrupts={\n");
+		for (i = 0; i < smmu->PmuInterruptCount; i++) {
+			printf("\t\tGSIV=%u\n",
+			    (uint32_t)(iarray[i] & 0xffffffff));
+			printf("\t\tFlags=%u\n", (uint32_t)(iarray[i] >> 32));
+		}
+	}
+}
+
+static void
+acpi_print_iort_smmuv3(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_SMMU_V3 *smmu = (ACPI_IORT_SMMU_V3 *)node->NodeData;
+	uint8_t httuo;
+	
+	printf("\tBase Address=%016jx\n", (uintmax_t)smmu->BaseAddress);
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_SMMU_V3_## flag, \
+	    #flag)
+	httuo = __SHIFTOUT(smmu->Flags, ACPI_IORT_SMMU_V3_HTTU_OVERRIDE);
+	printf("\tFlags={HTTU Override=%hhx", httuo);
+	pf_sep = ',';
+	PRINTFLAG(smmu->Flags, HTTU_OVERRIDE);
+	PRINTFLAG(smmu->Flags, COHACC_OVERRIDE);
+	PRINTFLAG(smmu->Flags, PXM_VALID);
+	PRINTFLAG_END();
+#undef PRINTFLAG
+	printf("\tVATOS Address=%016jx\n", (uintmax_t)smmu->VatosAddress);
+	printf("\tModel=");
+	switch (smmu->Model) {
+	case ACPI_IORT_SMMU_V3_GENERIC:
+		printf("Generic SMMUv3\n");
+		break;
+	case ACPI_IORT_SMMU_V3_HISILICON_HI161X:
+		printf("HiSilicon Hi161x SMMU-v3\n");
+		break;
+	case ACPI_IORT_SMMU_V3_CAVIUM_CN99XX:
+		printf("Cavium CN99xx SMMU-v3\n");
+		break;
+	default:
+		printf("reserved (%u)\n", smmu->Model);
+		break;
+	}
+
+	printf("\tEvent GSIV=%u\n", smmu->EventGsiv);
+	printf("\tPRI GSIV=%u\n", smmu->PriGsiv);
+	printf("\tGERR GSIV=%u\n", smmu->GerrGsiv);
+	printf("\tSync GSIV=%u\n", smmu->SyncGsiv);
+	printf("\tProximity domain=%u\n", smmu->Pxm);
+
+	/* XXX should we print the refered contents? */
+	printf("\tDevice ID mapping index=%u\n", smmu->IdMappingIndex);
+}
+
+static void
+acpi_print_iort_node(ACPI_IORT_NODE *node)
+{
+	ACPI_IORT_ID_MAPPING *mapping;
+	uint32_t offset;
+	int datasize;
+	bool dodump = false;
+	struct iort_node_list *list;
+	unsigned int i;
+
+	printf("\tLength=%hu\n", node->Length);
+	printf("\tRevision=%hhu\n", node->Revision);
+	printf("\tType=");
+
+	datasize = node->MappingOffset - offsetof(ACPI_IORT_NODE, NodeData);
+	if (datasize != 0)
+		dodump = true;
+
+	for (list = iort_node_list; list->gname != NULL; list++) {
+		if (node->Type == list->Type) {
+			printf("%s\n", list->gname);
+			if (dodump)
+				(*list->func)(node);
+			break;
+		}
+	}
+	if (list->gname == NULL)
+		printf("reserved (0x%hhx)\n", node->Type);
+
+	printf("\tMappingCount=%u\n", node->MappingCount);
+	if (node->MappingCount == 0)
+		return;
+
+	offset = node->MappingOffset;
+	printf("\tMapping offset=%u\n", offset);
+	for (i = 0; i < node->MappingCount; i++) {
+		mapping = (ACPI_IORT_ID_MAPPING *)((vaddr_t)node + offset);
+		printf("\tMapping={\n");
+		printf("\t\tInput base=%u\n", mapping->InputBase);
+		printf("\t\tCount=%u\n", mapping->IdCount);
+		printf("\t\tOutput base=%u\n", mapping->OutputBase);
+		printf("\t\tOutput reference offset=%u\n",
+		    mapping->OutputReference);
+#define	PRINTFLAG(var, flag)	printflag((var), ACPI_IORT_ID_## flag, #flag)
+		printf("\t\tFlags=");
+		PRINTFLAG(mapping->Flags, SINGLE_MAPPING);
+		PRINTFLAG_END();
+#undef PRINTFLAG
+		printf("\t}\n");
+		offset += sizeof(ACPI_IORT_ID_MAPPING);
+	}
+}
+
+static void
+acpi_handle_iort(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_TABLE_IORT *iort;
+	ACPI_IORT_NODE *node;
+	unsigned int i;
+
+	printf(BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	iort = (ACPI_TABLE_IORT *)sdp;
+	printf("\tIORT Nodes=%u\n", iort->NodeCount);
+	printf("\tNode offset=%u\n", iort->NodeOffset);
+
+	node = (ACPI_IORT_NODE *)((vaddr_t)iort + iort->NodeOffset);
+	for (i = 0; i < iort->NodeCount; i++) {
+		printf("\n");
+		acpi_print_iort_node(node);
+
+		/* Next */
+		node = (ACPI_IORT_NODE *)((vaddr_t)node + node->Length);
+	}
+	
+	printf(END_COMMENT);
+}
+
 static void
 acpi_print_native_lpit(ACPI_LPIT_NATIVE *nl)
 {
 	printf("\tEntryTrigger=");
 	acpi_print_gas(&nl->EntryTrigger);
-	printf("\tResidency=%u\n", nl->Residency);
+	printf("\n\tResidency=%u\n", nl->Residency);
 	printf("\tLatency=%u\n", nl->Latency);
 	if (nl->Header.Flags & ACPI_LPIT_NO_COUNTER)
 		printf("\tResidencyCounter=Not Present");
 	else {
 		printf("\tResidencyCounter=");
 		acpi_print_gas(&nl->ResidencyCounter);
+		printf("\n");
 	}
 	if (nl->CounterFrequency)
 		printf("\tCounterFrequency=%ju\n", nl->CounterFrequency);
@@ -3338,8 +3819,9 @@ acpi_handle_wdrt(ACPI_TABLE_HEADER *sdp)
 
 	printf("\tControl Register=");
 	acpi_print_gas(&wdrt->ControlRegister);
-	printf("\tCount Register=");
+	printf("\n\tCount Register=");
 	acpi_print_gas(&wdrt->CountRegister);
+	printf("\n");
 	acpi_print_pci(wdrt->PciVendorId, wdrt->PciDeviceId,
 	    wdrt->PciSegment, wdrt->PciBus, wdrt->PciDevice, wdrt->PciFunction);
 
@@ -3388,30 +3870,50 @@ acpi_print_sdt(ACPI_TABLE_HEADER *sdp)
 	printf(", Creator Revision=0x%x\n", sdp->AslCompilerRevision);
 }
 
+void
+acpi_print_tabs(unsigned int n)
+{
+
+	while (n-- > 0)
+		printf("\t");
+}
+
 static void
-acpi_dump_bytes(ACPI_TABLE_HEADER *sdp)
+acpi_dump_bytes(uint8_t *p, uint32_t len, unsigned int ntabs)
 {
 	unsigned int i;
-	uint8_t *p;
 
-	p = (uint8_t *)sdp;
-	printf("\n\tData={");
-	for (i = 0; i < sdp->Length; i++) {
+	acpi_print_tabs(ntabs);
+	printf("Data={");
+	for (i = 0; i < len; i++) {
 		if (cflag) {
-			if (i % 64 == 0)
-				printf("\n\t ");
-			else if (i % 16 == 0)
+			if (i % 64 == 0) {
+				printf("\n");
+				acpi_print_tabs(ntabs);
+				printf(" ");
+			}else if (i % 16 == 0)
 				printf(" ");
 			printf("%c", (p[i] >= ' ' && p[i] <= '~') ? p[i] : '.');
 		} else {
-			if (i % 16 == 0)
-				printf("\n\t\t");
-			else if (i % 8 == 0)
+			if (i % 16 == 0) {
+				printf("\n");
+				acpi_print_tabs(ntabs + 1);
+			} else if (i % 8 == 0)
 				printf("   ");
 			printf(" %02x", p[i]);
 		}
 	}
-	printf("\n\t}\n");
+	printf("\n");
+	acpi_print_tabs(ntabs);
+	printf("}\n");
+}
+
+/* Dump data which has ACPI_TABLE_HEADER */
+static void
+acpi_dump_table(ACPI_TABLE_HEADER *sdp)
+{
+
+	acpi_dump_bytes((uint8_t *)sdp, sdp->Length, 1);
 }
 
 static void
@@ -3745,10 +4247,14 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 			acpi_handle_fadt(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_BERT, 4))
 			acpi_handle_bert(sdp);
+		else if (!memcmp(sdp->Signature, ACPI_SIG_BGRT, 4))
+			acpi_handle_bgrt(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_BOOT, 4))
 			acpi_handle_boot(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_CPEP, 4))
 			acpi_handle_cpep(sdp);
+		else if (!memcmp(sdp->Signature, ACPI_SIG_CSRT, 4))
+			acpi_handle_csrt(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_DBGP, 4))
 			acpi_handle_dbgp(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_DBG2, 4))
@@ -3769,6 +4275,8 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 			acpi_handle_hest(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_HPET, 4))
 			acpi_handle_hpet(sdp);
+		else if (!memcmp(sdp->Signature, ACPI_SIG_IORT, 4))
+			acpi_handle_iort(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_ECDT, 4))
 			acpi_handle_ecdt(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_LPIT, 4))
@@ -3804,7 +4312,8 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 		else {
 			printf(BEGIN_COMMENT);
 			acpi_print_sdt(sdp);
-			acpi_dump_bytes(sdp);
+			printf("\n");
+			acpi_dump_table(sdp);
 			printf(END_COMMENT);
 		}
 	}

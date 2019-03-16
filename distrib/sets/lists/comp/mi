@@ -1,4 +1,4 @@
-#	$NetBSD: mi,v 1.2233 2018/10/05 09:51:55 hannken Exp $
+#	$NetBSD: mi,v 1.2263 2019/03/12 23:51:40 christos Exp $
 #
 # Note: don't delete entries from here - mark them as "obsolete" instead.
 ./etc/mtree/set.comp				comp-sys-root
@@ -39,7 +39,7 @@
 ./usr/bin/gcc					comp-c-bin		gcccmds
 ./usr/bin/gcore					comp-debug-bin
 ./usr/bin/gcov					comp-debug-bin		gcccmds
-./usr/bin/gcov-dump				comp-debug-bin		gcccmds,gcc=6
+./usr/bin/gcov-dump				comp-debug-bin		gcccmds
 ./usr/bin/gdb					comp-debug-bin		gdb
 ./usr/bin/gdbtui				comp-debug-bin		gdb
 ./usr/bin/genassym				comp-util-bin
@@ -384,7 +384,6 @@
 ./usr/include/dev/audio_if.h			comp-obsolete		obsolete
 ./usr/include/dev/audiovar.h			comp-obsolete		obsolete
 ./usr/include/dev/biovar.h			comp-c-include
-./usr/include/dev/bluetooth			comp-c-include
 ./usr/include/dev/bluetooth/bcsp.h		comp-c-include
 ./usr/include/dev/bluetooth/btdev.h		comp-c-include
 ./usr/include/dev/bluetooth/bth5.h		comp-c-include
@@ -583,7 +582,7 @@
 ./usr/include/dev/isa/pcppireg.h		comp-obsolete		obsolete
 ./usr/include/dev/isa/pcppivar.h		comp-obsolete		obsolete
 ./usr/include/dev/isa/pssreg.h			comp-obsolete		obsolete
-./usr/include/dev/isa/satlinkio.h		comp-c-include
+./usr/include/dev/isa/satlinkio.h		comp-obsolete		obsolete
 ./usr/include/dev/isa/satlinkreg.h		comp-obsolete		obsolete
 ./usr/include/dev/isa/sbdspvar.h		comp-obsolete		obsolete
 ./usr/include/dev/isa/sbreg.h			comp-obsolete		obsolete
@@ -643,7 +642,7 @@
 ./usr/include/dev/pci/if_fxpreg.h		comp-obsolete		obsolete
 ./usr/include/dev/pci/if_fxpvar.h		comp-obsolete		obsolete
 ./usr/include/dev/pci/if_levar.h		comp-obsolete		obsolete
-./usr/include/dev/pci/if_lmc.h			comp-c-include
+./usr/include/dev/pci/if_lmc.h			comp-obsolete		obsolete
 ./usr/include/dev/pci/if_lmc_types.h		comp-obsolete		obsolete
 ./usr/include/dev/pci/if_lmcioctl.h		comp-obsolete		obsolete
 ./usr/include/dev/pci/if_lmcvar.h		comp-obsolete		obsolete
@@ -709,6 +708,7 @@
 ./usr/include/dev/scsipi/ses.h			comp-c-include
 ./usr/include/dev/scsipi/ss_mustek.h		comp-obsolete		obsolete
 ./usr/include/dev/scsipi/ssvar.h		comp-obsolete		obsolete
+./usr/include/dev/spi/spi_io.h			comp-c-include
 ./usr/include/dev/spkrio.h			comp-c-include
 ./usr/include/dev/sun/disklabel.h		comp-c-include
 ./usr/include/dev/sun/eeprom.h			comp-c-include
@@ -903,6 +903,7 @@
 ./usr/include/g++/algobase.h			comp-obsolete		obsolete
 ./usr/include/g++/algorithm			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/alloc.h			comp-obsolete		obsolete
+./usr/include/g++/any				comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/array				comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/atomic			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/backward/algo.h		comp-obsolete		obsolete
@@ -969,7 +970,8 @@
 ./usr/include/g++/bits/basic_string.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/boost_concept_check.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/c++0x_warning.h		comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/bits/c++14_warning.h		comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/c++14_warning.h		comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/bits/c++14_warning.h		comp-cxx-include	gcc=7,obsolete
 ./usr/include/g++/bits/c++allocator.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/c++config.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/c++io.h			comp-cxx-include	gcc,cxx,libstdcxx
@@ -986,10 +988,12 @@
 ./usr/include/g++/bits/ctype_inline.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/ctype_noninline.h	comp-obsolete		obsolete
 ./usr/include/g++/bits/cxxabi_forced.h		comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/cxxabi_init_exception.h	comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/cxxabi_tweaks.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/deque.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/enable_special_members.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/error_constants.h	comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/exception.h		comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/exception_defines.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/exception_ptr.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/extc++.h			comp-cxx-include	gcc,cxx,libstdcxx
@@ -1010,6 +1014,7 @@
 ./usr/include/g++/bits/hashtable.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/hashtable_policy.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/indirect_array.h		comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/invoke.h			comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/ios_base.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/istream.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/list.tcc			comp-cxx-include	gcc,cxx,libstdcxx
@@ -1026,6 +1031,7 @@
 ./usr/include/g++/bits/messages_members.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/move.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/nested_exception.h	comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/node_handle.h		comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/opt_random.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/os_defines.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/ostream.tcc		comp-cxx-include	gcc,cxx,libstdcxx
@@ -1039,6 +1045,7 @@
 ./usr/include/g++/bits/random.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/random.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/range_access.h		comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/refwrap.h		comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/regex.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/regex.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/regex_automaton.h	comp-cxx-include	gcc,cxx,libstdcxx
@@ -1060,9 +1067,11 @@
 ./usr/include/g++/bits/shared_ptr_atomic.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/shared_ptr_base.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/slice_array.h		comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/bits/specfun.h		comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/bits/specfun.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/sstream.tcc		comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/bits/std_mutex.h		comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/bits/std_abs.h		comp-cxx-include	gcc=7,cxx,libstdcxx
+./usr/include/g++/bits/std_function.h		comp-cxx-include	gcc=7,cxx,libstdcxx
+./usr/include/g++/bits/std_mutex.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/stdc++.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/stdtr1c++.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/stl_algo.h		comp-cxx-include	gcc,cxx,libstdcxx
@@ -1096,6 +1105,7 @@
 ./usr/include/g++/bits/stream_iterator.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/streambuf.tcc		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/streambuf_iterator.h	comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/bits/string_view.tcc		comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/bits/stringfwd.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/time_members.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/bits/type_traits.h		comp-obsolete		obsolete
@@ -1145,13 +1155,13 @@
 ./usr/include/g++/cstring			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/ctgmath			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/ctime				comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/cuchar			comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/cuchar			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/cwchar			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/cwctype			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/cxxabi-forced.h		comp-obsolete 		obsolete
 ./usr/include/g++/cxxabi.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/array			comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/debug/assertions.h		comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/debug/assertions.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/bitset			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/debug.h			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/deque			comp-cxx-include	gcc,cxx,libstdcxx
@@ -1164,7 +1174,7 @@
 ./usr/include/g++/debug/hash_multiset.h		comp-obsolete		obsolete
 ./usr/include/g++/debug/hash_set		comp-obsolete		obsolete
 ./usr/include/g++/debug/hash_set.h		comp-obsolete		obsolete
-./usr/include/g++/debug/helper_functions.h	comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/debug/helper_functions.h	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/list			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/macros.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/map			comp-cxx-include	gcc,cxx,libstdcxx
@@ -1184,7 +1194,7 @@
 ./usr/include/g++/debug/safe_unordered_container.tcc	comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/set			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/set.h			comp-cxx-include	gcc,cxx,libstdcxx
-./usr/include/g++/debug/stl_iterator.h		comp-cxx-include	gcc=6,cxx,libstdcxx
+./usr/include/g++/debug/stl_iterator.h		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/string			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/unordered_map		comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/debug/unordered_set		comp-cxx-include	gcc,cxx,libstdcxx
@@ -1689,6 +1699,7 @@
 ./usr/include/g++/nmultset.h			comp-obsolete		obsolete
 ./usr/include/g++/nset.h			comp-obsolete		obsolete
 ./usr/include/g++/numeric			comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/optional			comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/osfcn.h			comp-obsolete		obsolete
 ./usr/include/g++/ostream			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/ostream.h			comp-obsolete		obsolete
@@ -1883,6 +1894,7 @@
 ./usr/include/g++/streambuf.h			comp-obsolete		obsolete
 ./usr/include/g++/strfile.h			comp-obsolete		obsolete
 ./usr/include/g++/string			comp-cxx-include	gcc,cxx,libstdcxx
+./usr/include/g++/string_view			comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/strstream			comp-obsolete		obsolete
 ./usr/include/g++/strstream.h			comp-obsolete		obsolete
 ./usr/include/g++/swap.h			comp-obsolete		obsolete
@@ -1999,86 +2011,91 @@
 ./usr/include/g++/utility			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/valarray			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/values.h			comp-obsolete		obsolete
+./usr/include/g++/variant			comp-cxx-include	gcc=7,cxx,libstdcxx
 ./usr/include/g++/vector			comp-cxx-include	gcc,cxx,libstdcxx
 ./usr/include/g++/vector.h			comp-obsolete		obsolete
 ./usr/include/gcc-4.5/mf-runtime.h		comp-obsolete		obsolete
 ./usr/include/gcc-4.5/omp.h			comp-obsolete		obsolete
-./usr/include/gcc-4.8/mf-runtime.h		comp-gcc-include	obsolete
-./usr/include/gcc-4.8/omp.h			comp-gcc-include	obsolete
-./usr/include/gcc-5/adxintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/ammintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx2intrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512bwintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512cdintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512dqintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512erintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512fintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512ifmaintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512ifmavlintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512pfintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512vbmiintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512vbmivlintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512vlbwintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512vldqintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avx512vlintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/avxintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/bmi2intrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/bmiintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/bmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/clflushoptintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/clwbintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/cpuid.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/cross-stdarg.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/emmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/f16cintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/fma4intrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/fmaintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/fxsrintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/ia32intrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/immintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/lwpintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/lzcntintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/mm3dnow.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/mm_malloc.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/mmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/mwaitxintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/nmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/omp.h			comp-gcc-include	gcc=5
-./usr/include/gcc-5/omp.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/openacc.h			comp-gcc-include	gcc=5
-./usr/include/gcc-5/openacc.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/pmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/popcntintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/prfchwintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/rdseedintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/rtmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/sanitizer/allocator_interface.h	comp-gcc-include	gcc=5,gcccmds
-./usr/include/gcc-5/sanitizer/asan_interface.h	comp-gcc-include	gcc=5,gcccmds
-./usr/include/gcc-5/sanitizer/common_interface_defs.h	comp-gcc-include	gcc=5,gcccmds
-./usr/include/gcc-5/sanitizer/tsan_interface_atomic.h	comp-gcc-include	gcc=5,gcccmds
-./usr/include/gcc-5/shaintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/smmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/stdatomic.h			comp-gcc-include	gcc=5,gcccmds
-./usr/include/gcc-5/stdatomic.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/tbmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/tgmath.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/tmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/wmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/x86intrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xmmintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xopintrin.h		comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xsavecintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xsaveintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xsaveoptintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xsavesintrin.h	comp-obsolete	gcc=6,obsolete
-./usr/include/gcc-5/xtestintrin.h	comp-obsolete	gcc=6,obsolete
+./usr/include/gcc-4.8/mf-runtime.h		comp-obsolete		obsolete
+./usr/include/gcc-4.8/omp.h			comp-obsolete		obsolete
+./usr/include/gcc-5/adxintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/ammintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/avx2intrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512bwintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512cdintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512dqintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512erintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512fintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512ifmaintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512ifmavlintrin.h	comp-obsolete		obsolete
+./usr/include/gcc-5/avx512pfintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512vbmiintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512vbmivlintrin.h	comp-obsolete		obsolete
+./usr/include/gcc-5/avx512vlbwintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512vldqintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avx512vlintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/avxintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/bmi2intrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/bmiintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/bmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/clflushoptintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/clwbintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/cpuid.h			comp-obsolete		obsolete
+./usr/include/gcc-5/cross-stdarg.h		comp-obsolete		obsolete
+./usr/include/gcc-5/emmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/f16cintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/fma4intrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/fmaintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/fxsrintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/ia32intrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/immintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/lwpintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/lzcntintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/mm3dnow.h			comp-obsolete		obsolete
+./usr/include/gcc-5/mm_malloc.h			comp-obsolete		obsolete
+./usr/include/gcc-5/mmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/mwaitxintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/nmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/omp.h			comp-obsolete		obsolete
+./usr/include/gcc-5/openacc.h			comp-obsolete		obsolete
+./usr/include/gcc-5/pmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/popcntintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/prfchwintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/rdseedintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/rtmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/sanitizer/allocator_interface.h	comp-obsolete		obsolete
+./usr/include/gcc-5/sanitizer/asan_interface.h	comp-obsolete		obsolete
+./usr/include/gcc-5/sanitizer/common_interface_defs.h	comp-obsolete		obsolete
+./usr/include/gcc-5/sanitizer/tsan_interface_atomic.h	comp-obsolete		obsolete
+./usr/include/gcc-5/shaintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/smmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/stdatomic.h			comp-obsolete		obsolete
+./usr/include/gcc-5/tbmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/tgmath.h			comp-obsolete		obsolete
+./usr/include/gcc-5/tmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/wmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/x86intrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/xmmintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/xopintrin.h			comp-obsolete		obsolete
+./usr/include/gcc-5/xsavecintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/xsaveintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/xsaveoptintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/xsavesintrin.h		comp-obsolete		obsolete
+./usr/include/gcc-5/xtestintrin.h		comp-obsolete		obsolete
 ./usr/include/gcc-6/omp.h			comp-gcc-include	gcc=6
 ./usr/include/gcc-6/openacc.h			comp-gcc-include	gcc=6
-./usr/include/gcc-6/sanitizer/allocator_interface.h	comp-gcc-include	gcc=6,gcccmds
-./usr/include/gcc-6/sanitizer/asan_interface.h	comp-gcc-include	gcc=6,gcccmds
-./usr/include/gcc-6/sanitizer/common_interface_defs.h	comp-gcc-include	gcc=6,gcccmds
-./usr/include/gcc-6/sanitizer/tsan_interface_atomic.h	comp-gcc-include	gcc=6,gcccmds
-./usr/include/gcc-6/stdatomic.h			comp-gcc-include	gcc=6,gcccmds
+./usr/include/gcc-6/sanitizer/allocator_interface.h	comp-gcc-include	gcc=6
+./usr/include/gcc-6/sanitizer/asan_interface.h	comp-gcc-include	gcc=6
+./usr/include/gcc-6/sanitizer/common_interface_defs.h	comp-gcc-include	gcc=6
+./usr/include/gcc-6/sanitizer/tsan_interface_atomic.h	comp-gcc-include	gcc=6
+./usr/include/gcc-6/stdatomic.h			comp-gcc-include	gcc=6
+./usr/include/gcc-7/omp.h			comp-gcc-include	gcc=7
+./usr/include/gcc-7/openacc.h			comp-gcc-include	gcc=7
+./usr/include/gcc-7/sanitizer/allocator_interface.h	comp-gcc-include	gcc=7
+./usr/include/gcc-7/sanitizer/asan_interface.h	comp-gcc-include	gcc=7
+./usr/include/gcc-7/sanitizer/common_interface_defs.h	comp-gcc-include	gcc=7
+./usr/include/gcc-7/sanitizer/tsan_interface_atomic.h	comp-gcc-include	gcc=7
+./usr/include/gcc-7/stdatomic.h			comp-gcc-include	gcc=7
 ./usr/include/gelf.h				comp-c-include
 ./usr/include/getopt.h				comp-c-include
 ./usr/include/glob.h				comp-c-include
@@ -2710,8 +2727,7 @@
 ./usr/include/openssl/ssl3.h			comp-c-include
 ./usr/include/openssl/sslerr.h			comp-c-include	openssl=11
 ./usr/include/openssl/stack.h			comp-c-include
-./usr/include/openssl/store.h			comp-c-include	openssl=10
-./usr/include/openssl/store.h			comp-obsolete	openssl=11,obsolete
+./usr/include/openssl/store.h			comp-c-include
 ./usr/include/openssl/storeerr.h		comp-c-include	openssl=11
 ./usr/include/openssl/symhacks.h		comp-c-include
 ./usr/include/openssl/tls1.h			comp-c-include
@@ -3002,6 +3018,7 @@
 ./usr/include/sys/ipc.h				comp-c-include
 ./usr/include/sys/joystick.h			comp-c-include
 ./usr/include/sys/kcore.h			comp-c-include
+./usr/include/sys/kcov.h			comp-c-include
 ./usr/include/sys/kcpuset.h			comp-c-include
 ./usr/include/sys/kernel.h			comp-obsolete		obsolete
 ./usr/include/sys/keylock.h			comp-obsolete		obsolete
@@ -3432,6 +3449,8 @@
 ./usr/lib/libiscsi_p.a				comp-iscsi-proflib	compatfile,iscsi,profile
 ./usr/lib/libisns.a				comp-isns-lib		compatfile
 ./usr/lib/libisns_p.a				comp-isns-proflib	compatfile,profile
+./usr/lib/libjemalloc.a				comp-c-lib		compatfile
+./usr/lib/libjemalloc_p.a			comp-c-proflib		compatfile,profile
 ./usr/lib/libkadm.a				comp-obsolete		obsolete
 ./usr/lib/libkadm5clnt.a			comp-krb5-lib		compatfile,kerberos
 ./usr/lib/libkadm5clnt_p.a			comp-krb5-proflib	compatfile,kerberos,profile
@@ -3527,7 +3546,7 @@
 ./usr/lib/libppath.a				comp-c-lib		compatfile
 ./usr/lib/libppath_p.a				comp-c-proflib		compatfile,profile
 ./usr/lib/libproc.a				comp-c-lib		compatfile,dtrace
-./usr/lib/libproc_p.a				comp-c-lib		compatfile,dtrace,profile
+./usr/lib/libproc_p.a				comp-c-proflib		compatfile,dtrace,profile
 ./usr/lib/libprop.a				comp-c-lib		compatfile
 ./usr/lib/libprop_p.a				comp-c-proflib		compatfile,profile
 ./usr/lib/libpthread.a				comp-c-lib		compatfile
@@ -3880,6 +3899,7 @@
 ./usr/libdata/lint/llib-lisccfg.ln		comp-bind-lintlib	lint
 ./usr/libdata/lint/llib-liscsi.ln		comp-c-lintlib		lint,iscsi
 ./usr/libdata/lint/llib-lisns.ln		comp-isns-lintlib	lint
+./usr/libdata/lint/llib-ljemalloc.ln		comp-c-lintlib		lint
 ./usr/libdata/lint/llib-lkdc.ln			comp-krb5-lintlib	lint,kerberos
 ./usr/libdata/lint/llib-lkstream.ln		comp-obsolete		obsolete
 ./usr/libdata/lint/llib-lkvm.ln			comp-c-lintlib		lint
@@ -3966,8 +3986,8 @@
 ./usr/libexec/f771				comp-obsolete		obsolete
 ./usr/libexec/lint1				comp-c-bin
 ./usr/libexec/lint2				comp-c-bin
-./usr/libexec/lto-wrapper			comp-c-bin		gcc,pic
-./usr/libexec/lto1				comp-c-bin		gcc,pic
+./usr/libexec/lto-wrapper			comp-c-bin		gcc,gcccmds,pic
+./usr/libexec/lto1				comp-c-bin		gcc,gcccmds,pic
 ./usr/libexec/pcpp				comp-c-bin		pcc
 ./usr/sbin/config				comp-obsolete		obsolete
 ./usr/sbin/config.new				comp-obsolete		obsolete
@@ -4136,7 +4156,7 @@
 ./usr/share/man/cat1/g77.0			comp-obsolete		obsolete
 ./usr/share/man/cat1/gcc.0			comp-c-catman		gcccmds,.cat
 ./usr/share/man/cat1/gcore.0			comp-debug-catman	.cat
-./usr/share/man/cat1/gcov-dump.0		comp-debug-catman	gcccmds,.cat,gcc=6
+./usr/share/man/cat1/gcov-dump.0		comp-debug-catman	gcccmds,.cat
 ./usr/share/man/cat1/gcov.0			comp-debug-catman	gcccmds,.cat
 ./usr/share/man/cat1/gdb.0			comp-debug-catman	gdb,.cat
 ./usr/share/man/cat1/genassym.0			comp-util-catman	.cat
@@ -5034,6 +5054,8 @@
 ./usr/share/man/cat3/SPLAY_RIGHT.0		comp-c-catman		.cat
 ./usr/share/man/cat3/SPLAY_ROOT.0		comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_ACCESS_EXISTS.0	comp-c-catman		.cat
+./usr/share/man/cat3/SQLITE_CHANGESETAPPLY_NOSAVEPOINT.0   comp-c-catman           .cat
+./usr/share/man/cat3/SQLITE_CHANGESETSTART_INVERT.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SQLITE_CHANGESET_DATA.0	comp-3-catman	.cat
 ./usr/share/man/cat3/SQLITE_CHANGESET_OMIT.0	comp-3-catman	.cat
 ./usr/share/man/cat3/SQLITE_CHECKPOINT_PASSIVE.0	comp-c-catman		.cat
@@ -5043,7 +5065,9 @@
 ./usr/share/man/cat3/SQLITE_DBCONFIG_MAINDBNAME.0 comp-c-catman .cat
 ./usr/share/man/cat3/SQLITE_DBSTATUS_LOOKASIDE_USED.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_DENY.0	comp-c-catman		.cat
+./usr/share/man/cat3/SQLITE_DESERIALIZE_FREEONCLOSE.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SQLITE_DETERMINISTIC.0	comp-c-catman		.cat
+./usr/share/man/cat3/SQLITE_ERROR_MISSING_COLLSEQ.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SQLITE_FCNTL_LOCKSTATE.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_INDEX_CONSTRAINT_EQ.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_INDEX_SCAN_UNIQUE.0	comp-3-catman	.cat
@@ -5055,8 +5079,11 @@
 ./usr/share/man/cat3/SQLITE_MUTEX_FAST.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_OK.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_OPEN_READONLY.0	comp-c-catman		.cat
+./usr/share/man/cat3/SQLITE_PREPARE_PERSISTENT.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SQLITE_ROLLBACK.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_SCANSTAT_NLOOP.0	comp-3-catman	.cat
+./usr/share/man/cat3/SQLITE_SERIALIZE_NOCOPY.0   comp-c-catman           .cat
+./usr/share/man/cat3/SQLITE_SESSION_CONFIG_STRMSIZE.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SQLITE_SHM_NLOCK.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_SHM_UNLOCK.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_STATUS_MEMORY_USED.0	comp-c-catman		.cat
@@ -5067,6 +5094,7 @@
 ./usr/share/man/cat3/SQLITE_UTF8.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_VERSION.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SQLITE_VTAB_CONSTRAINT_SUPPORT.0	comp-c-catman		.cat
+./usr/share/man/cat3/SQLITE_WIN32_DATA_DIRECTORY_TYPE.0   comp-c-catman           .cat
 ./usr/share/man/cat3/SSL_CIPHER_get_name.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SSL_COMP_add_compression_method.0	comp-c-catman		.cat
 ./usr/share/man/cat3/SSL_CONF_CTX_new.0			comp-c-catman	.cat,openssl=11
@@ -6064,6 +6092,7 @@
 ./usr/share/man/cat3/cdbr_find.0		comp-c-catman		.cat
 ./usr/share/man/cat3/cdbr_get.0			comp-c-catman		.cat
 ./usr/share/man/cat3/cdbr_open.0		comp-c-catman		.cat
+./usr/share/man/cat3/cdbr_open_mem.0		comp-c-catman		.cat
 ./usr/share/man/cat3/cdbw.0			comp-c-catman		.cat
 ./usr/share/man/cat3/cdbw_close.0		comp-c-catman		.cat
 ./usr/share/man/cat3/cdbw_open.0		comp-c-catman		.cat
@@ -6247,6 +6276,7 @@
 ./usr/share/man/cat3/curses_attributes.0	comp-c-catman		.cat
 ./usr/share/man/cat3/curses_background.0	comp-c-catman		.cat
 ./usr/share/man/cat3/curses_border.0		comp-c-catman		.cat
+./usr/share/man/cat3/curses_cchar.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_chgat.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_clear.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_color.0		comp-c-catman		.cat
@@ -6258,8 +6288,9 @@
 ./usr/share/man/cat3/curses_fileio.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_inch.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_input.0		comp-c-catman		.cat
+./usr/share/man/cat3/curses_insch.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_insdelln.0		comp-c-catman		.cat
-./usr/share/man/cat3/curses_insertch.0		comp-c-catman		.cat
+./usr/share/man/cat3/curses_insertch.0		comp-obsolete		obsolete
 ./usr/share/man/cat3/curses_insertln.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_keyname.0		comp-c-catman		.cat
 ./usr/share/man/cat3/curses_line.0		comp-c-catman		.cat
@@ -7110,6 +7141,7 @@
 ./usr/share/man/cat3/getc.0			comp-c-catman		.cat
 ./usr/share/man/cat3/getc_unlocked.0		comp-c-catman		.cat
 ./usr/share/man/cat3/getcap.0			comp-obsolete		obsolete
+./usr/share/man/cat3/getcchar.0			comp-obsolete		obsolete
 ./usr/share/man/cat3/getch.0			comp-c-catman		.cat
 ./usr/share/man/cat3/getchar.0			comp-c-catman		.cat
 ./usr/share/man/cat3/getchar_unlocked.0		comp-c-catman		.cat
@@ -8436,6 +8468,7 @@
 ./usr/share/man/cat3/mvinchnstr.0		comp-c-catman		.cat
 ./usr/share/man/cat3/mvinchstr.0		comp-c-catman		.cat
 ./usr/share/man/cat3/mvinnstr.0			comp-c-catman		.cat
+./usr/share/man/cat3/mvinsch.0			comp-c-catman		.cat
 ./usr/share/man/cat3/mvinstr.0			comp-c-catman		.cat
 ./usr/share/man/cat3/mvprintw.0			comp-c-catman		.cat
 ./usr/share/man/cat3/mvvline.0			comp-c-catman		.cat
@@ -8453,6 +8486,7 @@
 ./usr/share/man/cat3/mvwinchnstr.0		comp-c-catman		.cat
 ./usr/share/man/cat3/mvwinchstr.0		comp-c-catman		.cat
 ./usr/share/man/cat3/mvwinnstr.0		comp-c-catman		.cat
+./usr/share/man/cat3/mvwinsch.0			comp-c-catman		.cat
 ./usr/share/man/cat3/mvwinstr.0			comp-c-catman		.cat
 ./usr/share/man/cat3/mvwprintw.0		comp-c-catman		.cat
 ./usr/share/man/cat3/mvwvline.0			comp-c-catman		.cat
@@ -9458,6 +9492,7 @@
 ./usr/share/man/cat3/set_top_row.0		comp-c-catman		.cat
 ./usr/share/man/cat3/setbuf.0			comp-c-catman		.cat
 ./usr/share/man/cat3/setbuffer.0		comp-c-catman		.cat
+./usr/share/man/cat3/setcchar.0			comp-c-catman		.cat
 ./usr/share/man/cat3/setclasscontext.0		comp-c-catman		.cat
 ./usr/share/man/cat3/setdisktab.0		comp-c-catman		.cat
 ./usr/share/man/cat3/setdomainname.0		comp-c-catman		.cat
@@ -9650,6 +9685,7 @@
 ./usr/share/man/cat3/sqlite3_db_release_memory.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_db_status.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_declare_vtab.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_deserialize.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_destructor_type.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_enable_load_extension.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_enable_shared_cache.0	comp-c-catman		.cat
@@ -9666,6 +9702,7 @@
 ./usr/share/man/cat3/sqlite3_initialize.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_interrupt.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_io_methods.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_keyword_count.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_last_insert_rowid.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_limit.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_load_extension.0	comp-c-catman		.cat
@@ -9689,13 +9726,16 @@
 ./usr/share/man/cat3/sqlite3_preupdate_hook.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3_progress_handler.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_randomness.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_rebaser.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_release_memory.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_reset.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_reset_auto_extension.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_result_blob.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_result_subtype.0	comp-3-catman	.cat
+./usr/share/man/cat3/sqlite3_serialize.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_session.0		comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3_set_authorizer.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_set_last_insert_rowid.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_sleep.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_snapshot.0		comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3_snapshot_cmp.0	comp-3-catman	.cat
@@ -9714,6 +9754,11 @@
 ./usr/share/man/cat3/sqlite3_stmt_scanstatus.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3_stmt_scanstatus_reset.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3_stmt_status.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_str.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3_str_appendf.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3_str_errcode.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3_str_finish.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3_str_new.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_strglob.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_stricmp.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_strlike.0		comp-3-catman	.cat
@@ -9737,13 +9782,16 @@
 ./usr/share/man/cat3/sqlite3_vfs.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_vfs_find.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_vtab.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_vtab_collation.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_vtab_config.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_vtab_cursor.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_vtab_nochange.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3_vtab_on_conflict.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_wal_autocheckpoint.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_wal_checkpoint.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_wal_checkpoint_v2.0	comp-c-catman		.cat
 ./usr/share/man/cat3/sqlite3_wal_hook.0	comp-c-catman		.cat
+./usr/share/man/cat3/sqlite3_win32_set_directory.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3changegroup_add.0 comp-c-catman .cat
 ./usr/share/man/cat3/sqlite3changegroup_delete.0 comp-c-catman .cat
 ./usr/share/man/cat3/sqlite3changegroup_new.0	comp-3-catman	.cat
@@ -9761,8 +9809,13 @@
 ./usr/share/man/cat3/sqlite3changeset_op.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3changeset_pk.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3changeset_start.0	comp-3-catman	.cat
+./usr/share/man/cat3/sqlite3rebaser_configure.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3rebaser_create.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3rebaser_delete.0   comp-c-catman           .cat
+./usr/share/man/cat3/sqlite3rebaser_rebase.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3session_attach.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3session_changeset.0	comp-3-catman	.cat
+./usr/share/man/cat3/sqlite3session_config.0   comp-c-catman           .cat
 ./usr/share/man/cat3/sqlite3session_create.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3session_delete.0	comp-3-catman	.cat
 ./usr/share/man/cat3/sqlite3session_diff.0	comp-3-catman	.cat
@@ -10419,11 +10472,11 @@
 ./usr/share/man/cat9/MFREE.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/MGET.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/MGETHDR.0			comp-sys-catman		.cat
-./usr/share/man/cat9/MH_ALIGN.0			comp-sys-catman		.cat
-./usr/share/man/cat9/M_ALIGN.0			comp-sys-catman		.cat
-./usr/share/man/cat9/M_COPY_PKTHDR.0		comp-sys-catman		.cat
+./usr/share/man/cat9/MH_ALIGN.0			comp-obsolete		obsolete
+./usr/share/man/cat9/M_ALIGN.0			comp-obsolete		obsolete
+./usr/share/man/cat9/M_COPY_PKTHDR.0		comp-obsolete		obsolete
 ./usr/share/man/cat9/M_LEADINGSPACE.0		comp-sys-catman		.cat
-./usr/share/man/cat9/M_MOVE_PKTHDR.0		comp-sys-catman		.cat
+./usr/share/man/cat9/M_MOVE_PKTHDR.0		comp-obsolete		obsolete
 ./usr/share/man/cat9/M_PREPEND.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/M_TRAILINGSPACE.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/NDINIT.0			comp-sys-catman		.cat
@@ -11232,13 +11285,13 @@
 ./usr/share/man/cat9/m_tag_copy_chain.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/m_tag_delete.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/m_tag_delete_chain.0	comp-sys-catman		.cat
-./usr/share/man/cat9/m_tag_delete_nonpersistent.0	comp-sys-catman		.cat
+./usr/share/man/cat9/m_tag_delete_nonpersistent.0	comp-obsolete		obsolete
 ./usr/share/man/cat9/m_tag_find.0		comp-sys-catman		.cat
-./usr/share/man/cat9/m_tag_first.0		comp-sys-catman		.cat
+./usr/share/man/cat9/m_tag_first.0		comp-obsolete		obsolete
 ./usr/share/man/cat9/m_tag_free.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/m_tag_get.0		comp-sys-catman		.cat
-./usr/share/man/cat9/m_tag_init.0		comp-sys-catman		.cat
-./usr/share/man/cat9/m_tag_next.0		comp-sys-catman		.cat
+./usr/share/man/cat9/m_tag_init.0		comp-obsolete		obsolete
+./usr/share/man/cat9/m_tag_next.0		comp-obsolete		obsolete
 ./usr/share/man/cat9/m_tag_prepend.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/m_tag_unlink.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/makeiplcookie.0		comp-sys-catman		.cat
@@ -11711,6 +11764,7 @@
 ./usr/share/man/cat9/specificdata_key_delete.0	comp-sys-catman		.cat
 ./usr/share/man/cat9/specificdata_setspecific.0	comp-sys-catman		.cat
 ./usr/share/man/cat9/specificdata_setspecific_nowait.0 comp-sys-catman	.cat
+./usr/share/man/cat9/spi.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/spinlockinit.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/spinlockmgr.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/spl.0			comp-sys-catman		.cat
@@ -11792,6 +11846,19 @@
 ./usr/share/man/cat9/tc_syncbus.0		comp-sys-catman		.cat
 ./usr/share/man/cat9/tc_wmb.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/tcp_congctl.0		comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool.0		comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_cancel_job.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_cancel_job_async.0 comp-sys-catman	.cat
+./usr/share/man/cat9/threadpool_get.0		comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_job_destroy.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_job_done.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_job_init.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_percpu_get.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_percpu_put.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_percpu_ref.0	comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_percpu_ref_remote.0 comp-sys-catman	.cat
+./usr/share/man/cat9/threadpool_put.0		comp-sys-catman		.cat
+./usr/share/man/cat9/threadpool_schedule_job.0	comp-sys-catman		.cat
 ./usr/share/man/cat9/tick.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/tickadj.0			comp-sys-catman		.cat
 ./usr/share/man/cat9/time.0			comp-obsolete		obsolete
@@ -12109,7 +12176,7 @@
 ./usr/share/man/html1/g77.html			comp-obsolete	obsolete
 ./usr/share/man/html1/gcc.html			comp-c-htmlman		gcccmds,html
 ./usr/share/man/html1/gcore.html		comp-debug-htmlman	html
-./usr/share/man/html1/gcov-dump.html		comp-debug-htmlman	gcccmds,html,gcc=6
+./usr/share/man/html1/gcov-dump.html		comp-debug-htmlman	gcccmds,html
 ./usr/share/man/html1/gcov.html			comp-debug-htmlman	gcccmds,html
 ./usr/share/man/html1/gdb.html			comp-debug-htmlman	gdb,html
 ./usr/share/man/html1/genassym.html		comp-util-htmlman	html
@@ -12982,6 +13049,8 @@
 ./usr/share/man/html3/SPLAY_RIGHT.html		comp-c-htmlman		html
 ./usr/share/man/html3/SPLAY_ROOT.html		comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_ACCESS_EXISTS.html	comp-c-htmlman		html
+./usr/share/man/html3/SQLITE_CHANGESETAPPLY_NOSAVEPOINT.html       comp-c-htmlman          html
+./usr/share/man/html3/SQLITE_CHANGESETSTART_INVERT.html       comp-c-htmlman          html
 ./usr/share/man/html3/SQLITE_CHANGESET_DATA.html	comp-c-htmlman	html
 ./usr/share/man/html3/SQLITE_CHANGESET_OMIT.html	comp-c-htmlman	html
 ./usr/share/man/html3/SQLITE_CHECKPOINT_PASSIVE.html	comp-c-htmlman		html
@@ -12991,7 +13060,9 @@
 ./usr/share/man/html3/SQLITE_DBCONFIG_MAINDBNAME.html comp-c-htmlman html
 ./usr/share/man/html3/SQLITE_DBSTATUS_LOOKASIDE_USED.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_DENY.html	comp-c-htmlman		html
+./usr/share/man/html3/SQLITE_DESERIALIZE_FREEONCLOSE.html       comp-c-htmlman          html
 ./usr/share/man/html3/SQLITE_DETERMINISTIC.html	comp-c-htmlman		html
+./usr/share/man/html3/SQLITE_ERROR_MISSING_COLLSEQ.html       comp-c-htmlman          html
 ./usr/share/man/html3/SQLITE_FCNTL_LOCKSTATE.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_INDEX_CONSTRAINT_EQ.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_INDEX_SCAN_UNIQUE.html	comp-c-htmlman	html
@@ -13003,8 +13074,11 @@
 ./usr/share/man/html3/SQLITE_MUTEX_FAST.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_OK.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_OPEN_READONLY.html	comp-c-htmlman		html
+./usr/share/man/html3/SQLITE_PREPARE_PERSISTENT.html       comp-c-htmlman          html
 ./usr/share/man/html3/SQLITE_ROLLBACK.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_SCANSTAT_NLOOP.html	comp-c-htmlman	html
+./usr/share/man/html3/SQLITE_SERIALIZE_NOCOPY.html       comp-c-htmlman          html
+./usr/share/man/html3/SQLITE_SESSION_CONFIG_STRMSIZE.html       comp-c-htmlman          html
 ./usr/share/man/html3/SQLITE_SHM_NLOCK.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_SHM_UNLOCK.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_STATUS_MEMORY_USED.html	comp-c-htmlman		html
@@ -13015,6 +13089,7 @@
 ./usr/share/man/html3/SQLITE_UTF8.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_VERSION.html	comp-c-htmlman		html
 ./usr/share/man/html3/SQLITE_VTAB_CONSTRAINT_SUPPORT.html	comp-c-htmlman		html
+./usr/share/man/html3/SQLITE_WIN32_DATA_DIRECTORY_TYPE.html       comp-c-htmlman          html
 ./usr/share/man/html3/SSL_CIPHER_get_name.html	comp-c-htmlman		html
 ./usr/share/man/html3/SSL_COMP_add_compression_method.html	comp-c-htmlman		html
 ./usr/share/man/html3/SSL_CONF_CTX_new.html		comp-c-htmlman	html,openssl=11
@@ -14007,6 +14082,7 @@
 ./usr/share/man/html3/cdbr_find.html		comp-c-htmlman		html
 ./usr/share/man/html3/cdbr_get.html		comp-c-htmlman		html
 ./usr/share/man/html3/cdbr_open.html		comp-c-htmlman		html
+./usr/share/man/html3/cdbr_open_mem.html	comp-c-htmlman		html
 ./usr/share/man/html3/cdbw.html			comp-c-htmlman		html
 ./usr/share/man/html3/cdbw_close.html		comp-c-htmlman		html
 ./usr/share/man/html3/cdbw_open.html		comp-c-htmlman		html
@@ -14148,6 +14224,7 @@
 ./usr/share/man/html3/curses_attributes.html	comp-c-htmlman		html
 ./usr/share/man/html3/curses_background.html	comp-c-htmlman		html
 ./usr/share/man/html3/curses_border.html	comp-c-htmlman		html
+./usr/share/man/html3/curses_cchar.html		comp-c-htmlman		html
 ./usr/share/man/html3/curses_chgat.html		comp-c-htmlman		html
 ./usr/share/man/html3/curses_clear.html		comp-c-htmlman		html
 ./usr/share/man/html3/curses_color.html		comp-c-htmlman		html
@@ -14159,8 +14236,9 @@
 ./usr/share/man/html3/curses_fileio.html	comp-c-htmlman		html
 ./usr/share/man/html3/curses_inch.html		comp-c-htmlman		html
 ./usr/share/man/html3/curses_input.html		comp-c-htmlman		html
+./usr/share/man/html3/curses_insch.html		comp-c-htmlman		html
 ./usr/share/man/html3/curses_insdelln.html	comp-c-htmlman		html
-./usr/share/man/html3/curses_insertch.html	comp-c-htmlman		html
+./usr/share/man/html3/curses_insertch.html	comp-obsolete		obsolete
 ./usr/share/man/html3/curses_insertln.html	comp-c-htmlman		html
 ./usr/share/man/html3/curses_keyname.html	comp-c-htmlman		html
 ./usr/share/man/html3/curses_line.html		comp-c-htmlman		html
@@ -15019,6 +15097,7 @@
 ./usr/share/man/html3/getc.html			comp-c-htmlman		html
 ./usr/share/man/html3/getc_unlocked.html	comp-c-htmlman		html
 ./usr/share/man/html3/getcap.html		comp-obsolete		obsolete
+./usr/share/man/html3/getcchar.html		comp-c-htmlman		html
 ./usr/share/man/html3/getch.html		comp-c-htmlman		html
 ./usr/share/man/html3/getchar.html		comp-c-htmlman		html
 ./usr/share/man/html3/getchar_unlocked.html	comp-c-htmlman		html
@@ -16311,6 +16390,7 @@
 ./usr/share/man/html3/mvinchnstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvinchstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvinnstr.html		comp-c-htmlman		html
+./usr/share/man/html3/mvinsch.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvinstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvprintw.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvvline.html		comp-c-htmlman		html
@@ -16328,6 +16408,7 @@
 ./usr/share/man/html3/mvwinchnstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvwinchstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvwinnstr.html		comp-c-htmlman		html
+./usr/share/man/html3/mvwinsch.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvwinstr.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvwprintw.html		comp-c-htmlman		html
 ./usr/share/man/html3/mvwvline.html		comp-c-htmlman		html
@@ -17346,6 +17427,7 @@
 ./usr/share/man/html3/set_top_row.html		comp-c-htmlman		html
 ./usr/share/man/html3/setbuf.html		comp-c-htmlman		html
 ./usr/share/man/html3/setbuffer.html		comp-c-htmlman		html
+./usr/share/man/html3/setcchar.html		comp-c-htmlman		html
 ./usr/share/man/html3/setclasscontext.html	comp-c-htmlman		html
 ./usr/share/man/html3/setdisktab.html		comp-c-htmlman		html
 ./usr/share/man/html3/setdomainname.html	comp-c-htmlman		html
@@ -17522,6 +17604,7 @@
 ./usr/share/man/html3/sqlite3_db_release_memory.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_db_status.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_declare_vtab.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_deserialize.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_destructor_type.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_enable_load_extension.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_enable_shared_cache.html	comp-c-htmlman		html
@@ -17538,6 +17621,7 @@
 ./usr/share/man/html3/sqlite3_initialize.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_interrupt.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_io_methods.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_keyword_count.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_last_insert_rowid.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_limit.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_load_extension.html	comp-c-htmlman		html
@@ -17561,13 +17645,16 @@
 ./usr/share/man/html3/sqlite3_preupdate_hook.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3_progress_handler.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_randomness.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_rebaser.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_release_memory.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_reset.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_reset_auto_extension.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_result_blob.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_result_subtype.html	comp-c-htmlman	html
+./usr/share/man/html3/sqlite3_serialize.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_session.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3_set_authorizer.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_set_last_insert_rowid.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_sleep.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_snapshot.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3_snapshot_cmp.html	comp-c-htmlman	html
@@ -17586,6 +17673,11 @@
 ./usr/share/man/html3/sqlite3_stmt_scanstatus.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3_stmt_scanstatus_reset.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3_stmt_status.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_str.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3_str_appendf.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3_str_errcode.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3_str_finish.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3_str_new.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_strglob.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_stricmp.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_strlike.html	comp-c-htmlman	html
@@ -17609,13 +17701,16 @@
 ./usr/share/man/html3/sqlite3_vfs.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_vfs_find.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_vtab.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_vtab_collation.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_vtab_config.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_vtab_cursor.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_vtab_nochange.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3_vtab_on_conflict.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_wal_autocheckpoint.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_wal_checkpoint.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_wal_checkpoint_v2.html	comp-c-htmlman		html
 ./usr/share/man/html3/sqlite3_wal_hook.html	comp-c-htmlman		html
+./usr/share/man/html3/sqlite3_win32_set_directory.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3changegroup_add.html comp-c-htmlman html
 ./usr/share/man/html3/sqlite3changegroup_delete.html comp-c-htmlman html
 ./usr/share/man/html3/sqlite3changegroup_new.html	comp-c-htmlman	html
@@ -17633,8 +17728,13 @@
 ./usr/share/man/html3/sqlite3changeset_op.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3changeset_pk.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3changeset_start.html	comp-c-htmlman	html
+./usr/share/man/html3/sqlite3rebaser_configure.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3rebaser_create.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3rebaser_delete.html       comp-c-htmlman          html
+./usr/share/man/html3/sqlite3rebaser_rebase.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3session_attach.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3session_changeset.html	comp-c-htmlman	html
+./usr/share/man/html3/sqlite3session_config.html       comp-c-htmlman          html
 ./usr/share/man/html3/sqlite3session_create.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3session_delete.html	comp-c-htmlman	html
 ./usr/share/man/html3/sqlite3session_diff.html	comp-c-htmlman	html
@@ -18265,11 +18365,11 @@
 ./usr/share/man/html9/MFREE.html		comp-sys-htmlman	html
 ./usr/share/man/html9/MGET.html			comp-sys-htmlman	html
 ./usr/share/man/html9/MGETHDR.html		comp-sys-htmlman	html
-./usr/share/man/html9/MH_ALIGN.html		comp-sys-htmlman	html
-./usr/share/man/html9/M_ALIGN.html		comp-sys-htmlman	html
-./usr/share/man/html9/M_COPY_PKTHDR.html	comp-sys-htmlman	html
+./usr/share/man/html9/MH_ALIGN.html		comp-obsolete	obsolete
+./usr/share/man/html9/M_ALIGN.html		comp-obsolete	obsolete
+./usr/share/man/html9/M_COPY_PKTHDR.html	comp-obsolete	obsolete
 ./usr/share/man/html9/M_LEADINGSPACE.html	comp-sys-htmlman	html
-./usr/share/man/html9/M_MOVE_PKTHDR.html	comp-sys-htmlman	html
+./usr/share/man/html9/M_MOVE_PKTHDR.html	comp-obsolete		obsolete
 ./usr/share/man/html9/M_PREPEND.html		comp-sys-htmlman	html
 ./usr/share/man/html9/M_TRAILINGSPACE.html	comp-sys-htmlman	html
 ./usr/share/man/html9/NDINIT.html		comp-sys-htmlman	html
@@ -19042,13 +19142,13 @@
 ./usr/share/man/html9/m_tag_copy_chain.html	comp-sys-htmlman	html
 ./usr/share/man/html9/m_tag_delete.html		comp-sys-htmlman	html
 ./usr/share/man/html9/m_tag_delete_chain.html	comp-sys-htmlman	html
-./usr/share/man/html9/m_tag_delete_nonpersistent.html	comp-sys-htmlman	html
+./usr/share/man/html9/m_tag_delete_nonpersistent.html	comp-obsolete	obsolete
 ./usr/share/man/html9/m_tag_find.html		comp-sys-htmlman	html
-./usr/share/man/html9/m_tag_first.html		comp-sys-htmlman	html
+./usr/share/man/html9/m_tag_first.html		comp-obsolete	obsolete
 ./usr/share/man/html9/m_tag_free.html		comp-sys-htmlman	html
 ./usr/share/man/html9/m_tag_get.html		comp-sys-htmlman	html
-./usr/share/man/html9/m_tag_init.html		comp-sys-htmlman	html
-./usr/share/man/html9/m_tag_next.html		comp-sys-htmlman	html
+./usr/share/man/html9/m_tag_init.html		comp-obsolete	obsolete
+./usr/share/man/html9/m_tag_next.html		comp-obsolete	obsolete
 ./usr/share/man/html9/m_tag_prepend.html	comp-sys-htmlman	html
 ./usr/share/man/html9/m_tag_unlink.html		comp-sys-htmlman	html
 ./usr/share/man/html9/makeiplcookie.html	comp-sys-htmlman	html
@@ -19499,6 +19599,7 @@
 ./usr/share/man/html9/specificdata_key_delete.html comp-sys-htmlman	html
 ./usr/share/man/html9/specificdata_setspecific.html comp-sys-htmlman	html
 ./usr/share/man/html9/specificdata_setspecific_nowait.html comp-sys-htmlman html
+./usr/share/man/html9/spi.html			comp-sys-htmlman	html
 ./usr/share/man/html9/spinlockinit.html		comp-sys-htmlman	html
 ./usr/share/man/html9/spinlockmgr.html		comp-sys-htmlman	html
 ./usr/share/man/html9/spl.html			comp-sys-htmlman	html
@@ -19579,6 +19680,19 @@
 ./usr/share/man/html9/tc_syncbus.html		comp-sys-htmlman	html
 ./usr/share/man/html9/tc_wmb.html		comp-sys-htmlman	html
 ./usr/share/man/html9/tcp_congctl.html		comp-sys-htmlman	html
+./usr/share/man/html9/threadpool.html		comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_cancel_job.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_cancel_job_async.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_get.html	comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_job_destroy.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_job_done.html	comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_job_init.html	comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_percpu_get.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_percpu_put.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_percpu_ref.html comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_percpu_ref_remote.html comp-sys-htmlman html
+./usr/share/man/html9/threadpool_put.html	comp-sys-htmlman	html
+./usr/share/man/html9/threadpool_schedule_job.html comp-sys-htmlman	html
 ./usr/share/man/html9/tick.html			comp-sys-htmlman	html
 ./usr/share/man/html9/tickadj.html		comp-sys-htmlman	html
 ./usr/share/man/html9/time_second.html		comp-sys-htmlman	html
@@ -19870,7 +19984,7 @@
 ./usr/share/man/man1/g77.1			comp-obsolete		obsolete
 ./usr/share/man/man1/gcc.1			comp-c-man		gcccmds,.man
 ./usr/share/man/man1/gcore.1			comp-debug-man		.man
-./usr/share/man/man1/gcov-dump.1		comp-debug-man		gcccmds,.man,gcc=6
+./usr/share/man/man1/gcov-dump.1		comp-debug-man		gcccmds,.man
 ./usr/share/man/man1/gcov.1			comp-debug-man		gcccmds,.man
 ./usr/share/man/man1/gdb.1			comp-debug-man		gdb,.man
 ./usr/share/man/man1/genassym.1			comp-util-man		.man
@@ -20772,6 +20886,8 @@
 ./usr/share/man/man3/SPLAY_RIGHT.3		comp-c-man		.man
 ./usr/share/man/man3/SPLAY_ROOT.3		comp-c-man		.man
 ./usr/share/man/man3/SQLITE_ACCESS_EXISTS.3	comp-c-man		.man
+./usr/share/man/man3/SQLITE_CHANGESETAPPLY_NOSAVEPOINT.3   comp-c-man              .man
+./usr/share/man/man3/SQLITE_CHANGESETSTART_INVERT.3   comp-c-man              .man
 ./usr/share/man/man3/SQLITE_CHANGESET_DATA.3	comp-c-man	.man
 ./usr/share/man/man3/SQLITE_CHANGESET_OMIT.3	comp-c-man	.man
 ./usr/share/man/man3/SQLITE_CHECKPOINT_PASSIVE.3	comp-c-man		.man
@@ -20781,7 +20897,9 @@
 ./usr/share/man/man3/SQLITE_DBCONFIG_MAINDBNAME.3 comp-c-man .man
 ./usr/share/man/man3/SQLITE_DBSTATUS_LOOKASIDE_USED.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_DENY.3	comp-c-man		.man
+./usr/share/man/man3/SQLITE_DESERIALIZE_FREEONCLOSE.3   comp-c-man              .man
 ./usr/share/man/man3/SQLITE_DETERMINISTIC.3	comp-c-man		.man
+./usr/share/man/man3/SQLITE_ERROR_MISSING_COLLSEQ.3   comp-c-man              .man
 ./usr/share/man/man3/SQLITE_FCNTL_LOCKSTATE.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_INDEX_CONSTRAINT_EQ.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_INDEX_SCAN_UNIQUE.3	comp-c-man	.man
@@ -20793,8 +20911,11 @@
 ./usr/share/man/man3/SQLITE_MUTEX_FAST.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_OK.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_OPEN_READONLY.3	comp-c-man		.man
+./usr/share/man/man3/SQLITE_PREPARE_PERSISTENT.3   comp-c-man              .man
 ./usr/share/man/man3/SQLITE_ROLLBACK.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_SCANSTAT_NLOOP.3	comp-c-man	.man
+./usr/share/man/man3/SQLITE_SERIALIZE_NOCOPY.3   comp-c-man              .man
+./usr/share/man/man3/SQLITE_SESSION_CONFIG_STRMSIZE.3   comp-c-man              .man
 ./usr/share/man/man3/SQLITE_SHM_NLOCK.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_SHM_UNLOCK.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_STATUS_MEMORY_USED.3	comp-c-man		.man
@@ -20805,6 +20926,7 @@
 ./usr/share/man/man3/SQLITE_UTF8.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_VERSION.3	comp-c-man		.man
 ./usr/share/man/man3/SQLITE_VTAB_CONSTRAINT_SUPPORT.3	comp-c-man		.man
+./usr/share/man/man3/SQLITE_WIN32_DATA_DIRECTORY_TYPE.3   comp-c-man              .man
 ./usr/share/man/man3/SSL_CIPHER_get_name.3	comp-c-man		.man
 ./usr/share/man/man3/SSL_COMP_add_compression_method.3	comp-c-man		.man
 ./usr/share/man/man3/SSL_CONF_CTX_new.3			comp-c-man	.man,openssl=11
@@ -21808,6 +21930,7 @@
 ./usr/share/man/man3/cdbr_find.3		comp-c-man		.man
 ./usr/share/man/man3/cdbr_get.3			comp-c-man		.man
 ./usr/share/man/man3/cdbr_open.3		comp-c-man		.man
+./usr/share/man/man3/cdbr_open_mem.3		comp-c-man		.man
 ./usr/share/man/man3/cdbw.3			comp-c-man		.man
 ./usr/share/man/man3/cdbw_close.3		comp-c-man		.man
 ./usr/share/man/man3/cdbw_open.3		comp-c-man		.man
@@ -21991,6 +22114,7 @@
 ./usr/share/man/man3/curses_attributes.3	comp-c-man		.man
 ./usr/share/man/man3/curses_background.3	comp-c-man		.man
 ./usr/share/man/man3/curses_border.3		comp-c-man		.man
+./usr/share/man/man3/curses_cchar.3		comp-c-man		.man
 ./usr/share/man/man3/curses_chgat.3		comp-c-man		.man
 ./usr/share/man/man3/curses_clear.3		comp-c-man		.man
 ./usr/share/man/man3/curses_color.3		comp-c-man		.man
@@ -22002,8 +22126,9 @@
 ./usr/share/man/man3/curses_fileio.3		comp-c-man		.man
 ./usr/share/man/man3/curses_inch.3		comp-c-man		.man
 ./usr/share/man/man3/curses_input.3		comp-c-man		.man
+./usr/share/man/man3/curses_insch.3		comp-c-man		.man
 ./usr/share/man/man3/curses_insdelln.3		comp-c-man		.man
-./usr/share/man/man3/curses_insertch.3		comp-c-man		.man
+./usr/share/man/man3/curses_insertch.3		comp-obsolete		obsolete
 ./usr/share/man/man3/curses_insertln.3		comp-c-man		.man
 ./usr/share/man/man3/curses_keyname.3		comp-c-man		.man
 ./usr/share/man/man3/curses_line.3		comp-c-man		.man
@@ -22865,6 +22990,7 @@
 ./usr/share/man/man3/getc.3			comp-c-man		.man
 ./usr/share/man/man3/getc_unlocked.3		comp-c-man		.man
 ./usr/share/man/man3/getcap.3			comp-obsolete		obsolete
+./usr/share/man/man3/getcchar.3			comp-c-man		.man
 ./usr/share/man/man3/getch.3			comp-c-man		.man
 ./usr/share/man/man3/getchar.3			comp-c-man		.man
 ./usr/share/man/man3/getchar_unlocked.3		comp-c-man		.man
@@ -24192,6 +24318,7 @@
 ./usr/share/man/man3/mvinchnstr.3		comp-c-man		.man
 ./usr/share/man/man3/mvinchstr.3		comp-c-man		.man
 ./usr/share/man/man3/mvinnstr.3			comp-c-man		.man
+./usr/share/man/man3/mvinsch.3			comp-c-man		.man
 ./usr/share/man/man3/mvinstr.3			comp-c-man		.man
 ./usr/share/man/man3/mvprintw.3			comp-c-man		.man
 ./usr/share/man/man3/mvvline.3			comp-c-man		.man
@@ -24209,6 +24336,7 @@
 ./usr/share/man/man3/mvwinchnstr.3		comp-c-man		.man
 ./usr/share/man/man3/mvwinchstr.3		comp-c-man		.man
 ./usr/share/man/man3/mvwinnstr.3		comp-c-man		.man
+./usr/share/man/man3/mvwinsch.3			comp-c-man		.man
 ./usr/share/man/man3/mvwinstr.3			comp-c-man		.man
 ./usr/share/man/man3/mvwprintw.3		comp-c-man		.man
 ./usr/share/man/man3/mvwvline.3			comp-c-man		.man
@@ -25237,6 +25365,7 @@
 ./usr/share/man/man3/set_top_row.3		comp-c-man		.man
 ./usr/share/man/man3/setbuf.3			comp-c-man		.man
 ./usr/share/man/man3/setbuffer.3		comp-c-man		.man
+./usr/share/man/man3/setcchar.3			comp-c-man		.man
 ./usr/share/man/man3/setclasscontext.3		comp-c-man		.man
 ./usr/share/man/man3/setdisktab.3		comp-c-man		.man
 ./usr/share/man/man3/setdomainname.3		comp-c-man		.man
@@ -25425,6 +25554,7 @@
 ./usr/share/man/man3/sqlite3_db_release_memory.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_db_status.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_declare_vtab.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_deserialize.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_destructor_type.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_enable_load_extension.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_enable_shared_cache.3	comp-c-man		.man
@@ -25441,6 +25571,7 @@
 ./usr/share/man/man3/sqlite3_initialize.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_interrupt.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_io_methods.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_keyword_count.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_last_insert_rowid.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_limit.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_load_extension.3	comp-c-man		.man
@@ -25464,13 +25595,16 @@
 ./usr/share/man/man3/sqlite3_preupdate_hook.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3_progress_handler.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_randomness.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_rebaser.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_release_memory.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_reset.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_reset_auto_extension.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_result_blob.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_result_subtype.3	comp-c-man	.man
+./usr/share/man/man3/sqlite3_serialize.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_session.3		comp-c-man	.man
 ./usr/share/man/man3/sqlite3_set_authorizer.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_set_last_insert_rowid.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_sleep.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_snapshot.3		comp-c-man	.man
 ./usr/share/man/man3/sqlite3_snapshot_cmp.3	comp-c-man	.man
@@ -25489,6 +25623,11 @@
 ./usr/share/man/man3/sqlite3_stmt_scanstatus.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3_stmt_scanstatus_reset.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3_stmt_status.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_str.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3_str_appendf.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3_str_errcode.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3_str_finish.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3_str_new.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_strglob.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_stricmp.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_strlike.3		comp-c-man	.man
@@ -25512,13 +25651,16 @@
 ./usr/share/man/man3/sqlite3_vfs.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_vfs_find.3		comp-c-man		.man
 ./usr/share/man/man3/sqlite3_vtab.3		comp-c-man		.man
+./usr/share/man/man3/sqlite3_vtab_collation.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_vtab_config.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_vtab_cursor.3	comp-c-man		.man
+./usr/share/man/man3/sqlite3_vtab_nochange.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3_vtab_on_conflict.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_wal_autocheckpoint.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_wal_checkpoint.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_wal_checkpoint_v2.3	comp-c-man		.man
 ./usr/share/man/man3/sqlite3_wal_hook.3		comp-c-man		.man
+./usr/share/man/man3/sqlite3_win32_set_directory.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3changegroup_add.3 comp-c-man .man
 ./usr/share/man/man3/sqlite3changegroup_delete.3 comp-c-man .man
 ./usr/share/man/man3/sqlite3changegroup_new.3	comp-c-man	.man
@@ -25536,8 +25678,13 @@
 ./usr/share/man/man3/sqlite3changeset_op.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3changeset_pk.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3changeset_start.3	comp-c-man	.man
+./usr/share/man/man3/sqlite3rebaser_configure.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3rebaser_create.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3rebaser_delete.3   comp-c-man              .man
+./usr/share/man/man3/sqlite3rebaser_rebase.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3session_attach.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3session_changeset.3	comp-c-man	.man
+./usr/share/man/man3/sqlite3session_config.3   comp-c-man              .man
 ./usr/share/man/man3/sqlite3session_create.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3session_delete.3	comp-c-man	.man
 ./usr/share/man/man3/sqlite3session_diff.3	comp-c-man	.man
@@ -26193,11 +26340,11 @@
 ./usr/share/man/man9/MFREE.9			comp-sys-man		.man
 ./usr/share/man/man9/MGET.9			comp-sys-man		.man
 ./usr/share/man/man9/MGETHDR.9			comp-sys-man		.man
-./usr/share/man/man9/MH_ALIGN.9			comp-sys-man		.man
-./usr/share/man/man9/M_ALIGN.9			comp-sys-man		.man
-./usr/share/man/man9/M_COPY_PKTHDR.9		comp-sys-man		.man
+./usr/share/man/man9/MH_ALIGN.9			comp-obsolete		obsolete
+./usr/share/man/man9/M_ALIGN.9			comp-obsolete		obsolete
+./usr/share/man/man9/M_COPY_PKTHDR.9		comp-obsolete		obsolete
 ./usr/share/man/man9/M_LEADINGSPACE.9		comp-sys-man		.man
-./usr/share/man/man9/M_MOVE_PKTHDR.9		comp-sys-man		.man
+./usr/share/man/man9/M_MOVE_PKTHDR.9		comp-obsolete		obsolete
 ./usr/share/man/man9/M_PREPEND.9		comp-sys-man		.man
 ./usr/share/man/man9/M_TRAILINGSPACE.9		comp-sys-man		.man
 ./usr/share/man/man9/NDINIT.9			comp-sys-man		.man
@@ -27006,13 +27153,13 @@
 ./usr/share/man/man9/m_tag_copy_chain.9		comp-sys-man		.man
 ./usr/share/man/man9/m_tag_delete.9		comp-sys-man		.man
 ./usr/share/man/man9/m_tag_delete_chain.9	comp-sys-man		.man
-./usr/share/man/man9/m_tag_delete_nonpersistent.9	comp-sys-man		.man
+./usr/share/man/man9/m_tag_delete_nonpersistent.9	comp-obsolete		obsolete
 ./usr/share/man/man9/m_tag_find.9		comp-sys-man		.man
-./usr/share/man/man9/m_tag_first.9		comp-sys-man		.man
+./usr/share/man/man9/m_tag_first.9		comp-obsolete		obsolete
 ./usr/share/man/man9/m_tag_free.9		comp-sys-man		.man
 ./usr/share/man/man9/m_tag_get.9		comp-sys-man		.man
-./usr/share/man/man9/m_tag_init.9		comp-sys-man		.man
-./usr/share/man/man9/m_tag_next.9		comp-sys-man		.man
+./usr/share/man/man9/m_tag_init.9		comp-obsolete		obsolete
+./usr/share/man/man9/m_tag_next.9		comp-obsolete		obsolete
 ./usr/share/man/man9/m_tag_prepend.9		comp-sys-man		.man
 ./usr/share/man/man9/m_tag_unlink.9		comp-sys-man		.man
 ./usr/share/man/man9/makeiplcookie.9		comp-sys-man		.man
@@ -27485,6 +27632,7 @@
 ./usr/share/man/man9/specificdata_key_delete.9	comp-sys-man		.man
 ./usr/share/man/man9/specificdata_setspecific.9	comp-sys-man		.man
 ./usr/share/man/man9/specificdata_setspecific_nowait.9 comp-sys-man	.man
+./usr/share/man/man9/spi.9			comp-sys-man		.man
 ./usr/share/man/man9/spinlockinit.9		comp-sys-man		.man
 ./usr/share/man/man9/spinlockmgr.9		comp-sys-man		.man
 ./usr/share/man/man9/spl.9			comp-sys-man		.man
@@ -27566,6 +27714,19 @@
 ./usr/share/man/man9/tc_syncbus.9		comp-sys-man		.man
 ./usr/share/man/man9/tc_wmb.9			comp-sys-man		.man
 ./usr/share/man/man9/tcp_congctl.9		comp-sys-man		.man
+./usr/share/man/man9/threadpool.9		comp-sys-man		.man
+./usr/share/man/man9/threadpool_cancel_job.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_cancel_job_async.9 comp-sys-man		.man
+./usr/share/man/man9/threadpool_get.9		comp-sys-man		.man
+./usr/share/man/man9/threadpool_job_destroy.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_job_done.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_job_init.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_percpu_get.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_percpu_put.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_percpu_ref.9	comp-sys-man		.man
+./usr/share/man/man9/threadpool_percpu_ref_remote.9 comp-sys-man	.man
+./usr/share/man/man9/threadpool_put.9		comp-sys-man		.man
+./usr/share/man/man9/threadpool_schedule_job.9	comp-sys-man		.man
 ./usr/share/man/man9/tick.9			comp-sys-man		.man
 ./usr/share/man/man9/tickadj.9			comp-sys-man		.man
 ./usr/share/man/man9/time.9			comp-obsolete		obsolete

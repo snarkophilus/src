@@ -1,4 +1,4 @@
-/* $NetBSD: acpi_machdep.c,v 1.19 2018/03/20 12:14:52 bouyer Exp $ */
+/* $NetBSD: acpi_machdep.c,v 1.25 2019/03/09 10:04:41 kre Exp $ */
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_machdep.c,v 1.19 2018/03/20 12:14:52 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_machdep.c,v 1.25 2019/03/09 10:04:41 kre Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -100,7 +100,7 @@ acpi_md_OsGetRootPointer(void)
 	ACPI_PHYSICAL_ADDRESS PhysicalAddress;
 	ACPI_STATUS Status;
 
-#ifndef XEN
+#ifndef XENPV
 	/* If EFI is available, attempt to use it to locate the ACPI table. */
 	if (efi_probe()) {
 		PhysicalAddress = efi_getcfgtblpa(&EFI_UUID_ACPI20);
@@ -151,23 +151,43 @@ acpi_md_OsInstallInterruptHandler(uint32_t InterruptNumber,
     const char *xname)
 {
 	void *ih;
+
+	ih = acpi_md_intr_establish(InterruptNumber, IPL_TTY, IST_LEVEL,
+	    (int (*)(void *))ServiceRoutine, Context, false, xname);
+	if (ih == NULL)
+		return AE_NO_MEMORY;
+
+	*cookiep = ih;
+
+	return AE_OK;
+}
+
+void
+acpi_md_OsRemoveInterruptHandler(void *cookie)
+{
+	intr_disestablish(cookie);
+}
+
+void *
+acpi_md_intr_establish(uint32_t InterruptNumber, int ipl, int type,
+    int (*handler)(void *), void *arg, bool mpsafe, const char *xname)
+{
+	void *ih;
 	struct pic *pic;
+	int irq, pin;
 #if NIOAPIC > 0
 	struct ioapic_softc *sc;
 	struct acpi_md_override ovr;
 	struct mp_intr_map tmpmap, *mip, **mipp = NULL;
-#endif
-	int irq, pin, type, redir, mpflags;
+	int redir, mpflags;
 
 	/*
 	 * ACPI interrupts default to level-triggered active-low.
 	 */
 
-	type = IST_LEVEL;
 	mpflags = (MPS_INTTR_LEVEL << 2) | MPS_INTPO_ACTLO;
 	redir = IOAPIC_REDLO_LEVEL | IOAPIC_REDLO_ACTLO;
 
-#if NIOAPIC > 0
 
 	/*
 	 * Apply any MADT override setting.
@@ -239,11 +259,8 @@ acpi_md_OsInstallInterruptHandler(uint32_t InterruptNumber,
 		irq = pin = (int)InterruptNumber;
 	}
 
-	/*
-	 * XXX probably, IPL_BIO is enough.
-	 */
-	ih = intr_establish_xname(irq, pic, pin, type, IPL_TTY,
-	    (int (*)(void *)) ServiceRoutine, Context, false, xname);
+	ih = intr_establish_xname(irq, pic, pin, type, ipl,
+	    handler, arg, mpsafe, xname);
 
 #if NIOAPIC > 0
 	if (mipp) {
@@ -251,18 +268,13 @@ acpi_md_OsInstallInterruptHandler(uint32_t InterruptNumber,
 	}
 #endif
 
-	if (ih == NULL)
-		return AE_NO_MEMORY;
-
-	*cookiep = ih;
-
-	return AE_OK;
+	return ih;
 }
 
 void
-acpi_md_OsRemoveInterruptHandler(void *cookie)
+acpi_md_intr_disestablish(void *ih)
 {
-	intr_disestablish(cookie);
+	intr_disestablish(ih);
 }
 
 ACPI_STATUS
@@ -313,7 +325,7 @@ acpi_md_OsReadable(void *Pointer, uint32_t Length)
 
 	for (; sva < eva; sva += PAGE_SIZE) {
 		pte = kvtopte(sva);
-		if ((*pte & PG_V) == 0) {
+		if ((*pte & PTE_P) == 0) {
 			rv = FALSE;
 			break;
 		}
@@ -337,7 +349,7 @@ acpi_md_OsWritable(void *Pointer, uint32_t Length)
 
 	for (; sva < eva; sva += PAGE_SIZE) {
 		pte = kvtopte(sva);
-		if ((*pte & (PG_V|PG_W)) != (PG_V|PG_W)) {
+		if ((*pte & (PTE_P|PTE_W)) != (PTE_P|PTE_W)) {
 			rv = FALSE;
 			break;
 		}
@@ -372,7 +384,7 @@ acpi_md_mcfg_validate(uint64_t addr, int bus_start, int *bus_end)
 	uint32_t type;
 	int i, n;
 
-#ifndef XEN
+#ifndef XENPV
 	if (lookup_bootinfo(BTINFO_EFIMEMMAP) != NULL)
 		bim = efi_get_e820memmap();
 	else
@@ -469,14 +481,14 @@ acpi_md_callback(struct acpi_softc *sc)
 #endif
 	mpacpi_find_interrupts(sc);
 
-#ifndef XEN
+#ifndef XENPV
 	acpi_md_sleep_init();
 #endif
 
 	acpimcfg_init(x86_bus_space_mem, &acpi_md_mcfg_ops);
 }
 
-#ifndef XEN
+#ifndef XENPV
 void
 device_acpi_register(device_t dev, void *aux)
 {

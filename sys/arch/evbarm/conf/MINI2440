@@ -1,4 +1,4 @@
-#	$NetBSD: MINI2440,v 1.24 2018/08/25 20:52:40 rin Exp $
+#	$NetBSD: MINI2440,v 1.26 2019/02/06 11:58:30 rin Exp $
 #
 #	MINI2440 -- Friendly ARM evaluation board based on Samsung S3C2440
 #
@@ -270,7 +270,6 @@ uhub*	at uhub? port ?
 
 # USB Mass Storage
 umass*	at uhub? port ? configuration ? interface ?
-wd* at umass?
 
 # USB audio
 #uaudio*	at uhub? port ? configuration ?
@@ -288,6 +287,8 @@ wd* at umass?
 #irframe* at ustir?
 
 # MII/PHY support
+#rgephy* at mii? phy ?		# Realtek 8169S/8110S/8211 PHYs
+#rlphy* at mii? phy ?		# Realtek 8139/8201L PHYs
 #ukphy*	at mii? phy ?		# generic unknown PHYs
 #urlphy* at mii? phy ?		# Realtek RTL8150L internal PHYs
 
@@ -297,6 +298,7 @@ wd* at umass?
 #cue*	at uhub? port ?		# CATC USB-EL1201A based adapters
 #kue*	at uhub? port ?		# Kawasaki LSI KL5KUSB101B based adapters
 #mue*	at uhub? port ?		# Microchip LAN75xx/LAN78xx based adapters
+#ure*	at uhub? port ?		# Realtek RTL8152/RTL8153 based adapters
 #url*	at uhub? port ?		# Realtek RTL8150L based adapters
 
 # Prolific PL2301/PL2302 host-to-host adapter

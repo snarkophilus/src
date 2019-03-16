@@ -1,4 +1,4 @@
-/* $NetBSD: vexpress_platform.c,v 1.11 2018/10/18 09:01:53 skrll Exp $ */
+/* $NetBSD: vexpress_platform.c,v 1.14 2019/01/31 13:16:31 skrll Exp $ */
 
 /*-
  * Copyright (c) 2017 Jared McNeill <jmcneill@invisible.ca>
@@ -30,7 +30,7 @@
 #include "opt_console.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vexpress_platform.c,v 1.11 2018/10/18 09:01:53 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vexpress_platform.c,v 1.14 2019/01/31 13:16:31 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -94,9 +94,31 @@ static bus_space_handle_t sysreg_bsh;
 
 void vexpress_platform_early_putchar(char);
 
-static void
+void
+vexpress_platform_early_putchar(char c)
+{
+#ifdef CONSADDR
+#define CONSADDR_VA ((CONSADDR - VEXPRESS_CORE_PBASE) + VEXPRESS_CORE_VBASE)
+	volatile uint32_t *uartaddr = cpu_earlydevice_va_p() ?
+	    (volatile uint32_t *)CONSADDR_VA :
+	    (volatile uint32_t *)CONSADDR;
+
+	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFF) != 0)
+		continue;
+
+	uartaddr[PL01XCOM_DR / 4] = htole32(c);
+	arm_dsb();
+
+	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFE) == 0)
+		continue;
+#endif
+}
+
+
+static int
 vexpress_a15_smp_init(void)
 {
+	int ret = 0;
 #ifdef MULTIPROCESSOR
 	bus_space_tag_t gicd_bst = &armv7_generic_bs_tag;
 	bus_space_handle_t gicd_bsh;
@@ -123,15 +145,21 @@ vexpress_a15_smp_init(void)
 	bus_space_write_4(gicd_bst, gicd_bsh, GICD_SGIR, sgir);
 
 	/* Wait for APs to start */
-	for (u_int i = 0x10000000; i > 0; i--) {
+	u_int i;
+	for (i = 0x10000000; i > 0; i--) {
 		arm_dmb();
 		if (arm_cpu_hatched == started)
 			break;
+	}
+	if (i == 0) {
+		aprint_error("WARNING: AP failed to start\n");
+		ret++;
 	}
 
 	/* Disable GIC distributor */
 	bus_space_write_4(gicd_bst, gicd_bsh, GICD_CTRL, 0);
 #endif
+	return ret;
 }
 
 
@@ -178,26 +206,6 @@ vexpress_platform_init_attach_args(struct fdt_attach_args *faa)
 	faa->faa_dmat = &arm_generic_dma_tag;
 }
 
-void
-vexpress_platform_early_putchar(char c)
-{
-#ifdef CONSADDR
-#define CONSADDR_VA ((CONSADDR - VEXPRESS_CORE_PBASE) + VEXPRESS_CORE_VBASE)
-	volatile uint32_t *uartaddr = cpu_earlydevice_va_p() ?
-	    (volatile uint32_t *)CONSADDR_VA :
-	    (volatile uint32_t *)CONSADDR;
-
-	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFF) != 0)
-		continue;
-
-	uartaddr[PL01XCOM_DR / 4] = htole32(c);
-	arm_dsb();
-
-	while ((le32toh(uartaddr[PL01XCOM_FR / 4]) & PL01X_FR_TXFE) == 0)
-		continue;
-#endif
-}
-
 static void
 vexpress_platform_device_register(device_t self, void *aux)
 {
@@ -226,7 +234,6 @@ static const struct arm_platform vexpress_platform = {
 	.ap_bootstrap = vexpress_platform_bootstrap,
 	.ap_mpstart = vexpress_a15_smp_init,
 	.ap_init_attach_args = vexpress_platform_init_attach_args,
-	.ap_early_putchar = vexpress_platform_early_putchar,
 	.ap_device_register = vexpress_platform_device_register,
 	.ap_reset = vexpress_platform_reset,
 	.ap_delay = gtmr_delay,

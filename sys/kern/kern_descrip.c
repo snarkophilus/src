@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_descrip.c,v 1.238 2018/10/05 22:12:38 christos Exp $	*/
+/*	$NetBSD: kern_descrip.c,v 1.243 2019/02/20 19:42:14 christos Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_descrip.c,v 1.238 2018/10/05 22:12:38 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_descrip.c,v 1.243 2019/02/20 19:42:14 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -118,7 +118,8 @@ static int	filedescopen(dev_t, int, int, lwp_t *);
 
 static int sysctl_kern_file(SYSCTLFN_PROTO);
 static int sysctl_kern_file2(SYSCTLFN_PROTO);
-static void fill_file(struct kinfo_file *, const file_t *, const fdfile_t *,
+static void fill_file(struct file *, const struct file *);
+static void fill_file2(struct kinfo_file *, const file_t *, const fdfile_t *,
 		      int, pid_t);
 
 const struct cdevsw filedesc_cdevsw = {
@@ -149,6 +150,8 @@ fd_sys_init(void)
 	static struct sysctllog *clog;
 
 	mutex_init(&filelist_lock, MUTEX_DEFAULT, IPL_NONE);
+
+	LIST_INIT(&filehead);
 
 	file_cache = pool_cache_init(sizeof(file_t), coherency_unit, 0,
 	    0, "file", NULL, IPL_NONE, file_ctor, file_dtor, NULL);
@@ -747,7 +750,7 @@ fd_dup2(file_t *fp, unsigned newfd, int flags)
 	fdfile_t *ff;
 	fdtab_t *dt;
 
-	if (flags & ~(O_CLOEXEC|O_NONBLOCK))
+	if (flags & ~(O_CLOEXEC|O_NONBLOCK|O_NOSIGPIPE))
 		return EINVAL;
 	/*
 	 * Ensure there are enough slots in the descriptor table,
@@ -788,7 +791,7 @@ fd_dup2(file_t *fp, unsigned newfd, int flags)
 	mutex_exit(&fdp->fd_lock);
 
 	dt->dt_ff[newfd]->ff_exclose = (flags & O_CLOEXEC) != 0;
-	fp->f_flag |= flags & FNONBLOCK;
+	fp->f_flag |= flags & (FNONBLOCK|FNOSIGPIPE);
 	/* Slot is now allocated.  Insert copy of the file. */
 	fd_affix(curproc, fp, newfd);
 	if (ff != NULL) {
@@ -1226,6 +1229,7 @@ file_dtor(void *arg, void *obj)
 	LIST_REMOVE(fp, f_list);
 	mutex_exit(&filelist_lock);
 
+	KASSERT(fp->f_count == 0);
 	kauth_cred_free(fp->f_cred);
 	mutex_destroy(&fp->f_lock);
 }
@@ -1988,6 +1992,8 @@ sysctl_file_marker_reset(void)
 static int
 sysctl_kern_file(SYSCTLFN_ARGS)
 {
+	const bool allowaddr = get_expose_address(curproc);
+	struct filelist flist;
 	int error;
 	size_t buflen;
 	struct file *fp, fbuf;
@@ -2014,13 +2020,18 @@ sysctl_kern_file(SYSCTLFN_ARGS)
 		return 0;
 	}
 	sysctl_unlock();
-	error = sysctl_copyout(l, &filehead, where, sizeof(filehead));
+	if (allowaddr) {
+		memcpy(&flist, &filehead, sizeof(flist));
+	} else {
+		memset(&flist, 0, sizeof(flist));
+	}
+	error = sysctl_copyout(l, &flist, where, sizeof(flist));
 	if (error) {
 		sysctl_relock();
 		return error;
 	}
-	buflen -= sizeof(filehead);
-	where += sizeof(filehead);
+	buflen -= sizeof(flist);
+	where += sizeof(flist);
 
 	/*
 	 * followed by an array of file structures
@@ -2088,7 +2099,7 @@ sysctl_kern_file(SYSCTLFN_ARGS)
 				break;
 			}
 
-			memcpy(&fbuf, fp, sizeof(fbuf));
+			fill_file(&fbuf, fp);
 			mutex_exit(&fp->f_lock);
 			error = sysctl_copyout(l, &fbuf, where, sizeof(fbuf));
 			if (error) {
@@ -2233,7 +2244,7 @@ sysctl_kern_file2(SYSCTLFN_ARGS)
 				}
 				if (len >= elem_size && elem_count > 0) {
 					mutex_enter(&fp->f_lock);
-					fill_file(&kf, fp, ff, i, p->p_pid);
+					fill_file2(&kf, fp, ff, i, p->p_pid);
 					mutex_exit(&fp->f_lock);
 					mutex_exit(&fd->fd_lock);
 					error = sysctl_copyout(l,
@@ -2284,7 +2295,30 @@ sysctl_kern_file2(SYSCTLFN_ARGS)
 }
 
 static void
-fill_file(struct kinfo_file *kp, const file_t *fp, const fdfile_t *ff,
+fill_file(struct file *fp, const struct file *fpsrc)
+{
+	const bool allowaddr = get_expose_address(curproc);
+
+	memset(fp, 0, sizeof(*fp));
+
+	fp->f_offset = fpsrc->f_offset;
+	COND_SET_VALUE(fp->f_cred, fpsrc->f_cred, allowaddr);
+	COND_SET_VALUE(fp->f_ops, fpsrc->f_ops, allowaddr);
+	COND_SET_VALUE(fp->f_undata, fpsrc->f_undata, allowaddr);
+	COND_SET_VALUE(fp->f_list, fpsrc->f_list, allowaddr);
+	COND_SET_VALUE(fp->f_lock, fpsrc->f_lock, allowaddr);
+	fp->f_flag = fpsrc->f_flag;
+	fp->f_marker = fpsrc->f_marker;
+	fp->f_type = fpsrc->f_type;
+	fp->f_advice = fpsrc->f_advice;
+	fp->f_count = fpsrc->f_count;
+	fp->f_msgcount = fpsrc->f_msgcount;
+	fp->f_unpcount = fpsrc->f_unpcount;
+	COND_SET_VALUE(fp->f_unplist, fpsrc->f_unplist, allowaddr);
+}
+
+static void
+fill_file2(struct kinfo_file *kp, const file_t *fp, const fdfile_t *ff,
 	  int i, pid_t pid)
 {
 	const bool allowaddr = get_expose_address(curproc);

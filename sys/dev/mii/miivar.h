@@ -1,4 +1,4 @@
-/*	$NetBSD: miivar.h,v 1.62 2014/05/28 09:49:55 msaitoh Exp $	*/
+/*	$NetBSD: miivar.h,v 1.66 2019/02/26 05:26:10 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -36,6 +36,7 @@
 #include <sys/queue.h>
 #include <sys/callout.h>
 
+#include <dev/mii/mii.h>
 #include <dev/mii/mii_verbose.h>
 
 /*
@@ -48,8 +49,8 @@ struct mii_softc;
 /*
  * Callbacks from MII layer into network interface device driver.
  */
-typedef	int (*mii_readreg_t)(device_t, int, int);
-typedef	void (*mii_writereg_t)(device_t, int, int, int);
+typedef	int (*mii_readreg_t)(device_t, int, int, uint16_t *);
+typedef	int (*mii_writereg_t)(device_t, int, int, uint16_t);
 typedef	void (*mii_statchg_t)(struct ifnet *);
 
 /*
@@ -126,8 +127,8 @@ struct mii_softc {
 	struct mii_data *mii_pdata;	/* pointer to parent's mii_data */
 
 	int mii_flags;			/* misc. flags; see below */
-	int mii_capabilities;		/* capabilities from BMSR */
-	int mii_extcapabilities;	/* extended capabilities */
+	uint16_t mii_capabilities;	/* capabilities from BMSR */
+	uint16_t mii_extcapabilities;	/* extended capabilities from EXTSR */
 	int mii_ticks;			/* MII_TICK counter */
 	int mii_anegticks;		/* ticks before retrying aneg */
 
@@ -171,9 +172,9 @@ typedef struct mii_softc mii_softc_t;
 struct mii_attach_args {
 	struct mii_data *mii_data;	/* pointer to parent data */
 	int mii_phyno;			/* MII address */
-	u_int mii_id1;			/* PHY ID register 1 */
-	u_int mii_id2;			/* PHY ID register 2 */
-	int mii_capmask;		/* capability mask from BMSR */
+	uint16_t mii_id1;		/* PHY ID register 1 */
+	uint16_t mii_id2;		/* PHY ID register 2 */
+	uint16_t mii_capmask;		/* capability mask from BMSR */
 	int mii_flags;			/* flags from parent */
 };
 typedef struct mii_attach_args mii_attach_args_t;
@@ -182,10 +183,14 @@ typedef struct mii_attach_args mii_attach_args_t;
  * Used to match a PHY.
  */
 struct mii_phydesc {
-	u_int32_t mpd_oui;		/* the PHY's OUI */
-	u_int32_t mpd_model;		/* the PHY's model */
+	uint32_t mpd_oui;		/* the PHY's OUI */
+	uint32_t mpd_model;		/* the PHY's model */
 	const char *mpd_name;		/* the PHY's name */
 };
+
+#define MII_PHY_DESC(a, b) { MII_OUI_ ## a, MII_MODEL_ ## a ## _ ## b, \
+        MII_STR_ ## a ## _ ## b }
+#define MII_PHY_END     { 0, 0, NULL }
 
 /*
  * An array of these structures map MII media types to BMCR/ANAR settings.
@@ -210,13 +215,64 @@ struct mii_media {
 
 #ifdef _KERNEL
 
-#define	PHY_READ(p, r) \
+#define	PHY_READ(p, r, v)					    \
 	(*(p)->mii_pdata->mii_readreg)(device_parent((p)->mii_dev), \
-	    (p)->mii_phy, (r))
+	    (p)->mii_phy, (r), (v))
 
 #define	PHY_WRITE(p, r, v) \
 	(*(p)->mii_pdata->mii_writereg)(device_parent((p)->mii_dev), \
 	    (p)->mii_phy, (r), (v))
+
+/*
+ * Setup MDD indirect access. Set device address and register number.
+ * "addr" variable takes an address ORed with the function (MMDACR_FN_*).
+ *
+ */
+static inline int
+MMD_INDIRECT(struct mii_softc *sc, uint16_t daddr, uint16_t regnum)
+{
+	int rv;
+
+	/*
+	 * Set the MMD device address and set the access mode (function)
+	 * to address.
+	 */
+	if ((rv = PHY_WRITE(sc, MII_MMDACR, (daddr & ~MMDACR_FUNCMASK))) != 0)
+		return rv;
+
+	/* Set the register number */
+	if ((rv = PHY_WRITE(sc, MII_MMDAADR, regnum)) != 0)
+		return rv;
+
+	/* Set the access mode (function) */
+	rv = PHY_WRITE(sc, MII_MMDACR, daddr);
+
+	return rv;
+}
+
+static inline int
+MMD_INDIRECT_READ(struct mii_softc *sc, uint16_t daddr, uint16_t regnum,
+    uint16_t *valp)
+{
+	int rv;
+
+	if ((rv = MMD_INDIRECT(sc, daddr, regnum)) != 0)
+		return rv;
+
+	return PHY_READ(sc, MII_MMDAADR, valp);
+}
+
+static inline int
+MMD_INDIRECT_WRITE(struct mii_softc *sc, uint16_t daddr, uint16_t regnum,
+    uint16_t val)
+{
+	int rv;
+
+	if ((rv = MMD_INDIRECT(sc, daddr, regnum)) != 0)
+		return rv;
+
+	return PHY_WRITE(sc, MII_MMDAADR, val);
+}
 
 #define	PHY_SERVICE(p, d, o) \
 	(*(p)->mii_funcs->pf_service)((p), (d), (o))

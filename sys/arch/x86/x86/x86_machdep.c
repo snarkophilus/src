@@ -1,4 +1,4 @@
-/*	$NetBSD: x86_machdep.c,v 1.120 2018/09/19 16:23:05 maxv Exp $	*/
+/*	$NetBSD: x86_machdep.c,v 1.124 2019/02/15 08:54:01 nonaka Exp $	*/
 
 /*-
  * Copyright (c) 2002, 2006, 2007 YAMAMOTO Takashi,
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: x86_machdep.c,v 1.120 2018/09/19 16:23:05 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: x86_machdep.c,v 1.124 2019/02/15 08:54:01 nonaka Exp $");
 
 #include "opt_modular.h"
 #include "opt_physmem.h"
@@ -74,8 +74,15 @@ __KERNEL_RCSID(0, "$NetBSD: x86_machdep.c,v 1.120 2018/09/19 16:23:05 maxv Exp $
 #include "tsc.h"
 
 #include "acpica.h"
+#include "ioapic.h"
+#include "lapic.h"
+
 #if NACPICA > 0
 #include <dev/acpi/acpivar.h>
+#endif
+
+#if NIOAPIC > 0 || NACPICA > 0
+#include <machine/i82093var.h>
 #endif
 
 #include "opt_md.h"
@@ -454,7 +461,7 @@ void
 x86_cpu_idle_init(void)
 {
 
-#ifndef XEN
+#ifndef XENPV
 	if ((cpu_feature[1] & CPUID2_MONITOR) == 0 ||
 	    cpu_vendor == CPUVENDOR_AMD)
 		x86_cpu_idle_set(x86_cpu_idle_halt, "halt", true);
@@ -484,7 +491,7 @@ x86_cpu_idle_set(void (*func)(void), const char *text, bool ipi)
 	(void)strlcpy(x86_cpu_idle_text, text, sizeof(x86_cpu_idle_text));
 }
 
-#ifndef XEN
+#ifndef XENPV
 
 #define KBTOB(x)	((size_t)(x) * 1024UL)
 #define MBTOB(x)	((size_t)(x) * 1024UL * 1024UL)
@@ -941,7 +948,7 @@ init_x86_vm(paddr_t pa_kend)
 	return 0;
 }
 
-#endif /* !XEN */
+#endif /* !XENPV */
 
 void
 init_x86_msgbuf(void)
@@ -1085,7 +1092,7 @@ machdep_init(void)
 void
 x86_startup(void)
 {
-#if !defined(XEN)
+#if !defined(XENPV)
 	nmi_init();
 #endif
 }
@@ -1143,7 +1150,7 @@ sysctl_machdep_diskinfo(SYSCTLFN_ARGS)
 	return sysctl_lookup(SYSCTLFN_CALL(&node));
 }
 
-#ifndef XEN
+#ifndef XENPV
 static int
 sysctl_machdep_tsc_enable(SYSCTLFN_ARGS)
 {
@@ -1175,6 +1182,32 @@ sysctl_machdep_tsc_enable(SYSCTLFN_ARGS)
 }
 #endif
 
+static const char * const vm_guest_name[VM_LAST] = {
+	[VM_GUEST_NO] =		"none",
+	[VM_GUEST_VM] =		"generic",
+	[VM_GUEST_XEN] =	"Xen",
+	[VM_GUEST_HV] =		"Hyper-V",
+	[VM_GUEST_VMWARE] =	"VMware",
+	[VM_GUEST_KVM] =	"KVM",
+};
+
+static int
+sysctl_machdep_hypervisor(SYSCTLFN_ARGS)
+{
+	struct sysctlnode node;
+	const char *t = NULL;
+	char buf[8];
+
+	node = *rnode;
+	node.sysctl_data = buf;
+	if (vm_guest >= VM_GUEST_NO && vm_guest < VM_LAST)
+		t = vm_guest_name[vm_guest];
+	if (t == NULL)
+		t = "unknown";
+	strlcpy(buf, t, sizeof(buf));
+	return sysctl_lookup(SYSCTLFN_CALL(&node));
+}
+
 static void
 const_sysctl(struct sysctllog **clog, const char *name, int type,
     u_quad_t value, int tag)
@@ -1188,7 +1221,7 @@ const_sysctl(struct sysctllog **clog, const char *name, int type,
 SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
 	extern uint64_t tsc_freq;
-#ifndef XEN
+#ifndef XENPV
 	extern int tsc_user_enabled;
 #endif
 	extern int sparse_dump;
@@ -1240,7 +1273,7 @@ SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 		       SYSCTL_DESCR("Whether the kernel uses PAE"),
 		       NULL, 0, &use_pae, 0,
 		       CTL_MACHDEP, CTL_CREATE, CTL_EOL);
-#ifndef XEN
+#ifndef XENPV
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_READWRITE,
 		       CTLTYPE_INT, "tsc_user_enable",
@@ -1248,6 +1281,11 @@ SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 		       sysctl_machdep_tsc_enable, 0, &tsc_user_enabled, 0,
 		       CTL_MACHDEP, CTL_CREATE, CTL_EOL);
 #endif
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_STRING, "hypervisor", NULL,
+		       sysctl_machdep_hypervisor, 0, NULL, 0,
+		       CTL_MACHDEP, CTL_CREATE, CTL_EOL);
 #ifdef SVS
 	int sysctl_machdep_svs_enabled(SYSCTLFN_ARGS);
 	const struct sysctlnode *svs_rnode = NULL;
@@ -1291,10 +1329,30 @@ SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 	const_sysctl(clog, "xsave_features", CTLTYPE_QUAD, x86_xsave_features,
 	    CPU_XSAVE_FEATURES);
 
-#ifndef XEN
+#ifndef XENPV
 	const_sysctl(clog, "biosbasemem", CTLTYPE_INT, biosbasemem,
 	    CPU_BIOSBASEMEM);
 	const_sysctl(clog, "biosextmem", CTLTYPE_INT, biosextmem,
 	    CPU_BIOSEXTMEM);
 #endif
 }
+
+/* Here for want of a better place */
+#if defined(DOM0OPS) || !defined(XENPV)
+struct pic *
+intr_findpic(int num)
+{
+#if NIOAPIC > 0
+	struct ioapic_softc *pic;
+
+	pic = ioapic_find_bybase(num);
+	if (pic != NULL)
+		return &pic->sc_pic;
+#endif
+	if (num < NUM_LEGACY_IRQS)
+		return &i8259_pic;
+
+	return NULL;
+}
+#endif
+

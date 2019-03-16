@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ipsec.c,v 1.18 2018/10/19 00:12:56 knakahara Exp $  */
+/*	$NetBSD: if_ipsec.c,v 1.21 2019/03/14 03:52:40 knakahara Exp $  */
 
 /*
  * Copyright (c) 2017 Internet Initiative Japan Inc.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ipsec.c,v 1.18 2018/10/19 00:12:56 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ipsec.c,v 1.21 2019/03/14 03:52:40 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -509,6 +509,7 @@ if_ipsec_in_enqueue(struct mbuf *m, int af, struct ifnet *ifp)
 		ifp->if_ibytes += pktlen;
 		ifp->if_ipackets++;
 	} else {
+		ifp->if_iqdrops++;
 		m_freem(m);
 	}
 
@@ -1104,6 +1105,7 @@ if_ipsec_delete_tunnel(struct ifnet *ifp)
 		mutex_exit(&sc->ipsec_lock);
 		encap_lock_exit();
 		kmem_free(nvar, sizeof(*nvar));
+		kmem_free(nullvar, sizeof(*nullvar));
 		return;
 	}
 
@@ -1191,6 +1193,8 @@ if_ipsec_ensure_flags(struct ifnet *ifp, short oflags)
 		/* nothing to do */
 		mutex_exit(&sc->ipsec_lock);
 		encap_lock_exit();
+		kmem_free(nvar, sizeof(*nvar));
+		kmem_free(nullvar, sizeof(*nullvar));
 		return 0;
 	}
 
@@ -1594,14 +1598,7 @@ if_ipsec_add_sp0(struct sockaddr *src, in_port_t sport,
 	padlen = PFKEY_UNUNIT64(xpl.sadb_x_policy_len) - sizeof(xpl);
 	if (policy == IPSEC_POLICY_IPSEC) {
 		if_ipsec_add_mbuf(m, &xisr, sizeof(xisr));
-		/*
-		 * secpolicy.req->saidx.{src, dst} must be set port number,
-		 * when it is used for NAT-T.
-		 */
-		if_ipsec_add_mbuf_addr_port(m, src, sport, false);
-		if_ipsec_add_mbuf_addr_port(m, dst, dport, false);
 		padlen -= PFKEY_ALIGN8(sizeof(xisr));
-		padlen -= PFKEY_ALIGN8(src->sa_len + dst->sa_len);
 	}
 	if_ipsec_add_pad(m, padlen);
 

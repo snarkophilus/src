@@ -1,4 +1,4 @@
-/* $NetBSD: crt0-common.c,v 1.19 2018/07/13 01:00:17 kre Exp $ */
+/* $NetBSD: crt0-common.c,v 1.23 2018/12/28 20:12:35 christos Exp $ */
 
 /*
  * Copyright (c) 1998 Christos Zoulas
@@ -36,19 +36,19 @@
  */
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: crt0-common.c,v 1.19 2018/07/13 01:00:17 kre Exp $");
+__RCSID("$NetBSD: crt0-common.c,v 1.23 2018/12/28 20:12:35 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/exec.h>
+#include <sys/exec_elf.h>
 #include <sys/syscall.h>
 #include <machine/profile.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "rtld.h"
-
 extern int main(int, char **, char **);
 
+typedef void (*fptr_t)(void);
 #ifndef HAVE_INITFINI_ARRAY
 extern void	_init(void);
 extern void	_fini(void);
@@ -76,8 +76,7 @@ struct ps_strings *__ps_strings = 0;
 static char	 empty_string[] = "";
 char		*__progname = empty_string;
 
-__dead __dso_hidden void ___start(void (*)(void), const Obj_Entry *,
-			 struct ps_strings *);
+__dead __dso_hidden void ___start(void (*)(void), struct ps_strings *);
 
 #define	write(fd, s, n)	__syscall(SYS_write, (fd), (s), (n))
 
@@ -87,7 +86,6 @@ do {						\
 	_exit(1);				\
 } while (0)
 
-#ifdef HAVE_INITFINI_ARRAY
 /*
  * If we are using INIT_ARRAY/FINI_ARRAY and we are linked statically,
  * we have to process these instead of relying on RTLD to do it for us.
@@ -111,7 +109,7 @@ _preinit(void)
 }
 
 static inline void
-_init(void)
+_initarray(void)
 {
 	for (const fptr_t *f = __init_array_start; f < __init_array_end; f++) {
 		(*f)();
@@ -119,13 +117,12 @@ _init(void)
 }
 
 static void
-_fini(void)
+_finiarray(void)
 {
 	for (const fptr_t *f = __fini_array_start; f < __fini_array_end; f++) {
 		(*f)();
 	}
 }
-#endif /* HAVE_INITFINI_ARRAY */
 
 #if defined(__x86_64__) || defined(__powerpc__) || defined(__sparc__)
 #define HAS_IPLTA
@@ -290,7 +287,6 @@ relocate_self(struct ps_strings *ps_strings)
 
 void
 ___start(void (*cleanup)(void),			/* from shared loader */
-    const Obj_Entry *obj,			/* from shared loader */
     struct ps_strings *ps_strings)
 {
 #if defined(HAS_RELOCATE_SELF)
@@ -314,13 +310,8 @@ ___start(void (*cleanup)(void),			/* from shared loader */
 		__progname = empty_string;
 	}
 
-	if (&rtld_DYNAMIC != NULL && obj != NULL) {
-		if (obj->magic != RTLD_MAGIC)
-			_FATAL("Corrupt Obj_Entry pointer in GOT\n");
-		if (obj->version != RTLD_VERSION)
-			_FATAL("Dynamic linker version mismatch\n");
+	if (cleanup != NULL)
 		atexit(cleanup);
-	}
 
 	_libc_init();
 
@@ -333,17 +324,20 @@ ___start(void (*cleanup)(void),			/* from shared loader */
 #endif
 	}
 
-#ifdef HAVE_INITFINI_ARRAY
 	_preinit();
-#endif
 
 #ifdef MCRT0
 	atexit(_mcleanup);
 	monstartup((u_long)&__eprol, (u_long)&__etext);
 #endif
 
+	atexit(_finiarray);
+	_initarray();
+
+#ifndef HAVE_INITFINI_ARRAY
 	atexit(_fini);
 	_init();
+#endif
 
 	exit(main(ps_strings->ps_nargvstr, ps_strings->ps_argvstr, environ));
 }

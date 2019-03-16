@@ -1,4 +1,4 @@
-/*	$NetBSD: usbdi.c,v 1.178 2018/09/16 20:21:56 mrg Exp $	*/
+/*	$NetBSD: usbdi.c,v 1.182 2019/02/17 04:17:31 rin Exp $	*/
 
 /*
  * Copyright (c) 1998, 2012, 2015 The NetBSD Foundation, Inc.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: usbdi.c,v 1.178 2018/09/16 20:21:56 mrg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: usbdi.c,v 1.182 2019/02/17 04:17:31 rin Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_usb.h"
@@ -258,13 +258,14 @@ usbd_close_pipe(struct usbd_pipe *pipe)
 	LIST_REMOVE(pipe, up_next);
 	pipe->up_endpoint->ue_refcnt--;
 
+	pipe->up_methods->upm_close(pipe);
+
 	if (pipe->up_intrxfer != NULL) {
 	    	usbd_unlock_pipe(pipe);
 		usbd_destroy_xfer(pipe->up_intrxfer);
 		usbd_lock_pipe(pipe);
 	}
 
-	pipe->up_methods->upm_close(pipe);
 	usbd_unlock_pipe(pipe);
 	kmem_free(pipe, pipe->up_dev->ud_bus->ub_pipesize);
 
@@ -883,9 +884,13 @@ usbd_ar_pipe(struct usbd_pipe *pipe)
 		USBHIST_LOG(usbdebug, "pipe = %#jx xfer = %#jx "
 		    "(methods = %#jx)", (uintptr_t)pipe, (uintptr_t)xfer,
 		    (uintptr_t)pipe->up_methods, 0);
-		/* Make the HC abort it (and invoke the callback). */
-		pipe->up_methods->upm_abort(xfer);
-		/* XXX only for non-0 usbd_clear_endpoint_stall(pipe); */
+		if (xfer->ux_status == USBD_NOT_STARTED) {
+			SIMPLEQ_REMOVE_HEAD(&pipe->up_queue, ux_next);
+		} else {
+			/* Make the HC abort it (and invoke the callback). */
+			pipe->up_methods->upm_abort(xfer);
+			/* XXX only for non-0 usbd_clear_endpoint_stall(pipe); */
+		}
 	}
 	pipe->up_aborting = 0;
 	return USBD_NORMAL_COMPLETION;
@@ -898,9 +903,7 @@ usb_transfer_complete(struct usbd_xfer *xfer)
 	struct usbd_pipe *pipe = xfer->ux_pipe;
 	struct usbd_bus *bus = pipe->up_dev->ud_bus;
 	int sync = xfer->ux_flags & USBD_SYNCHRONOUS;
-	int erred =
-	    xfer->ux_status == USBD_CANCELLED ||
-	    xfer->ux_status == USBD_TIMEOUT;
+	int erred;
 	int polling = bus->ub_usepolling;
 	int repeat = pipe->up_repeat;
 
@@ -914,6 +917,27 @@ usb_transfer_complete(struct usbd_xfer *xfer)
 	KASSERTMSG(xfer->ux_state == XFER_ONQU, "xfer %p state is %x", xfer,
 	    xfer->ux_state);
 	KASSERT(pipe != NULL);
+
+	/*
+	 * If device is known to miss out ack, then pretend that
+	 * output timeout is a success. Userland should handle
+	 * the logic to verify that the operation succeeded.
+	 */
+	if (pipe->up_dev->ud_quirks &&
+	    pipe->up_dev->ud_quirks->uq_flags & UQ_MISS_OUT_ACK &&
+	    xfer->ux_status == USBD_TIMEOUT &&
+	    !usbd_xfer_isread(xfer)) {
+		USBHIST_LOG(usbdebug, "Possible output ack miss for xfer %#jx: "
+		    "hiding write timeout to %d.%s for %d bytes written",
+		    (uintptr_t)xfer, curlwp->l_proc->p_pid, curlwp->l_lid,
+		    xfer->ux_length);
+
+		xfer->ux_status = USBD_NORMAL_COMPLETION;
+		xfer->ux_actlen = xfer->ux_length;
+	}
+
+	erred = xfer->ux_status == USBD_CANCELLED ||
+	        xfer->ux_status == USBD_TIMEOUT;
 
 	if (!repeat) {
 		/* Remove request from queue. */

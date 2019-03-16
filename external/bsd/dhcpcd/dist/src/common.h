@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -127,6 +127,14 @@
 # endif
 # ifndef __unused
 #  define __unused
+# endif
+#endif
+
+#ifndef __fallthrough
+# if __GNUC__ >= 7
+#  define __fallthrough __attribute__((fallthrough))
+# else
+#  define __fallthrough
 # endif
 #endif
 

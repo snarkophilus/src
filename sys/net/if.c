@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.437 2018/10/18 11:34:54 knakahara Exp $	*/
+/*	$NetBSD: if.c,v 1.446 2019/03/01 11:06:57 pgoyette Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2008 The NetBSD Foundation, Inc.
@@ -90,7 +90,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.437 2018/10/18 11:34:54 knakahara Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.446 2019/03/01 11:06:57 pgoyette Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_inet.h"
@@ -119,6 +119,7 @@ __KERNEL_RCSID(0, "$NetBSD: if.c,v 1.437 2018/10/18 11:34:54 knakahara Exp $");
 #include <sys/xcall.h>
 #include <sys/cpu.h>
 #include <sys/intr.h>
+#include <sys/compat_stub.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -148,6 +149,11 @@ __KERNEL_RCSID(0, "$NetBSD: if.c,v 1.437 2018/10/18 11:34:54 knakahara Exp $");
 #include "ether.h"
 #include "fddi.h"
 #include "token.h"
+
+#include "bridge.h"
+#if NBRIDGE > 0
+#include <net/if_bridgevar.h>
+#endif
 
 #include "carp.h"
 #if NCARP > 0
@@ -239,13 +245,6 @@ static void sysctl_net_pktq_setup(struct sysctllog **, int);
 #endif
 
 static void if_sysctl_setup(struct sysctllog **);
-
-/* Compatibility vector functions */
-u_long (*vec_compat_cvtcmd)(u_long) = NULL;
-int (*vec_compat_ifioctl)(struct socket *, u_long, u_long, void *,
-	struct lwp *) = NULL;
-int (*vec_compat_ifconf)(struct lwp *, u_long, void *) = (void *)enosys;
-int (*vec_compat_ifdatareq)(struct lwp *, u_long, void *) = (void *)enosys;
 
 static int
 if_listener_cb(kauth_cred_t cred, kauth_action_t action, void *cookie,
@@ -1783,8 +1782,8 @@ ifa_psref_init(struct ifaddr *ifa)
 void
 ifaref(struct ifaddr *ifa)
 {
-	KASSERT(!ISSET(ifa->ifa_flags, IFA_DESTROYING));
-	ifa->ifa_refcnt++;
+
+	atomic_inc_uint(&ifa->ifa_refcnt);
 }
 
 void
@@ -1793,7 +1792,7 @@ ifafree(struct ifaddr *ifa)
 	KASSERT(ifa != NULL);
 	KASSERT(ifa->ifa_refcnt > 0);
 
-	if (--ifa->ifa_refcnt == 0) {
+	if (atomic_dec_uint_nv(&ifa->ifa_refcnt) == 0) {
 		free(ifa, M_IFADDR);
 	}
 }
@@ -2183,7 +2182,8 @@ link_rtrequest(int cmd, struct rtentry *rt, const struct rt_addrinfo *info)
 	struct psref psref;
 
 	if (cmd != RTM_ADD || (ifa = rt->rt_ifa) == NULL ||
-	    (ifp = ifa->ifa_ifp) == NULL || (dst = rt_getkey(rt)) == NULL)
+	    (ifp = ifa->ifa_ifp) == NULL || (dst = rt_getkey(rt)) == NULL ||
+	    ISSET(info->rti_flags, RTF_DONTCHANGEIFA))
 		return;
 	if ((ifa = ifaof_ifpforaddr_psref(dst, ifp, &psref)) != NULL) {
 		rt_replace_ifa(rt, ifa);
@@ -2436,6 +2436,9 @@ p2p_rtrequest(int req, struct rtentry *rt,
 			break;
 
 		rt->rt_ifp = lo0ifp;
+
+		if (ISSET(info->rti_flags, RTF_DONTCHANGEIFA))
+			break;
 
 		IFADDR_READER_FOREACH(ifa, ifp) {
 			if (equal(rt_getkey(rt), ifa->ifa_addr))
@@ -2856,7 +2859,7 @@ if_tunnel_check_nesting(struct ifnet *ifp, struct mbuf *m, int limit)
 	struct m_tag *mtag;
 	int *count;
 
-	mtag = m_tag_find(m, PACKET_TAG_TUNNEL_INFO, NULL);
+	mtag = m_tag_find(m, PACKET_TAG_TUNNEL_INFO);
 	if (mtag != NULL) {
 		count = (int *)(mtag + 1);
 		if (++(*count) > limit) {
@@ -2905,40 +2908,41 @@ ifioctl_common(struct ifnet *ifp, u_long cmd, void *data)
 		/* Pre-compute the checksum flags mask. */
 		ifp->if_csum_flags_tx = 0;
 		ifp->if_csum_flags_rx = 0;
-		if (ifp->if_capenable & IFCAP_CSUM_IPv4_Tx) {
+		if (ifp->if_capenable & IFCAP_CSUM_IPv4_Tx)
 			ifp->if_csum_flags_tx |= M_CSUM_IPv4;
-		}
-		if (ifp->if_capenable & IFCAP_CSUM_IPv4_Rx) {
+		if (ifp->if_capenable & IFCAP_CSUM_IPv4_Rx)
 			ifp->if_csum_flags_rx |= M_CSUM_IPv4;
-		}
 
-		if (ifp->if_capenable & IFCAP_CSUM_TCPv4_Tx) {
+		if (ifp->if_capenable & IFCAP_CSUM_TCPv4_Tx)
 			ifp->if_csum_flags_tx |= M_CSUM_TCPv4;
-		}
-		if (ifp->if_capenable & IFCAP_CSUM_TCPv4_Rx) {
+		if (ifp->if_capenable & IFCAP_CSUM_TCPv4_Rx)
 			ifp->if_csum_flags_rx |= M_CSUM_TCPv4;
-		}
 
-		if (ifp->if_capenable & IFCAP_CSUM_UDPv4_Tx) {
+		if (ifp->if_capenable & IFCAP_CSUM_UDPv4_Tx)
 			ifp->if_csum_flags_tx |= M_CSUM_UDPv4;
-		}
-		if (ifp->if_capenable & IFCAP_CSUM_UDPv4_Rx) {
+		if (ifp->if_capenable & IFCAP_CSUM_UDPv4_Rx)
 			ifp->if_csum_flags_rx |= M_CSUM_UDPv4;
-		}
 
-		if (ifp->if_capenable & IFCAP_CSUM_TCPv6_Tx) {
+		if (ifp->if_capenable & IFCAP_CSUM_TCPv6_Tx)
 			ifp->if_csum_flags_tx |= M_CSUM_TCPv6;
-		}
-		if (ifp->if_capenable & IFCAP_CSUM_TCPv6_Rx) {
+		if (ifp->if_capenable & IFCAP_CSUM_TCPv6_Rx)
 			ifp->if_csum_flags_rx |= M_CSUM_TCPv6;
-		}
 
-		if (ifp->if_capenable & IFCAP_CSUM_UDPv6_Tx) {
+		if (ifp->if_capenable & IFCAP_CSUM_UDPv6_Tx)
 			ifp->if_csum_flags_tx |= M_CSUM_UDPv6;
-		}
-		if (ifp->if_capenable & IFCAP_CSUM_UDPv6_Rx) {
+		if (ifp->if_capenable & IFCAP_CSUM_UDPv6_Rx)
 			ifp->if_csum_flags_rx |= M_CSUM_UDPv6;
-		}
+
+		if (ifp->if_capenable & IFCAP_TSOv4)
+			ifp->if_csum_flags_tx |= M_CSUM_TSOv4;
+		if (ifp->if_capenable & IFCAP_TSOv6)
+			ifp->if_csum_flags_tx |= M_CSUM_TSOv6;
+
+#if NBRIDGE > 0
+		if (ifp->if_bridge != NULL)
+			bridge_calc_csum_flags(ifp->if_bridge);
+#endif
+
 		if (ifp->if_flags & IFF_UP)
 			return ENETRESET;
 		return 0;
@@ -3121,15 +3125,11 @@ doifioctl(struct socket *so, u_long cmd, void *data, struct lwp *l)
 {
 	struct ifnet *ifp;
 	struct ifreq *ifr;
-	int error = 0;
-#if defined(COMPAT_OSOCK) || defined(COMPAT_OIFREQ)
+	int error = 0, hook;
 	u_long ocmd = cmd;
-#endif
 	short oif_flags;
-#ifdef COMPAT_OIFREQ
 	struct ifreq ifrb;
 	struct oifreq *oifr = NULL;
-#endif
 	int r;
 	struct psref psref;
 	int bound;
@@ -3140,26 +3140,27 @@ doifioctl(struct socket *so, u_long cmd, void *data, struct lwp *l)
 	case SIOCINITIFADDR:
 		return EPERM;
 	default:
-		error = (*vec_compat_ifconf)(l, cmd, data);
+		MODULE_HOOK_CALL(uipc_syscalls_40_hook, (cmd, data), enosys(),
+		    error);
 		if (error != ENOSYS)
 			return error;
-		error = (*vec_compat_ifdatareq)(l, cmd, data);
+		MODULE_HOOK_CALL(uipc_syscalls_50_hook, (l, cmd, data),
+		    enosys(), error);
 		if (error != ENOSYS)
 			return error;
+		error = 0;
 		break;
 	}
 
 	ifr = data;
-#ifdef COMPAT_OIFREQ
-	if (vec_compat_cvtcmd) {
-		cmd = (*vec_compat_cvtcmd)(cmd);
+	MODULE_HOOK_CALL(if_cvtcmd_43_hook, (&cmd, ocmd), enosys(), hook);
+	if (hook != ENOSYS) {
 		if (cmd != ocmd) {
 			oifr = data;
 			data = ifr = &ifrb;
 			ifreqo2n(oifr, ifr);
 		}
 	}
-#endif
 
 	switch (cmd) {
 	case SIOCIFCREATE:
@@ -3220,6 +3221,7 @@ doifioctl(struct socket *so, u_long cmd, void *data, struct lwp *l)
 	case SIOCSLIFPHYADDR:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
+	case SIOCSETHERCAP:
 	case SIOCSIFMEDIA:
 	case SIOCSDRVSPEC:
 	case SIOCG80211:
@@ -3252,11 +3254,9 @@ doifioctl(struct socket *so, u_long cmd, void *data, struct lwp *l)
 		error = EOPNOTSUPP;
 	else {
 		KERNEL_LOCK_IF_IFP_MPSAFE(ifp);
-#ifdef COMPAT_OSOCK
-		if (vec_compat_ifioctl != NULL)
-			error = (*vec_compat_ifioctl)(so, ocmd, cmd, data, l);
-		else
-#endif
+		MODULE_HOOK_CALL(if_ifioctl_43_hook,
+			     (so, ocmd, cmd, data, l), enosys(), error);
+		if (error == ENOSYS)
 			error = (*so->so_proto->pr_usrreqs->pr_ioctl)(so,
 			    cmd, data, ifp);
 		KERNEL_UNLOCK_IF_IFP_MPSAFE(ifp);
@@ -3269,10 +3269,8 @@ doifioctl(struct socket *so, u_long cmd, void *data, struct lwp *l)
 			splx(s);
 		}
 	}
-#ifdef COMPAT_OIFREQ
 	if (cmd != ocmd)
 		ifreqn2o(oifr, ifr);
-#endif
 
 	IFNET_UNLOCK(ifp);
 	KERNEL_UNLOCK_UNLESS_IFP_MPSAFE(ifp);
@@ -3407,31 +3405,29 @@ int
 ifreq_setaddr(u_long cmd, struct ifreq *ifr, const struct sockaddr *sa)
 {
 	uint8_t len = sizeof(ifr->ifr_ifru.ifru_space);
-#ifdef COMPAT_OIFREQ
 	struct ifreq ifrb;
 	struct oifreq *oifr = NULL;
 	u_long ocmd = cmd;
+	int hook;
 
-	if (vec_compat_cvtcmd) {
-		    cmd = (*vec_compat_cvtcmd)(cmd);
-		    if (cmd != ocmd) {
-			    oifr = (struct oifreq *)(void *)ifr;
-			    ifr = &ifrb;
-			    ifreqo2n(oifr, ifr);
-			    len = sizeof(oifr->ifr_addr);
-		    }
+	MODULE_HOOK_CALL(if_cvtcmd_43_hook, (&cmd, ocmd), enosys(), hook);
+	if (hook != ENOSYS) {
+		if (cmd != ocmd) {
+			oifr = (struct oifreq *)(void *)ifr;
+			ifr = &ifrb;
+			ifreqo2n(oifr, ifr);
+				len = sizeof(oifr->ifr_addr);
+		}
 	}
-#endif
+
 	if (len < sa->sa_len)
 		return EFBIG;
 
 	memset(&ifr->ifr_addr, 0, len);
 	sockaddr_copy(&ifr->ifr_addr, len, sa);
 
-#ifdef COMPAT_OIFREQ
 	if (cmd != ocmd)
 		ifreqn2o(oifr, ifr);
-#endif
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.386 2018/09/02 16:05:33 maxv Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.388 2019/01/17 02:47:15 knakahara Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.386 2018/09/02 16:05:33 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.388 2019/01/17 02:47:15 knakahara Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -567,7 +567,7 @@ ip_input(struct mbuf *m)
 	 * IPsec (encapsulated, tunnel mode).
 	 */
 #if defined(IPSEC)
-	if (!ipsec_used || !ipsec_indone(m))
+	if (!ipsec_used || !ipsec_skip_pfil(m))
 #else
 	if (1)
 #endif
@@ -1221,7 +1221,7 @@ ip_srcroute(struct mbuf *m0)
 	struct ip_srcrt *isr;
 	struct m_tag *mtag;
 
-	mtag = m_tag_find(m0, PACKET_TAG_SRCROUTE, NULL);
+	mtag = m_tag_find(m0, PACKET_TAG_SRCROUTE);
 	if (mtag == NULL)
 		return NULL;
 	isr = (struct ip_srcrt *)(mtag + 1);

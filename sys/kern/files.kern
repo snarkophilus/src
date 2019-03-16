@@ -1,4 +1,4 @@
-#	$NetBSD: files.kern,v 1.23 2018/09/14 01:55:19 mrg Exp $
+#	$NetBSD: files.kern,v 1.33 2019/02/23 03:10:06 kamil Exp $
 
 #
 # kernel sources
@@ -6,14 +6,14 @@
 define	kern:	machdep, uvm
 defflag	opt_kern.h			KERN
 defflag	opt_script.h			SETUIDSCRIPTS FDSCRIPTS
-file	compat/common/compat_util.c	kern
-file	compat/common/compat_mod.c	compat_netbsd | compat_netbsd32
+defflag					KASLR
 file	conf/debugsyms.c		kern
 file	conf/param.c			kern
 file	kern/bufq_disksort.c		bufq_disksort
 file	kern/bufq_fcfs.c		bufq_fcfs
 file	kern/bufq_priocscan.c		bufq_priocscan
 file	kern/bufq_readprio.c		bufq_readprio | new_bufq_strategy
+file	kern/compat_stub.c		kern
 file	kern/core_elf32.c		exec_elf32
 file	kern/core_elf64.c		exec_elf64
 file	kern/core_netbsd.c		exec_aout | exec_coff | exec_ecoff
@@ -76,6 +76,7 @@ file	kern/kern_rwlock.c		kern
 file	kern/kern_rwlock_obj.c		kern
 file	kern/kern_scdebug.c		kern
 file	kern/kern_sdt.c			kdtrace_hooks
+file	kern/kern_crashme.c		debug
 file	kern/kern_sig.c			kern
 file	kern/kern_sleepq.c		kern
 file	kern/kern_softint.c		kern
@@ -86,6 +87,7 @@ file	kern/kern_synch.c		kern
 file	kern/kern_syscall.c		kern
 file	kern/kern_sysctl.c		kern
 file	kern/kern_tc.c			kern
+file	kern/kern_threadpool.c		kern
 file	kern/kern_time.c		kern
 file	kern/kern_timeout.c		kern
 file	kern/kern_turnstile.c		kern
@@ -95,6 +97,7 @@ file	kern/kern_uuid.c		kern
 file	kern/kgdb_stub.c		kgdb
 file	kern/sched_4bsd.c		sched_4bsd
 file	kern/sched_m2.c			sched_m2
+file	kern/subr_asan.c		kasan
 file	kern/subr_autoconf.c		kern
 file	kern/subr_blist.c		vmswap
 file	kern/subr_bufq.c		kern
@@ -107,6 +110,7 @@ file	kern/subr_device.c		kern
 file	kern/subr_devsw.c		kern
 file	kern/subr_disk.c		kern
 file	kern/subr_disk_open.c		kern
+file	kern/subr_emul.c		kern
 file	kern/subr_evcnt.c		kern
 file	kern/subr_exec_fd.c		kern
 file	kern/subr_extent.c		kern
@@ -116,6 +120,8 @@ file	kern/subr_interrupt.c		kern
 file	kern/subr_iostat.c		kern
 file	kern/subr_ipi.c			kern
 file	kern/subr_kcpuset.c		kern
+file	kern/subr_kleak.c		kleak
+file	kern/subr_kcov.c		kcov
 defflag	opt_kmem.h			KMEM_GUARD
 					KMEM_SIZE
 defparam opt_kmem.h			KMEM_GUARD_DEPTH
@@ -139,6 +145,7 @@ file	kern/subr_psref.c		kern
 file	kern/subr_specificdata.c	kern
 file	kern/subr_tftproot.c		tftproot
 file	kern/subr_time.c		kern
+file	kern/subr_thmap.c		kern
 file	kern/subr_userconf.c		userconf
 file	kern/subr_vmem.c		kern
 file	kern/subr_workqueue.c		kern
@@ -173,7 +180,6 @@ file	kern/tty_tty.c			kern
 file	kern/uipc_accf.c		kern
 file	kern/uipc_domain.c		kern
 file	kern/uipc_mbuf.c		kern
-file	kern/uipc_mbuf2.c		kern
 file	kern/uipc_mbufdebug.c		kern & ether
 file	net/link_proto.c		kern	# XXX
 file	kern/uipc_proto.c		kern
@@ -223,3 +229,4 @@ prefix	../common/lib/libc/misc
 file	ubsan.c				kubsan
 prefix
 makeoptions	kubsan	CFLAGS+="-fsanitize=undefined"
+makeoptions	kubsan	CPPFLAGS+="-DACPI_MISALIGNMENT_NOT_SUPPORTED"

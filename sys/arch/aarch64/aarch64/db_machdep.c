@@ -1,4 +1,4 @@
-/* $NetBSD: db_machdep.c,v 1.9 2018/10/12 01:28:57 ryo Exp $ */
+/* $NetBSD: db_machdep.c,v 1.14 2019/01/27 02:08:36 pgoyette Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_machdep.c,v 1.9 2018/10/12 01:28:57 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_machdep.c,v 1.14 2019/01/27 02:08:36 pgoyette Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_compat_netbsd32.h"
@@ -303,6 +303,7 @@ db_md_lwp_cmd(db_expr_t addr, bool have_addr, db_expr_t count,
     const char *modif)
 {
 	lwp_t *l;
+	struct pcb *pcb;
 
 	if (!have_addr) {
 		db_printf("lwp: <address>\n");
@@ -319,9 +320,10 @@ db_md_lwp_cmd(db_expr_t addr, bool have_addr, db_expr_t count,
 	db_printf("\tl->l_md.md_onfault=%p\n", l->l_md.md_onfault);
 	db_printf("\tl->l_md.md_utf    =%p\n", l->l_md.md_utf);
 	dump_trapframe(l->l_md.md_utf, db_printf);
-	db_printf("\tl->l_md.md_ktf    =%p\n", l->l_md.md_ktf);
-	if (l->l_md.md_ktf != l->l_md.md_utf)
-		dump_trapframe(l->l_md.md_ktf, db_printf);
+	pcb = l->l_addr;
+	db_printf("\tl->l_addr.pcb_tf    =%p\n", pcb->pcb_tf);
+	if (pcb->pcb_tf != l->l_md.md_utf)
+		dump_trapframe(pcb->pcb_tf, db_printf);
 	db_printf("\tl->l_md.md_cpacr  =%016" PRIx64 "\n", l->l_md.md_cpacr);
 	db_printf("\tl->l_md.md_flags  =%08x\n", l->l_md.md_flags);
 
@@ -357,7 +359,7 @@ db_md_sysreg_cmd(db_expr_t addr, bool have_addr, db_expr_t count,
 #define SHOW_ARMREG(x)	\
 	db_printf("%-16s = %016" PRIx64 "\n", #x, reg_ ## x ## _read())
 
-	SHOW_ARMREG(cbar_el1);
+//	SHOW_ARMREG(cbar_el1);	/* Cortex */
 	SHOW_ARMREG(ccsidr_el1);
 	SHOW_ARMREG(clidr_el1);
 	SHOW_ARMREG(cntfrq_el0);
@@ -397,7 +399,7 @@ db_md_sysreg_cmd(db_expr_t addr, bool have_addr, db_expr_t count,
 	SHOW_ARMREG(id_aa64pfr0_el1);
 	SHOW_ARMREG(id_aa64pfr1_el1);
 	SHOW_ARMREG(isr_el1);
-	SHOW_ARMREG(l2ctlr_el1);
+//	SHOW_ARMREG(l2ctlr_el1);	/* Cortex */
 	SHOW_ARMREG(mair_el1);
 	SHOW_ARMREG(mdscr_el1);
 	SHOW_ARMREG(midr_el1);
@@ -616,11 +618,9 @@ db_machdep_init(void)
 	}
 
 	mdscr = reg_mdscr_el1_read();
-	mdscr |= __BIT(15);
-	mdscr |= __BIT(13);
+	mdscr |= MDSCR_MDE;	/* enable watchpoint and breakpoint */
 	reg_mdscr_el1_write(mdscr);
 	reg_oslar_el1_write(0);
-	daif_enable(DAIF_D);
 }
 
 static void
@@ -761,14 +761,16 @@ void
 db_md_switch_cpu_cmd(db_expr_t addr, bool have_addr, db_expr_t count,
     const char *modif)
 {
-	if (addr >= ncpu) {
-		db_printf("cpu %"DDB_EXPR_FMT"d out of range", addr);
+	u_int cpuno = (u_int)addr;
+
+	if (!have_addr || (cpuno >= ncpu)) {
+		db_printf("cpu: 0..%d\n", ncpu - 1);
 		return;
 	}
 
-	struct cpu_info *new_ci = cpu_lookup(addr);
+	struct cpu_info *new_ci = cpu_lookup(cpuno);
 	if (new_ci == NULL) {
-		db_printf("cpu %"DDB_EXPR_FMT"d does not exist", addr);
+		db_printf("cpu %u does not exist", cpuno);
 		return;
 	}
 

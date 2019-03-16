@@ -1,4 +1,4 @@
-$NetBSD: TODO.smpnet,v 1.25 2018/09/23 13:48:16 maxv Exp $
+$NetBSD: TODO.smpnet,v 1.27 2019/01/21 02:28:25 pgoyette Exp $
 
 MP-safe components
 ==================
@@ -115,7 +115,6 @@ Unfortunately some bpf_mtap on Rx are still called in hardware interrupt context
 This is the list of the functions that have such bpf_mtap:
 
  - sca_frame_process() @ sys/dev/ic/hd64570.c
- - rxintr_cleanup() @ sys/dev/pci/if_lmc.c
 
 Ideally we should make the functions run in softint somehow, but we don't have
 actual devices, no time (or interest/love) to work on the task, so instead we
@@ -191,3 +190,16 @@ for packet transmissions, resulting in serializing all Tx packet processing on
 the queue.  We should probably design and implement an alternative queuing
 mechanism that deals with multi-core systems at the first place, not making the
 existing ALTQ MP-safe because it's just annoying.
+
+Using kernel modules
+--------------------
+
+Please note that if you enable NET_MPSAFE in your kernel, and you use and
+loadable kernel modules (including compat_xx modules or individual network
+interface if_xxx device driver modules), you will need to build custom
+modules.  For each module you will need to add the following line to its
+Makefile:
+
+	CPPFLAGS+=	NET_MPSAFE
+
+Failure to do this may result in unpredictable behavior.

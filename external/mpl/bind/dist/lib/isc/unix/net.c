@@ -1,4 +1,4 @@
-/*	$NetBSD: net.c,v 1.2 2018/08/12 13:02:39 christos Exp $	*/
+/*	$NetBSD: net.c,v 1.4 2019/02/24 20:01:32 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -14,6 +14,7 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <sys/types.h>
 
 #if defined(HAVE_SYS_SYSCTL_H)
@@ -29,16 +30,15 @@
 #include <fcntl.h>
 
 #include <isc/log.h>
-#include <isc/msgs.h>
 #include <isc/net.h>
 #include <isc/netdb.h>
 #include <isc/once.h>
-#include <isc/strerror.h>
+#include <isc/strerr.h>
 #include <isc/string.h>
 #include <isc/util.h>
 
-#ifndef ISC_SOCKADDR_LEN_T
-#define ISC_SOCKADDR_LEN_T unsigned int
+#ifndef socklen_t
+#define socklen_t unsigned int
 #endif
 
 /*%
@@ -94,23 +94,8 @@
 
 #endif /* HAVE_SYSCTLBYNAME */
 
-#if defined(ISC_PLATFORM_HAVEIPV6)
-# if defined(ISC_PLATFORM_NEEDIN6ADDRANY)
-const struct in6_addr isc_net_in6addrany = IN6ADDR_ANY_INIT;
-# endif
-
-# if defined(ISC_PLATFORM_NEEDIN6ADDRLOOPBACK)
-const struct in6_addr isc_net_in6addrloop = IN6ADDR_LOOPBACK_INIT;
-# endif
-
-# if defined(WANT_IPV6)
 static isc_once_t 	once_ipv6only = ISC_ONCE_INIT;
-
-#  if defined(ISC_PLATFORM_HAVEIN6PKTINFO)
 static isc_once_t 	once_ipv6pktinfo = ISC_ONCE_INIT;
-#  endif
-# endif /* WANT_IPV6 */
-#endif /* ISC_PLATFORM_HAVEIPV6 */
 
 #ifndef ISC_CMSG_IP_TOS
 #ifdef __APPLE__
@@ -153,21 +138,14 @@ try_proto(int domain) {
 #endif
 			return (ISC_R_NOTFOUND);
 		default:
-			isc__strerror(errno, strbuf, sizeof(strbuf));
+			strerror_r(errno, strbuf, sizeof(strbuf));
 			UNEXPECTED_ERROR(__FILE__, __LINE__,
-					 "socket() %s: %s",
-					 isc_msgcat_get(isc_msgcat,
-							ISC_MSGSET_GENERAL,
-							ISC_MSG_FAILED,
-							"failed"),
+					 "socket() failed: %s",
 					 strbuf);
 			return (ISC_R_UNEXPECTED);
 		}
 	}
 
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef WANT_IPV6
-#ifdef ISC_PLATFORM_HAVEIN6PKTINFO
 	if (domain == PF_INET6) {
 		struct sockaddr_in6 sin6;
 		unsigned int len;
@@ -205,9 +183,6 @@ try_proto(int domain) {
 			}
 		}
 	}
-#endif
-#endif
-#endif
 
 	(void)close(s);
 
@@ -217,13 +192,7 @@ try_proto(int domain) {
 static void
 initialize_action(void) {
 	ipv4_result = try_proto(PF_INET);
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef WANT_IPV6
-#ifdef ISC_PLATFORM_HAVEIN6PKTINFO
 	ipv6_result = try_proto(PF_INET6);
-#endif
-#endif
-#endif
 #ifdef ISC_PLATFORM_HAVESYSUNH
 	unix_result = try_proto(PF_UNIX);
 #endif
@@ -252,8 +221,6 @@ isc_net_probeunix(void) {
 	return (unix_result);
 }
 
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef WANT_IPV6
 static void
 try_ipv6only(void) {
 #ifdef IPV6_V6ONLY
@@ -275,13 +242,9 @@ try_ipv6only(void) {
 	/* check for TCP sockets */
 	s = socket(PF_INET6, SOCK_STREAM, 0);
 	if (s == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "socket() %s: %s",
-				 isc_msgcat_get(isc_msgcat,
-						ISC_MSGSET_GENERAL,
-						ISC_MSG_FAILED,
-						"failed"),
+				 "socket() failed: %s",
 				 strbuf);
 		ipv6only_result = ISC_R_UNEXPECTED;
 		return;
@@ -298,13 +261,9 @@ try_ipv6only(void) {
 	/* check for UDP sockets */
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (s == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "socket() %s: %s",
-				 isc_msgcat_get(isc_msgcat,
-						ISC_MSGSET_GENERAL,
-						ISC_MSG_FAILED,
-						"failed"),
+				 "socket() failed: %s",
 				 strbuf);
 		ipv6only_result = ISC_R_UNEXPECTED;
 		return;
@@ -329,10 +288,7 @@ initialize_ipv6only(void) {
 	RUNTIME_CHECK(isc_once_do(&once_ipv6only,
 				  try_ipv6only) == ISC_R_SUCCESS);
 }
-#endif /* WANT_IPV6 */
 
-#ifdef ISC_PLATFORM_HAVEIN6PKTINFO
-#ifdef WANT_IPV6
 static void
 try_ipv6pktinfo(void) {
 	int s, on;
@@ -349,13 +305,9 @@ try_ipv6pktinfo(void) {
 	/* we only use this for UDP sockets */
 	s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 	if (s == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "socket() %s: %s",
-				 isc_msgcat_get(isc_msgcat,
-						ISC_MSGSET_GENERAL,
-						ISC_MSG_FAILED,
-						"failed"),
+				 "socket() failed: %s",
 				 strbuf);
 		ipv6pktinfo_result = ISC_R_UNEXPECTED;
 		return;
@@ -384,57 +336,39 @@ initialize_ipv6pktinfo(void) {
 	RUNTIME_CHECK(isc_once_do(&once_ipv6pktinfo,
 				  try_ipv6pktinfo) == ISC_R_SUCCESS);
 }
-#endif /* WANT_IPV6 */
-#endif /* ISC_PLATFORM_HAVEIN6PKTINFO */
-#endif /* ISC_PLATFORM_HAVEIPV6 */
 
 isc_result_t
 isc_net_probe_ipv6only(void) {
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef WANT_IPV6
 	initialize_ipv6only();
-#else
-	ipv6only_result = ISC_R_NOTFOUND;
-#endif
-#endif
 	return (ipv6only_result);
 }
 
 isc_result_t
 isc_net_probe_ipv6pktinfo(void) {
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef ISC_PLATFORM_HAVEIN6PKTINFO
-#ifdef WANT_IPV6
 	initialize_ipv6pktinfo();
-#else
-	ipv6pktinfo_result = ISC_R_NOTFOUND;
-#endif
-#endif
-#endif
 	return (ipv6pktinfo_result);
 }
 
-#if ISC_CMSG_IP_TOS || \
-    defined(ISC_NET_BSD44MSGHDR) && defined(IPV6_TCLASS) && defined(WANT_IPV6)
+#if ISC_CMSG_IP_TOS || defined(IPV6_TCLASS)
 
-static inline ISC_SOCKADDR_LEN_T
-cmsg_len(ISC_SOCKADDR_LEN_T len) {
+static inline socklen_t
+cmsg_len(socklen_t len) {
 #ifdef CMSG_LEN
 	return (CMSG_LEN(len));
 #else
-	ISC_SOCKADDR_LEN_T hdrlen;
+	socklen_t hdrlen;
 
 	/*
 	 * Cast NULL so that any pointer arithmetic performed by CMSG_DATA
 	 * is correct.
 	 */
-	hdrlen = (ISC_SOCKADDR_LEN_T)CMSG_DATA(((struct cmsghdr *)NULL));
+	hdrlen = (socklen_t)CMSG_DATA(((struct cmsghdr *)NULL));
 	return (hdrlen + len);
 #endif
 }
 
-static inline ISC_SOCKADDR_LEN_T
-cmsg_space(ISC_SOCKADDR_LEN_T len) {
+static inline socklen_t
+cmsg_space(socklen_t len) {
 #ifdef CMSG_SPACE
 	return (CMSG_SPACE(len));
 #else
@@ -461,7 +395,6 @@ cmsg_space(ISC_SOCKADDR_LEN_T len) {
 #endif
 }
 
-#ifdef ISC_NET_BSD44MSGHDR
 /*
  * Make a fd non-blocking.
  */
@@ -481,7 +414,7 @@ make_nonblock(int fd) {
 #endif
 
 	if (ret == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		UNEXPECTED_ERROR(__FILE__, __LINE__,
 #ifdef USE_FIONBIO_IOCTL
 				 "ioctl(%d, FIONBIO, &on): %s", fd,
@@ -496,11 +429,11 @@ make_nonblock(int fd) {
 	return (ISC_R_SUCCESS);
 }
 
-static isc_boolean_t
+static bool
 cmsgsend(int s, int level, int type, struct addrinfo *res) {
 	char strbuf[ISC_STRERRORSIZE];
 	struct sockaddr_storage ss;
-	ISC_SOCKADDR_LEN_T len = sizeof(ss);
+	socklen_t len = sizeof(ss);
 	struct msghdr msg;
 	union {
 		struct cmsghdr h;
@@ -513,19 +446,19 @@ cmsgsend(int s, int level, int type, struct addrinfo *res) {
 	isc_result_t result;
 
 	if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
 			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
 			      "bind: %s", strbuf);
-		return (ISC_FALSE);
+		return (false);
 	}
 
 	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
 			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
 			      "getsockname: %s", strbuf);
-		return (ISC_FALSE);
+		return (false);
 	}
 
 	iovec.iov_base = buf;
@@ -565,12 +498,12 @@ cmsgsend(int s, int level, int type, struct addrinfo *res) {
 #endif
 	default:
 		INSIST(0);
+		ISC_UNREACHABLE();
 	}
 
 	if (sendmsg(s, &msg, 0) < 0) {
 		int debug = ISC_LOG_DEBUG(10);
 		const char *typestr;
-		const char *msgstr;
 		switch (errno) {
 #ifdef ENOPROTOOPT
 		case ENOPROTOOPT:
@@ -584,20 +517,18 @@ cmsgsend(int s, int level, int type, struct addrinfo *res) {
 		default:
 			debug = ISC_LOG_NOTICE;
 		}
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		if (debug != ISC_LOG_NOTICE) {
 			isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
 				      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
 				      "sendmsg: %s", strbuf);
 		} else {
 			typestr = (type == IP_TOS) ? "IP_TOS" : "IPV6_TCLASS";
-			msgstr = isc_msgcat_get(isc_msgcat, ISC_MSGSET_GENERAL,
-						ISC_MSG_FAILED, "failed");
 			UNEXPECTED_ERROR(__FILE__, __LINE__, "probing "
-					 "sendmsg() with %s=%02x %s: %s",
-					 typestr, dscp, msgstr, strbuf);
+					 "sendmsg() with %s=%02x failed: %s",
+					 typestr, dscp, strbuf);
 		}
-		return (ISC_FALSE);
+		return (false);
 	}
 
 	/*
@@ -619,11 +550,10 @@ cmsgsend(int s, int level, int type, struct addrinfo *res) {
 	msg.msg_flags = 0;
 
 	if (recvmsg(s, &msg, 0) < 0)
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TRUE);
+	return (true);
 }
-#endif
 #endif
 
 static void
@@ -657,7 +587,7 @@ try_dscp_v4(void) {
 	s = socket(res0->ai_family, res0->ai_socktype, res0->ai_protocol);
 
 	if (s == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
 			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
 			      "socket: %s", strbuf);
@@ -674,14 +604,10 @@ try_dscp_v4(void) {
 		dscp_result |= ISC_NET_DSCPRECVV4;
 #endif /* IP_RECVTOS */
 
-#ifdef ISC_NET_BSD44MSGHDR
-
 #if ISC_CMSG_IP_TOS
 	if (cmsgsend(s, IPPROTO_IP, IP_TOS, res0))
 		dscp_result |= ISC_NET_DSCPPKTV4;
 #endif /* ISC_CMSG_IP_TOS */
-
-#endif /* ISC_NET_BSD44MSGHDR */
 
 	freeaddrinfo(res0);
 	close(s);
@@ -691,8 +617,6 @@ try_dscp_v4(void) {
 
 static void
 try_dscp_v6(void) {
-#ifdef ISC_PLATFORM_HAVEIPV6
-#ifdef WANT_IPV6
 #ifdef IPV6_TCLASS
 	char strbuf[ISC_STRERRORSIZE];
 	struct addrinfo hints, *res0;
@@ -721,7 +645,7 @@ try_dscp_v6(void) {
 
 	s = socket(res0->ai_family, res0->ai_socktype, res0->ai_protocol);
 	if (s == -1) {
-		isc__strerror(errno, strbuf, sizeof(strbuf));
+		strerror_r(errno, strbuf, sizeof(strbuf));
 		isc_log_write(isc_lctx, ISC_LOGCATEGORY_GENERAL,
 			      ISC_LOGMODULE_SOCKET, ISC_LOG_DEBUG(10),
 			      "socket: %s", strbuf);
@@ -737,17 +661,13 @@ try_dscp_v6(void) {
 		dscp_result |= ISC_NET_DSCPRECVV6;
 #endif /* IPV6_RECVTCLASS */
 
-#ifdef ISC_NET_BSD44MSGHDR
 	if (cmsgsend(s, IPPROTO_IPV6, IPV6_TCLASS, res0))
 		dscp_result |= ISC_NET_DSCPPKTV6;
-#endif /* ISC_NET_BSD44MSGHDR */
 
 	freeaddrinfo(res0);
 	close(s);
 
 #endif /* IPV6_TCLASS */
-#endif /* WANT_IPV6 */
-#endif /* ISC_PLATFORM_HAVEIPV6 */
 }
 
 static void

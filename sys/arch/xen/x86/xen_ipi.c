@@ -1,4 +1,4 @@
-/* $NetBSD: xen_ipi.c,v 1.26 2018/07/24 12:26:14 bouyer Exp $ */
+/* $NetBSD: xen_ipi.c,v 1.32 2019/02/02 12:32:55 cherry Exp $ */
 
 /*-
  * Copyright (c) 2011 The NetBSD Foundation, Inc.
@@ -33,10 +33,10 @@
 
 /* 
  * Based on: x86/ipi.c
- * __KERNEL_RCSID(0, "$NetBSD: xen_ipi.c,v 1.26 2018/07/24 12:26:14 bouyer Exp $");
+ * __KERNEL_RCSID(0, "$NetBSD: xen_ipi.c,v 1.32 2019/02/02 12:32:55 cherry Exp $");
  */
 
-__KERNEL_RCSID(0, "$NetBSD: xen_ipi.c,v 1.26 2018/07/24 12:26:14 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xen_ipi.c,v 1.32 2019/02/02 12:32:55 cherry Exp $");
 
 #include "opt_ddb.h"
 
@@ -59,7 +59,7 @@ __KERNEL_RCSID(0, "$NetBSD: xen_ipi.c,v 1.26 2018/07/24 12:26:14 bouyer Exp $");
 #include <xen/intr.h>
 #include <xen/intrdefs.h>
 #include <xen/hypervisor.h>
-#include <xen/xen-public/vcpu.h>
+#include <xen/include/public/vcpu.h>
 
 #ifdef DDB
 extern void ddb_ipi(struct trapframe);
@@ -137,13 +137,13 @@ xen_ipi_init(void)
 	snprintf(intr_xname, sizeof(intr_xname), "%s ipi",
 	    device_xname(ci->ci_dev));
 
-	if (intr_establish_xname(0, &xen_pic, evtchn, IST_LEVEL, IPL_HIGH,
+	if (xen_intr_establish_xname(-1, &xen_pic, evtchn, IST_LEVEL, IPL_HIGH,
 		xen_ipi_handler, ci, true, intr_xname) == NULL) {
 		panic("%s: unable to register ipi handler\n", __func__);
 		/* NOTREACHED */
 	}
 
-	hypervisor_enable_event(evtchn);
+	hypervisor_unmask_event(evtchn);
 }
 
 #ifdef DIAGNOSTIC

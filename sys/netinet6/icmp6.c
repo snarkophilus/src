@@ -1,4 +1,4 @@
-/*	$NetBSD: icmp6.c,v 1.239 2018/09/03 16:29:36 riastradh Exp $	*/
+/*	$NetBSD: icmp6.c,v 1.242 2018/12/22 14:07:54 maxv Exp $	*/
 /*	$KAME: icmp6.c,v 1.217 2001/06/20 15:03:29 jinmei Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: icmp6.c,v 1.239 2018/09/03 16:29:36 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: icmp6.c,v 1.242 2018/12/22 14:07:54 maxv Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -766,7 +766,7 @@ _icmp6_input(struct mbuf *m, int off, int proto)
 			memset(p, 0, 4);
 			memcpy(p + 4, hostname, maxhlen); /* meaningless TTL */
 
-			M_COPY_PKTHDR(n, m);
+			m_copy_pkthdr(n, m);
 			n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
 				sizeof(struct icmp6_hdr) + 4 + maxhlen;
 			nicmp6->icmp6_type = ICMP6_WRUREPLY;
@@ -1407,7 +1407,7 @@ ni6_input(struct mbuf *m, int off)
 	if (n == NULL) {
 		goto bad;
 	}
-	M_MOVE_PKTHDR(n, m);
+	m_move_pkthdr(n, m);
 	if (replylen > MHLEN) {
 		if (replylen > MCLBYTES) {
 			/*
@@ -2861,7 +2861,6 @@ icmp6_redirect_timeout(struct rtentry *rt, struct rttimer *r)
 
 	if ((rt->rt_flags & (RTF_GATEWAY | RTF_DYNAMIC | RTF_HOST)) ==
 	    (RTF_GATEWAY | RTF_DYNAMIC | RTF_HOST)) {
-		printf("%s: RTM_DELETE\n", __func__);
 		rtrequest(RTM_DELETE, rt_getkey(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, &retrt);
 		rt_unref(rt);

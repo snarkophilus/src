@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.1078 2018/10/06 18:52:59 martin Exp $
+#	$NetBSD: bsd.own.mk,v 1.1112 2019/03/11 09:20:14 mrg Exp $
 
 # This needs to be before bsd.init.mk
 .if defined(BSD_MK_COMPAT_FILE)
@@ -58,7 +58,14 @@ TOOLCHAIN_MISSING?=	no
 #
 # What GCC is used?
 #
+.if \
+    ${MACHINE_CPU} == "hppa"	|| \
+    ${MACHINE_CPU} == "ia64"	|| \
+    ${MACHINE_ARCH} == "powerpc64"	|| \
+    ${MACHINE_CPU} == "vax"
 HAVE_GCC?=	6
+.endif
+HAVE_GCC?=	7
 
 #
 # Platforms that can't run a modern GCC natively
@@ -72,6 +79,8 @@ MKGCCCMDS?=	no
 #
 .if ${HAVE_GCC} == 6
 EXTERNAL_GCC_SUBDIR?=	gcc.old
+.elif ${HAVE_GCC} == 7
+EXTERNAL_GCC_SUBDIR?=	gcc
 .else
 EXTERNAL_GCC_SUBDIR=?	/does/not/exist
 .endif
@@ -149,14 +158,26 @@ EXTERNAL_GDB_SUBDIR=		/does/not/exist
 #
 # What binutils is used?
 #
-HAVE_BINUTILS?=	227
+HAVE_BINUTILS?=	231
 
-.if ${HAVE_BINUTILS} == 230
+.if ${HAVE_BINUTILS} == 231
 EXTERNAL_BINUTILS_SUBDIR=	binutils
 .elif ${HAVE_BINUTILS} == 227
 EXTERNAL_BINUTILS_SUBDIR=	binutils.old
 .else
 EXTERNAL_BINUTILS_SUBDIR=	/does/not/exist
+.endif
+
+#
+# What version of jemalloc we use (100 is the one
+# built-in to libc from 2005 (pre version 3).
+#
+.if ${MACHINE_CPU} == "x86_64"	|| \
+    ${MACHINE_CPU} == "i386"	|| \
+    ${MACHINE_CPU} == "aarch64"	
+HAVE_JEMALLOC?=		510
+.else
+HAVE_JEMALLOC?=		100
 .endif
 
 .if empty(.MAKEFLAGS:tW:M*-V .OBJDIR*)
@@ -318,7 +339,7 @@ TOOL_CXX.pcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-p++
 #
 DESTDIR?=
 
-# Don't append another copy of sysroot (coming from COMPATCPPFLAGS etc.
+# Don't append another copy of sysroot (coming from COMPATCPPFLAGS etc.)
 # because it confuses Coverity. Still we need to cov-configure specially
 # for each specific sysroot argument.
 .if !defined(HOSTPROG) && !defined(HOSTLIB)
@@ -336,8 +357,9 @@ LDFLAGS+=	--sysroot=/
 .endif
 
 DBSYM=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-dbsym
-ELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}m68k-elf2aout
-ELF2ECOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}mips-elf2ecoff
+ARM_ELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}arm-elf2aout
+M68K_ELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}m68k-elf2aout
+MIPS_ELF2ECOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}mips-elf2ecoff
 INSTALL=	${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-install
 LEX=		${TOOLDIR}/bin/${_TOOL_PREFIX}lex
 LINT=		CC=${CC:Q} ${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-lint
@@ -403,6 +425,7 @@ TOOL_MANDOC_HTML=	${TOOLDIR}/bin/${_TOOL_PREFIX}mandoc -Thtml
 TOOL_MANDOC_LINT=	${TOOLDIR}/bin/${_TOOL_PREFIX}mandoc -Tlint
 TOOL_MDSETIMAGE=	${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-mdsetimage
 TOOL_MENUC=		MENUDEF=${TOOLDIR}/share/misc ${TOOLDIR}/bin/${_TOOL_PREFIX}menuc
+TOOL_ARMELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}arm-elf2aout
 TOOL_M68KELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}m68k-elf2aout
 TOOL_MIPSELF2ECOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}mips-elf2ecoff
 TOOL_MKCSMAPPER=	${TOOLDIR}/bin/${_TOOL_PREFIX}mkcsmapper
@@ -420,7 +443,7 @@ TOOL_NCDCS=		${TOOLDIR}/bin/${_TOOL_PREFIX}ibmnws-ncdcs
 TOOL_PAX=		${TOOLDIR}/bin/${_TOOL_PREFIX}pax
 TOOL_PIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}pic
 TOOL_PIGZ=		${TOOLDIR}/bin/${_TOOL_PREFIX}pigz
-TOOL_XZ=		${TOOLDIR}/bin/xz
+TOOL_XZ=		${TOOLDIR}/bin/${_TOOL_PREFIX}xz
 TOOL_PKG_CREATE=	${TOOLDIR}/bin/${_TOOL_PREFIX}pkg_create
 TOOL_POWERPCMKBOOTIMAGE=${TOOLDIR}/bin/${_TOOL_PREFIX}powerpc-mkbootimage
 TOOL_PWD_MKDB=		${TOOLDIR}/bin/${_TOOL_PREFIX}pwd_mkdb
@@ -486,6 +509,7 @@ TOOL_CTFMERGE=		ctfmerge
 TOOL_CVSLATEST=		cvslatest
 TOOL_DB=		db
 TOOL_DISKLABEL=		disklabel
+TOOL_DTC=		dtc
 TOOL_EQN=		eqn
 TOOL_FDISK=		fdisk
 TOOL_FGEN=		fgen
@@ -515,6 +539,7 @@ TOOL_MANDOC_HTML=	mandoc -Thtml
 TOOL_MANDOC_LINT=	mandoc -Tlint
 TOOL_MDSETIMAGE=	mdsetimage
 TOOL_MENUC=		menuc
+TOOL_ARMELF2AOUT=	arm-elf2aout
 TOOL_M68KELF2AOUT=	m68k-elf2aout
 TOOL_MIPSELF2ECOFF=	mips-elf2ecoff
 TOOL_MKCSMAPPER=	mkcsmapper
@@ -613,16 +638,6 @@ MACHINES.sparc=		sparc sparc64
 MACHINES.sparc64=	sparc64
 MACHINES.vax=		vax
 MACHINES.x86_64=	amd64
-
-# for crunchide & ldd, define the OBJECT_FMTS used by a MACHINE_ARCH
-#
-OBJECT_FMTS=
-.if	${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "ia64"
-OBJECT_FMTS+=	elf32
-.endif
-.if	${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH:M*64*} != ""
-OBJECT_FMTS+=	elf64
-.endif
 
 # OBJCOPY flags to create a.out binaries for old firmware
 # shared among src/distrib and ${MACHINE}/conf/Makefile.${MACHINE}.inc
@@ -805,7 +820,6 @@ NOPROFILE=	# defined
 #
 # The ia64 port is incomplete.
 #
-MKLINT.ia64=	no
 MKGDB.ia64=	no
 
 #
@@ -1100,11 +1114,6 @@ USE_LIBCSANITIZER?=	undefined
 # Exceptions to the above:
 #
 
-# Rump doesn't work yet on ia64
-.if ${MACHINE} == "ia64"
-MKRUMP=		no
-.endif
-
 # RUMP uses -nostdinc which coverity does not like
 # It also does not use many new files, so disable it
 .if defined(COVERITY_TOP_CONFIG)
@@ -1206,6 +1215,7 @@ MKSLJIT=	yes
     ${MACHINE} == "hpcsh"	|| \
     ${MACHINE} == "i386"	|| \
     ${MACHINE} == "ibmnws"	|| \
+    ${MACHINE} == "iyonix"	|| \
     ${MACHINE} == "luna68k"	|| \
     ${MACHINE} == "mac68k"	|| \
     ${MACHINE} == "macppc"	|| \
@@ -1316,6 +1326,18 @@ INSTALL_LINK?=		${INSTALL} ${INSTPRIV} ${HRDLINK} ${RENAME}
 INSTALL_SYMLINK?=	${INSTALL} ${INSTPRIV} ${SYMLINK} ${RENAME}
 .endif
 
+# for crunchide & ldd, define the OBJECT_FMTS used by a MACHINE_ARCH
+#
+OBJECT_FMTS=
+.if	${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "ia64"
+OBJECT_FMTS+=	elf32
+.endif
+.if	${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH:M*64*} != ""
+. if !(${MKCOMPAT:Uyes} == "no" && ${MACHINE_CPU} == "mips")
+OBJECT_FMTS+=	elf64
+. endif
+.endif
+
 #
 # Set defaults for the USE_xxx variables.
 #
@@ -1361,7 +1383,12 @@ ${var}?= no
 
 # Default to USE_XZ_SETS on some 64bit architectures where decompressor
 # memory will likely not be in short supply.
-.if ${MACHINE} == "amd64" || ${MACHINE} == "sparc64" || ${MACHINE} == "alpha"
+# Since pigz can not create .xz format files currently, disable .xz
+# format if USE_PIGZGZIP is enabled.
+.if ${USE_PIGZGZIP} == "no" && \
+		(${MACHINE} == "amd64" || \
+		 ${MACHINE} == "sparc64" || \
+		 ${MACHINE} == "alpha")
 USE_XZ_SETS?= yes
 .else
 USE_XZ_SETS?= no
@@ -1409,7 +1436,7 @@ X11SRCDIRMIT?=		${X11SRCDIR}/external/mit
 	FS ICE SM X11 XScrnSaver XTrap Xau Xcomposite Xcursor Xdamage \
 	Xdmcp Xevie Xext Xfixes Xfont Xfont2 Xft Xi Xinerama Xmu Xpresent Xpm \
 	Xrandr Xrender Xres Xt Xtst Xv XvMC Xxf86dga Xxf86misc Xxf86vm drm \
-	epoxy fontenc xkbfile xkbui Xaw pciaccess xcb xshmfence \
+	epoxy fontenc vdpau xkbfile xkbui Xaw pciaccess xcb xshmfence \
 	pthread-stubs
 X11SRCDIR.${_lib}?=		${X11SRCDIRMIT}/lib${_lib}/dist
 .endfor
@@ -1419,7 +1446,7 @@ X11SRCDIR.${_lib}?=		${X11SRCDIRMIT}/lib${_lib}/dist
 X11SRCDIR.${_proto}proto?=		${X11SRCDIRMIT}/${_proto}proto/dist
 .endfor
 
-# During transition from xorg-server 1.10 to 1.18
+# During transition from xorg-server 1.10 to 1.20
 .if \
     ${MACHINE} == "alpha"	|| \
     ${MACHINE} == "amiga"	|| \
@@ -1432,13 +1459,22 @@ X11SRCDIR.${_proto}proto?=		${X11SRCDIRMIT}/${_proto}proto/dist
     ${MACHINE} == "newsmips"	|| \
     ${MACHINE} == "sgimips"	|| \
     ${MACHINE} == "vax"		|| \
+    ${MACHINE} == "x68k"	|| \
     ${MACHINE} == "zaurus"
 HAVE_XORG_SERVER_VER?=110
 .else
-HAVE_XORG_SERVER_VER?=118
+HAVE_XORG_SERVER_VER?=120
 .endif
 
-.if ${HAVE_XORG_SERVER_VER} == "118"
+# MesaLib.old and MesaLib7 go together, and MesaLib is alone.
+HAVE_MESA_VER?=	10
+.if ${HAVE_MESA_VER} == "10"
+EXTERNAL_MESALIB_DIR?=	MesaLib.old
+.else
+EXTERNAL_MESALIB_DIR?=	MesaLib
+.endif
+
+.if ${HAVE_XORG_SERVER_VER} == "120"
 XORG_SERVER_SUBDIR?=xorg-server
 . if ${MACHINE} == "amd64" || ${MACHINE} == "i386"
 HAVE_XORG_GLAMOR?=	yes
@@ -1457,10 +1493,10 @@ HAVE_XORG_GLAMOR?=	no
 	xorg-cf-files imake xbiff xkeyboard-config \
 	xbitmaps appres xeyes xev xedit sessreg pixman \
 	beforelight bitmap editres makedepend fonttosfnt fslsfonts fstobdf \
-	glu glw mesa-demos MesaGLUT MesaLib MesaLib7 \
+	glu glw mesa-demos MesaGLUT MesaLib MesaLib.old MesaLib7 \
 	ico iceauth listres lndir \
 	luit xproxymanagementprotocol mkfontdir oclock proxymngr rgb \
-	rstart setxkbmap showfont smproxy twm viewres \
+	rstart setxkbmap showfont smproxy transset twm viewres \
 	x11perf xauth xcalc xclipboard \
 	xclock xcmsdb xconsole xditview xdpyinfo xdriinfo xdm \
 	xfd xf86dga xfindproxy xfontsel xfwp xgamma xgc xhost xinit \
@@ -1482,6 +1518,9 @@ HAVE_XORG_GLAMOR?=	no
 X11SRCDIR.${_dir}?=		${X11SRCDIRMIT}/${_dir}/dist
 .endfor
 
+# X11SRCDIR.Mesa points to the currently used Mesa sources
+X11SRCDIR.Mesa?=		${X11SRCDIRMIT}/${EXTERNAL_MESALIB_DIR}/dist
+
 .for _i in \
 	elographics keyboard mouse synaptics vmmouse void ws
 X11SRCDIR.xf86-input-${_i}?=	${X11SRCDIRMIT}/xf86-input-${_i}/dist
@@ -1489,7 +1528,7 @@ X11SRCDIR.xf86-input-${_i}?=	${X11SRCDIRMIT}/xf86-input-${_i}/dist
 
 # xf86-video-modesetting move into the server build.
 EXTRA_DRIVERS=
-.if ${HAVE_XORG_SERVER_VER} == "118"
+.if ${HAVE_XORG_SERVER_VER} == "120"
 X11SRCDIR.xf86-video-modesetting=${X11SRCDIR.xorg-server}/hw/xfree86/drivers/modesetting
 .else
 EXTRA_DRIVERS=	modesetting 
@@ -1503,7 +1542,7 @@ EXTRA_DRIVERS=	modesetting
 	r128 rendition \
 	s3 s3virge savage siliconmotion sis suncg14 \
 	suncg6 sunffb sunleo suntcx \
-	tdfx tga trident tseng vesa vga vmware wsfb xgi
+	tdfx tga trident tseng vboxvideo vesa vga vmware wsfb xgi
 X11SRCDIR.xf86-video-${_v}?=	${X11SRCDIRMIT}/xf86-video-${_v}/dist
 .endfor
 

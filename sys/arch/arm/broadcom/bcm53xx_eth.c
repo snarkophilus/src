@@ -35,7 +35,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(1, "$NetBSD: bcm53xx_eth.c,v 1.32 2018/09/03 16:29:23 riastradh Exp $");
+__KERNEL_RCSID(1, "$NetBSD: bcm53xx_eth.c,v 1.34 2019/03/08 08:12:39 msaitoh Exp $");
 
 #include <sys/param.h>
 #include <sys/atomic.h>
@@ -1546,7 +1546,7 @@ bcmeth_copy_packet(struct mbuf *m)
 	if (m0 == NULL) {
 		return NULL;
 	}
-	M_COPY_PKTHDR(m0, m);
+	m_copy_pkthdr(m0, m);
 	MCLAIM(m0, m->m_owner);
 	if (m0->m_pkthdr.len > MHLEN) {
 		MCLGET(m0, M_DONTWAIT);
@@ -1903,7 +1903,7 @@ bcmeth_soft_txintr(struct bcmeth_softc *sc)
 	mutex_enter(sc->sc_lock);
 	/*
 	 * Let's do what we came here for.  Consume transmitted
-	 * packets off the the transmit ring.
+	 * packets off the transmit ring.
 	 */
 	if (!bcmeth_txq_consume(sc, &sc->sc_txq)
 	    || !bcmeth_txq_enqueue(sc, &sc->sc_txq)) {
@@ -1939,7 +1939,7 @@ bcmeth_soft_intr(void *arg)
 	    || bcmeth_txq_active_p(sc, &sc->sc_txq)) {
 		/*
 		 * Let's do what we came here for.  Consume transmitted
-		 * packets off the the transmit ring.
+		 * packets off the transmit ring.
 		 */
 		if (!bcmeth_txq_consume(sc, &sc->sc_txq)
 		    || !bcmeth_txq_enqueue(sc, &sc->sc_txq)) {

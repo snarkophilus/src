@@ -1,4 +1,4 @@
-/*	$NetBSD: log.c,v 1.2 2018/08/12 13:02:37 christos Exp $	*/
+/*	$NetBSD: log.c,v 1.4 2019/02/24 20:01:31 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -16,6 +16,8 @@
 #include <config.h>
 
 #include <errno.h>
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <time.h>
@@ -27,7 +29,6 @@
 #include <isc/log.h>
 #include <isc/magic.h>
 #include <isc/mem.h>
-#include <isc/msgs.h>
 #include <isc/print.h>
 #include <isc/stat.h>
 #include <isc/stdio.h>
@@ -47,7 +48,7 @@
 #define LOG_BUFFER_SIZE	(8 * 1024)
 
 #ifndef PATH_MAX
-#define PATH_MAX 1024	/* AIX and others don't define this. */
+#define PATH_MAX 1024	/* WIN32 and others don't define this. */
 #endif
 
 /*!
@@ -114,7 +115,7 @@ struct isc_logconfig {
 	unsigned int			duplicate_interval;
 	int				highest_level;
 	char *				tag;
-	isc_boolean_t			dynamic;
+	bool				dynamic;
 };
 
 /*!
@@ -229,10 +230,9 @@ greatest_version(isc_logfile_t *file, int versions, int *greatest);
 
 static void
 isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
-	     isc_logmodule_t *module, int level, isc_boolean_t write_once,
-	     isc_msgcat_t *msgcat, int msgset, int msg,
+	     isc_logmodule_t *module, int level, bool write_once,
 	     const char *format, va_list args)
-     ISC_FORMAT_PRINTF(9, 0);
+     ISC_FORMAT_PRINTF(6, 0);
 
 /*@{*/
 /*!
@@ -277,11 +277,7 @@ isc_log_create(isc_mem_t *mctx, isc_log_t **lctxp, isc_logconfig_t **lcfgp) {
 
 		ISC_LIST_INIT(lctx->messages);
 
-		result = isc_mutex_init(&lctx->lock);
-		if (result != ISC_R_SUCCESS) {
-			isc_mem_putanddetach(&mctx, lctx, sizeof(*lctx));
-			return (result);
-		}
+		isc_mutex_init(&lctx->lock);
 
 		/*
 		 * Normally setting the magic number is the last step done
@@ -338,7 +334,7 @@ isc_logconfig_create(isc_log_t *lctx, isc_logconfig_t **lcfgp) {
 		lcfg->duplicate_interval = 0;
 		lcfg->highest_level = level;
 		lcfg->tag = NULL;
-		lcfg->dynamic = ISC_FALSE;
+		lcfg->dynamic = false;
 
 		ISC_LIST_INIT(lcfg->channels);
 
@@ -470,7 +466,7 @@ isc_log_destroy(isc_log_t **lctxp) {
 		isc_logconfig_destroy(&lcfg);
 	}
 
-	DESTROYLOCK(&lctx->lock);
+	isc_mutex_destroy(&lctx->lock);
 
 	while ((message = ISC_LIST_HEAD(lctx->messages)) != NULL) {
 		ISC_LIST_UNLINK(lctx->messages, message, link);
@@ -546,7 +542,7 @@ isc_logconfig_destroy(isc_logconfig_t **lcfgp) {
 			    lcfg->channellist_count *
 			    sizeof(ISC_LIST(isc_logchannellist_t)));
 
-	lcfg->dynamic = ISC_FALSE;
+	lcfg->dynamic = false;
 	if (lcfg->tag != NULL)
 		isc_mem_free(lcfg->lctx->mctx, lcfg->tag);
 	lcfg->tag = NULL;
@@ -749,7 +745,7 @@ isc_log_createchannel(isc_logconfig_t *lcfg, const char *name,
 		FILE_VERSIONS(channel) = destination->file.versions;
 		FILE_SUFFIX(channel) = destination->file.suffix;
 		FILE_MAXSIZE(channel) = destination->file.maximum_size;
-		FILE_MAXREACHED(channel) = ISC_FALSE;
+		FILE_MAXREACHED(channel) = false;
 		break;
 
 	case ISC_LOG_TOFILEDESC:
@@ -836,8 +832,8 @@ isc_log_write(isc_log_t *lctx, isc_logcategory_t *category,
 	 */
 
 	va_start(args, format);
-	isc_log_doit(lctx, category, module, level, ISC_FALSE,
-		     NULL, 0, 0, format, args);
+	isc_log_doit(lctx, category, module, level, false,
+		     format, args);
 	va_end(args);
 }
 
@@ -849,8 +845,8 @@ isc_log_vwrite(isc_log_t *lctx, isc_logcategory_t *category,
 	/*
 	 * Contract checking is done in isc_log_doit().
 	 */
-	isc_log_doit(lctx, category, module, level, ISC_FALSE,
-		     NULL, 0, 0, format, args);
+	isc_log_doit(lctx, category, module, level, false,
+		     format, args);
 }
 
 void
@@ -864,8 +860,8 @@ isc_log_write1(isc_log_t *lctx, isc_logcategory_t *category,
 	 */
 
 	va_start(args, format);
-	isc_log_doit(lctx, category, module, level, ISC_TRUE,
-		     NULL, 0, 0, format, args);
+	isc_log_doit(lctx, category, module, level, true,
+		     format, args);
 	va_end(args);
 }
 
@@ -877,70 +873,8 @@ isc_log_vwrite1(isc_log_t *lctx, isc_logcategory_t *category,
 	/*
 	 * Contract checking is done in isc_log_doit().
 	 */
-	isc_log_doit(lctx, category, module, level, ISC_TRUE,
-		     NULL, 0, 0, format, args);
-}
-
-void
-isc_log_iwrite(isc_log_t *lctx, isc_logcategory_t *category,
-	       isc_logmodule_t *module, int level,
-	       isc_msgcat_t *msgcat, int msgset, int msg,
-	       const char *format, ...)
-{
-	va_list args;
-
-	/*
-	 * Contract checking is done in isc_log_doit().
-	 */
-
-	va_start(args, format);
-	isc_log_doit(lctx, category, module, level, ISC_FALSE,
-		     msgcat, msgset, msg, format, args);
-	va_end(args);
-}
-
-void
-isc_log_ivwrite(isc_log_t *lctx, isc_logcategory_t *category,
-	       isc_logmodule_t *module, int level,
-	       isc_msgcat_t *msgcat, int msgset, int msg,
-	       const char *format, va_list args)
-{
-	/*
-	 * Contract checking is done in isc_log_doit().
-	 */
-	isc_log_doit(lctx, category, module, level, ISC_FALSE,
-		     msgcat, msgset, msg, format, args);
-}
-
-void
-isc_log_iwrite1(isc_log_t *lctx, isc_logcategory_t *category,
-		isc_logmodule_t *module, int level,
-		isc_msgcat_t *msgcat, int msgset, int msg,
-		const char *format, ...)
-{
-	va_list args;
-
-	/*
-	 * Contract checking is done in isc_log_doit().
-	 */
-
-	va_start(args, format);
-	isc_log_doit(lctx, category, module, level, ISC_TRUE,
-		     msgcat, msgset, msg, format, args);
-	va_end(args);
-}
-
-void
-isc_log_ivwrite1(isc_log_t *lctx, isc_logcategory_t *category,
-		 isc_logmodule_t *module, int level,
-		 isc_msgcat_t *msgcat, int msgset, int msg,
-		 const char *format, va_list args)
-{
-	/*
-	 * Contract checking is done in isc_log_doit().
-	 */
-	isc_log_doit(lctx, category, module, level, ISC_TRUE,
-		     msgcat, msgset, msg, format, args);
+	isc_log_doit(lctx, category, module, level, true,
+		     format, args);
 }
 
 void
@@ -1091,7 +1025,7 @@ assignchannel(isc_logconfig_t *lcfg, unsigned int category_id,
 		if (lcfg->highest_level < channel->level)
 			lcfg->highest_level = channel->level;
 		if (channel->level == ISC_LOG_DYNAMIC)
-			lcfg->dynamic = ISC_TRUE;
+			lcfg->dynamic = true;
 	}
 
 	return (ISC_R_SUCCESS);
@@ -1222,8 +1156,8 @@ remove_old_tsversions(isc_logfile_t *file, int versions) {
 	isc_result_t result;
 	char *bname, *digit_end;
 	const char *dirname;
-	isc_int64_t version, last = ISC_INT64_MAX;
-	isc_int64_t to_keep[ISC_LOG_MAX_VERSIONS];
+	int64_t version, last = INT64_MAX;
+	int64_t to_keep[ISC_LOG_MAX_VERSIONS];
 	size_t bnamelen;
 	isc_dir_t dir;
 	char sep = '/';
@@ -1279,8 +1213,7 @@ remove_old_tsversions(isc_logfile_t *file, int versions) {
 			    dir.entry.name[bnamelen] == '.')
 			{
 				char *ename = &dir.entry.name[bnamelen + 1];
-				version = isc_string_touint64(ename,
-							      &digit_end, 10);
+				version = strtoull(ename, &digit_end, 10);
 				if (*digit_end == '\0') {
 					int i = 0;
 					while (i < versions &&
@@ -1315,7 +1248,7 @@ remove_old_tsversions(isc_logfile_t *file, int versions) {
 		    dir.entry.name[bnamelen] == '.')
 		{
 			char *ename = &dir.entry.name[bnamelen + 1];
-			version = isc_string_touint64(ename, &digit_end, 10);
+			version = strtoull(ename, &digit_end, 10);
 			/*
 			 * Remove any backup files that exceed versions.
 			 */
@@ -1497,8 +1430,8 @@ isc_logfile_roll(isc_logfile_t *file) {
 static isc_result_t
 isc_log_open(isc_logchannel_t *channel) {
 	struct stat statbuf;
-	isc_boolean_t regular_file;
-	isc_boolean_t roll = ISC_FALSE;
+	bool regular_file;
+	bool roll = false;
 	isc_result_t result = ISC_R_SUCCESS;
 	const char *path;
 
@@ -1515,7 +1448,7 @@ isc_log_open(isc_logchannel_t *channel) {
 	 * and either has no size limit or has reached its size limit.
 	 */
 	if (stat(path, &statbuf) == 0) {
-		regular_file = S_ISREG(statbuf.st_mode) ? ISC_TRUE : ISC_FALSE;
+		regular_file = S_ISREG(statbuf.st_mode) ? true : false;
 		/* XXXDCL if not regular_file complain? */
 		if ((FILE_MAXSIZE(channel) == 0 &&
 		     FILE_VERSIONS(channel) != ISC_LOG_ROLLNEVER) ||
@@ -1523,7 +1456,7 @@ isc_log_open(isc_logchannel_t *channel) {
 		     statbuf.st_size >= FILE_MAXSIZE(channel)))
 			roll = regular_file;
 	} else if (errno == ENOENT) {
-		regular_file = ISC_TRUE;
+		regular_file = true;
 		POST(regular_file);
 	} else
 		result = ISC_R_INVALIDFILE;
@@ -1553,7 +1486,7 @@ isc_log_open(isc_logchannel_t *channel) {
 	return (result);
 }
 
-isc_boolean_t
+bool
 isc_log_wouldlog(isc_log_t *lctx, int level) {
 	/*
 	 * Try to avoid locking the mutex for messages which can't
@@ -1573,17 +1506,15 @@ isc_log_wouldlog(isc_log_t *lctx, int level) {
 	 */
 
 	if (lctx == NULL || lctx->logconfig == NULL)
-		return (ISC_FALSE);
+		return (false);
 
-	return (ISC_TF(level <= lctx->logconfig->highest_level ||
-		       (lctx->logconfig->dynamic &&
-			level <= lctx->debug_level)));
+	return (level <= lctx->logconfig->highest_level ||
+		(lctx->logconfig->dynamic && level <= lctx->debug_level));
 }
 
 static void
 isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
-	     isc_logmodule_t *module, int level, isc_boolean_t write_once,
-	     isc_msgcat_t *msgcat, int msgset, int msg,
+	     isc_logmodule_t *module, int level, bool write_once,
 	     const char *format, va_list args)
 {
 	int syslog_level;
@@ -1591,12 +1522,11 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 	char local_time[64];
 	char iso8601z_string[64];
 	char iso8601l_string[64];
-	char level_string[24];
-	const char *iformat;
+	char level_string[24] = { 0 };
 	struct stat statbuf;
-	isc_boolean_t matched = ISC_FALSE;
-	isc_boolean_t printtime, iso8601, utc, printtag, printcolon;
-	isc_boolean_t printcategory, printmodule, printlevel, buffered;
+	bool matched = false;
+	bool printtime, iso8601, utc, printtag, printcolon;
+	bool printcategory, printmodule, printlevel, buffered;
 	isc_logconfig_t *lcfg;
 	isc_logchannel_t *channel;
 	isc_logchannellist_t *category_channels;
@@ -1622,15 +1552,9 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 	if (! isc_log_wouldlog(lctx, level))
 		return;
 
-	if (msgcat != NULL)
-		iformat = isc_msgcat_get(msgcat, msgset, msg, format);
-	else
-		iformat = format;
-
 	local_time[0] = '\0';
 	iso8601l_string[0] = '\0';
 	iso8601z_string[0] = '\0';
-	level_string[0] = '\0';
 
 	LOCK(&lctx->lock);
 
@@ -1676,7 +1600,7 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 			continue;
 		}
 
-		matched = ISC_TRUE;
+		matched = true;
 
 		channel = category_channels->channel;
 		category_channels = ISC_LIST_NEXT(category_channels, link);
@@ -1711,20 +1635,17 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 
 		if ((channel->flags & ISC_LOG_PRINTLEVEL) != 0 &&
 		    level_string[0] == '\0') {
-			if (level < ISC_LOG_CRITICAL)
+			if (level < ISC_LOG_CRITICAL) {
 				snprintf(level_string, sizeof(level_string),
-					 isc_msgcat_get(isc_msgcat,
-							ISC_MSGSET_LOG,
-							ISC_MSG_LEVEL,
-							"level %d: "),
-					 level);
-			else if (level > ISC_LOG_DYNAMIC)
+					 "level %d: ", level);
+			} else if (level > ISC_LOG_DYNAMIC) {
 				snprintf(level_string, sizeof(level_string),
 					 "%s %d: ", log_level_strings[0],
 					 level);
-			else
+			} else {
 				snprintf(level_string, sizeof(level_string),
 					 "%s: ", log_level_strings[-level]);
+			}
 		}
 
 		/*
@@ -1732,7 +1653,7 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 		 */
 		if (lctx->buffer[0] == '\0') {
 			(void)vsnprintf(lctx->buffer, sizeof(lctx->buffer),
-					iformat, args);
+					format, args);
 
 			/*
 			 * Check for duplicates.
@@ -1837,23 +1758,18 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 			}
 		}
 
-		utc	      = ISC_TF((channel->flags & ISC_LOG_UTC) != 0);
-		iso8601       = ISC_TF((channel->flags & ISC_LOG_ISO8601) != 0);
-		printtime     = ISC_TF((channel->flags & ISC_LOG_PRINTTIME)
-				       != 0);
-		printtag      = ISC_TF((channel->flags &
-					(ISC_LOG_PRINTTAG|ISC_LOG_PRINTPREFIX))
-				       != 0 && lcfg->tag != NULL);
-		printcolon    = ISC_TF((channel->flags & ISC_LOG_PRINTTAG)
-				       != 0 && lcfg->tag != NULL);
-		printcategory = ISC_TF((channel->flags & ISC_LOG_PRINTCATEGORY)
-				       != 0);
-		printmodule   = ISC_TF((channel->flags & ISC_LOG_PRINTMODULE)
-				       != 0);
-		printlevel    = ISC_TF((channel->flags & ISC_LOG_PRINTLEVEL)
-				       != 0);
-		buffered      = ISC_TF((channel->flags & ISC_LOG_BUFFERED)
-				       != 0);
+		utc	      = ((channel->flags & ISC_LOG_UTC) != 0);
+		iso8601       = ((channel->flags & ISC_LOG_ISO8601) != 0);
+		printtime     = ((channel->flags & ISC_LOG_PRINTTIME) != 0);
+		printtag      = ((channel->flags &
+				  (ISC_LOG_PRINTTAG|ISC_LOG_PRINTPREFIX)) != 0 &&
+				 lcfg->tag != NULL);
+		printcolon    = ((channel->flags & ISC_LOG_PRINTTAG) != 0 &&
+				 lcfg->tag != NULL);
+		printcategory = ((channel->flags & ISC_LOG_PRINTCATEGORY) != 0);
+		printmodule   = ((channel->flags & ISC_LOG_PRINTMODULE) != 0);
+		printlevel    = ((channel->flags & ISC_LOG_PRINTLEVEL) != 0);
+		buffered      = ((channel->flags & ISC_LOG_BUFFERED) != 0);
 
 		if (printtime) {
 			if (iso8601) {
@@ -1887,7 +1803,7 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 				    statbuf.st_size < FILE_MAXSIZE(channel)) {
 					(void)fclose(FILE_STREAM(channel));
 					FILE_STREAM(channel) = NULL;
-					FILE_MAXREACHED(channel) = ISC_FALSE;
+					FILE_MAXREACHED(channel) = false;
 				} else
 					/*
 					 * Eh, skip it.
@@ -1944,7 +1860,7 @@ isc_log_doit(isc_log_t *lctx, isc_logcategory_t *category,
 				if (fstat(fileno(FILE_STREAM(channel)),
 					  &statbuf) >= 0 &&
 				    statbuf.st_size > FILE_MAXSIZE(channel))
-					FILE_MAXREACHED(channel) = ISC_TRUE;
+					FILE_MAXREACHED(channel) = true;
 			}
 
 			break;

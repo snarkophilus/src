@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.sys.mk,v 1.286 2018/08/03 02:34:31 kamil Exp $
+#	$NetBSD: bsd.sys.mk,v 1.291 2019/02/23 03:10:06 kamil Exp $
 #
 # Build definitions used for NetBSD source tree builds.
 
@@ -232,6 +232,22 @@ CPUFLAGS+=	-Wa,--fatal-warnings
 CFLAGS+=	${CPUFLAGS}
 AFLAGS+=	${CPUFLAGS}
 
+.if ${KLEAK:U0} > 0
+KLEAKFLAGS=	-fsanitize-coverage=trace-pc
+.for f in subr_kleak.c
+KLEAKFLAGS.${f}=	# empty
+.endfor
+CFLAGS+=	${KLEAKFLAGS.${.IMPSRC:T}:U${KLEAKFLAGS}}
+.endif
+
+.if ${KCOV:U0} > 0
+KCOVFLAGS=	-fsanitize-coverage=trace-pc
+.for f in subr_kcov.c subr_lwp_specificdata.c subr_specificdata.c
+KCOVFLAGS.${f}=		# empty
+.endfor
+CFLAGS+=	${KCOVFLAGS.${.IMPSRC:T}:U${KCOVFLAGS}}
+.endif
+
 .if !defined(NOPIE) && (!defined(LDSTATIC) || ${LDSTATIC} != "-static")
 # Position Independent Executable flags
 PIE_CFLAGS?=        -fPIE
@@ -239,13 +255,16 @@ PIE_LDFLAGS?=       -pie ${${ACTIVE_CC} == "gcc":? -shared-libgcc :}
 PIE_AFLAGS?=	    -fPIE
 .endif
 
-ELF2ECOFF?=	elf2ecoff
+ARM_ELF2AOUT?=	elf2aout
+M68K_ELF2AOUT?=	elf2aout
+MIPS_ELF2ECOFF?=	elf2ecoff
 MKDEP?=		mkdep
 MKDEPCXX?=	mkdep
 OBJCOPY?=	objcopy
 OBJDUMP?=	objdump
 PAXCTL?=	paxctl
 STRIP?=		strip
+MV?=		mv -f
 
 .SUFFIXES:	.o .ln .lo .c .cc .cpp .cxx .C .m ${YHEADER:D.h}
 
@@ -285,13 +304,13 @@ STRIP?=		strip
 .c.lo:
 	${_MKTARGET_COMPILE}
 	${HOST_COMPILE.c} -o ${.TARGET}.o ${COPTS.${.IMPSRC:T}} ${CPUFLAGS.${.IMPSRC:T}} ${CPPFLAGS.${.IMPSRC:T}} ${.IMPSRC}
-	mv ${.TARGET}.o ${.TARGET}
+	${MV} ${.TARGET}.o ${.TARGET}
 
 # C++
 .cc.lo .cpp.lo .cxx.lo .C.lo:
 	${_MKTARGET_COMPILE}
 	${HOST_COMPILE.cc} -o ${.TARGET}.o ${COPTS.${.IMPSRC:T}} ${CPUFLAGS.${.IMPSRC:T}} ${CPPFLAGS.${.IMPSRC:T}} ${.IMPSRC}
-	mv ${.TARGET}.o ${.TARGET}
+	${MV} ${.TARGET}.o ${.TARGET}
 
 # Assembly
 .s.o:

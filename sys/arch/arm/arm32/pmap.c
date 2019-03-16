@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.370 2018/10/18 09:01:52 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.371 2018/10/28 14:59:17 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -218,7 +218,7 @@
 #include <arm/locore.h>
 #include <arm/arm32/pmap_common.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.370 2018/10/18 09:01:52 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.371 2018/10/28 14:59:17 skrll Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG

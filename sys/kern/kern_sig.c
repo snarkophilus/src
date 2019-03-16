@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sig.c,v 1.349 2018/05/28 14:07:37 kamil Exp $	*/
+/*	$NetBSD: kern_sig.c,v 1.351 2019/03/08 23:32:30 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.349 2018/05/28 14:07:37 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.351 2019/03/08 23:32:30 kamil Exp $");
 
 #include "opt_ptrace.h"
 #include "opt_dtrace.h"
@@ -190,6 +190,13 @@ signal_listener_cb(kauth_cred_t cred, kauth_action_t action, void *cookie,
 	return result;
 }
 
+static int
+sigacts_ctor(void *arg __unused, void *obj, int flags __unused)
+{
+	memset(obj, 0, sizeof(struct sigacts));
+	return 0;
+}
+
 /*
  * signal_init:
  *
@@ -203,7 +210,7 @@ signal_init(void)
 
 	sigacts_cache = pool_cache_init(sizeof(struct sigacts), 0, 0, 0,
 	    "sigacts", sizeof(struct sigacts) > PAGE_SIZE ?
-	    &sigactspool_allocator : NULL, IPL_NONE, NULL, NULL, NULL);
+	    &sigactspool_allocator : NULL, IPL_NONE, sigacts_ctor, NULL, NULL);
 	ksiginfo_cache = pool_cache_init(sizeof(ksiginfo_t), 0, 0, 0,
 	    "ksiginfo", NULL, IPL_VM, NULL, NULL, NULL);
 
@@ -904,13 +911,25 @@ trapsignal(struct lwp *l, ksiginfo_t *ksi)
 	KASSERT(!cpu_intr_p());
 	mutex_enter(proc_lock);
 	mutex_enter(p->p_lock);
+
+	if (ISSET(p->p_slflag, PSL_TRACED) &&
+	    !(p->p_pptr == p->p_opptr && ISSET(p->p_lflag, PL_PPWAIT))) {
+		p->p_xsig = signo;
+		p->p_sigctx.ps_faked = true; // XXX
+		p->p_sigctx.ps_info._signo = signo;
+		p->p_sigctx.ps_info._code = ksi->ksi_code;
+		sigswitch(0, signo, false);
+		// XXX ktrpoint(KTR_PSIG)
+		mutex_exit(p->p_lock);
+		return;
+	}
+
 	mask = &l->l_sigmask;
 	ps = p->p_sigacts;
 
-	const bool traced = (p->p_slflag & PSL_TRACED) != 0;
 	const bool caught = sigismember(&p->p_sigctx.ps_sigcatch, signo);
 	const bool masked = sigismember(mask, signo);
-	if (!traced && caught && !masked) {
+	if (caught && !masked) {
 		mutex_exit(proc_lock);
 		l->l_ru.ru_nsignals++;
 		kpsendsig(l, ksi, mask);
@@ -1671,7 +1690,9 @@ issignal(struct lwp *l)
 		if (p->p_stat == SSTOP || (p->p_sflag & PS_STOPPING) != 0) {
 			sigswitch(PS_NOCLDSTOP, 0, true);
 			signo = sigchecktrace();
-		} else
+		} else if (p->p_stat == SACTIVE)
+			signo = sigchecktrace();
+		else
 			signo = 0;
 
 		/* Signals from the debugger are "out of band". */

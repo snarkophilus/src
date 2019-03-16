@@ -1,4 +1,4 @@
-/*	$NetBSD: util.h,v 1.2 2018/08/12 13:02:38 christos Exp $	*/
+/*	$NetBSD: util.h,v 1.4 2019/02/24 20:01:31 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -71,7 +71,7 @@
  * Use this in translation units that would otherwise be empty, to
  * suppress compiler warnings.
  */
-#define EMPTY_TRANSLATION_UNIT static void __used isc__empty(int level) { if (level++ < 100) isc__empty(level); }
+#define EMPTY_TRANSLATION_UNIT extern int isc__empty;
 
 /*%
  * We use macros instead of calling the routines directly because
@@ -83,7 +83,6 @@
 #ifdef ISC_UTIL_TRACEON
 #define ISC_UTIL_TRACE(a) a
 #include <stdio.h>		/* Required for fprintf/stderr when tracing. */
-#include <isc/msgs.h>		/* Required for isc_msgcat when tracing. */
 #else
 #define ISC_UTIL_TRACE(a)
 #endif
@@ -91,57 +90,35 @@
 #include <isc/result.h>		/* Contractual promise. */
 
 #define LOCK(lp) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_LOCKING, "LOCKING"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "LOCKING %p %s %d\n", \
 			       (lp), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_mutex_lock((lp)) == ISC_R_SUCCESS); \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_LOCKED, "LOCKED"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "LOCKED %p %s %d\n", \
 			       (lp), __FILE__, __LINE__)); \
 	} while (/*CONSTCOND*/0)
 #define UNLOCK(lp) do { \
 	RUNTIME_CHECK(isc_mutex_unlock((lp)) == ISC_R_SUCCESS); \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_UNLOCKED, "UNLOCKED"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "UNLOCKED %p %s %d\n", \
 			       (lp), __FILE__, __LINE__)); \
 	} while (/*CONSTCOND*/0)
-#define ISLOCKED(lp) (1)
-#define DESTROYLOCK(lp) \
-	RUNTIME_CHECK(isc_mutex_destroy((lp)) == ISC_R_SUCCESS)
-
 
 #define BROADCAST(cvp) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_BROADCAST, "BROADCAST"),\
+	ISC_UTIL_TRACE(fprintf(stderr, "BROADCAST %p %s %d\n", \
 			       (cvp), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_condition_broadcast((cvp)) == ISC_R_SUCCESS); \
 	} while (/*CONSTCOND*/0)
 #define SIGNAL(cvp) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_SIGNAL, "SIGNAL"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "SIGNAL %p %s %d\n", \
 			       (cvp), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_condition_signal((cvp)) == ISC_R_SUCCESS); \
 	} while (/*CONSTCOND*/0)
 #define WAIT(cvp, lp) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_UTILWAIT, "WAIT"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "WAIT %p LOCK %p %s %d\n", \
 			       (cvp), \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_LOCK, "LOCK"), \
 			       (lp), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_condition_wait((cvp), (lp)) == ISC_R_SUCCESS); \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p %s %p %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_WAITED, "WAITED"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "WAITED %p LOCKED %p %s %d\n", \
 			       (cvp), \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_LOCKED, "LOCKED"), \
 			       (lp), __FILE__, __LINE__)); \
 	} while (/*CONSTCOND*/0)
 
@@ -156,26 +133,17 @@
 	isc_condition_waituntil((cvp), (lp), (tp))
 
 #define RWLOCK(lp, t) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p, %d %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_RWLOCK, "RWLOCK"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "RWLOCK %p, %d %s %d\n", \
 			       (lp), (t), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_rwlock_lock((lp), (t)) == ISC_R_SUCCESS); \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p, %d %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_RWLOCKED, "RWLOCKED"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "RWLOCKED %p, %d %s %d\n", \
 			       (lp), (t), __FILE__, __LINE__)); \
 	} while (/*CONSTCOND*/0)
 #define RWUNLOCK(lp, t) do { \
-	ISC_UTIL_TRACE(fprintf(stderr, "%s %p, %d %s %d\n", \
-			       isc_msgcat_get(isc_msgcat, ISC_MSGSET_UTIL, \
-					      ISC_MSG_RWUNLOCK, "RWUNLOCK"), \
+	ISC_UTIL_TRACE(fprintf(stderr, "RWUNLOCK %p, %d %s %d\n", \
 			       (lp), (t), __FILE__, __LINE__)); \
 	RUNTIME_CHECK(isc_rwlock_unlock((lp), (t)) == ISC_R_SUCCESS); \
 	} while (/*CONSTCOND*/0)
-
-#define DESTROYMUTEXBLOCK(bp, n) \
-	RUNTIME_CHECK(isc_mutexblock_destroy((bp), (n)) == ISC_R_SUCCESS)
 
 /*
  * List Macros.
@@ -205,6 +173,42 @@
  */
 #include <isc/likely.h>
 
+#ifdef HAVE_BUILTIN_UNREACHABLE
+#define ISC_UNREACHABLE() __builtin_unreachable();
+#else
+#define ISC_UNREACHABLE()
+#endif
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
+/* GCC defines __SANITIZE_ADDRESS__, so reuse the macro for clang */
+#if __has_feature(address_sanitizer)
+#define __SANITIZE_ADDRESS__ 1
+#endif
+
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR >= 6)
+#define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#elif __has_feature(c_static_assert)
+#define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#else
+#define STATIC_ASSERT(cond, msg) INSIST(cond)
+#endif
+
+#ifdef UNIT_TESTING
+extern void mock_assert(const int result, const char* const expression,
+			const char * const file, const int line);
+#define REQUIRE(expression)						\
+	mock_assert((int)(expression), #expression, __FILE__, __LINE__)
+#define ENSURE(expression)						\
+	mock_assert((int)(expression), #expression, __FILE__, __LINE__)
+#define INSIST(expression)						\
+	mock_assert((int)(expression), #expression, __FILE__, __LINE__)
+#define INVARIANT(expression)						\
+	mock_assert((int)(expression), #expression, __FILE__, __LINE__)
+
+#else /* UNIT_TESTING */
 /*
  * Assertions
  */
@@ -219,6 +223,8 @@
 /*% Invariant Assertion */
 #define INVARIANT(e)			ISC_INVARIANT(e)
 
+#endif /* UNIT_TESTING */
+
 /*
  * Errors
  */
@@ -228,13 +234,28 @@
 #define UNEXPECTED_ERROR		isc_error_unexpected
 /*% Fatal Error */
 #define FATAL_ERROR			isc_error_fatal
+
+#ifdef UNIT_TESTING
+
+#define RUNTIME_CHECK(expression)					\
+	mock_assert((int)(expression), #expression, __FILE__, __LINE__)
+
+#else /* UNIT_TESTING */
+
 /*% Runtime Check */
 #define RUNTIME_CHECK(cond)		ISC_ERROR_RUNTIMECHECK(cond)
+
+#endif /* UNIT_TESTING */
 
 /*%
  * Time
  */
 #define TIME_NOW(tp) 	RUNTIME_CHECK(isc_time_now((tp)) == ISC_R_SUCCESS)
+
+/*%
+ * Alignment
+ */
+#define ISC_ALIGN(x, a) (((x) + (a) - 1) & ~((typeof(x))(a)-1))
 
 /*%
  * Misc

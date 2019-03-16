@@ -1,4 +1,4 @@
-/*	$NetBSD: result.h,v 1.2 2018/08/12 13:02:38 christos Exp $	*/
+/*	$NetBSD: result.h,v 1.4 2019/02/24 20:01:31 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -86,9 +86,10 @@
 #define ISC_R_MULTIPLE			62	/*%< multiple */
 #define ISC_R_WOULDBLOCK		63	/*%< would block */
 #define ISC_R_COMPLETE			64	/*%< complete */
+#define ISC_R_CRYPTOFAILURE		65	/*%< cryptography library failure */
 
 /*% Not a result code: the number of results. */
-#define ISC_R_NRESULTS 			65
+#define ISC_R_NRESULTS 			66
 
 ISC_LANG_BEGINDECLS
 
@@ -107,11 +108,11 @@ isc_result_toid(isc_result_t);
 
 isc_result_t
 isc_result_register(unsigned int base, unsigned int nresults,
-		    const char **text, isc_msgcat_t *msgcat, int set);
+		    const char **text, int set);
 
 isc_result_t
 isc_result_registerids(unsigned int base, unsigned int nresults,
-		       const char **ids, isc_msgcat_t *msgcat, int set);
+		       const char **ids, int set);
 
 ISC_LANG_ENDDECLS
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: StdAfx.h,v 1.2 2018/08/12 13:02:30 christos Exp $	*/
+/*	$NetBSD: StdAfx.h,v 1.4 2019/02/24 20:01:29 christos Exp $	*/
 
 // stdafx.h : include file for standard system include files,
 //  or project specific include files that are used frequently, but
@@ -6,10 +6,10 @@
 //
 
 /*
- * Minimum version is Windows XP SP1
+ * Minimum version is Windows 8 and Windows Server 2012
  */
-#define _WIN32_WINNT 0x0501
-#define NTDDI_VERSION 0x05010100
+#define _WIN32_WINNT 0x0602
+#define NTDDI_VERSION 0x06020000
 
 #ifndef _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_DEPRECATE 1

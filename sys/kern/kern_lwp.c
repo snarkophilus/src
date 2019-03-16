@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_lwp.c,v 1.194 2018/07/04 18:15:27 kamil Exp $	*/
+/*	$NetBSD: kern_lwp.c,v 1.196 2019/03/01 09:02:03 hannken Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2006, 2007, 2008, 2009 The NetBSD Foundation, Inc.
@@ -211,7 +211,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_lwp.c,v 1.194 2018/07/04 18:15:27 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_lwp.c,v 1.196 2019/03/01 09:02:03 hannken Exp $");
 
 #include "opt_ddb.h"
 #include "opt_lockdebug.h"
@@ -236,6 +236,7 @@ __KERNEL_RCSID(0, "$NetBSD: kern_lwp.c,v 1.194 2018/07/04 18:15:27 kamil Exp $")
 #include <sys/lwpctl.h>
 #include <sys/atomic.h>
 #include <sys/filedesc.h>
+#include <sys/fstrans.h>
 #include <sys/dtrace_bsd.h>
 #include <sys/sdt.h>
 #include <sys/xcall.h>
@@ -1093,6 +1094,9 @@ lwp_exit(struct lwp *l)
 	/* Drop filedesc reference. */
 	fd_free();
 
+	/* Release fstrans private data. */
+	fstrans_lwp_dtor(l);
+
 	/* Delete the specificdata while it's still safe to sleep. */
 	lwp_finispecific(l);
 
@@ -1856,7 +1860,7 @@ lwp_ctl_alloc(vaddr_t *uaddr)
 	mutex_exit(&lp->lp_lock);
 
 	KPREEMPT_DISABLE(l);
-	l->l_lwpctl->lc_curcpu = (int)curcpu()->ci_data.cpu_index;
+	l->l_lwpctl->lc_curcpu = (int)cpu_index(curcpu());
 	KPREEMPT_ENABLE(l);
 
 	return 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.70 2018/06/30 14:59:38 riastradh Exp $	*/
+/*	$NetBSD: clock.c,v 1.78 2019/03/09 09:51:29 kre Exp $	*/
 
 /*-
  * Copyright (c) 2017, 2018 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.70 2018/06/30 14:59:38 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.78 2019/03/09 09:51:29 kre Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -62,7 +62,7 @@ __KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.70 2018/06/30 14:59:38 riastradh Exp $")
 
 #include <xen/evtchn.h>
 #include <xen/hypervisor.h>
-#include <xen/xen-public/vcpu.h>
+#include <xen/include/public/vcpu.h>
 #include <xen/xen.h>
 
 #include <x86/rtc.h>
@@ -162,7 +162,7 @@ void
 idle_block(void)
 {
 
-	KASSERT(curcpu()->ci_ipending == 0);
+	KASSERT(curcpu()->ci_xpending == 0);
 	HYPERVISOR_block();
 }
 
@@ -728,7 +728,7 @@ xen_suspendclocks(struct cpu_info *ci)
 	KASSERT(evtch != -1);
 
 	hypervisor_mask_event(evtch);
-	intr_disestablish(ci->ci_xen_timer_intrhand);
+	xen_intr_disestablish(ci->ci_xen_timer_intrhand);
 	ci->ci_xen_timer_intrhand = NULL;
 
 	aprint_verbose("Xen clock: removed event channel %d\n", evtch);
@@ -751,7 +751,7 @@ xen_resumeclocks(struct cpu_info *ci)
 {
 	char intr_xname[INTRDEVNAMEBUF];
 	int evtch;
-	int error;
+	int error __diagused;
 
 	KASSERT(ci == curcpu());
 	KASSERT(kpreempt_disabled());
@@ -763,13 +763,13 @@ xen_resumeclocks(struct cpu_info *ci)
 	snprintf(intr_xname, sizeof(intr_xname), "%s clock",
 	    device_xname(ci->ci_dev));
 	/* XXX sketchy function pointer cast -- fix the API, please */
-	ci->ci_xen_timer_intrhand = intr_establish_xname(0, &xen_pic, evtch,
+	ci->ci_xen_timer_intrhand = xen_intr_establish_xname(-1, &xen_pic, evtch,
 	    IST_LEVEL, IPL_CLOCK, (int (*)(void *))xen_timer_handler, ci, true,
 	    intr_xname);
 	if (ci->ci_xen_timer_intrhand == NULL)
 		panic("failed to establish timer interrupt handler");
 
-	hypervisor_enable_event(evtch);
+	hypervisor_unmask_event(evtch);
 
 	aprint_verbose("Xen %s: using event channel %d\n", intr_xname, evtch);
 
@@ -811,6 +811,7 @@ xen_timer_handler(void *cookie, struct clockframe *frame)
 	KASSERT(cpu_intr_p());
 	KASSERT(cookie == ci);
 
+	frame = NULL; /* We use values cached in curcpu()  */
 again:
 	/*
 	 * Find how many nanoseconds of Xen system time has elapsed

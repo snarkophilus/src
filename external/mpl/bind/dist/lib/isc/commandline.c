@@ -1,4 +1,4 @@
-/*	$NetBSD: commandline.c,v 1.2 2018/08/12 13:02:37 christos Exp $	*/
+/*	$NetBSD: commandline.c,v 1.4 2019/02/24 20:01:31 christos Exp $	*/
 
 /*
  * Portions Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -51,11 +51,11 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include <isc/commandline.h>
 #include <isc/mem.h>
-#include <isc/msgs.h>
 #include <isc/print.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -69,9 +69,9 @@ LIBISC_EXTERNAL_DATA char *isc_commandline_argument;
 /*% For printing error messages. */
 LIBISC_EXTERNAL_DATA char *isc_commandline_progname;
 /*% Print error messages. */
-LIBISC_EXTERNAL_DATA isc_boolean_t isc_commandline_errprint = ISC_TRUE;
+LIBISC_EXTERNAL_DATA bool isc_commandline_errprint = true;
 /*% Reset processing. */
-LIBISC_EXTERNAL_DATA isc_boolean_t isc_commandline_reset = ISC_TRUE;
+LIBISC_EXTERNAL_DATA bool isc_commandline_reset = true;
 
 static char endopt = '\0';
 
@@ -97,7 +97,7 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 	if (isc_commandline_reset || *place == '\0') {
 		if (isc_commandline_reset) {
 			isc_commandline_index = 1;
-			isc_commandline_reset = ISC_FALSE;
+			isc_commandline_reset = false;
 		}
 
 		if (isc_commandline_progname == NULL)
@@ -136,12 +136,8 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 			isc_commandline_index++;
 
 		if (isc_commandline_errprint && *options != ':')
-			fprintf(stderr, "%s: %s -- %c\n",
+			fprintf(stderr, "%s: illegal option -- %c\n",
 				isc_commandline_progname,
-				isc_msgcat_get(isc_msgcat,
-					       ISC_MSGSET_COMMANDLINE,
-					       ISC_MSG_ILLEGALOPT,
-					       "illegal option"),
 				isc_commandline_option);
 
 		return (BADOPT);
@@ -189,13 +185,8 @@ isc_commandline_parse(int argc, char * const *argv, const char *options) {
 				return (BADARG);
 
 			if (isc_commandline_errprint)
-				fprintf(stderr, "%s: %s -- %c\n",
+				fprintf(stderr, "%s: option requires an argument -- %c\n",
 					isc_commandline_progname,
-					isc_msgcat_get(isc_msgcat,
-						       ISC_MSGSET_COMMANDLINE,
-						       ISC_MSG_OPTNEEDARG,
-						       "option requires "
-						       "an argument"),
 					isc_commandline_option);
 
 			return (BADOPT);

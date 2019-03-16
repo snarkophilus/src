@@ -1,4 +1,4 @@
-/*	$NetBSD: lib.c,v 1.2 2018/08/12 13:02:35 christos Exp $	*/
+/*	$NetBSD: lib.c,v 1.4 2019/02/24 20:01:30 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -15,12 +15,11 @@
 
 #include <config.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 
-#include <isc/entropy.h>
 #include <isc/hash.h>
 #include <isc/mem.h>
-#include <isc/msgcat.h>
 #include <isc/mutex.h>
 #include <isc/once.h>
 #include <isc/util.h>
@@ -38,49 +37,24 @@
  ***/
 
 LIBDNS_EXTERNAL_DATA unsigned int			dns_pps = 0U;
-LIBDNS_EXTERNAL_DATA isc_msgcat_t *			dns_msgcat = NULL;
-
-
-/***
- *** Private
- ***/
-
-static isc_once_t		msgcat_once = ISC_ONCE_INIT;
 
 
 /***
  *** Functions
  ***/
 
-static void
-open_msgcat(void) {
-	isc_msgcat_open("libdns.cat", &dns_msgcat);
-}
-
-void
-dns_lib_initmsgcat(void) {
-
-	/*
-	 * Initialize the DNS library's message catalog, dns_msgcat, if it
-	 * has not already been initialized.
-	 */
-
-	RUNTIME_CHECK(isc_once_do(&msgcat_once, open_msgcat) == ISC_R_SUCCESS);
-}
-
 static isc_once_t init_once = ISC_ONCE_INIT;
 static isc_mem_t *dns_g_mctx = NULL;
 static dns_dbimplementation_t *dbimp = NULL;
-static isc_boolean_t initialize_done = ISC_FALSE;
+static bool initialize_done = false;
 static isc_mutex_t reflock;
 static unsigned int references = 0;
 
 static void
 initialize(void) {
 	isc_result_t result;
-	isc_entropy_t *ectx = NULL;
 
-	REQUIRE(initialize_done == ISC_FALSE);
+	REQUIRE(initialize_done == false);
 
 	result = isc_mem_create(0, 0, &dns_g_mctx);
 	if (result != ISC_R_SUCCESS)
@@ -89,34 +63,16 @@ initialize(void) {
 	result = dns_ecdb_register(dns_g_mctx, &dbimp);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_mctx;
-	result = isc_entropy_create(dns_g_mctx, &ectx);
+
+	result = dst_lib_init(dns_g_mctx, NULL);
 	if (result != ISC_R_SUCCESS)
 		goto cleanup_db;
-	result = isc_hash_create(dns_g_mctx, NULL, DNS_NAME_MAXWIRE);
-	if (result != ISC_R_SUCCESS)
-		goto cleanup_ectx;
 
-	result = dst_lib_init(dns_g_mctx, ectx, 0);
-	if (result != ISC_R_SUCCESS)
-		goto cleanup_hash;
+	isc_mutex_init(&reflock);
 
-	result = isc_mutex_init(&reflock);
-	if (result != ISC_R_SUCCESS)
-		goto cleanup_dst;
-
-	isc_hash_init();
-	isc_entropy_detach(&ectx);
-
-	initialize_done = ISC_TRUE;
+	initialize_done = true;
 	return;
 
-  cleanup_dst:
-	dst_lib_destroy();
-  cleanup_ectx:
-	if (ectx != NULL)
-		isc_entropy_detach(&ectx);
-  cleanup_hash:
-	isc_hash_destroy();
   cleanup_db:
 	if (dbimp != NULL)
 		dns_ecdb_unregister(&dbimp);
@@ -150,11 +106,11 @@ dns_lib_init(void) {
 
 void
 dns_lib_shutdown(void) {
-	isc_boolean_t cleanup_ok = ISC_FALSE;
+	bool cleanup_ok = false;
 
 	LOCK(&reflock);
 	if (--references == 0)
-		cleanup_ok = ISC_TRUE;
+		cleanup_ok = true;
 	UNLOCK(&reflock);
 
 	if (!cleanup_ok)
@@ -162,8 +118,6 @@ dns_lib_shutdown(void) {
 
 	dst_lib_destroy();
 
-	if (isc_hashctx != NULL)
-		isc_hash_destroy();
 	if (dbimp != NULL)
 		dns_ecdb_unregister(&dbimp);
 	if (dns_g_mctx != NULL)

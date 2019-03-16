@@ -1,4 +1,4 @@
-/*	$NetBSD: wi.c,v 1.248 2018/09/03 16:29:31 riastradh Exp $	*/
+/*	$NetBSD: wi.c,v 1.250 2019/02/05 06:17:02 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 2004 The NetBSD Foundation, Inc.
@@ -99,7 +99,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wi.c,v 1.248 2018/09/03 16:29:31 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wi.c,v 1.250 2019/02/05 06:17:02 msaitoh Exp $");
 
 #define WI_HERMES_AUTOINC_WAR	/* Work around data write autoinc bug. */
 #define WI_HERMES_STATS_WAR	/* Work around stats counter bug. */
@@ -417,8 +417,7 @@ wi_attach(struct wi_softc *sc, const u_int8_t *macaddr)
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_init = wi_init;
 	ifp->if_stop = wi_stop;
-	ifp->if_flags =
-	    IFF_SIMPLEX | IFF_BROADCAST | IFF_MULTICAST | IFF_NOTRAILERS;
+	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST | IFF_MULTICAST;
 	IFQ_SET_READY(&ifp->if_snd);
 
 	ic->ic_ifp = ifp;
@@ -2512,7 +2511,7 @@ wi_set_cfg(struct ifnet *ifp, u_long cmd, void *data)
 			break;
 		}
 		/* XXX wi_len looks in u_int8_t, not in u_int16_t */
-		m = m_devget((char *)&wreq.wi_val, wreq.wi_len, 0, ifp, NULL);
+		m = m_devget((char *)&wreq.wi_val, wreq.wi_len, 0, ifp);
 		if (m == NULL) {
 			error = ENOMEM;
 			break;

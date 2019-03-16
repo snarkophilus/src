@@ -1,4 +1,4 @@
-/*	$NetBSD: expand.c,v 1.127 2018/07/22 23:07:48 kre Exp $	*/
+/*	$NetBSD: expand.c,v 1.131 2019/02/27 04:10:56 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)expand.c	8.5 (Berkeley) 5/15/95";
 #else
-__RCSID("$NetBSD: expand.c,v 1.127 2018/07/22 23:07:48 kre Exp $");
+__RCSID("$NetBSD: expand.c,v 1.131 2019/02/27 04:10:56 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -127,6 +127,16 @@ STATIC void rmescapes_nl(char *);
 #define	NULLTERM_4_TRACE(p)	do { /* nothing */ } while (/*CONSTCOND*/0)
 #endif
 
+#define	IS_BORING(_ch)						\
+	((_ch) == CTLQUOTEMARK || (_ch) == CTLQUOTEEND || (_ch) == CTLNONL)
+#define	SKIP_BORING(p)						\
+	do {							\
+		char _ch;					\
+								\
+		while ((_ch = *(p)), IS_BORING(_ch))		\
+			(p)++;					\
+	} while (0)
+
 /*
  * Expand shell variables and backquotes inside a here document.
  */
@@ -198,9 +208,13 @@ expandarg(union node *arg, struct arglist *arglist, int flag)
 			expandmeta(exparg.list, flag);
 		else
 			add_args(exparg.list);
+#if 0
+	} else if (flag & EXP_REDIR) {
+		/* if EXP_REDIR ever happens, it happens here */
+		/* for now just (below) remove escapes, and leave it alone */
+#endif
 	} else {
-		if (flag & EXP_REDIR) /*XXX - for now, just remove escapes */
-			rmescapes(p);
+		rmescapes(p);	/* we might have escaped CTL bytes to remove */
 		sp = stalloc(sizeof(*sp));
 		sp->text = p;
 		*exparg.lastp = sp;
@@ -227,7 +241,7 @@ STATIC const char *
 argstr(const char *p, int flag)
 {
 	char c;
-	int quotes = flag & (EXP_GLOB | EXP_CASE | EXP_REDIR);	/* do CTLESC */
+	const int quotes = flag & EXP_QNEEDED;		/* do CTLESC */
 	int firsteq = 1;
 	const char *ifs = NULL;
 	int ifs_split = EXP_IFS_SPLIT;
@@ -271,10 +285,12 @@ argstr(const char *p, int flag)
 			STPUTC('\n', expdest);	/* no line_number++ */
 			break;
 		case CTLQUOTEEND:
+			if ((flag & EXP_SPLIT) != 0)
+				STPUTC(c, expdest);
 			ifs_split = EXP_IFS_SPLIT;
 			break;
 		case CTLESC:
-			if (quotes)
+			if (quotes || ISCTL(*p))
 				STPUTC(c, expdest);
 			c = *p++;
 			STPUTC(c, expdest);
@@ -284,11 +300,13 @@ argstr(const char *p, int flag)
 		case CTLVAR: {
 #ifdef DEBUG
 			unsigned int pos = expdest - stackblock();
+			NULLTERM_4_TRACE(expdest);
 #endif
 			p = evalvar(p, (flag & ~EXP_IFS_SPLIT) | (flag & ifs_split));
 			NULLTERM_4_TRACE(expdest);
 			VTRACE(DBG_EXPAND, ("argstr evalvar "
-			   "added \"%s\" to expdest\n",
+			   "added %zd \"%s\" to expdest\n",
+			   (size_t)(expdest - (stackblock() + pos)),
 			   stackblock() + pos));
 			break;
 		}
@@ -353,7 +371,7 @@ exptilde(const char *p, int flag)
 	const char *startp = p;
 	struct passwd *pw;
 	const char *home;
-	int quotes = flag & (EXP_GLOB | EXP_CASE);
+	const int quotes = flag & EXP_QNEEDED;
 	char *user;
 	struct stackmark smark;
 #ifdef DEBUG
@@ -423,7 +441,7 @@ exptilde(const char *p, int flag)
 		CTRACE(DBG_EXPAND, (": returning unused \"%s\"\n", startp));
 		return startp;
 	} while ((c = *home++) != '\0') {
-		if (quotes && SQSYNTAX[(int)c] == CCTL)
+		if ((quotes && NEEDESC(c)) || ISCTL(c))
 			STPUTC(CTLESC, expdest);
 		STPUTC(c, expdest);
 	}
@@ -570,9 +588,8 @@ expbackq(union node *cmd, int quoted, int flag)
 	struct nodelist *saveargbackq;
 	char lastc;
 	int startloc = dest - stackblock();
-	char const *syntax = quoted? DQSYNTAX : BASESYNTAX;
 	int saveherefd;
-	int quotes = flag & (EXP_GLOB | EXP_CASE);
+	const int quotes = flag & EXP_QNEEDED;
 	int nnl;
 	struct stackmark smark;
 
@@ -646,7 +663,8 @@ expbackq(union node *cmd, int quoted, int flag)
 					}
 					CHECKSTRSPACE(2, dest);
 				}
-				if (quotes && syntax[(int)lastc] == CCTL)
+				if ((quotes && quoted && NEEDESC(lastc)) ||
+				    ISCTL(lastc))
 					USTPUTC(CTLESC, dest);
 				USTPUTC(lastc, dest);
 			}
@@ -811,7 +829,7 @@ subevalvar_trim(const char *p, int strloc, int subtype, int startloc,
 		abort();
 	}
 
-recordleft:
+ recordleft:
 	*loc = c;
 	amount = ((str - 1) - (loc - startp)) - expdest;
 	STADJUST(amount, expdest);
@@ -819,7 +837,7 @@ recordleft:
 		*startp++ = *loc++;
 	return 1;
 
-recordright:
+ recordright:
 	amount = loc - expdest;
 	STADJUST(amount, expdest);
 	STPUTC('\0', expdest);
@@ -847,7 +865,7 @@ evalvar(const char *p, int flag)
 	int startloc;
 	int varlen;
 	int apply_ifs;
-	int quotes = flag & (EXP_GLOB | EXP_CASE | EXP_REDIR);
+	const int quotes = flag & EXP_QNEEDED;
 
 	varflags = (unsigned char)*p++;
 	subtype = varflags & VSTYPE;
@@ -898,6 +916,10 @@ evalvar(const char *p, int flag)
 		}
 	}
 
+	if (!set && subtype != VSPLUS && special && *var == '@')
+		if (startloc > 0 && expdest[-1] == CTLQUOTEMARK)
+			expdest--, startloc--;
+
 	if (set && subtype != VSPLUS) {
 		/* insert the value of the variable */
 		if (special) {
@@ -907,7 +929,7 @@ evalvar(const char *p, int flag)
 				 */
 				while (--special > 0) {
 /*						not needed, it is a number...
-					if (quotes && syntax[(int)*var] == CCTL)
+					if (quotes && NEEDESC(*var))
 						STPUTC(CTLESC, expdest);
 */
 					STPUTC(*var++, expdest);
@@ -919,28 +941,42 @@ evalvar(const char *p, int flag)
 				STADJUST(-varlen, expdest);
 			}
 		} else {
-			char const *syntax = (varflags & VSQUOTE) ? DQSYNTAX
-								  : BASESYNTAX;
 
 			if (subtype == VSLENGTH) {
-				for (;*val; val++)
+				for (; *val; val++)
 					varlen++;
-			} else {
-				while (*val) {
-					if (quotes && (varflags & VSQUOTE) &&
-					    (syntax[(int)*val] == CCTL ||
-					     syntax[(int)*val] == CBACK))
+			} else if (quotes && varflags & VSQUOTE) {
+				/*
+				 * If we are going to look for magic in the
+				 * value (quotes is set) and the expansion
+				 * occurs inside "" (VSQUOTE) then any char
+				 * that has any potential special meaning
+				 * needs to have that meaning suppressed,
+				 * so supply a CTLESC prefix for it.
+				 */
+				for (; (c = *val) != '\0'; val++) {
+					if (NEEDESC(c))
 						STPUTC(CTLESC, expdest);
-					STPUTC(*val++, expdest);
+					STPUTC(c, expdest);
+				}
+			} else {
+				/*
+				 * We are going to rmescapes() later,
+				 * so make sure that any data char that
+				 * might be mistaken for one of our CTLxxx
+				 * magic chars is protected ... always.
+				 */
+				for (; (c = *val) != '\0'; val++) {
+					if (ISCTL(c))
+						STPUTC(CTLESC, expdest);
+					STPUTC(c, expdest);
 				}
 			}
 		}
 	}
 
 
-	if (flag & EXP_IN_QUOTES)
-		apply_ifs = 0;
-	else if (varflags & VSQUOTE) {
+	if (varflags & VSQUOTE) {
 		if  (*var == '@' && shellparam.nparam != 1)
 		    apply_ifs = 1;
 		else {
@@ -951,6 +987,8 @@ evalvar(const char *p, int flag)
 		    flag |= EXP_IN_QUOTES;
 		    apply_ifs = 0;
 		}
+	} else if (flag & EXP_IN_QUOTES) {
+		apply_ifs = 0;
 	} else
 		apply_ifs = 1;
 
@@ -1113,23 +1151,30 @@ varvalue(const char *name, int quoted, int subtype, int flag)
 	int i;
 	int sep;
 	char **ap;
-	char const *syntax;
+#ifdef DEBUG
+	char *start = expdest;
+#endif
+
+	VTRACE(DBG_EXPAND, ("varvalue(%c%s, sub=%d, fl=%#x)", *name,
+	    quoted ? ", quoted" : "", subtype, flag));
 
 	if (subtype == VSLENGTH)	/* no magic required ... */
 		flag &= ~EXP_FULL;
 
 #define STRTODEST(p) \
 	do {\
-		if (flag & (EXP_GLOB | EXP_CASE) && subtype != VSLENGTH) { \
-			syntax = quoted? DQSYNTAX : BASESYNTAX; \
+		if ((flag & EXP_QNEEDED) && quoted) { \
 			while (*p) { \
-				if (syntax[(int)*p] == CCTL) \
+				if (NEEDESC(*p)) \
 					STPUTC(CTLESC, expdest); \
 				STPUTC(*p++, expdest); \
 			} \
 		} else \
-			while (*p) \
+			while (*p) { \
+				if (ISCTL(*p)) \
+					STPUTC(CTLESC, expdest); \
 				STPUTC(*p++, expdest); \
+			} \
 	} while (0)
 
 
@@ -1151,9 +1196,17 @@ varvalue(const char *name, int quoted, int subtype, int flag)
 			if (optlist[optorder[i]].val)
 				STPUTC(optlist[optorder[i]].letter, expdest);
 		}
+		VTRACE(DBG_EXPAND, (": %.*s\n", expdest-start, start));
 		return;
 	case '@':
 		if (flag & EXP_SPLIT && quoted) {
+			VTRACE(DBG_EXPAND, (": $@ split (%d)\n",
+			    shellparam.nparam));
+		/* GROSS HACK */
+			if (shellparam.nparam == 0 &&
+				expdest[-1] == CTLQUOTEMARK)
+					expdest--;
+		/* KCAH SSORG */
 			for (ap = shellparam.p ; (p = *ap++) != NULL ; ) {
 				STRTODEST(p);
 				if (*ap)
@@ -1170,8 +1223,8 @@ varvalue(const char *name, int quoted, int subtype, int flag)
 			if (!*ap)
 				break;
 			if (sep) {
-				if (quoted && (flag & (EXP_GLOB|EXP_CASE)) &&
-				    (SQSYNTAX[sep] == CCTL || SQSYNTAX[sep] == CSBACK))
+				if (quoted && (flag & EXP_QNEEDED) &&
+				    NEEDESC(sep))
 					STPUTC(CTLESC, expdest);
 				STPUTC(sep, expdest);
 			} else
@@ -1179,6 +1232,7 @@ varvalue(const char *name, int quoted, int subtype, int flag)
 			      && !quoted && **ap != '\0')
 				STPUTC('\0', expdest);
 		}
+		VTRACE(DBG_EXPAND, (": %.*s\n", expdest-start, start));
 		return;
 	default:
 		if (is_digit(*name)) {
@@ -1197,12 +1251,15 @@ varvalue(const char *name, int quoted, int subtype, int flag)
 				return;
 			STRTODEST(p);
 		}
+		VTRACE(DBG_EXPAND, (": %.*s\n", expdest-start, start));
 		return;
 	}
 	/*
 	 * only the specials with an int value arrive here
 	 */
+	VTRACE(DBG_EXPAND, ("(%d)", num));
 	expdest = cvtnum(num, expdest);
+	VTRACE(DBG_EXPAND, (": %.*s\n", expdest-start, start));
 }
 
 
@@ -1278,7 +1335,7 @@ ifsbreakup(char *string, struct arglist *arglist)
 		while (p < string + ifsp->endoff) {
 			had_param_ch = 1;
 			q = p;
-			if (*p == CTLNONL) {
+			if (IS_BORING(*p)) {
 				p++;
 				continue;
 			}
@@ -1339,6 +1396,9 @@ ifsbreakup(char *string, struct arglist *arglist)
 		}
 	}
 
+	while (*start == CTLQUOTEEND)
+		start++;
+
 	/*
 	 * Save anything left as an argument.
 	 * Traditionally we have treated 'IFS=':'; set -- x$IFS' as
@@ -1395,7 +1455,7 @@ expandmeta(struct strlist *str, int flag)
 		for (;;) {			/* fast check for meta chars */
 			if ((c = *p++) == '\0')
 				goto nometa;
-			if (c == '*' || c == '?' || c == '[' || c == '!')
+			if (c == '*' || c == '?' || c == '[' /* || c == '!' */)
 				break;
 		}
 		savelastp = exparg.lastp;
@@ -1470,7 +1530,7 @@ expmeta(char *enddir, char *name)
 			if (*q == '!' || *q == '^')
 				q++;
 			for (;;) {
-				while (*q == CTLQUOTEMARK || *q == CTLNONL)
+				while (IS_BORING(*q))
 					q++;
 				if (*q == ']') {
 					q++;
@@ -1522,7 +1582,7 @@ expmeta(char *enddir, char *name)
 			}
 		} else if (*p == '\0')
 			break;
-		else if (*p == CTLQUOTEMARK || *p == CTLNONL)
+		else if (IS_BORING(*p))
 			continue;
 		else if (*p == CTLESC)
 			p++;
@@ -1536,7 +1596,7 @@ expmeta(char *enddir, char *name)
 		if (enddir != expdir)
 			metaflag++;
 		for (p = name ; ; p++) {
-			if (*p == CTLQUOTEMARK || *p == CTLNONL)
+			if (IS_BORING(*p))
 				continue;
 			if (*p == CTLESC)
 				p++;
@@ -1552,7 +1612,7 @@ expmeta(char *enddir, char *name)
 	if (start != name) {
 		p = name;
 		while (p < start) {
-			while (*p == CTLQUOTEMARK || *p == CTLNONL)
+			while (IS_BORING(*p))
 				p++;
 			if (*p == CTLESC)
 				p++;
@@ -1579,7 +1639,7 @@ expmeta(char *enddir, char *name)
 	}
 	matchdot = 0;
 	p = start;
-	while (*p == CTLQUOTEMARK || *p == CTLNONL)
+	while (IS_BORING(*p))
 		p++;
 	if (*p == CTLESC)
 		p++;
@@ -1771,6 +1831,7 @@ patmatch(const char *pattern, const char *string, int squoted)
 				goto backtrack;
 			break;
 		case CTLQUOTEMARK:
+		case CTLQUOTEEND:
 		case CTLNONL:
 			continue;
 		case '?':
@@ -1785,7 +1846,7 @@ patmatch(const char *pattern, const char *string, int squoted)
 			c = *p;
 			while (c == CTLQUOTEMARK || c == '*')
 				c = *++p;
-			if (c != CTLESC &&  c != CTLQUOTEMARK && c != CTLNONL &&
+			if (c != CTLESC && !IS_BORING(c) &&
 			    c != '?' && c != '*' && c != '[') {
 				while (*q != c) {
 					if (squoted && *q == CTLESC &&
@@ -1832,13 +1893,11 @@ patmatch(const char *pattern, const char *string, int squoted)
 			if (*endp == '!' || *endp == '^')
 				endp++;
 			for (;;) {
-				while (*endp == CTLQUOTEMARK || *endp==CTLNONL)
+				while (IS_BORING(*endp))
 					endp++;
 				if (*endp == '\0')
 					goto dft;	/* no matching ] */
-				if (*endp == CTLESC)
-					endp++;
-				if (*++endp == ']')
+				if (*endp++ == ']')
 					break;
 			}
 			/* end shortcut */
@@ -1860,7 +1919,7 @@ patmatch(const char *pattern, const char *string, int squoted)
 			chr = (unsigned char)*q++;
 			c = *p++;
 			do {
-				if (c == CTLQUOTEMARK || c == CTLNONL)
+				if (IS_BORING(c))
 					continue;
 				if (c == '\0') {
 					p = savep, q = saveq;
@@ -1934,13 +1993,13 @@ rmescapes(char *str)
 	char *p, *q;
 
 	p = str;
-	while (*p != CTLESC && *p != CTLQUOTEMARK && *p != CTLNONL) {
+	while (!ISCTL(*p)) {
 		if (*p++ == '\0')
 			return;
 	}
 	q = p;
 	while (*p) {
-		if (*p == CTLQUOTEMARK || *p == CTLNONL) {
+		if (IS_BORING(*p)) {
 			p++;
 			continue;
 		}
@@ -1951,6 +2010,10 @@ rmescapes(char *str)
 		}
 		if (*p == CTLESC)
 			p++;
+#ifdef DEBUG
+		else if (ISCTL(*p))
+			abort();
+#endif
 		*q++ = *p++;
 	}
 	*q = '\0';
@@ -1973,7 +2036,7 @@ rmescapes_nl(char *str)
 	int nls = 0, holdnl = 0, holdlast;
 
 	p = str;
-	while (*p != CTLESC && *p != CTLQUOTEMARK && *p != CTLNONL) {
+	while (!ISCTL(*p)) {
 		if (*p++ == '\0')
 			return;
 	}
@@ -1981,7 +2044,7 @@ rmescapes_nl(char *str)
 		--p;	/* so we do not place a \n badly */
 	q = p;
 	while (*p) {
-		if (*p == CTLQUOTEMARK) {
+		if (*p == CTLQUOTEMARK || *p == CTLQUOTEEND) {
 			p++;
 			continue;
 		}
@@ -1997,6 +2060,10 @@ rmescapes_nl(char *str)
 		}
 		if (*p == CTLESC)
 			p++;
+#ifdef DEBUG
+		else if (ISCTL(*p))
+			abort();
+#endif
 
 		holdlast = holdnl;
 		holdnl = is_in_name(*p);	/* letters, digits, _ */

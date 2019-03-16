@@ -1,4 +1,4 @@
-/*	$NetBSD: nitrogen6_machdep.c,v 1.12 2018/10/20 05:58:34 skrll Exp $	*/
+/*	$NetBSD: nitrogen6_machdep.c,v 1.17 2019/03/16 10:45:06 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2012 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nitrogen6_machdep.c,v 1.12 2018/10/20 05:58:34 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nitrogen6_machdep.c,v 1.17 2019/03/16 10:45:06 skrll Exp $");
 
 #include "opt_evbarm_boardtype.h"
 #include "opt_arm_debug.h"
@@ -108,15 +108,6 @@ void nitrogen6_platform_early_putchar(char);
 #include <sys/kgdb.h>
 #endif
 
-static dev_type_cnputc(earlyconsputc);
-static dev_type_cngetc(earlyconsgetc);
-
-static struct consdev earlycons = {
-	.cn_putc = earlyconsputc,
-	.cn_getc = earlyconsgetc,
-	.cn_pollc = nullcnpollc,
-};
-
 static void
 earlyconsputc(dev_t dev, int c)
 {
@@ -126,8 +117,14 @@ earlyconsputc(dev_t dev, int c)
 static int
 earlyconsgetc(dev_t dev)
 {
-	return 0;	/* XXX */
+	return 0;
 }
+
+static struct consdev earlycons = {
+	.cn_putc = earlyconsputc,
+	.cn_getc = earlyconsgetc,
+	.cn_pollc = nullcnpollc,
+};
 
 /*
  * Static device mappings. These peripheral registers are mapped at
@@ -193,11 +190,6 @@ nitrogen6_platform_early_putchar(char c)
 			break;
 	}
 }
-
-
-#define	SCU_DIAG_CONTROL		0x30
-#define	  SCU_DIAG_DISABLE_MIGBIT	  __BIT(0)
-
 
 void
 nitrogen6_mpstart(void)
@@ -308,7 +300,6 @@ initarm(void *arg)
 	nitrogen6_setup_iomux();
 
 	consinit();
-//XXXNH
 	cpu_domains((DOMAIN_CLIENT << (PMAP_DOMAIN_KERNEL*2)) | DOMAIN_CLIENT);
 
 #ifdef NO_POWERSAVE
@@ -395,6 +386,9 @@ initarm(void *arg)
 #endif
 	u_int sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, bp, nbp);
 
+	/*
+	 * initarm_common flushes cache if required before AP start
+	 */
 	VPRINTF("mpstart\n");
 	nitrogen6_mpstart();
 

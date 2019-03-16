@@ -1,4 +1,4 @@
-#       $NetBSD: Makefile,v 1.431 2018/10/05 09:51:55 hannken Exp $
+#       $NetBSD: Makefile,v 1.435 2019/02/24 02:29:56 rin Exp $
 
 #	Makefile for section 9 (kernel function and variable) manual pages.
 
@@ -52,10 +52,11 @@ MAN=	accept_filter.9 accf_data.9 accf_http.9 \
 	secmodel_overlay.9 secmodel_securelevel.9 secmodel_suser.9 \
 	SET.9 setbit.9 setjmp.9 shutdownhook_establish.9 \
 	signal.9 skpc.9 sockopt.9 softintr.9 spl.9 specificdata.9 \
-	splraiseipl.9 \
+	spi.9 splraiseipl.9 \
 	store.9 suspendsched.9 \
 	sysctl.9 sysmon_envsys.9 sysmon_pswitch.9 sysmon_taskq.9 tc.9 \
-	tcp_congctl.9 timecounter.9 time_second.9 todr.9 ts2timo.9 tvtohz.9 \
+	tcp_congctl.9 threadpool.9 timecounter.9 time_second.9 todr.9 \
+	ts2timo.9 tvtohz.9 \
 	ucas.9 uiomove.9 ucom.9 userret.9 \
 	vattr.9 veriexec.9 vcons.9 vfs.9 vfs_hooks.9 vfsops.9 vfssubr.9 \
 	video.9 vme.9 \
@@ -497,9 +498,8 @@ MLINKS+=mbuf.9 m_get.9 mbuf.9 m_gethdr.9 mbuf.9 m_devget.9 \
 	mbuf.9 m_split.9 mbuf.9 m_adj.9 mbuf.9 m_free.9 \
 	mbuf.9 m_freem.9 mbuf.9 mtod.9 mbuf.9 mtocl.9 mbuf.9 cltom.9 \
 	mbuf.9 MGET.9 mbuf.9 MGETHDR.9 mbuf.9 MEXTMALLOC.9 \
-	mbuf.9 MEXTADD.9 mbuf.9 MCLGET.9 mbuf.9 M_COPY_PKTHDR.9 \
-	mbuf.9 M_MOVE_PKTHDR.9 \
-	mbuf.9 M_ALIGN.9 mbuf.9 MH_ALIGN.9 mbuf.9 M_LEADINGSPACE.9 \
+	mbuf.9 MEXTADD.9 mbuf.9 MCLGET.9 \
+	mbuf.9 M_LEADINGSPACE.9 \
 	mbuf.9 M_TRAILINGSPACE.9 mbuf.9 M_PREPEND.9 mbuf.9 MCHTYPE.9 \
 	mbuf.9 MFREE.9
 MLINKS+=mca.9 mca_intr_establish.9 \
@@ -546,13 +546,9 @@ MLINKS+=m_tag.9 m_tag_copy.9 \
 	m_tag.9 m_tag_copy_chain.9 \
 	m_tag.9 m_tag_delete.9 \
 	m_tag.9 m_tag_delete_chain.9 \
-	m_tag.9 m_tag_delete_nonpersistent.9 \
 	m_tag.9 m_tag_find.9 \
-	m_tag.9 m_tag_first.9 \
 	m_tag.9 m_tag_free.9 \
 	m_tag.9 m_tag_get.9 \
-	m_tag.9 m_tag_init.9 \
-	m_tag.9 m_tag_next.9 \
 	m_tag.9 m_tag_prepend.9 \
 	m_tag.9 m_tag_unlink.9
 MLINKS+=namecache.9 cache_lookup.9 \
@@ -920,6 +916,18 @@ MLINKS+=tc.9 tc_intr_establish.9 \
 	tc.9 tc_badaddr.9 \
 	tc.9 TC_DENSE_TO_SPARSE.9 \
 	tc.9 TC_PHYS_TO_UNCACHED.9
+MLINKS+=threadpool.9 threadpool_get.9 \
+	threadpool.9 threadpool_put.9 \
+	threadpool.9 threadpool_percpu_get.9 \
+	threadpool.9 threadpool_percpu_put.9 \
+	threadpool.9 threadpool_percpu_ref.9 \
+	threadpool.9 threadpool_percpu_ref_remote.9 \
+	threadpool.9 threadpool_job_init.9 \
+	threadpool.9 threadpool_job_destroy.9 \
+	threadpool.9 threadpool_job_done.9 \
+	threadpool.9 threadpool_schedule_job.9 \
+	threadpool.9 threadpool_cancel_job.9 \
+	threadpool.9 threadpool_cancel_job_async.9
 MLINKS+=todr.9 todr_gettime.9 todr.9 todr_settime.9 \
 	todr.9 clock_ymdhms_to_secs.9 todr.9 clock_secs_to_ymdhms.9
 

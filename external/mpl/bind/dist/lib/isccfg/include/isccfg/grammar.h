@@ -1,4 +1,4 @@
-/*	$NetBSD: grammar.h,v 1.2 2018/08/12 13:02:40 christos Exp $	*/
+/*	$NetBSD: grammar.h,v 1.4 2019/02/24 20:01:32 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -16,6 +16,9 @@
 
 /*! \file isccfg/grammar.h */
 
+#include <inttypes.h>
+#include <stdbool.h>
+
 #include <isc/lex.h>
 #include <isc/netaddr.h>
 #include <isc/sockaddr.h>
@@ -31,7 +34,7 @@
 
 /*% Clause may occur multiple times (e.g., "zone") */
 #define CFG_CLAUSEFLAG_MULTI 		0x00000001
-/*% Clause is obsolete */
+/*% Clause is obsolete (logs a warning, but is not a fatal error) */
 #define CFG_CLAUSEFLAG_OBSOLETE 	0x00000002
 /*% Clause is not implemented, and may never be */
 #define CFG_CLAUSEFLAG_NOTIMP	 	0x00000004
@@ -54,8 +57,10 @@
 /*% A configuration option that is ineffective due to
  * compile time options, but is harmless. */
 #define CFG_CLAUSEFLAG_NOOP		0x00000200
-/*% Clause is obsolete in a future release */
+/*% Clause will be obsolete in a future release (logs a warning) */
 #define CFG_CLAUSEFLAG_DEPRECATED	0x00000400
+/*% Clause has been obsolete so long that it's now a fatal error */
+#define CFG_CLAUSEFLAG_ANCIENT		0x00000800
 
 /*%
  * Zone types for which a clause is valid:
@@ -71,6 +76,7 @@
 #define CFG_ZONE_REDIRECT		0x02000000
 #define CFG_ZONE_DELEGATION		0x01000000
 #define CFG_ZONE_INVIEW			0x00800000
+#define CFG_ZONE_MIRROR			0x00400000
 
 typedef struct cfg_clausedef cfg_clausedef_t;
 typedef struct cfg_tuplefielddef cfg_tuplefielddef_t;
@@ -166,10 +172,10 @@ struct cfg_rep {
 struct cfg_obj {
 	const cfg_type_t *type;
 	union {
-		isc_uint32_t  	uint32;
-		isc_uint64_t  	uint64;
+		uint32_t  	uint32;
+		uint64_t  	uint64;
 		isc_textregion_t string; /*%< null terminated, too */
-		isc_boolean_t 	boolean;
+		bool 	boolean;
 		cfg_map_t	map;
 		cfg_list_t	list;
 		cfg_obj_t **	tuple;
@@ -203,10 +209,10 @@ struct cfg_parser {
 	isc_token_t     token;
 
 	/*% We are at the end of all input. */
-	isc_boolean_t	seen_eof;
+	bool	seen_eof;
 
 	/*% The current token has been pushed back. */
-	isc_boolean_t	ungotten;
+	bool	ungotten;
 
 	/*%
 	 * The stack of currently active files, represented
@@ -299,7 +305,10 @@ LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_qstring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_astring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_ustring;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sstring;
+LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_bracketed_aml;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_bracketed_text;
+LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_optional_bracketed_text;
+LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_keyref;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sockaddr;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_sockaddrdscp;
 LIBISCCFG_EXTERNAL_DATA extern cfg_type_t cfg_type_netaddr;
@@ -359,7 +368,7 @@ cfg_parse_rawaddr(cfg_parser_t *pctx, unsigned int flags, isc_netaddr_t *na);
 void
 cfg_print_rawaddr(cfg_printer_t *pctx, const isc_netaddr_t *na);
 
-isc_boolean_t
+bool
 cfg_lookingat_netaddr(cfg_parser_t *pctx, unsigned int flags);
 
 isc_result_t
@@ -429,6 +438,14 @@ cfg_parse_enum(cfg_parser_t *pctx, const cfg_type_t *type, cfg_obj_t **ret);
 
 void
 cfg_doc_enum(cfg_printer_t *pctx, const cfg_type_t *type);
+
+isc_result_t
+cfg_parse_enum_or_other(cfg_parser_t *pctx, const cfg_type_t *enumtype,
+			const cfg_type_t *othertype, cfg_obj_t **ret);
+
+void
+cfg_doc_enum_or_other(cfg_printer_t *pctx, const cfg_type_t *enumtype,
+		      const cfg_type_t *othertype);
 
 void
 cfg_print_chars(cfg_printer_t *pctx, const char *text, int len);
@@ -524,11 +541,11 @@ void
 cfg_parser_warning(cfg_parser_t *pctx, unsigned int flags,
 		   const char *fmt, ...) ISC_FORMAT_PRINTF(3, 4);
 
-isc_boolean_t
+bool
 cfg_is_enum(const char *s, const char *const *enums);
 /*%< Return true iff the string 's' is one of the strings in 'enums' */
 
-isc_boolean_t
+bool
 cfg_clause_validforzone(const char *name, unsigned int ztype);
 /*%<
  * Check whether an option is legal for the specified zone type.

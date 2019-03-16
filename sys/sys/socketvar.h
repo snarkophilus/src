@@ -1,4 +1,4 @@
-/*	$NetBSD: socketvar.h,v 1.158 2018/08/01 23:35:32 rjs Exp $	*/
+/*	$NetBSD: socketvar.h,v 1.160 2019/03/07 12:29:14 maxv Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -252,8 +252,6 @@ struct knote;
 struct sockaddr_big;
 enum uio_seg;
 
-struct	mbuf *getsombuf(struct socket *, int);
-
 /* 0x400 is SO_OTIMESTAMP */
 #define SOOPT_TIMESTAMP(o)     ((o) & (SO_TIMESTAMP | 0x400))
 
@@ -410,6 +408,21 @@ sbspace(const struct sockbuf *sb)
 	if (sb->sb_hiwat <= sb->sb_cc || sb->sb_mbmax <= sb->sb_mbcnt)
 		return 0;
 	return lmin(sb->sb_hiwat - sb->sb_cc, sb->sb_mbmax - sb->sb_mbcnt);
+}
+
+static __inline u_long
+sbspace_oob(const struct sockbuf *sb)
+{
+	u_long hiwat = sb->sb_hiwat;
+
+	if (hiwat < ULONG_MAX - 1024)
+		hiwat += 1024;
+
+	KASSERT(solocked(sb->sb_so));
+
+	if (hiwat <= sb->sb_cc || sb->sb_mbmax <= sb->sb_mbcnt)
+		return 0;
+	return lmin(hiwat - sb->sb_cc, sb->sb_mbmax - sb->sb_mbcnt);
 }
 
 /* do we have to send all at once on a socket? */

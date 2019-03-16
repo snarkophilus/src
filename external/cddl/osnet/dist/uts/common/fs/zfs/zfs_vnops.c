@@ -80,9 +80,11 @@
 #endif
 
 #ifdef __NetBSD__
+#include <dev/mm.h>
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/genfs/genfs_node.h>
 #include <uvm/uvm_extern.h>
+#include <sys/fstrans.h>
 
 uint_t zfs_putpage_key;
 #endif
@@ -1181,7 +1183,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			 * holding up the transaction if the data copy hangs
 			 * up on a pagefault (e.g., from an NFS server mapping).
 			 */
-#ifdef illumos
+#if defined(illumos) || defined(__NetBSD__)
 			size_t cbytes;
 #endif
 
@@ -1189,7 +1191,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			    max_blksz);
 			ASSERT(abuf != NULL);
 			ASSERT(arc_buf_size(abuf) == max_blksz);
-#ifdef illumos
+#if defined(illumos) || defined(__NetBSD__)
 			if (error = uiocopy(abuf->b_data, max_blksz,
 			    UIO_WRITE, uio, &cbytes)) {
 				dmu_return_arcbuf(abuf);
@@ -1201,17 +1203,6 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			ssize_t resid = uio->uio_resid;
 
 			error = vn_io_fault_uiomove(abuf->b_data, max_blksz, uio);
-			if (error != 0) {
-				uio->uio_offset -= resid - uio->uio_resid;
-				uio->uio_resid = resid;
-				dmu_return_arcbuf(abuf);
-				break;
-			}
-#endif
-#ifdef __NetBSD__
-			ssize_t resid = uio->uio_resid;
-
-			error = uiomove(abuf->b_data, max_blksz, UIO_WRITE, uio);
 			if (error != 0) {
 				uio->uio_offset -= resid - uio->uio_resid;
 				uio->uio_resid = resid;
@@ -1296,7 +1287,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 				dmu_assign_arcbuf(sa_get_db(zp->z_sa_hdl),
 				    woff, abuf, tx);
 			}
-#ifdef illumos
+#if defined(illumos) || defined(__NetBSD__)
 			ASSERT(tx_bytes <= uio->uio_resid);
 			uioskip(uio, tx_bytes);
 #endif
@@ -1938,9 +1929,8 @@ specvp_check(vnode_t **vpp, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
-    int *direntflags, pathname_t *realpnp)
+zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, int flags,
+    struct componentname *cnp, int nameiop, cred_t *cr)
 {
 	znode_t *zdp = VTOZ(dvp);
 	znode_t *zp;
@@ -2045,6 +2035,29 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	    NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
+	}
+
+	/*
+	 * First handle the special cases.
+	 */
+	if ((cnp->cn_flags & ISDOTDOT) != 0) {
+		/*
+		 * If we are a snapshot mounted under .zfs, return
+		 * the vp for the snapshot directory.
+		 */
+		if (zdp->z_id == zfsvfs->z_root && zfsvfs->z_parent != zfsvfs) {
+			ZFS_EXIT(zfsvfs);
+			error = zfsctl_snapshot(zfsvfs->z_parent, vpp);
+
+			return (error);
+		}
+	}
+	if (zfs_has_ctldir(zdp) && strcmp(nm, ZFS_CTLDIR_NAME) == 0) {
+		ZFS_EXIT(zfsvfs);
+		if ((cnp->cn_flags & ISLASTCN) != 0 && nameiop != LOOKUP)
+			return (SET_ERROR(ENOTSUP));
+		error = zfsctl_root(zfsvfs, vpp);
+		return (error);
 	}
 
 	error = zfs_dirlook(zdp, nm, &zp);
@@ -3056,11 +3069,22 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 #endif
 #ifdef __FreeBSD__
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
+	vap->va_nodeid = zp->z_id;
 #endif
 #ifdef __NetBSD__
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsidx.__fsid_val[0];
-#endif
 	vap->va_nodeid = zp->z_id;
+	/*
+	 * If we are a snapshot mounted under .zfs, return
+	 * the object id of the snapshot to make getcwd happy.
+	 */
+	if (zp->z_id == zfsvfs->z_root && zfsvfs->z_parent != zfsvfs) {
+		vnode_t *cvp = vp->v_mount->mnt_vnodecovered;
+
+		if (cvp && zfsctl_is_node(cvp))
+			vap->va_nodeid = dmu_objset_id(zfsvfs->z_os);
+	}
+#endif
 	if ((vp->v_flag & VROOT) && zfs_show_ctldir(zp))
 		links = zp->z_links + 1;
 	else
@@ -3857,8 +3881,13 @@ zfs_rename_relock(struct vnode *sdvp, struct vnode **svpp,
 	zfsvfs_t	*zfsvfs;
 	struct vnode	*nvp, *svp, *tvp;
 	znode_t		*sdzp, *tdzp, *szp, *tzp;
+#ifdef __FreeBSD__
 	const char	*snm = scnp->cn_nameptr;
 	const char	*tnm = tcnp->cn_nameptr;
+#endif
+#ifdef __NetBSD__
+	char *snm, *tnm;
+#endif
 	int error;
 
 #ifdef __FreeBSD__
@@ -3928,7 +3957,15 @@ relock:
 	 * Re-resolve svp to be certain it still exists and fetch the
 	 * correct vnode.
 	 */
+#ifdef __NetBSD__
+	/* ZFS wants a null-terminated name. */
+	snm = PNBUF_GET();
+	strlcpy(snm, scnp->cn_nameptr, scnp->cn_namelen + 1);
+#endif
 	error = zfs_dirent_lookup(sdzp, snm, &szp, ZEXISTS);
+#ifdef __NetBSD__
+	PNBUF_PUT(snm);
+#endif
 	if (error != 0) {
 		/* Source entry invalid or not there. */
 		ZFS_EXIT(zfsvfs);
@@ -3947,7 +3984,15 @@ relock:
 	/*
 	 * Re-resolve tvp, if it disappeared we just carry on.
 	 */
+#ifdef __NetBSD__
+	/* ZFS wants a null-terminated name. */
+	tnm = PNBUF_GET();
+	strlcpy(tnm, tcnp->cn_nameptr, tcnp->cn_namelen + 1);
+#endif
 	error = zfs_dirent_lookup(tdzp, tnm, &tzp, 0);
+#ifdef __NetBSD__
+	PNBUF_PUT(tnm);
+#endif
 	if (error != 0) {
 		ZFS_EXIT(zfsvfs);
 		VOP_UNLOCK(sdvp, 0);
@@ -4148,8 +4193,13 @@ zfs_rename(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	znode_t		*sdzp, *tdzp, *szp, *tzp;
 	zilog_t		*zilog = NULL;
 	dmu_tx_t	*tx;
+#ifdef __FreeBSD__
 	char		*snm = __UNCONST(scnp->cn_nameptr);
 	char		*tnm = __UNCONST(tcnp->cn_nameptr);
+#endif
+#ifdef __NetBSD__
+	char *snm, *tnm;
+#endif
 	int		error = 0;
 
 	/* Reject renames across filesystems. */
@@ -4177,6 +4227,13 @@ zfs_rename(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	sdzp = VTOZ(sdvp);
 	zfsvfs = tdzp->z_zfsvfs;
 	zilog = zfsvfs->z_log;
+#ifdef __NetBSD__
+	/* ZFS wants a null-terminated name. */
+	snm = PNBUF_GET();
+	strlcpy(snm, scnp->cn_nameptr, scnp->cn_namelen + 1);
+	tnm = PNBUF_GET();
+	strlcpy(tnm, tcnp->cn_nameptr, tcnp->cn_namelen + 1);
+#endif
 
 	/*
 	 * After we re-enter ZFS_ENTER() we will have to revalidate all
@@ -4190,11 +4247,13 @@ zfs_rename(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		goto unlockout;
 	}
 
+#ifndef __NetBSD__
 	/* If source and target are the same file, there is nothing to do. */
 	if ((*svpp) == (*tvpp)) {
 		error = 0;
 		goto unlockout;
 	}
+#endif
 
 	if (((*svpp)->v_type == VDIR && (*svpp)->v_mountedhere != NULL) ||
 	    ((*tvpp) != NULL && (*tvpp)->v_type == VDIR &&
@@ -4396,6 +4455,10 @@ unlockout:			/* all 4 vnodes are locked, ZFS_ENTER called */
 
 	VOP_UNLOCK(*svpp, 0);
 	VOP_UNLOCK(sdvp, 0);
+#ifdef __NetBSD__
+	PNBUF_PUT(snm);
+	PNBUF_PUT(tnm);
+#endif
 
 	if (*tvpp != sdvp && *tvpp != *svpp)
 	if (*tvpp != NULL)
@@ -5050,6 +5113,10 @@ zfs_netbsd_access(void *v)
 	KASSERT(VOP_ISLOCKED(vp));
 	error = zfs_access(vp, zfs_mode, 0, cred, NULL);
 
+	/* We expect EACCES as common error. */
+	if (error == EPERM)
+		error = EACCES;
+
 	return (error);
 }
 
@@ -5064,12 +5131,11 @@ zfs_netbsd_lookup(void *v)
 	struct vnode *dvp = ap->a_dvp;
 	struct vnode **vpp = ap->a_vpp;
 	struct componentname *cnp = ap->a_cnp;
-	char nm[NAME_MAX + 1];
+	char *nm, short_nm[31];
 	int error;
 	int iswhiteout;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
-	KASSERT(cnp->cn_namelen < sizeof nm);
 
 	*vpp = NULL;
 
@@ -5099,10 +5165,17 @@ zfs_netbsd_lookup(void *v)
 	 * zfs_lookup wants a null-terminated component name, but namei
 	 * gives us a pointer into the full pathname.
 	 */
+	ASSERT(cnp->cn_namelen < PATH_MAX - 1);
+	if (cnp->cn_namelen + 1 > sizeof(short_nm))
+		nm = PNBUF_GET();
+	else
+		nm = short_nm;
 	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
 
-	error = zfs_lookup(dvp, nm, vpp, NULL, 0, NULL, cnp->cn_cred, NULL,
-	    NULL, NULL);
+	error = zfs_lookup(dvp, nm, vpp, 0, cnp, cnp->cn_nameiop, cnp->cn_cred);
+
+	if (nm != short_nm)
+		PNBUF_PUT(nm);
 
 	/*
 	 * Translate errors to match our namei insanity.  Also, if the
@@ -5121,8 +5194,15 @@ zfs_netbsd_lookup(void *v)
 				error = EJUSTRETURN;
 				break;
 			}
-			/* FALLTHROUGH */
+			break;
 		case DELETE:
+			if (error == 0) {
+				error = VOP_ACCESS(dvp, VWRITE, cnp->cn_cred);
+				if (error) {
+					VN_RELE(*vpp);
+					*vpp = NULL;
+				}
+			}
 			break;
 		}
 	}
@@ -5171,6 +5251,7 @@ zfs_netbsd_create(void *v)
 	struct vnode **vpp = ap->a_vpp;
 	struct componentname *cnp = ap->a_cnp;
 	struct vattr *vap = ap->a_vap;
+	char *nm;
 	int mode;
 	int error;
 
@@ -5179,9 +5260,14 @@ zfs_netbsd_create(void *v)
 	vattr_init_mask(vap);
 	mode = vap->va_mode & ALLPERMS;
 
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
 	/* XXX !EXCL is wrong here...  */
-	error = zfs_create(dvp, __UNCONST(cnp->cn_nameptr), vap, !EXCL, mode,
-	    vpp, cnp->cn_cred, NULL);
+	error = zfs_create(dvp, nm, vap, !EXCL, mode, vpp, cnp->cn_cred, NULL);
+
+	PNBUF_PUT(nm);
 
 	KASSERT((error == 0) == (*vpp != NULL));
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
@@ -5201,12 +5287,19 @@ zfs_netbsd_remove(void *v)
 	struct vnode *dvp = ap->a_dvp;
 	struct vnode *vp = ap->a_vp;
 	struct componentname *cnp = ap->a_cnp;
+	char *nm;
 	int error;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 	KASSERT(VOP_ISLOCKED(vp) == LK_EXCLUSIVE);
 
-	error = zfs_remove(dvp, vp, __UNCONST(cnp->cn_nameptr), cnp->cn_cred);
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
+	error = zfs_remove(dvp, vp, nm, cnp->cn_cred);
+
+	PNBUF_PUT(nm);
 	vput(vp);
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 	return (error);
@@ -5225,14 +5318,20 @@ zfs_netbsd_mkdir(void *v)
 	struct vnode **vpp = ap->a_vpp;
 	struct componentname *cnp = ap->a_cnp;
 	struct vattr *vap = ap->a_vap;
+	char *nm;
 	int error;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 
 	vattr_init_mask(vap);
 
-	error = zfs_mkdir(dvp, __UNCONST(cnp->cn_nameptr), vap, vpp,
-	    cnp->cn_cred);
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
+	error = zfs_mkdir(dvp, nm, vap, vpp, cnp->cn_cred);
+
+	PNBUF_PUT(nm);
 
 	KASSERT((error == 0) == (*vpp != NULL));
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
@@ -5252,12 +5351,19 @@ zfs_netbsd_rmdir(void *v)
 	struct vnode *dvp = ap->a_dvp;
 	struct vnode *vp = ap->a_vp;
 	struct componentname *cnp = ap->a_cnp;
+	char *nm;
 	int error;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 	KASSERT(VOP_ISLOCKED(vp) == LK_EXCLUSIVE);
 
-	error = zfs_rmdir(dvp, vp, __UNCONST(cnp->cn_nameptr), cnp->cn_cred);
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
+	error = zfs_rmdir(dvp, vp, nm, cnp->cn_cred);
+
+	PNBUF_PUT(nm);
 	vput(vp);
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 	return error;
@@ -5329,10 +5435,13 @@ zfs_netbsd_setattr(void *v)
 	vnode_t *vp = ap->a_vp;
 	vattr_t *vap = ap->a_vap;
 	cred_t *cred = ap->a_cred;
+	znode_t *zp = VTOZ(vp);
 	xvattr_t xvap;
-	u_long fflags;
+	kauth_action_t action;
+	u_long fflags, sfflags = 0;
 	uint64_t zflags;
-	int flags = 0;
+	int error, flags = 0;
+	bool changing_sysflags;
 
 	vattr_init_mask(vap);
 	vap->va_mask &= ~AT_NOSET;
@@ -5350,40 +5459,14 @@ zfs_netbsd_setattr(void *v)
 		fflags = vap->va_flags;
 		if ((fflags & ~(SF_IMMUTABLE|SF_APPEND|SF_NOUNLINK|UF_NODUMP)) != 0)
 			return (EOPNOTSUPP);
-		/*
-		 * Callers may only modify the file flags on objects they
-		 * have VADMIN rights for.
-		 */
-		if ((error = VOP_ACCESS(vp, VWRITE, cred)) != 0)
-			return (error);
-		/*
-		 * Unprivileged processes are not permitted to unset system
-		 * flags, or modify flags if any system flags are set.
-		 * Privileged non-jail processes may not modify system flags
-		 * if securelevel > 0 and any existing system flags are set.
-		 * Privileged jail processes behave like privileged non-jail
-		 * processes if the security.jail.chflags_allowed sysctl is
-		 * is non-zero; otherwise, they behave like unprivileged
-		 * processes.
-		 */
-		if (kauth_authorize_system(cred, KAUTH_SYSTEM_CHSYSFLAGS, 0,
-			NULL, NULL, NULL) != 0) {
-
-			if (zflags &
-			    (ZFS_IMMUTABLE | ZFS_APPENDONLY | ZFS_NOUNLINK)) {
-				return (EPERM);
-			}
-			if (fflags &
-			    (SF_IMMUTABLE | SF_APPEND | SF_NOUNLINK)) {
-				return (EPERM);
-			}
-		}
 
 #define	FLAG_CHANGE(fflag, zflag, xflag, xfield)	do {		\
 	if (((fflags & (fflag)) && !(zflags & (zflag))) ||		\
 	    ((zflags & (zflag)) && !(fflags & (fflag)))) {		\
 		XVA_SET_REQ(&xvap, (xflag));				\
 		(xfield) = ((fflags & (fflag)) != 0);			\
+		if (((fflag) & SF_SETTABLE) != 0)			\
+			sfflags |= (fflag);				\
 	}								\
 } while (0)
 		/* Convert chflags into ZFS-type flags. */
@@ -5397,7 +5480,34 @@ zfs_netbsd_setattr(void *v)
 		FLAG_CHANGE(UF_NODUMP, ZFS_NODUMP, XAT_NODUMP,
 		    xvap.xva_xoptattrs.xoa_nodump);
 #undef	FLAG_CHANGE
+
+		action = KAUTH_VNODE_WRITE_FLAGS;
+		changing_sysflags = false;
+
+		if (zflags & (ZFS_IMMUTABLE|ZFS_APPENDONLY|ZFS_NOUNLINK)) {
+			action |= KAUTH_VNODE_HAS_SYSFLAGS;
+		}
+		if (sfflags != 0) {
+			action |= KAUTH_VNODE_WRITE_SYSFLAGS;
+			changing_sysflags = true;
+		}
+
+		error = kauth_authorize_vnode(cred, action, vp, NULL,
+		    genfs_can_chflags(cred, vp->v_type, zp->z_uid,
+		    changing_sysflags));
+		if (error)
+			return error;
 	}
+
+	if (vap->va_atime.tv_sec != VNOVAL || vap->va_mtime.tv_sec != VNOVAL ||
+	    vap->va_birthtime.tv_sec != VNOVAL) {
+		error = kauth_authorize_vnode(cred, KAUTH_VNODE_WRITE_TIMES, vp,
+		     NULL, genfs_can_chtimes(vp, vap->va_vaflags, zp->z_uid,
+		     cred));
+		if (error)
+			return error;
+	}
+
 	return (zfs_setattr(vp, (vattr_t *)&xvap, flags, cred, NULL));
 }
 
@@ -5464,7 +5574,8 @@ zfs_netbsd_rename(void *v)
 
 	VN_RELE(fdvp);
 	VN_RELE(tdvp);
-	VN_RELE(fvp);
+	if (fvp != NULL)
+		VN_RELE(fvp);
 	if (tvp != NULL)
 		VN_RELE(tvp);
 
@@ -5486,6 +5597,7 @@ zfs_netbsd_symlink(void *v)
 	struct componentname *cnp = ap->a_cnp;
 	struct vattr *vap = ap->a_vap;
 	char *target = ap->a_target;
+	char *nm;
 	int error;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
@@ -5493,8 +5605,13 @@ zfs_netbsd_symlink(void *v)
 	vap->va_type = VLNK;	/* Netbsd: Syscall only sets va_mode. */
 	vattr_init_mask(vap);
 
-	error = zfs_symlink(dvp, vpp, __UNCONST(cnp->cn_nameptr), vap, target,
-	    cnp->cn_cred, 0);
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
+	error = zfs_symlink(dvp, vpp, nm, vap, target, cnp->cn_cred, 0);
+
+	PNBUF_PUT(nm);
 
 	KASSERT((error == 0) == (*vpp != NULL));
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
@@ -5522,13 +5639,20 @@ zfs_netbsd_link(void *v)
 	struct vnode *dvp = ap->a_dvp;
 	struct vnode *vp = ap->a_vp;
 	struct componentname *cnp = ap->a_cnp;
+	char *nm;
 	int error;
 
 	KASSERT(VOP_ISLOCKED(dvp) == LK_EXCLUSIVE);
 
+	/* ZFS wants a null-terminated name. */
+	nm = PNBUF_GET();
+	(void)strlcpy(nm, cnp->cn_nameptr, cnp->cn_namelen + 1);
+
 	vn_lock(vp, LK_EXCLUSIVE);
-	error = zfs_link(dvp, vp, __UNCONST(cnp->cn_nameptr), cnp->cn_cred,
+	error = zfs_link(dvp, vp, nm, cnp->cn_cred,
 	    NULL, 0);
+
+	PNBUF_PUT(nm);
 	VOP_UNLOCK(vp, 0);
 	return error;
 }
@@ -5572,11 +5696,6 @@ zfs_netbsd_reclaim(void *v)
 	/*
 	 * Process a deferred atime update.
 	 */
-	/*
-	 * XXXNETBSD I don't think this actually works.
-	 * We are dirtying the znode again after the vcache layer cleaned it,
-	 * so we would need to zil_commit() again here.
-	 */
 	if (zp->z_atime_dirty && zp->z_unlinked == 0) {
 		dmu_tx_t *tx = dmu_tx_create(zfsvfs->z_os);
 
@@ -5592,6 +5711,9 @@ zfs_netbsd_reclaim(void *v)
 			dmu_tx_commit(tx);
 		}
 	}
+
+	if (zfsvfs->z_log)
+		zil_commit(zfsvfs->z_log, zp->z_id);
 
 	if (zp->z_sa_hdl == NULL)
 		zfs_znode_free(zp);
@@ -5774,6 +5896,11 @@ zfs_putapage(vnode_t *vp, page_t **pp, int count, int flags)
 	struct uvm_object *uobj = &vp->v_uobj;
 	kmutex_t *mtx = uobj->vmobjlock;
 
+	if (zp->z_sa_hdl == NULL) {
+		err = 0;
+		goto out_unbusy;
+	}
+
 	off = pp[0]->offset;
 	len = count * PAGESIZE;
 	KASSERT(off + len <= round_page(zp->z_size));
@@ -5825,13 +5952,12 @@ zfs_putapage(vnode_t *vp, page_t **pp, int count, int flags)
 	}
 	dmu_tx_commit(tx);
 
-	if (async) {
-		mutex_enter(mtx);
-		mutex_enter(&uvm_pageqlock);
-		uvm_page_unbusy(pp, count);
-		mutex_exit(&uvm_pageqlock);
-		mutex_exit(mtx);
-	}
+out_unbusy:
+	mutex_enter(mtx);
+	mutex_enter(&uvm_pageqlock);
+	uvm_page_unbusy(pp, count);
+	mutex_exit(&uvm_pageqlock);
+	mutex_exit(mtx);
 
 out:
 	return (err);
@@ -5879,34 +6005,60 @@ zfs_netbsd_putpages(void *v)
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	rl_t *rl = NULL;
+	uint64_t len;
 	int error;
 	bool cleaned = false;
 
 	bool async = (flags & PGO_SYNCIO) == 0;
 	bool cleaning = (flags & PGO_CLEANIT) != 0;
 
-	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(zp);
-
 	if (cleaning) {
-		rl = zfs_range_lock(zp, offlo, offhi, RL_WRITER);
+		ASSERT((offlo & PAGE_MASK) == 0 && (offhi & PAGE_MASK) == 0);
+		ASSERT(offlo < offhi || offhi == 0);
+		if (offhi == 0)
+			len = UINT64_MAX;
+		else
+			len = offhi - offlo;
+		mutex_exit(vp->v_interlock);
+		if (curlwp == uvm.pagedaemon_lwp) {
+			error = fstrans_start_nowait(vp->v_mount);
+			if (error)
+				return error;
+		} else {
+			vfs_t *mp = vp->v_mount;
+			fstrans_start(mp);
+			if (vp->v_mount != mp) {
+				fstrans_done(mp);
+				ASSERT(!vn_has_cached_data(vp));
+				return 0;
+			}
+		}
+		/*
+		 * Cannot use ZFS_ENTER() here as it returns with error
+		 * if z_unmounted.  The next statement is equivalent.
+		 */
+		rrm_enter(&zfsvfs->z_teardown_lock, RW_READER, FTAG);
+
+		rl = zfs_range_lock(zp, offlo, len, RL_WRITER);
+		mutex_enter(vp->v_interlock);
 		tsd_set(zfs_putpage_key, &cleaned);
 	}
 	error = genfs_putpages(v);
-	if (rl) {
+	if (cleaning) {
 		tsd_set(zfs_putpage_key, NULL);
 		zfs_range_unlock(rl);
+
+		/*
+		 * Only zil_commit() if we cleaned something.  This avoids 
+		 * deadlock if we're called from zfs_netbsd_setsize().
+		 */
+
+		if (cleaned)
+		if (!async || zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
+			zil_commit(zfsvfs->z_log, zp->z_id);
+		ZFS_EXIT(zfsvfs);
+		fstrans_done(vp->v_mount);
 	}
-
-	/*
-	 * Only zil_commit() if we cleaned something.
-	 * This avoids deadlock if we're called from zfs_netbsd_setsize().
-	 */
-
-	if (cleaned)
-	if (!async || zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
-		zil_commit(zfsvfs->z_log, zp->z_id);
-	ZFS_EXIT(zfsvfs);
 	return error;
 }
 

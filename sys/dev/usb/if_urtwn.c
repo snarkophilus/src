@@ -1,4 +1,4 @@
-/*	$NetBSD: if_urtwn.c,v 1.64 2018/09/12 21:57:18 christos Exp $	*/
+/*	$NetBSD: if_urtwn.c,v 1.69 2019/03/07 14:55:49 christos Exp $	*/
 /*	$OpenBSD: if_urtwn.c,v 1.42 2015/02/10 23:25:46 mpi Exp $	*/
 
 /*-
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_urtwn.c,v 1.64 2018/09/12 21:57:18 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_urtwn.c,v 1.69 2019/03/07 14:55:49 christos Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -195,6 +195,7 @@ static const struct urtwn_dev {
 	URTWN_RTL8188E_DEV(TPLINK, RTL8188EU),
 
 	/* URTWN_RTL8192EU */
+	URTWN_RTL8192EU_DEV(DLINK,	DWA131E),
 	URTWN_RTL8192EU_DEV(REALTEK,	RTL8192EU),
 	URTWN_RTL8192EU_DEV(TPLINK,	RTL8192EU),
 };
@@ -484,7 +485,7 @@ urtwn_attach(device_t parent, device_t self, void *aux)
 	IFQ_SET_READY(&ifp->if_snd);
 	memcpy(ifp->if_xname, device_xname(sc->sc_dev), IFNAMSIZ);
 
-	if_attach(ifp);
+	if_initialize(ifp);
 	ieee80211_ifattach(ic);
 
 	/* override default methods */
@@ -508,6 +509,9 @@ urtwn_attach(device_t parent, device_t self, void *aux)
 	sc->sc_txtap_len = sizeof(sc->sc_txtapu);
 	sc->sc_txtap.wt_ihdr.it_len = htole16(sc->sc_txtap_len);
 	sc->sc_txtap.wt_ihdr.it_present = htole32(URTWN_TX_RADIOTAP_PRESENT);
+
+	ifp->if_percpuq = if_percpuq_create(ifp);
+	if_register(ifp);
 
 	ieee80211_announce(ic);
 
@@ -809,15 +813,44 @@ urtwn_free_tx_list(struct urtwn_softc *sc)
 	}
 }
 
+static int
+urtwn_tx_beacon(struct urtwn_softc *sc, struct mbuf *m,
+    struct ieee80211_node *ni)
+{
+	struct urtwn_tx_data *data =
+	    urtwn_get_tx_data(sc, sc->ac2idx[WME_AC_VO]);
+	return urtwn_tx(sc, m, ni, data);
+}
+
 static void
 urtwn_task(void *arg)
 {
 	struct urtwn_softc *sc = arg;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct urtwn_host_cmd_ring *ring = &sc->cmdq;
 	struct urtwn_host_cmd *cmd;
 	int s;
 
 	DPRINTFN(DBG_FN, ("%s: %s\n", device_xname(sc->sc_dev), __func__));
+	if (ic->ic_state == IEEE80211_S_RUN && 
+	    (ic->ic_opmode == IEEE80211_M_HOSTAP ||
+	    ic->ic_opmode == IEEE80211_M_IBSS)) {
+
+		struct mbuf *m = ieee80211_beacon_alloc(ic, ic->ic_bss,
+		    &sc->sc_bo);
+		if (m == NULL) {
+			aprint_error_dev(sc->sc_dev,
+			    "could not allocate beacon");
+		}
+
+		if (urtwn_tx_beacon(sc, m, ic->ic_bss) != 0) {
+			m_freem(m);
+			aprint_error_dev(sc->sc_dev, "could not send beacon");
+		}
+
+		/* beacon is no longer needed */
+		m_freem(m);
+	}
 
 	/* Process host commands. */
 	s = splusb();
@@ -1032,7 +1065,7 @@ urtwn_fw_cmd(struct urtwn_softc *sc, uint8_t id, const void *buf, int len)
 	for (ntries = 0; ntries < 100; ntries++) {
 		if (!(urtwn_read_1(sc, R92C_HMETFR) & (1 << fwcur)))
 			break;
-		DELAY(10);
+		DELAY(2000);
 	}
 	if (ntries == 100) {
 		aprint_error_dev(sc->sc_dev,
@@ -2941,6 +2974,21 @@ urtwn_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 		}
 		break;
 
+	case SIOCS80211CHANNEL:
+		/*
+		 * This allows for fast channel switching in monitor mode
+		 * (used by kismet). In IBSS mode, we must explicitly reset
+		 * the interface to generate a new beacon frame.
+		 */
+		error = ieee80211_ioctl(ic, cmd, data);
+		if (error == ENETRESET &&
+		    ic->ic_opmode == IEEE80211_M_MONITOR) {
+			urtwn_set_chan(sc, ic->ic_curchan,
+			    IEEE80211_HTINFO_2NDCHAN_NONE);
+			error = 0;
+		}
+		break;
+
 	default:
 		error = ieee80211_ioctl(ic, cmd, data);
 		break;
@@ -3466,12 +3514,12 @@ urtwn_load_firmware(struct urtwn_softc *sc)
 	if (ISSET(sc->chip, URTWN_CHIP_88E) ||
 	    ISSET(sc->chip, URTWN_CHIP_92EU))
 		urtwn_r88e_fw_reset(sc);
-	for (ntries = 0; ntries < 1000; ntries++) {
+	for (ntries = 0; ntries < 6000; ntries++) {
 		if (urtwn_read_4(sc, R92C_MCUFWDL) & R92C_MCUFWDL_WINTINI_RDY)
 			break;
 		DELAY(5);
 	}
-	if (ntries == 1000) {
+	if (ntries == 6000) {
 		aprint_error_dev(sc->sc_dev,
 		    "timeout waiting for firmware readiness\n");
 		error = ETIMEDOUT;

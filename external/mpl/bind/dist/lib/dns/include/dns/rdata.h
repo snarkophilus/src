@@ -1,4 +1,4 @@
-/*	$NetBSD: rdata.h,v 1.2 2018/08/12 13:02:35 christos Exp $	*/
+/*	$NetBSD: rdata.h,v 1.4 2019/02/24 20:01:30 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -86,6 +86,8 @@
  *** Imports
  ***/
 
+#include <stdbool.h>
+
 #include <isc/lang.h>
 
 #include <dns/types.h>
@@ -131,7 +133,7 @@ struct dns_rdata {
 #define DNS_RDATA_INITIALIZED(rdata) \
 	(!ISC_LINK_LINKED((rdata), link))
 #else
-#define DNS_RDATA_INITIALIZED(rdata) ISC_TRUE
+#define DNS_RDATA_INITIALIZED(rdata) true
 #endif
 #endif
 
@@ -533,14 +535,14 @@ dns_rdata_freestruct(void *source);
  *	dns_rdata_tostruct().
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_ismeta(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is a meta-type
  * like ANY or AXFR.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_issingleton(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is a singleton type,
@@ -551,14 +553,14 @@ dns_rdatatype_issingleton(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdataclass_ismeta(dns_rdataclass_t rdclass);
 /*%<
  * Return true iff the rdata class 'rdclass' is a meta-class
  * like ANY or NONE.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_isdnssec(dns_rdatatype_t type);
 /*%<
  * Return true iff 'type' is one of the DNSSEC
@@ -568,7 +570,7 @@ dns_rdatatype_isdnssec(dns_rdatatype_t type);
  * \li	'type' is a valid rdata type.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_iszonecutauth(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' is considered authoritative
@@ -580,7 +582,7 @@ dns_rdatatype_iszonecutauth(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_isknown(dns_rdatatype_t type);
 /*%<
  * Return true iff the rdata type 'type' is known.
@@ -589,7 +591,6 @@ dns_rdatatype_isknown(dns_rdatatype_t type);
  * \li	'type' is a valid rdata type.
  *
  */
-
 
 isc_result_t
 dns_rdata_additionaldata(dns_rdata_t *rdata, dns_additionaldatafunc_t add,
@@ -650,7 +651,7 @@ dns_rdata_digest(dns_rdata_t *rdata, dns_digestfunc_t digest, void *arg);
  *\li	Many other results are possible if not successful.
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_questiononly(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' can only appear in the question
@@ -661,7 +662,7 @@ dns_rdatatype_questiononly(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_notquestion(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' can not appear in the question
@@ -672,11 +673,21 @@ dns_rdatatype_notquestion(dns_rdatatype_t type);
  *
  */
 
-isc_boolean_t
+bool
 dns_rdatatype_atparent(dns_rdatatype_t type);
 /*%<
  * Return true iff rdata of type 'type' should appear at the parent of
  * a zone cut.
+ *
+ * Requires:
+ * \li	'type' is a valid rdata type.
+ *
+ */
+
+bool
+dns_rdatatype_atcname(dns_rdatatype_t type);
+/*%<
+ * Return true iff rdata of type 'type' can appear beside a cname.
  *
  * Requires:
  * \li	'type' is a valid rdata type.
@@ -711,10 +722,12 @@ dns_rdatatype_attributes(dns_rdatatype_t rdtype);
 #define DNS_RDATATYPEATTR_UNKNOWN		0x00000040U
 /*% Is META, and can only be in a question section */
 #define DNS_RDATATYPEATTR_QUESTIONONLY		0x00000080U
-/*% is META, and can NOT be in a question section */
+/*% Is META, and can NOT be in a question section */
 #define DNS_RDATATYPEATTR_NOTQUESTION		0x00000100U
 /*% Is present at zone cuts in the parent, not the child */
 #define DNS_RDATATYPEATTR_ATPARENT		0x00000200U
+/*% Can exist along side a CNAME */
+#define DNS_RDATATYPEATTR_ATCNAME		0x00000400U
 
 dns_rdatatype_t
 dns_rdata_covers(dns_rdata_t *rdata);
@@ -730,9 +743,9 @@ dns_rdata_covers(dns_rdata_t *rdata);
  *\li	The type covered.
  */
 
-isc_boolean_t
+bool
 dns_rdata_checkowner(const dns_name_t *name, dns_rdataclass_t rdclass,
-		     dns_rdatatype_t type, isc_boolean_t wildcard);
+		     dns_rdatatype_t type, bool wildcard);
 /*
  * Returns whether this is a valid ownername for this <type,class>.
  * If wildcard is true allow the first label to be a wildcard if
@@ -742,7 +755,7 @@ dns_rdata_checkowner(const dns_name_t *name, dns_rdataclass_t rdclass,
  *	'name' is a valid name.
  */
 
-isc_boolean_t
+bool
 dns_rdata_checknames(dns_rdata_t *rdata, const dns_name_t *owner,
 		     dns_name_t *bad);
 /*

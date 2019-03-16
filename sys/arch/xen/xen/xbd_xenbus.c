@@ -1,4 +1,4 @@
-/*      $NetBSD: xbd_xenbus.c,v 1.88 2018/08/26 21:04:16 jdolecek Exp $      */
+/*      $NetBSD: xbd_xenbus.c,v 1.92 2019/02/02 12:32:55 cherry Exp $      */
 
 /*
  * Copyright (c) 2006 Manuel Bouyer.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.88 2018/08/26 21:04:16 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.92 2019/02/02 12:32:55 cherry Exp $");
 
 #include "opt_xen.h"
 
@@ -76,8 +76,8 @@ __KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.88 2018/08/26 21:04:16 jdolecek Exp
 #include <xen/hypervisor.h>
 #include <xen/evtchn.h>
 #include <xen/granttables.h>
-#include <xen/xen-public/io/blkif.h>
-#include <xen/xen-public/io/protocols.h>
+#include <xen/include/public/io/blkif.h>
+#include <xen/include/public/io/protocols.h>
 
 #include <xen/xenbus.h>
 #include "locators.h"
@@ -378,7 +378,7 @@ xbd_xenbus_detach(device_t dev, int flags)
 	}
 
 	hypervisor_mask_event(sc->sc_evtchn);
-	intr_disestablish(sc->sc_ih);
+	xen_intr_disestablish(sc->sc_ih);
 
 	while (xengnt_status(sc->sc_ring_gntref)) {
 		/* XXXSMP */
@@ -413,7 +413,7 @@ xbd_xenbus_suspend(device_t dev, const pmf_qual_t *qual) {
 
 	hypervisor_mask_event(sc->sc_evtchn);
 	sc->sc_backend_status = BLKIF_STATE_SUSPENDED;
-	intr_disestablish(sc->sc_ih);
+	xen_intr_disestablish(sc->sc_ih);
 
 	splx(s);
 
@@ -465,7 +465,7 @@ xbd_xenbus_resume(device_t dev, const pmf_qual_t *qual)
 
 	aprint_verbose_dev(dev, "using event channel %d\n",
 	    sc->sc_evtchn);
-	sc->sc_ih = intr_establish_xname(0, &xen_pic, sc->sc_evtchn, IST_LEVEL,
+	sc->sc_ih = xen_intr_establish_xname(-1, &xen_pic, sc->sc_evtchn, IST_LEVEL,
 	    IPL_BIO, &xbd_handler, sc, false, device_xname(dev));
 	KASSERT(sc->sc_ih != NULL);
 
@@ -509,7 +509,7 @@ again:
 		 */
 		sc->sc_backend_status = BLKIF_STATE_CONNECTED;
 		xenbus_device_resume(sc->sc_xbusd);
-		hypervisor_enable_event(sc->sc_evtchn);
+		hypervisor_unmask_event(sc->sc_evtchn);
 		xenbus_switch_state(sc->sc_xbusd, NULL, XenbusStateConnected);
 	}
 
@@ -568,8 +568,7 @@ xbd_backend_changed(void *arg, XenbusState new_state)
 
 		xbd_connect(sc);
 		sc->sc_shutdown = BLKIF_SHUTDOWN_RUN;
-		hypervisor_enable_event(sc->sc_evtchn);
-
+		hypervisor_unmask_event(sc->sc_evtchn);
 		sc->sc_xbdsize =
 		    sc->sc_sectors * (uint64_t)sc->sc_secsize / DEV_BSIZE;
 		dg = &sc->sc_dksc.sc_dkdev.dk_geom;

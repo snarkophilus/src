@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL,v 1.116 2018/08/01 20:04:14 maxv Exp $
+#	$NetBSD: INSTALL,v 1.118 2019/03/14 16:59:10 thorpej Exp $
 
 #
 #	INSTALL -- installation kernel.
@@ -8,7 +8,7 @@ include "arch/x68k/conf/std.x68k"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"INSTALL-$Revision: 1.116 $"
+#ident 		"INSTALL-$Revision: 1.118 $"
 
 makeoptions	COPTS="-Os"		# Optimise for space. Implies -O2
 
@@ -42,7 +42,6 @@ options 	FPU_EMULATE		# software fpu emulation for MC68030
 options 	FPSP			# floating point emulation for MC68040
 options 	M060SP			# int/fp emulation for MC68060
 #options 	JUPITER			# support for "Jupiter-X" accelerator
-#options 	MAPPEDCOPY		# use page mapping for large copyin/copyout
 #options 	ZSCONSOLE,ZSCN_SPEED="9600"	# use serial console
 
 
@@ -134,7 +133,6 @@ include 	"conf/compat_netbsd30.config"
 #options 	COMPAT_AOUT_M68K # compatibility with NetBSD/m68k a.out
 #options 	COMPAT_M68K4K	# NetBSD/m68k4k binaries
 #options 	COMPAT_SUNOS	# SunOS 4.x binary compatibility; broken
-#options 	COMPAT_SVR4	# SVR4 binary compatibility; broken
 #options 	COMPAT_LINUX	# Linux/m68k binary compatibility
 
 ## File systems.

@@ -1,4 +1,4 @@
-/*	$NetBSD: lwp.h,v 1.179 2018/04/19 21:19:07 christos Exp $	*/
+/*	$NetBSD: lwp.h,v 1.181 2019/03/01 09:02:03 hannken Exp $	*/
 
 /*
  * Copyright (c) 2001, 2006, 2007, 2008, 2009, 2010
@@ -180,6 +180,7 @@ struct lwp {
 	struct kauth_cred *l_cred;	/* !: cached credentials */
 	struct filedesc	*l_fd;		/* !: cached copy of proc::p_fd */
 	void		*l_emuldata;	/* !: kernel lwp-private data */
+	struct fstrans_lwp_info *l_fstrans; /* (: fstrans private data */
 	u_int		l_cv_signalled;	/* c: restarted by cv_signal() */
 	u_short		l_shlocks;	/* !: lockdebug: shared locks held */
 	u_short		l_exlocks;	/* !: lockdebug: excl. locks held */
@@ -258,6 +259,7 @@ extern int		maxlwp __read_mostly;	/* max number of lwps */
 #define	LP_VFORKWAIT	0x00000200 /* Waiting at vfork() for a child */
 #define	LP_SINGLESTEP	0x00000400 /* Single step thread in ptrace(2) */
 #define	LP_TIMEINTR	0x00010000 /* Time this soft interrupt */
+#define	LP_PREEMPTING	0x00020000 /* mi_switch called involuntarily */
 #define	LP_RUNNING	0x20000000 /* Active on a CPU */
 #define	LP_BOUND	0x80000000 /* Bound to a CPU */
 

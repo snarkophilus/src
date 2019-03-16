@@ -1,4 +1,4 @@
-/*	$NetBSD: sdlz_helper.c,v 1.2 2018/08/12 13:02:31 christos Exp $	*/
+/*	$NetBSD: sdlz_helper.c,v 1.4 2019/02/24 20:01:29 christos Exp $	*/
 
 /*
  * Copyright (C) 2002 Stichting NLnet, Netherlands, stichting@nlnet.nl.
@@ -37,13 +37,15 @@
 
 /*
  * Copyright (C) 1999-2001, 2016  Internet Systems Consortium, Inc. ("ISC")
- * 
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 #include <config.h>
+
+#include <stdbool.h>
 
 #include <dns/log.h>
 #include <dns/result.h>
@@ -85,7 +87,7 @@ destroy_querylist(isc_mem_t *mctx, query_list_t **querylist)
 		 * was really a query segment, and not a pointer to
 		 * %zone%, or %record%, or %client%
 		*/
-		if (tseg->sql != NULL && tseg->direct == isc_boolean_true)
+		if (tseg->sql != NULL && tseg->direct == true)
 			isc_mem_free(mctx, tseg->sql);
 		/* get the next query segment, before we destroy this one. */
 		nseg = ISC_LIST_NEXT(nseg, link);
@@ -103,13 +105,14 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 		unsigned int flags)
 {
 	isc_result_t result;
-	isc_boolean_t foundzone = isc_boolean_false;
-	isc_boolean_t foundrecord = isc_boolean_false;
-	isc_boolean_t foundclient = isc_boolean_false;
+	bool foundzone = false;
+	bool foundrecord = false;
+	bool foundclient = false;
+	char *free_me = NULL;
 	char *temp_str = NULL;
-	char *right_str = NULL;
 	query_list_t *tql;
 	query_segment_t *tseg = NULL;
+	char *last = NULL;
 
 	REQUIRE(querylist != NULL && *querylist == NULL);
 	REQUIRE(mctx != NULL);
@@ -134,15 +137,24 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 	ISC_LIST_INIT(*tql);
 
 	/* make a copy of query_str so we can chop it up */
-	temp_str = right_str = isc_mem_strdup(mctx, query_str);
+	free_me = temp_str = isc_mem_strdup(mctx, query_str);
 	/* couldn't make a copy, problem!! */
-	if (right_str == NULL) {
+	if (temp_str == NULL) {
 		result = ISC_R_NOMEMORY;
 		goto cleanup;
 	}
 
 	/* loop through the string and chop it up */
-	while (right_str != NULL) {
+	for (;;) {
+		/*
+		 * Split string into tokens at '$'.
+		 */
+		const char *sql = strtok_r(temp_str, "$", &last);
+		if (sql == NULL) {
+			break;
+		}
+		temp_str = NULL;
+
 		/* allocate memory for tseg */
 		tseg = isc_mem_get(mctx, sizeof(query_segment_t));
 		if (tseg  == NULL) {	/* no memory, clean everything up. */
@@ -150,26 +162,20 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			goto cleanup;
 		}
 		tseg->sql = NULL;
-		tseg->direct = isc_boolean_false;
+		tseg->direct = false;
 		/* initialize the query segment link */
 		ISC_LINK_INIT(tseg, link);
 		/* append the query segment to the list */
 		ISC_LIST_APPEND(*tql, tseg, link);
 
-		/*
-		 * split string at the first "$". set query segment to
-		 * left portion
-		 */
-		tseg->sql = isc_mem_strdup(mctx,
-					   isc_string_separate(&right_str,
-							       "$"));
+		tseg->sql = isc_mem_strdup(mctx, sql);
 		if (tseg->sql == NULL) {
 			/* no memory, clean everything up. */
 			result = ISC_R_NOMEMORY;
 			goto cleanup;
 		}
 		/* tseg->sql points directly to a string. */
-		tseg->direct = isc_boolean_true;
+		tseg->direct = true;
 		tseg->strlen = strlen(tseg->sql);
 
 		/* check if we encountered "$zone$" token */
@@ -180,11 +186,11 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct zone string */
-			tseg->sql = (char**) zone;
+			tseg->sql = zone;
 			tseg->strlen = 0;
 			/* tseg->sql points in-directly to a string */
-			tseg->direct = isc_boolean_false;
-			foundzone = isc_boolean_true;
+			tseg->direct = false;
+			foundzone = true;
 			/* check if we encountered "$record$" token */
 		} else if (strcasecmp(tseg->sql, "record") == 0) {
 			/*
@@ -193,11 +199,11 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct record string */
-			tseg->sql = (char**) record;
+			tseg->sql = record;
 			tseg->strlen = 0;
-			/* tseg->sql points in-directly poinsts to a string */
-			tseg->direct = isc_boolean_false;
-			foundrecord = isc_boolean_true;
+			/* tseg->sql points in-directly points to a string */
+			tseg->direct = false;
+			foundrecord = true;
 			/* check if we encountered "$client$" token */
 		} else if (strcasecmp(tseg->sql, "client") == 0) {
 			/*
@@ -206,16 +212,16 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 			 */
 			isc_mem_free(mctx, tseg->sql);
 			/* set tseg->sql to in-direct record string */
-			tseg->sql = (char**) client;
+			tseg->sql = client;
 			tseg->strlen = 0;
-			/* tseg->sql points in-directly poinsts to a string */
-			tseg->direct = isc_boolean_false;
-			foundclient = isc_boolean_true;
+			/* tseg->sql points in-directly points to a string */
+			tseg->direct = false;
+			foundclient = true;
 		}
 	}
 
 	/* we don't need temp_str any more */
-	isc_mem_free(mctx, temp_str);
+	isc_mem_free(mctx, free_me);
 	/*
 	 * add checks later to verify zone and record are found if
 	 * necessary.
@@ -258,9 +264,9 @@ build_querylist(isc_mem_t *mctx, const char *query_str, char **zone,
 	return (ISC_R_SUCCESS);
 
  cleanup:
-	/* get rid of temp_str */
-	if (temp_str != NULL)
-		isc_mem_free(mctx, temp_str);
+	/* get rid of free_me */
+	if (free_me != NULL)
+		isc_mem_free(mctx, free_me);
 
  flag_fail:
 	/* get rid of what was build of the query list */
@@ -291,7 +297,7 @@ sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
 		 * if this is a query segment, use the
 		 * precalculated string length
 		 */
-		if (tseg->direct == isc_boolean_true)
+		if (tseg->direct == true)
 			length += tseg->strlen;
 		else	/* calculate string length for dynamic segments. */
 			length += strlen(* (char**) tseg->sql);
@@ -309,7 +315,7 @@ sdlzh_build_querystring(isc_mem_t *mctx, query_list_t *querylist)
 	/* start at the top of the list again */
 	tseg = ISC_LIST_HEAD(*querylist);
 	while (tseg != NULL) {
-		if (tseg->direct == isc_boolean_true)
+		if (tseg->direct == true)
 			/* query segments */
 			strcat(qs, tseg->sql);
 		else
@@ -363,13 +369,7 @@ sdlzh_build_sqldbinstance(isc_mem_t *mctx, const char *allnodes_str,
 	isc_mem_attach(mctx, &db->mctx);
 
 	/* initialize the reference count mutex */
-	result = isc_mutex_init(&db->instance_lock);
-	if (result != ISC_R_SUCCESS) {
-		UNEXPECTED_ERROR(__FILE__, __LINE__,
-				 "isc_mutex_init() failed: %s",
-				 isc_result_totext(result));
-		goto cleanup;
-	}
+	isc_mutex_init(&db->instance_lock);
 
 	/* build the all nodes query list */
 	result = build_querylist(mctx, allnodes_str, &db->zone,

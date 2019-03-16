@@ -1,4 +1,4 @@
-# $NetBSD: mi,v 1.795 2018/09/23 13:36:04 christos Exp $
+# $NetBSD: mi,v 1.809 2019/02/26 10:01:40 isaki Exp $
 #
 # Note: don't delete entries from here - mark them as "obsolete" instead.
 #
@@ -89,6 +89,7 @@
 ./usr/libdata/debug/usr/tests/lib/libbluetooth				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libbpfjit				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libc					tests-lib-debug		compattestfile,atf
+./usr/libdata/debug/usr/tests/lib/libc/atomic				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libc/c063				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libc/db				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libc/gen				tests-lib-debug		compattestfile,atf
@@ -124,6 +125,7 @@
 ./usr/libdata/debug/usr/tests/lib/libexecinfo				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/liblutok				tests-lutok-debug	compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libm					tests-lib-debug		compattestfile,atf
+./usr/libdata/debug/usr/tests/lib/libnvmm				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libobjc				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libposix				tests-lib-debug		compattestfile,atf
 ./usr/libdata/debug/usr/tests/lib/libposix/bsd				tests-lib-debug		compattestfile,atf
@@ -1270,6 +1272,7 @@
 ./usr/tests/bin/sh/dotcmd/while_return_until	tests-bin-tests	compattestfile,atf
 ./usr/tests/bin/sh/dotcmd/while_return_while	tests-bin-tests	compattestfile,atf
 ./usr/tests/bin/sh/t_arith			tests-bin-tests		compattestfile,atf
+./usr/tests/bin/sh/t_builtins			tests-bin-tests		compattestfile,atf
 ./usr/tests/bin/sh/t_cmdsub			tests-bin-tests		compattestfile,atf
 ./usr/tests/bin/sh/t_compexit			tests-obsolete		obsolete
 ./usr/tests/bin/sh/t_evaltested			tests-bin-tests		compattestfile,atf
@@ -2178,6 +2181,7 @@
 ./usr/tests/kernel/t_filedesc			tests-kernel-tests	atf,rump
 ./usr/tests/kernel/t_interp			tests-kernel-tests	atf
 ./usr/tests/kernel/t_kauth_pr_47598		tests-kernel-tests	compattestfile,atf
+./usr/tests/kernel/t_ksem			tests-kernel-tests	atf
 ./usr/tests/kernel/t_lock			tests-kernel-tests	compattestfile,atf
 ./usr/tests/kernel/t_lockf			tests-kernel-tests	compattestfile,atf
 ./usr/tests/kernel/t_lwpctl			tests-obsolete		obsolete
@@ -2418,6 +2422,7 @@
 ./usr/tests/lib/csu/h_initfini1			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/csu/h_initfini2			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/csu/h_initfini3			tests-lib-tests		compattestfile,atf
+./usr/tests/lib/csu/h_initfini_array		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/csu/t_crt0			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/csu/t_ifunc_static		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libbluetooth			tests-lib-tests	compattestfile,atf
@@ -2438,6 +2443,23 @@
 ./usr/tests/lib/libc				tests-lib-tests	compattestfile,atf
 ./usr/tests/lib/libc/Atffile			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libc/Kyuafile			tests-lib-tests		compattestfile,atf,kyua
+./usr/tests/lib/libc/atomic			tests-lib-tests	compattestfile,atf
+./usr/tests/lib/libc/atomic/Atffile		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_add	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_and	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_compare_and_swap	tests-lib-tests	compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_lock	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_nand	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_or		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_sub	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t___sync_xor	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_add	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_and	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_cas	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_dec	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_inc	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_or		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libc/atomic/t_atomic_swap	tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libc/c063			tests-lib-tests	compattestfile,atf
 ./usr/tests/lib/libc/c063/Atffile		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libc/c063/Kyuafile		tests-lib-tests		compattestfile,atf,kyua
@@ -3042,6 +3064,9 @@
 ./usr/tests/lib/libm/t_sqrt			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libm/t_tan			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libm/t_tanh			tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libnvmm				tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libnvmm/Atffile			tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libnvmm/Kyuafile		tests-lib-tests		compattestfile,atf,kyua
 ./usr/tests/lib/libobjc				tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libobjc/Atffile			tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libobjc/Kyuafile		tests-lib-tests		compattestfile,atf,kyua
@@ -3330,6 +3355,8 @@
 ./usr/tests/net/if_ipsec/Atffile		tests-net-tests		atf,rump
 ./usr/tests/net/if_ipsec/Kyuafile		tests-net-tests		atf,rump,kyua
 ./usr/tests/net/if_ipsec/t_ipsec		tests-net-tests		atf,rump
+./usr/tests/net/if_ipsec/t_ipsec_natt		tests-net-tests		atf,rump
+./usr/tests/net/if_ipsec/t_ipsec_pfil		tests-net-tests		atf,rump
 ./usr/tests/net/if_l2tp				tests-net-tests		compattestfile,atf
 ./usr/tests/net/if_l2tp/Atffile			tests-net-tests		atf,rump
 ./usr/tests/net/if_l2tp/Kyuafile		tests-net-tests		atf,rump,kyua
@@ -3462,6 +3489,7 @@
 ./usr/tests/rump/rumpkern/t_modlinkset		tests-rump-tests	atf,rump
 ./usr/tests/rump/rumpkern/t_signals		tests-rump-tests	atf,rump
 ./usr/tests/rump/rumpkern/t_sp			tests-rump-tests	atf,rump
+./usr/tests/rump/rumpkern/t_threadpool		tests-rump-tests	atf,rump
 ./usr/tests/rump/rumpkern/t_threads		tests-rump-tests	atf,rump
 ./usr/tests/rump/rumpkern/t_tsleep		tests-rump-tests	atf,rump
 ./usr/tests/rump/rumpkern/t_vm			tests-rump-tests	atf,rump
@@ -3688,6 +3716,7 @@
 ./usr/tests/usr.bin/cc/t_asan_poison		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/cc/t_asan_uaf		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/cc/t_hello			tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/cc/t_libgomp		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/cc/t_ubsan_int_add_overflow		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/cc/t_ubsan_int_divzero		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/cc/t_ubsan_int_neg_overflow		tests-usr.bin-tests	compattestfile,atf

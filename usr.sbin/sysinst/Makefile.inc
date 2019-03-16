@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.14 2018/10/06 18:45:37 martin Exp $
+#	$NetBSD: Makefile.inc,v 1.19 2019/02/12 18:32:15 martin Exp $
 #
 # Makefile for sysinst
 
@@ -57,6 +57,13 @@ CPPFLAGS+=	-I. -I${.CURDIR}/../.. -I${.CURDIR} \
 		${NODISKLABEL:D-DNO_DISKLABEL} \
 		${NOPARTMAN:D-DNO_PARTMAN}
 
+.if ${MACHINE} == "evbarm" \
+    || ${MACHINE} == "evbmips" \
+    || ${MACHINE} == "evbsh3"
+CPPFLAGS+=	-DARCH_SUBDIR="\"${MACHINE}-${MACHINE_ARCH}\""
+CPPFLAGS+=	-DPKG_ARCH_SUBDIR="\"${MACHINE_ARCH}\""
+.endif
+
 .if defined(NETBSD_OFFICIAL_RELEASE) && ${NETBSD_OFFICIAL_RELEASE} == "yes"
 CPPFLAGS+= -DSYSINST_FTP_HOST=\"ftp.NetBSD.org\" -DNETBSD_OFFICIAL_RELEASE
 CPPFLAGS+= -DSYSINST_HTTP_HOST=\"cdn.NetBSD.org\" -DNETBSD_OFFICIAL_RELEASE
@@ -95,6 +102,10 @@ COPTS += -Os
 
 .if (!defined(SMALLPROG) || defined(SMALLPROG_INET6)) && (${USE_INET6} != "no")
 CPPFLAGS+=-DINET6
+.endif
+
+.if defined(HAVE_GCC) && ${HAVE_GCC} == 7 && ${ACTIVE_CC} == "gcc"
+COPTS+=-Wno-format-truncation	# most useless gcc warning ever
 .endif
 
 .if defined(HAVE_GCC) || defined(HAVE_PCC)

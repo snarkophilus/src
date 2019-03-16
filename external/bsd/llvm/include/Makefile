@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.43 2018/07/17 18:55:27 joerg Exp $
+#	$NetBSD: Makefile,v 1.46 2019/03/03 17:46:01 maya Exp $
 
 .include <bsd.init.mk>
 
@@ -296,6 +296,6 @@ run-configure:
 	    ${LLVM_INCLUDE_CONFIG}/llvm/Config/config.h.in
 .endif
 
-depend dependall all: ${DPSRCS}
+includes depend dependall all: ${DPSRCS}
 
 .include <bsd.prog.mk>

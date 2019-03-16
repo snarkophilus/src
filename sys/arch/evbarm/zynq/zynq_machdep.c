@@ -1,4 +1,4 @@
-/*	$NetBSD: zynq_machdep.c,v 1.5 2018/10/18 09:01:54 skrll Exp $	*/
+/*	$NetBSD: zynq_machdep.c,v 1.10 2019/03/16 10:45:06 skrll Exp $	*/
 /*-
  * Copyright (c) 2012 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: zynq_machdep.c,v 1.5 2018/10/18 09:01:54 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: zynq_machdep.c,v 1.10 2019/03/16 10:45:06 skrll Exp $");
 
 #include "opt_evbarm_boardtype.h"
 #include "opt_arm_debug.h"
@@ -107,15 +107,6 @@ void zynq_platform_early_putchar(char);
 #include <sys/kgdb.h>
 #endif
 
-static dev_type_cnputc(earlyconsputc);
-static dev_type_cngetc(earlyconsgetc);
-
-static struct consdev earlycons = {
-	.cn_putc = earlyconsputc,
-	.cn_getc = earlyconsgetc,
-	.cn_pollc = nullcnpollc,
-};
-
 static void
 earlyconsputc(dev_t dev, int c)
 {
@@ -125,8 +116,14 @@ earlyconsputc(dev_t dev, int c)
 static int
 earlyconsgetc(dev_t dev)
 {
-	return 0;	/* XXX */
+	return 0;
 }
+
+static struct consdev earlycons = {
+	.cn_putc = earlyconsputc,
+	.cn_getc = earlyconsgetc,
+	.cn_pollc = nullcnpollc,
+};
 
 /*
  * Static device mappings. These peripheral registers are mapped at
@@ -192,9 +189,10 @@ zynq_platform_early_putchar(char c)
 	}
 }
 
-static void
+static int
 zynq_mpstart(void)
 {
+	int ret = 0;
 #ifdef MULTIPROCESSOR
 	/*
 	 * Invalidate all SCU cache tags. That is, for all cores (0-3)
@@ -237,7 +235,8 @@ zynq_mpstart(void)
 	}
 	for (size_t i = 1; i < arm_cpu_max; i++) {
 		if ((arm_cpu_hatched & __BIT(i)) == 0) {
-		printf("%s: warning: cpu%zu failed to hatch\n",
+			ret++;
+			printf("%s: warning: cpu%zu failed to hatch\n",
 			    __func__, i);
 		}
 	}
@@ -246,6 +245,7 @@ zynq_mpstart(void)
 	    arm_cpu_max, arm_cpu_max ? "s" : "",
 	    arm_cpu_hatched);
 #endif /* MULTIPROCESSOR */
+	return ret;
 }
 
 
@@ -340,6 +340,9 @@ initarm(void *arg)
 
 	u_int sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, NULL, 0);
 
+	/*
+	 * initarm_common flushes cache if required before AP start
+	 */
 	VPRINTF("mpstart\n");
 	zynq_mpstart();
 

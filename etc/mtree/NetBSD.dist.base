@@ -1,4 +1,4 @@
-#	$NetBSD: NetBSD.dist.base,v 1.179 2018/10/11 18:04:06 christos Exp $
+#	$NetBSD: NetBSD.dist.base,v 1.194 2019/02/24 02:29:09 rin Exp $
 #	@(#)4.4BSD.dist	8.1 (Berkeley) 6/13/93
 
 # Do not customize this file as it may be overwritten on upgrades.
@@ -112,10 +112,14 @@
 ./usr/include/dev
 ./usr/include/dev/apm
 ./usr/include/dev/ata
+./usr/include/dev/bluetooth
 ./usr/include/dev/dec
+./usr/include/dev/dm
 ./usr/include/dev/dmover
 ./usr/include/dev/dtv
 ./usr/include/dev/filemon
+./usr/include/dev/hdaudio
+./usr/include/dev/hdmicec
 ./usr/include/dev/hid
 ./usr/include/dev/hpc
 ./usr/include/dev/i2c
@@ -128,9 +132,12 @@
 ./usr/include/dev/pci
 ./usr/include/dev/pckbc
 ./usr/include/dev/pcmcia
+./usr/include/dev/pud
+./usr/include/dev/putter
 ./usr/include/dev/raidframe
 ./usr/include/dev/sbus
 ./usr/include/dev/scsipi
+./usr/include/dev/spi
 ./usr/include/dev/sun
 ./usr/include/dev/tc
 ./usr/include/dev/usb
@@ -187,10 +194,10 @@
 ./usr/include/g++/tr1
 ./usr/include/g++/tr1_impl
 ./usr/include/g++/tr2
-./usr/include/gcc-5
-./usr/include/gcc-5/sanitizer
 ./usr/include/gcc-6
 ./usr/include/gcc-6/sanitizer
+./usr/include/gcc-7
+./usr/include/gcc-7/sanitizer
 ./usr/include/gssapi
 ./usr/include/isofs
 ./usr/include/isofs/cd9660
@@ -212,13 +219,14 @@
 ./usr/include/msdosfs
 ./usr/include/net
 ./usr/include/net/agr
+./usr/include/net80211
 ./usr/include/netatalk
 ./usr/include/netbt
 ./usr/include/netcan
 ./usr/include/netinet
-./usr/include/net80211
 ./usr/include/netinet6
 ./usr/include/netipsec
+./usr/include/netmpls
 ./usr/include/netpgp
 ./usr/include/netsmb
 ./usr/include/nfs
@@ -365,8 +373,6 @@
 ./usr/share/examples/emul
 ./usr/share/examples/emul/linux
 ./usr/share/examples/emul/linux/etc
-./usr/share/examples/emul/svr4
-./usr/share/examples/emul/svr4/etc
 ./usr/share/examples/emul/ultrix
 ./usr/share/examples/emul/ultrix/etc
 ./usr/share/examples/fstab
@@ -392,6 +398,7 @@
 ./usr/share/examples/racoon/roadwarrior/client
 ./usr/share/examples/racoon/roadwarrior/server
 ./usr/share/examples/rtadvd
+./usr/share/examples/slip
 ./usr/share/examples/smbfs
 ./usr/share/examples/supfiles
 ./usr/share/examples/syslogd
@@ -1267,7 +1274,6 @@
 ./var/chroot/named/usr/libexec
 ./var/chroot/named/var
 ./var/chroot/named/var/run	mode=0775 gname=named
-./var/chroot/named/var/run/lwresd	mode=0775 gname=named
 ./var/chroot/named/var/run/named	mode=0775 gname=named
 ./var/chroot/named/var/tmp	mode=01775 gname=named
 ./var/chroot/nsd		mode=0755 uname=_nsd gname=_nsd
@@ -1319,7 +1325,6 @@
 ./var/preserve
 ./var/quotas			gname=operator mode=0750
 ./var/run
-./var/run/lwresd		mode=0775 gname=named
 ./var/run/named			mode=0775 gname=named
 ./var/rwho			uname=_rwhod gname=_rwhod
 ./var/shm			mode=01777

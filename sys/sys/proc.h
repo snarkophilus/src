@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.349 2018/08/10 21:44:59 pgoyette Exp $	*/
+/*	$NetBSD: proc.h,v 1.351 2019/03/01 03:03:19 christos Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -316,7 +316,6 @@ struct proc {
 	pid_t 		p_vfpid_done;	/* :: vforked done pid */
 	lwpid_t		p_lwp_created;	/* :: lwp created */
 	lwpid_t		p_lwp_exited;	/* :: lwp exited */
-	u_int		p_nsems;	/* Count of semaphores */
 	char		*p_path;	/* :: full pathname of executable */
 
 /*
@@ -338,7 +337,6 @@ struct proc {
 
 	vaddr_t		p_psstrp;	/* :: address of process's ps_strings */
 	u_int		p_pax;		/* :: PAX flags */
-
 	int		p_xexit;	/* p: exit code */
 /*
  * End area that is copied on creation
@@ -378,6 +376,7 @@ struct proc {
 #define	PK_SYSTEM	0x00000002 /* System process (kthread) */
 #define	PK_SYSVSEM	0x00000004 /* Used SysV semaphores */
 #define	PK_SUGID	0x00000100 /* Had set id privileges since last exec */
+#define	PK_KMEM		0x00000200 /* Has kmem access */
 #define	PK_EXEC		0x00004000 /* Process called exec */
 #define	PK_NOCLDWAIT	0x00020000 /* No zombies if child dies */
 #define	PK_32		0x00040000 /* 32-bit process (used on 64-bit kernels) */

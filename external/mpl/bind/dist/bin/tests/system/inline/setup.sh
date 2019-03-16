@@ -12,12 +12,11 @@ SYSTEMTESTTOP=..
 
 $SHELL clean.sh
 
-test -r $RANDFILE || $GENRANDOM 800 $RANDFILE
-
 cp ns1/root.db.in ns1/root.db
 rm -f ns1/root.db.signed
 
 touch ns2/trusted.conf
+cp ns2/nsec3-loop.db.in ns2/nsec3-loop.db
 cp ns2/bits.db.in ns2/bits.db
 cp ns2/bits.db.in ns2/inactiveksk.db
 cp ns2/bits.db.in ns2/inactivezsk.db
@@ -33,6 +32,7 @@ cp ns3/master.db.in ns3/updated.db
 cp ns3/master.db.in ns3/expired.db
 cp ns3/master.db.in ns3/nsec3.db
 cp ns3/master.db.in ns3/externalkey.db
+cp ns3/master.db.in ns3/delayedkeys.db
 cp ns3/master.db.in ns3/removedkeys-primary.db
 
 mkdir ns3/removedkeys

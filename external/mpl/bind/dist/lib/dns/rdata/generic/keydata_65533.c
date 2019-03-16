@@ -1,4 +1,4 @@
-/*	$NetBSD: keydata_65533.c,v 1.2 2018/08/12 13:02:36 christos Exp $	*/
+/*	$NetBSD: keydata_65533.c,v 1.4 2019/02/24 20:01:30 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -23,12 +23,11 @@
 
 static inline isc_result_t
 fromtext_keydata(ARGS_FROMTEXT) {
-	isc_result_t result;
 	isc_token_t token;
 	dns_secalg_t alg;
 	dns_secproto_t proto;
 	dns_keyflags_t flags;
-	isc_uint32_t refresh, addhd, removehd;
+	uint32_t refresh, addhd, removehd;
 
 	REQUIRE(type == dns_rdatatype_keydata);
 
@@ -40,37 +39,37 @@ fromtext_keydata(ARGS_FROMTEXT) {
 
 	/* refresh timer */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_time32_fromtext(DNS_AS_STR(token), &refresh));
 	RETERR(uint32_tobuffer(refresh, target));
 
 	/* add hold-down */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_time32_fromtext(DNS_AS_STR(token), &addhd));
 	RETERR(uint32_tobuffer(addhd, target));
 
 	/* remove hold-down */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_time32_fromtext(DNS_AS_STR(token), &removehd));
 	RETERR(uint32_tobuffer(removehd, target));
 
 	/* flags */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_keyflags_fromtext(&flags, &token.value.as_textregion));
 	RETERR(uint16_tobuffer(flags, target));
 
 	/* protocol */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secproto_fromtext(&proto, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &proto, 1));
 
 	/* algorithm */
 	RETERR(isc_lex_getmastertoken(lexer, &token, isc_tokentype_string,
-				      ISC_FALSE));
+				      false));
 	RETTOK(dns_secalg_fromtext(&alg, &token.value.as_textregion));
 	RETERR(mem_tobuffer(target, &alg, 1));
 
@@ -78,15 +77,7 @@ fromtext_keydata(ARGS_FROMTEXT) {
 	if ((flags & 0xc000) == 0xc000)
 		return (ISC_R_SUCCESS);
 
-	result = isc_base64_tobuffer(lexer, target, -1);
-	if (result != ISC_R_SUCCESS)
-		return (result);
-
-	/* Ensure there's at least enough data to compute a key ID for MD5 */
-	if (alg == DST_ALG_RSAMD5 && isc_buffer_usedlength(target) < 19)
-		return (ISC_R_UNEXPECTEDEND);
-
-	return (ISC_R_SUCCESS);
+	return (isc_base64_tobuffer(lexer, target, -2));
 }
 
 static inline isc_result_t
@@ -131,12 +122,14 @@ totext_keydata(ARGS_TOTEXT) {
 	RETERR(str_totext(buf, target));
 	RETERR(str_totext(" ", target));
 	if ((flags & DNS_KEYFLAG_KSK) != 0) {
-		if (flags & DNS_KEYFLAG_REVOKE)
+		if ((flags & DNS_KEYFLAG_REVOKE) != 0) {
 			keyinfo = "revoked KSK";
-		else
+		} else {
 			keyinfo = "KSK";
-	} else
+		}
+	} else {
 		keyinfo = "ZSK";
+	}
 
 	/* protocol */
 	snprintf(buf, sizeof(buf), "%u", sr.base[0]);
@@ -190,7 +183,7 @@ totext_keydata(ARGS_TOTEXT) {
 		/* Skip over refresh, addhd, and removehd */
 		isc_region_consume(&tmpr, 12);
 		snprintf(buf, sizeof(buf), "%u",
-			 dst_region_computeid(&tmpr, algorithm));
+			 dst_region_computeid(&tmpr));
 		RETERR(str_totext(buf, target));
 
 		if ((tctx->flags & DNS_STYLEFLAG_MULTILINE) != 0) {
@@ -410,7 +403,7 @@ digest_keydata(ARGS_DIGEST) {
 	return ((digest)(arg, &r));
 }
 
-static inline isc_boolean_t
+static inline bool
 checkowner_keydata(ARGS_CHECKOWNER) {
 
 	REQUIRE(type == dns_rdatatype_keydata);
@@ -420,10 +413,10 @@ checkowner_keydata(ARGS_CHECKOWNER) {
 	UNUSED(rdclass);
 	UNUSED(wildcard);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
-static inline isc_boolean_t
+static inline bool
 checknames_keydata(ARGS_CHECKNAMES) {
 
 	REQUIRE(rdata->type == dns_rdatatype_keydata);
@@ -432,7 +425,7 @@ checknames_keydata(ARGS_CHECKNAMES) {
 	UNUSED(owner);
 	UNUSED(bad);
 
-	return (ISC_TRUE);
+	return (true);
 }
 
 static inline int
