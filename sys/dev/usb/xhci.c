@@ -4181,7 +4181,6 @@ xhci_timeout_task(void *addr)
 	struct xhci_softc * const sc = XHCI_XFER2SC(xfer);
 
 	mutex_enter(&sc->sc_lock);
-	KASSERT(xfer->ux_status == USBD_TIMEOUT);
 	xhci_abort_xfer(xfer, USBD_TIMEOUT);
 	mutex_exit(&sc->sc_lock);
 }

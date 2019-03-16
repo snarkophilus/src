@@ -1742,7 +1742,6 @@ uhci_timeout_task(void *addr)
 	DPRINTF("xfer=%#jx", (uintptr_t)xfer, 0, 0, 0);
 
 	mutex_enter(&sc->sc_lock);
-	KASSERT(xfer->ux_status == USBD_TIMEOUT);
 	uhci_abort_xfer(xfer, USBD_TIMEOUT);
 	mutex_exit(&sc->sc_lock);
 }

@@ -342,7 +342,6 @@ dwc2_timeout_task(void *addr)
 	DPRINTF("xfer=%p\n", xfer);
 
 	mutex_enter(&sc->sc_lock);
-	KASSERT(xfer->ux_status == USBD_TIMEOUT);
 	dwc2_abort_xfer(xfer, USBD_TIMEOUT);
 	mutex_exit(&sc->sc_lock);
 }
