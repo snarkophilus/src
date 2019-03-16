@@ -1,4 +1,4 @@
-/*	$NetBSD: xen_pmap.c,v 1.27 2018/07/26 17:20:09 maxv Exp $	*/
+/*	$NetBSD: xen_pmap.c,v 1.29 2019/03/07 13:26:24 maxv Exp $	*/
 
 /*
  * Copyright (c) 2007 Manuel Bouyer.
@@ -101,7 +101,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xen_pmap.c,v 1.27 2018/07/26 17:20:09 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xen_pmap.c,v 1.29 2019/03/07 13:26:24 maxv Exp $");
 
 #include "opt_user_ldt.h"
 #include "opt_lockdebug.h"
@@ -132,7 +132,7 @@ __KERNEL_RCSID(0, "$NetBSD: xen_pmap.c,v 1.27 2018/07/26 17:20:09 maxv Exp $");
 #include <x86/i82489reg.h>
 #include <x86/i82489var.h>
 
-#include <xen/xen-public/xen.h>
+#include <xen/include/public/xen.h>
 #include <xen/hypervisor.h>
 #include <xen/xenpmap.h>
 
@@ -175,7 +175,7 @@ pmap_kenter_ma(vaddr_t va, paddr_t ma, vm_prot_t prot, u_int flags)
 	else
 		pte = kvtopte(va);
 
-	npte = ma | ((prot & VM_PROT_WRITE) ? PG_RW : PG_RO) | PG_V;
+	npte = ma | ((prot & VM_PROT_WRITE) ? PG_RW : 0) | PG_V;
 	if (flags & PMAP_NOCACHE)
 		npte |= PG_N;
 

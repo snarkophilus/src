@@ -1,4 +1,4 @@
-/*$NetBSD: ixv.c,v 1.107 2018/09/27 05:40:27 msaitoh Exp $*/
+/*$NetBSD: ixv.c,v 1.109 2019/02/22 06:49:15 msaitoh Exp $*/
 
 /******************************************************************************
 
@@ -1027,7 +1027,7 @@ ixv_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 	ifmr->ifm_status = IFM_AVALID;
 	ifmr->ifm_active = IFM_ETHER;
 
-	if (!adapter->link_active) {
+	if (adapter->link_active != LINK_STATE_UP) {
 		ifmr->ifm_active |= IFM_NONE;
 		IXGBE_CORE_UNLOCK(adapter);
 		return;
@@ -1302,7 +1302,7 @@ ixv_update_link_status(struct adapter *adapter)
 	KASSERT(mutex_owned(&adapter->core_mtx));
 
 	if (adapter->link_up) {
-		if (adapter->link_active == FALSE) {
+		if (adapter->link_active != LINK_STATE_UP) {
 			if (bootverbose) {
 				const char *bpsmsg;
 
@@ -1332,15 +1332,20 @@ ixv_update_link_status(struct adapter *adapter)
 				device_printf(dev, "Link is up %s %s \n",
 				    bpsmsg, "Full Duplex");
 			}
-			adapter->link_active = TRUE;
+			adapter->link_active = LINK_STATE_UP;
 			if_link_state_change(ifp, LINK_STATE_UP);
 		}
-	} else { /* Link down */
-		if (adapter->link_active == TRUE) {
+	} else {
+		/*
+		 * Do it when link active changes to DOWN. i.e.
+		 * a) LINK_STATE_UNKNOWN -> LINK_STATE_DOWN
+		 * b) LINK_STATE_UP      -> LINK_STATE_DOWN
+		 */
+		if (adapter->link_active != LINK_STATE_DOWN) {
 			if (bootverbose)
 				device_printf(dev, "Link is Down\n");
 			if_link_state_change(ifp, LINK_STATE_DOWN);
-			adapter->link_active = FALSE;
+			adapter->link_active = LINK_STATE_DOWN;
 		}
 	}
 } /* ixv_update_link_status */
@@ -1398,7 +1403,7 @@ static int
 ixv_allocate_pci_resources(struct adapter *adapter,
     const struct pci_attach_args *pa)
 {
-	pcireg_t	memtype;
+	pcireg_t	memtype, csr;
 	device_t        dev = adapter->dev;
 	bus_addr_t addr;
 	int flags;
@@ -1423,6 +1428,15 @@ map_err:
 			aprint_error_dev(dev, "unable to map BAR0\n");
 			return ENXIO;
 		}
+		/*
+		 * Enable address decoding for memory range in case it's not
+		 * set.
+		 */
+		csr = pci_conf_read(pa->pa_pc, pa->pa_tag,
+		    PCI_COMMAND_STATUS_REG);
+		csr |= PCI_COMMAND_MEM_ENABLE;
+		pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
+		    csr);
 		break;
 	default:
 		aprint_error_dev(dev, "unexpected type on BAR0\n");

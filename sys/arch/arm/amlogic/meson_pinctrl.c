@@ -1,4 +1,4 @@
-/* $NetBSD: meson_pinctrl.c,v 1.1 2019/01/19 20:56:03 jmcneill Exp $ */
+/* $NetBSD: meson_pinctrl.c,v 1.4 2019/03/02 11:15:55 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2019 Jared D. McNeill <jmcneill@invisible.ca>
@@ -29,7 +29,7 @@
 #include "opt_soc.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: meson_pinctrl.c,v 1.1 2019/01/19 20:56:03 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: meson_pinctrl.c,v 1.4 2019/03/02 11:15:55 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -75,6 +75,10 @@ static const struct of_compat_data compat_data[] = {
 #ifdef SOC_MESON8B
 	{ "amlogic,meson8b-aobus-pinctrl",	(uintptr_t)&meson8b_aobus_pinctrl_config },
 	{ "amlogic,meson8b-cbus-pinctrl",	(uintptr_t)&meson8b_cbus_pinctrl_config },
+#endif
+#ifdef SOC_MESONGXBB
+	{ "amlogic,meson-gxbb-aobus-pinctrl",	(uintptr_t)&mesongxbb_aobus_pinctrl_config },
+	{ "amlogic,meson-gxbb-periphs-pinctrl",	(uintptr_t)&mesongxbb_periphs_pinctrl_config },
 #endif
 	{ NULL, 0 }
 };
@@ -170,10 +174,9 @@ meson_pinctrl_set_config(device_t dev, const void *data, size_t len)
 	if (mux == -1)
 		return -1;
 
-	groups_len = OF_getproplen(mux, "groups");
-	if (groups_len <= 0)
+	groups = fdtbus_pinctrl_parse_groups(mux, &groups_len);
+	if (groups == NULL)
 		return -1;
-	groups = fdtbus_get_string(mux, "groups");
 
 	for (; groups_len > 0;
 	    groups_len -= strlen(groups) + 1, groups += strlen(groups) + 1) {
@@ -318,8 +321,10 @@ meson_pinctrl_gpio_acquire(device_t dev, const void *data, size_t len, int flags
 {
 	struct meson_pinctrl_softc * const sc = device_private(dev);
 	const struct meson_pinctrl_gpio *pin_def;
+	const struct meson_pinctrl_group *group;
 	struct meson_pinctrl_gpio_pin *gpin;
 	const u_int *gpio = data;
+	u_int n, bank;
 
 	if (len != 12)
 		return NULL;
@@ -330,6 +335,15 @@ meson_pinctrl_gpio_acquire(device_t dev, const void *data, size_t len, int flags
 	pin_def = meson_pinctrl_gpio_lookup(sc, id);
 	if (pin_def == NULL)
 		return NULL;
+
+	/* Disable conflicting groups */
+	for (n = 0; n < sc->sc_conf->ngroups; n++) {
+		group = &sc->sc_conf->groups[n];
+		for (bank = 0; bank < group->nbank; bank++) {
+			if (group->bank[bank] == pin_def->id)
+				meson_pinctrl_set_group(sc, group, false);
+		}
+	}
 
 	mutex_enter(&sc->sc_lock);
 	meson_pinctrl_pin_dir(sc, pin_def, flags);

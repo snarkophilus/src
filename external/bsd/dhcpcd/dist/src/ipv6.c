@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
+#include <arpa/inet.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -626,31 +627,18 @@ ipv6_deleteaddr(struct ipv6_addr *ia)
 			break;
 		}
 	}
+
+	/* Advertise the address if it exists on another interface. */
+	ipv6nd_advertise(ia);
 }
 
 static int
 ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 {
 	struct interface *ifp;
-	struct ipv6_state *state;
-	struct ipv6_addr *ia2;
 	uint32_t pltime, vltime;
+	bool vltime_was_zero;
 	__printflike(1, 2) void (*logfunc)(const char *, ...);
-
-	/* Ensure no other interface has this address */
-	TAILQ_FOREACH(ifp, ia->iface->ctx->ifaces, next) {
-		if (ifp == ia->iface)
-			continue;
-		state = IPV6_STATE(ifp);
-		if (state == NULL)
-			continue;
-		TAILQ_FOREACH(ia2, &state->addrs, next) {
-			if (IN6_ARE_ADDR_EQUAL(&ia2->addr, &ia->addr)) {
-				ipv6_deleteaddr(ia2);
-				break;
-			}
-		}
-	}
 
 	/* Remember the interface of the address. */
 	ifp = ia->iface;
@@ -714,7 +702,7 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		    " seconds",
 		    ifp->name, ia->prefix_pltime, ia->prefix_vltime);
 
-
+	vltime_was_zero = ia->prefix_vltime == 0;
 	if (if_address6(RTM_NEWADDR, ia) == -1) {
 		logerr(__func__);
 		/* Restore real pltime and vltime */
@@ -777,6 +765,10 @@ ipv6_addaddr1(struct ipv6_addr *ia, const struct timespec *now)
 		TAILQ_INSERT_TAIL(&state->addrs, ia2, next);
 	}
 #endif
+
+	/* Re-advertise the preferred address to be safe. */
+	if (!vltime_was_zero)
+		ipv6nd_advertise(ia);
 
 	return 0;
 }
@@ -891,10 +883,14 @@ ipv6_findaddrmatch(const struct ipv6_addr *addr, const struct in6_addr *match,
 struct ipv6_addr *
 ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, unsigned int flags)
 {
-	struct ipv6_addr *dap, *nap;
+	struct ipv6_addr *nap;
+#ifdef DHCP6
+	struct ipv6_addr *dap;
+#endif
 
-	dap = dhcp6_findaddr(ctx, addr, flags);
 	nap = ipv6nd_findaddr(ctx, addr, flags);
+#ifdef DHCP6
+	dap = dhcp6_findaddr(ctx, addr, flags);
 	if (!dap && !nap)
 		return NULL;
 	if (dap && !nap)
@@ -904,12 +900,15 @@ ipv6_findaddr(struct dhcpcd_ctx *ctx, const struct in6_addr *addr, unsigned int 
 	if (nap->iface->metric < dap->iface->metric)
 		return nap;
 	return dap;
+#else
+	return nap;
+#endif
 }
 
 ssize_t
 ipv6_addaddrs(struct ipv6_addrhead *addrs)
 {
-	struct ipv6_addr *ap, *apn, *apf;
+	struct ipv6_addr *ap, *apn;
 	ssize_t i;
 	struct timespec now;
 
@@ -935,27 +934,6 @@ ipv6_addaddrs(struct ipv6_addrhead *addrs)
 		} else if (!(ap->flags & IPV6_AF_STALE) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&ap->addr))
 		{
-			apf = ipv6_findaddr(ap->iface->ctx,
-			    &ap->addr, IPV6_AF_ADDED);
-			if (apf && apf->iface != ap->iface) {
-				if (apf->iface->metric <= ap->iface->metric) {
-					loginfox("%s: preferring %s on %s",
-					    ap->iface->name,
-					    ap->saddr,
-					    apf->iface->name);
-					continue;
-				}
-				loginfox("%s: preferring %s on %s",
-				    apf->iface->name,
-				    ap->saddr,
-				    ap->iface->name);
-				if (if_address6(RTM_DELADDR, apf) == -1 &&
-				    errno != EADDRNOTAVAIL && errno != ENXIO)
-					logerr(__func__);
-				apf->flags &=
-				    ~(IPV6_AF_ADDED | IPV6_AF_DADCOMPLETED);
-			} else if (apf)
-				apf->flags &= ~IPV6_AF_ADDED;
 			if (ap->flags & IPV6_AF_NEW)
 				i++;
 			if (!timespecisset(&now))
@@ -989,6 +967,7 @@ ipv6_freeaddr(struct ipv6_addr *ia)
 	}
 
 	eloop_q_timeout_delete(ia->iface->ctx->eloop, 0, NULL, ia);
+	free(ia->na);
 	free(ia);
 }
 
@@ -1108,6 +1087,9 @@ ipv6_handleifa(struct dhcpcd_ctx *ctx,
 	case RTM_DELADDR:
 		if (ia != NULL) {
 			TAILQ_REMOVE(&state->addrs, ia, next);
+			/* Advertise the address if it exists on
+			 * another interface. */
+			ipv6nd_advertise(ia);
 			/* We'll free it at the end of the function. */
 		}
 		break;
@@ -1209,8 +1191,10 @@ ipv6_hasaddr(const struct interface *ifp)
 
 	if (ipv6nd_iffindaddr(ifp, NULL, 0) != NULL)
 		return 1;
+#ifdef DHCP6
 	if (dhcp6_iffindaddr(ifp, NULL, 0) != NULL)
 		return 1;
+#endif
 	return 0;
 }
 
@@ -2177,13 +2161,11 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 	}
 
 	/* There is no point in trying to manage a /128 prefix,
-	 * ones without a lifetime or ones not on link or delegated */
-	if (addr->prefix_len == 128 ||
-	    addr->prefix_vltime == 0 ||
-	    !(addr->flags & (IPV6_AF_ONLINK | IPV6_AF_DELEGATEDPFX)))
+	 * ones without a lifetime.  */
+	if (addr->prefix_len == 128 || addr->prefix_vltime == 0)
 		return NULL;
 
-	/* Don't install a reject route when not creating bigger prefixes */
+	/* Don't install a reject route when not creating bigger prefixes. */
 	if (addr->flags & IPV6_AF_NOREJECT)
 		return NULL;
 
@@ -2215,7 +2197,9 @@ inet6_makeprefix(struct interface *ifp, const struct ra *rap,
 #ifndef __linux__
 		sa_in6_init(&rt->rt_gateway, &in6addr_loopback);
 #endif
-	} else
+	} else if (!(addr->flags & IPV6_AF_ONLINK))
+		sa_in6_init(&rt->rt_gateway, &rap->from);
+	else
 		rt->rt_gateway.sa_family = AF_UNSPEC;
 	sa_in6_init(&rt->rt_ifa, &addr->addr);
 	return rt;
@@ -2295,6 +2279,7 @@ inet6_raroutes(struct rt_head *routes, struct dhcpcd_ctx *ctx, int expired,
 	return 0;
 }
 
+#ifdef DHCP6
 static int
 inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
     enum DH6S dstate)
@@ -2318,6 +2303,7 @@ inet6_dhcproutes(struct rt_head *routes, struct dhcpcd_ctx *ctx,
 	}
 	return 0;
 }
+#endif
 
 bool
 inet6_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
@@ -2333,6 +2319,7 @@ inet6_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
 	if (inet6_raroutes(routes, ctx, 0, &have_default) == -1)
 		return false;
 
+#ifdef DHCP6
 	/* We have no way of knowing if prefixes added by DHCP are reachable
 	 * or not, so we have to assume they are.
 	 * Add bound before delegated so we can prefer interfaces better */
@@ -2340,6 +2327,7 @@ inet6_getroutes(struct dhcpcd_ctx *ctx, struct rt_head *routes)
 		return false;
 	if (inet6_dhcproutes(routes, ctx, DH6S_DELEGATED) == -1)
 		return false;
+#endif
 
 #ifdef HAVE_ROUTE_METRIC
 	/* If we have an unreachable router, we really do need to remove the

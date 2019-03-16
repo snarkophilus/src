@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -1604,11 +1604,6 @@ dhcp_openudp(struct interface *ifp)
 	n = 1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &n, sizeof(n)) == -1)
 		goto eexit;
-#ifdef SO_RERROR
-	n = 1;
-	if (setsockopt(s, SOL_SOCKET, SO_RERROR, &n, sizeof(n)) == -1)
-		goto eexit;
-#endif
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(BOOTPC);
@@ -1769,7 +1764,7 @@ send_message(struct interface *ifp, uint8_t type,
 
 	if (!callback) {
 		/* No carrier? Don't bother sending the packet. */
-		if (ifp->carrier == LINK_DOWN)
+		if (ifp->carrier <= LINK_DOWN)
 			return;
 		logdebugx("%s: sending %s with xid 0x%x",
 		    ifp->name,
@@ -1789,7 +1784,7 @@ send_message(struct interface *ifp, uint8_t type,
 		timespecnorm(&tv);
 		/* No carrier? Don't bother sending the packet.
 		 * However, we do need to advance the timeout. */
-		if (ifp->carrier == LINK_DOWN)
+		if (ifp->carrier <= LINK_DOWN)
 			goto fail;
 		logdebugx("%s: sending %s (xid 0x%x), next in %0.1f seconds",
 		    ifp->name,
@@ -1970,7 +1965,7 @@ dhcp_expire1(struct interface *ifp)
 	dhcp_drop(ifp, "EXPIRE");
 	unlink(state->leasefile);
 	state->interval = 0;
-	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier != LINK_DOWN)
+	if (!(ifp->options->options & DHCPCD_LINK) || ifp->carrier > LINK_DOWN)
 		dhcp_discover(ifp);
 }
 
@@ -2606,7 +2601,7 @@ dhcp_reboot(struct interface *ifp)
 	state->state = DHS_REBOOT;
 	state->interval = 0;
 
-	if (ifo->options & DHCPCD_LINK && ifp->carrier == LINK_DOWN) {
+	if (ifo->options & DHCPCD_LINK && ifp->carrier <= LINK_DOWN) {
 		loginfox("%s: waiting for carrier", ifp->name);
 		return;
 	}
@@ -2636,6 +2631,7 @@ dhcp_reboot(struct interface *ifp)
 	 * interface gets the reply. */
 	ia = ipv4_iffindaddr(ifp, &state->lease.addr, NULL);
 	if (ia != NULL &&
+	    !(ifp->ctx->options & DHCPCD_TEST) &&
 #ifdef IN_IFF_NOTUSEABLE
 	    !(ia->addr_flags & IN_IFF_NOTUSEABLE) &&
 #endif
@@ -2695,7 +2691,7 @@ dhcp_drop(struct interface *ifp, const char *reason)
 		state->state = DHS_RELEASE;
 
 		unlink(state->leasefile);
-		if (ifp->carrier != LINK_DOWN &&
+		if (ifp->carrier > LINK_DOWN &&
 		    state->new != NULL &&
 		    state->lease.server.s_addr != INADDR_ANY)
 		{

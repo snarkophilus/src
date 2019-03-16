@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.1095 2019/01/19 12:58:37 mrg Exp $
+#	$NetBSD: bsd.own.mk,v 1.1107 2019/03/04 21:19:58 christos Exp $
 
 # This needs to be before bsd.init.mk
 .if defined(BSD_MK_COMPAT_FILE)
@@ -58,7 +58,14 @@ TOOLCHAIN_MISSING?=	no
 #
 # What GCC is used?
 #
+.if \
+    ${MACHINE_CPU} == "hppa"	|| \
+    ${MACHINE_CPU} == "ia64"	|| \
+    ${MACHINE_ARCH} == "powerpc64"	|| \
+    ${MACHINE_CPU} == "vax"
 HAVE_GCC?=	6
+.endif
+HAVE_GCC?=	7
 
 #
 # Platforms that can't run a modern GCC natively
@@ -160,6 +167,12 @@ EXTERNAL_BINUTILS_SUBDIR=	binutils.old
 .else
 EXTERNAL_BINUTILS_SUBDIR=	/does/not/exist
 .endif
+
+#
+# What version of jemalloc we use (100 is the one
+# built-in to libc from 2005 (pre version 3).
+#
+HAVE_JEMALLOC?=		100
 
 .if empty(.MAKEFLAGS:tW:M*-V .OBJDIR*)
 .if defined(MAKEOBJDIRPREFIX) || defined(MAKEOBJDIR)
@@ -320,7 +333,7 @@ TOOL_CXX.pcc=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-p++
 #
 DESTDIR?=
 
-# Don't append another copy of sysroot (coming from COMPATCPPFLAGS etc.
+# Don't append another copy of sysroot (coming from COMPATCPPFLAGS etc.)
 # because it confuses Coverity. Still we need to cov-configure specially
 # for each specific sysroot argument.
 .if !defined(HOSTPROG) && !defined(HOSTLIB)
@@ -620,16 +633,6 @@ MACHINES.sparc64=	sparc64
 MACHINES.vax=		vax
 MACHINES.x86_64=	amd64
 
-# for crunchide & ldd, define the OBJECT_FMTS used by a MACHINE_ARCH
-#
-OBJECT_FMTS=
-.if	${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "ia64"
-OBJECT_FMTS+=	elf32
-.endif
-.if	${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH:M*64*} != ""
-OBJECT_FMTS+=	elf64
-.endif
-
 # OBJCOPY flags to create a.out binaries for old firmware
 # shared among src/distrib and ${MACHINE}/conf/Makefile.${MACHINE}.inc
 .if ${MACHINE_CPU} == "arm"
@@ -811,7 +814,6 @@ NOPROFILE=	# defined
 #
 # The ia64 port is incomplete.
 #
-MKLINT.ia64=	no
 MKGDB.ia64=	no
 
 #
@@ -1106,11 +1108,6 @@ USE_LIBCSANITIZER?=	undefined
 # Exceptions to the above:
 #
 
-# Rump doesn't work yet on ia64
-.if ${MACHINE} == "ia64"
-MKRUMP=		no
-.endif
-
 # RUMP uses -nostdinc which coverity does not like
 # It also does not use many new files, so disable it
 .if defined(COVERITY_TOP_CONFIG)
@@ -1321,6 +1318,18 @@ INSTALL_DIR?=		${INSTALL} ${INSTPRIV} -d
 INSTALL_FILE?=		${INSTALL} ${INSTPRIV} ${COPY} ${PRESERVE} ${RENAME}
 INSTALL_LINK?=		${INSTALL} ${INSTPRIV} ${HRDLINK} ${RENAME}
 INSTALL_SYMLINK?=	${INSTALL} ${INSTPRIV} ${SYMLINK} ${RENAME}
+.endif
+
+# for crunchide & ldd, define the OBJECT_FMTS used by a MACHINE_ARCH
+#
+OBJECT_FMTS=
+.if	${MACHINE_ARCH} != "alpha" && ${MACHINE_ARCH} != "ia64"
+OBJECT_FMTS+=	elf32
+.endif
+.if	${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH:M*64*} != ""
+. if !(${MKCOMPAT:Uyes} == "no" && ${MACHINE_CPU} == "mips")
+OBJECT_FMTS+=	elf64
+. endif
 .endif
 
 #
