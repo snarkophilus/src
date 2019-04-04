@@ -617,7 +617,7 @@ HP	Hewlett-Packard
 HPC	high performance computing
 HPET	high precision event timer
 HSM	hardware security module
-HSM	hierarchical storage management 
+HSM	hierarchical storage management
 HT	hyper-threading
 HTC	hardware thermal control
 HTCC	high temperature co-fired ceramic
@@ -1300,7 +1300,7 @@ SDEI	software delegated exception interface
 SDI	symbol deinterleave
 SDK	software development kit
 SDL	Simple Declarative Language
-SDL	Simple Direct-media Layer 
+SDL	Simple Direct-media Layer
 SDLC	{software,system,systems} development life cycle
 SDN	software defined networking
 SDP	Session Description Protocol

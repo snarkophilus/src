@@ -1089,7 +1089,7 @@ sbmac_initctx(struct sbmac_softc *sc)
 	sc->sbm_duplex = sbmac_duplex_half;
 	sc->sbm_fc = sbmac_fc_disabled;
 
-	/* 
+	/*
 	 * Determine SOC type.  112x has Pass3 SOC features.
 	 */
 	sysrev = SBMAC_READCSR( PKSEG1(A_SCD_SYSTEM_REVISION) );
@@ -1286,7 +1286,7 @@ sbmac_channel_start(struct sbmac_softc *sc)
 	 * On chips which support unaligned DMA features, set the descriptor
 	 * ring for transmit channels to use the unaligned buffer format.
 	 */
-	txdma = &(sc->sbm_txdma); 
+	txdma = &(sc->sbm_txdma);
 
 	if (sc->sbm_pass3_dma) {
 		dma_cfg0 = SBMAC_READCSR(txdma->sbdma_config0);
