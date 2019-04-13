@@ -1,4 +1,4 @@
-/*	$NetBSD: motg.c,v 1.23 2018/09/03 16:29:33 riastradh Exp $	*/
+/*	$NetBSD: motg.c,v 1.25 2019/02/17 04:17:52 rin Exp $	*/
 
 /*
  * Copyright (c) 1998, 2004, 2011, 2012, 2014 The NetBSD Foundation, Inc.
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: motg.c,v 1.23 2018/09/03 16:29:33 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: motg.c,v 1.25 2019/02/17 04:17:52 rin Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_usb.h"
@@ -760,7 +760,8 @@ motg_freex(struct usbd_bus *bus, struct usbd_xfer *xfer)
 	struct motg_softc *sc = MOTG_BUS2SC(bus);
 
 #ifdef DIAGNOSTIC
-	if (xfer->ux_state != XFER_BUSY) {
+	if (xfer->ux_state != XFER_BUSY &&
+	    xfer->ux_status != USBD_NOT_STARTED) {
 		printf("motg_freex: xfer=%p not busy, 0x%08x\n", xfer,
 		       xfer->ux_state);
 	}
@@ -2079,10 +2080,9 @@ motg_device_intr_tx(struct motg_softc *sc, int epnumber)
 complete:
 	DPRINTFN(MD_BULK, "xfer %#jx complete, status %jd", (uintptr_t)xfer,
 	    (xfer != NULL) ? xfer->ux_status : 0, 0, 0);
-#ifdef DIAGNOSTIC
-	if (xfer && xfer->ux_status == USBD_IN_PROGRESS && ep->phase != DATA_OUT)
-		panic("motg_device_intr_tx: bad phase %d", ep->phase);
-#endif
+	KASSERTMSG(xfer && xfer->ux_status == USBD_IN_PROGRESS && 
+	    ep->phase == DATA_OUT, "xfer %p status %d phase %d",
+	    xfer, xfer->ux_status, ep->phase);
 	ep->phase = IDLE;
 	ep->xfer = NULL;
 	if (xfer && xfer->ux_status == USBD_IN_PROGRESS) {

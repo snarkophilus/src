@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.sys.mk,v 1.289 2019/01/01 19:06:38 christos Exp $
+#	$NetBSD: bsd.sys.mk,v 1.291 2019/02/23 03:10:06 kamil Exp $
 #
 # Build definitions used for NetBSD source tree builds.
 
@@ -240,6 +240,14 @@ KLEAKFLAGS.${f}=	# empty
 CFLAGS+=	${KLEAKFLAGS.${.IMPSRC:T}:U${KLEAKFLAGS}}
 .endif
 
+.if ${KCOV:U0} > 0
+KCOVFLAGS=	-fsanitize-coverage=trace-pc
+.for f in subr_kcov.c subr_lwp_specificdata.c subr_specificdata.c
+KCOVFLAGS.${f}=		# empty
+.endfor
+CFLAGS+=	${KCOVFLAGS.${.IMPSRC:T}:U${KCOVFLAGS}}
+.endif
+
 .if !defined(NOPIE) && (!defined(LDSTATIC) || ${LDSTATIC} != "-static")
 # Position Independent Executable flags
 PIE_CFLAGS?=        -fPIE
@@ -256,6 +264,7 @@ OBJCOPY?=	objcopy
 OBJDUMP?=	objdump
 PAXCTL?=	paxctl
 STRIP?=		strip
+MV?=		mv -f
 
 .SUFFIXES:	.o .ln .lo .c .cc .cpp .cxx .C .m ${YHEADER:D.h}
 
@@ -295,13 +304,13 @@ STRIP?=		strip
 .c.lo:
 	${_MKTARGET_COMPILE}
 	${HOST_COMPILE.c} -o ${.TARGET}.o ${COPTS.${.IMPSRC:T}} ${CPUFLAGS.${.IMPSRC:T}} ${CPPFLAGS.${.IMPSRC:T}} ${.IMPSRC}
-	mv ${.TARGET}.o ${.TARGET}
+	${MV} ${.TARGET}.o ${.TARGET}
 
 # C++
 .cc.lo .cpp.lo .cxx.lo .C.lo:
 	${_MKTARGET_COMPILE}
 	${HOST_COMPILE.cc} -o ${.TARGET}.o ${COPTS.${.IMPSRC:T}} ${CPUFLAGS.${.IMPSRC:T}} ${CPPFLAGS.${.IMPSRC:T}} ${.IMPSRC}
-	mv ${.TARGET}.o ${.TARGET}
+	${MV} ${.TARGET}.o ${.TARGET}
 
 # Assembly
 .s.o:

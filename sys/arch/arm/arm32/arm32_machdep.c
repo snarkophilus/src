@@ -1,4 +1,4 @@
-/*	$NetBSD: arm32_machdep.c,v 1.125 2019/01/03 10:26:41 skrll Exp $	*/
+/*	$NetBSD: arm32_machdep.c,v 1.127 2019/02/04 13:12:03 skrll Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.125 2019/01/03 10:26:41 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.127 2019/02/04 13:12:03 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_arm_start.h"
@@ -716,8 +716,9 @@ cpu_uarea_alloc_idlelwp(struct cpu_info *ci)
  *
  * printf isn't available to us for a number of reasons.
  *
- * -  kprint_init has been called and printf will try to take locks which we can't
- *    do just yet because bootstrap translation tables do not allowing caching.
+ * -  kprint_init has been called and printf will try to take locks which we
+ *    can't  do just yet because bootstrap translation tables do not allowing
+ *    caching.
  *
  * -  kmutex(9) relies on curcpu which isn't setup yet.
  *
@@ -768,13 +769,13 @@ cpu_init_secondary_processor(int cpuindex)
 	VPRINTS(")");
 #endif
 
-	atomic_or_uint(&arm_cpu_hatched, __BIT(cpuindex));
-
 	VPRINTS(" hatched=");
-	VPRINTX(arm_cpu_hatched);
+	VPRINTX(arm_cpu_hatched | __BIT(cpuindex));
 	VPRINTS("\n\r");
 
-	/* return to assembly to Wait for cpu_boot_secondary_processors */
+	atomic_or_uint(&arm_cpu_hatched, __BIT(cpuindex));
+
+	/* return to assembly to wait for cpu_boot_secondary_processors */
 }
 
 void

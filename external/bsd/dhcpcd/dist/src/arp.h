@@ -1,6 +1,6 @@
 /*
  * dhcpcd - DHCP client daemon
- * Copyright (c) 2006-2018 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2019 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -95,8 +95,8 @@ void arp_report_conflicted(const struct arp_state *, const struct arp_msg *);
 struct arp_state *arp_new(struct interface *, const struct in_addr *);
 struct arp_state *arp_find(struct interface *, const struct in_addr *);
 void arp_announce(struct arp_state *);
-void arp_announceaddr(struct dhcpcd_ctx *, struct in_addr *);
-void arp_ifannounceaddr(struct interface *, struct in_addr *);
+void arp_announceaddr(struct dhcpcd_ctx *, const struct in_addr *);
+void arp_ifannounceaddr(struct interface *, const struct in_addr *);
 void arp_cancel(struct arp_state *);
 void arp_free(struct arp_state *);
 void arp_free_but(struct arp_state *);

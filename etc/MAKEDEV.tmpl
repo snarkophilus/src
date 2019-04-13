@@ -1,5 +1,5 @@
 #!/bin/sh -
-#	$NetBSD: MAKEDEV.tmpl,v 1.196 2018/11/07 07:43:07 maxv Exp $
+#	$NetBSD: MAKEDEV.tmpl,v 1.199 2019/02/23 10:43:25 mlelstv Exp $
 #
 # Copyright (c) 2003,2007,2008 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -268,11 +268,11 @@
 #	radio*	radio devices
 #	random	Random number generator
 #	rtc*	RealTimeClock
-#	satlink* PlanetConnect satellite receiver driver
 #	scsibus* SCSI busses
 #	se*	SCSI Ethernet
 #	ses*	SES/SAF-TE SCSI Devices
 #	speaker	PC speaker		(XXX - installed)
+#	spi*	SPI bus device
 #	sram	battery backuped memory (x68k)
 #	ss*	SCSI scanner
 #	stic*	PixelStamp interface chip
@@ -1585,6 +1585,12 @@ iic[0-9]*)
 	mkdev iic$unit c %iic_chr% $unit 600
 	;;
 
+spi[0-9]*)
+	unit=${i#spi}
+	: ${unit:-0}
+	mkdev spi$unit c %spi_chr% $unit 600
+	;;
+
 amr[0-9]*)
 	unit=${i#amr}
 	mkdev amr$unit c %amr_chr% $unit
@@ -1599,11 +1605,6 @@ apm)
 		# hpcmips uses `apmdev_chr' instead of `apm_chr'
 	mkdev apm	c %apmdev_chr% 0 644
 	mkdev apmctl	c %apmdev_chr% 8 644
-	;;
-
-satlink[0-9]*)
-	unit=${i#satlink}
-	mkdev satlink$unit c %satlink_chr% $unit 444
 	;;
 
 random)
@@ -2213,6 +2214,10 @@ nvmm)
 autofs)
 	mkdev autofs c %autofs_chr% 0 600
 	;;
+
+kcov)
+        mkdev kcov c %kcov_chr% 0
+        ;;
 
 midevend)
 %MI_DEVICES_END%

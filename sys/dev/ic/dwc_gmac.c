@@ -1,4 +1,4 @@
-/* $NetBSD: dwc_gmac.c,v 1.55 2018/10/08 17:09:31 martin Exp $ */
+/* $NetBSD: dwc_gmac.c,v 1.58 2019/03/07 14:02:16 msaitoh Exp $ */
 
 /*-
  * Copyright (c) 2013, 2014 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(1, "$NetBSD: dwc_gmac.c,v 1.55 2018/10/08 17:09:31 martin Exp $");
+__KERNEL_RCSID(1, "$NetBSD: dwc_gmac.c,v 1.58 2019/03/07 14:02:16 msaitoh Exp $");
 
 /* #define	DWC_GMAC_DEBUG	1 */
 
@@ -71,8 +71,8 @@ __KERNEL_RCSID(1, "$NetBSD: dwc_gmac.c,v 1.55 2018/10/08 17:09:31 martin Exp $")
 #include <dev/ic/dwc_gmac_reg.h>
 #include <dev/ic/dwc_gmac_var.h>
 
-static int dwc_gmac_miibus_read_reg(device_t, int, int);
-static void dwc_gmac_miibus_write_reg(device_t, int, int, int);
+static int dwc_gmac_miibus_read_reg(device_t, int, int, uint16_t *);
+static int dwc_gmac_miibus_write_reg(device_t, int, int, uint16_t);
 static void dwc_gmac_miibus_statchg(struct ifnet *);
 
 static int dwc_gmac_reset(struct dwc_gmac_softc *sc);
@@ -185,7 +185,7 @@ static void dwc_gmac_dump_ffilt(struct dwc_gmac_softc *sc, uint32_t ffilt);
 #endif
 
 int
-dwc_gmac_attach(struct dwc_gmac_softc *sc, uint32_t mii_clk)
+dwc_gmac_attach(struct dwc_gmac_softc *sc, int phy_id, uint32_t mii_clk)
 {
 	uint8_t enaddr[ETHER_ADDR_LEN];
 	uint32_t maclo, machi, ver, hwft;
@@ -306,7 +306,7 @@ dwc_gmac_attach(struct dwc_gmac_softc *sc, uint32_t mii_clk)
         mii->mii_readreg = dwc_gmac_miibus_read_reg;
         mii->mii_writereg = dwc_gmac_miibus_write_reg;
         mii->mii_statchg = dwc_gmac_miibus_statchg;
-        mii_attach(sc->sc_dev, mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY,
+        mii_attach(sc->sc_dev, mii, 0xffffffff, phy_id, MII_OFFSET_ANY,
 	    MIIF_DOPAUSE);
 
         if (LIST_EMPTY(&mii->mii_phys)) {
@@ -395,12 +395,11 @@ dwc_gmac_write_hwaddr(struct dwc_gmac_softc *sc,
 }
 
 static int
-dwc_gmac_miibus_read_reg(device_t self, int phy, int reg)
+dwc_gmac_miibus_read_reg(device_t self, int phy, int reg, uint16_t *val)
 {
 	struct dwc_gmac_softc * const sc = device_private(self);
 	uint16_t mii;
 	size_t cnt;
-	int rv = 0;
 
 	mii = __SHIFTIN(phy,GMAC_MII_PHY_MASK)
 	    | __SHIFTIN(reg,GMAC_MII_REG_MASK)
@@ -413,7 +412,7 @@ dwc_gmac_miibus_read_reg(device_t self, int phy, int reg)
 	for (cnt = 0; cnt < 1000; cnt++) {
 		if (!(bus_space_read_4(sc->sc_bst, sc->sc_bsh,
 		    AWIN_GMAC_MAC_MIIADDR) & GMAC_MII_BUSY)) {
-			rv = bus_space_read_4(sc->sc_bst, sc->sc_bsh,
+			*val = bus_space_read_4(sc->sc_bst, sc->sc_bsh,
 			    AWIN_GMAC_MAC_MIIDATA);
 			break;
 		}
@@ -422,11 +421,14 @@ dwc_gmac_miibus_read_reg(device_t self, int phy, int reg)
 
 	mutex_exit(&sc->sc_mdio_lock);
 
-	return rv;
+	if (cnt >= 1000)
+		return ETIMEDOUT;
+	
+	return 0;
 }
 
-static void
-dwc_gmac_miibus_write_reg(device_t self, int phy, int reg, int val)
+static int
+dwc_gmac_miibus_write_reg(device_t self, int phy, int reg, uint16_t val)
 {
 	struct dwc_gmac_softc * const sc = device_private(self);
 	uint16_t mii;
@@ -449,6 +451,11 @@ dwc_gmac_miibus_write_reg(device_t self, int phy, int reg, int val)
 	}
 
 	mutex_exit(&sc->sc_mdio_lock);
+
+	if (cnt >= 1000)
+		return ETIMEDOUT;
+
+	return 0;
 }
 
 static int

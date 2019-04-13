@@ -1,4 +1,4 @@
-/*      $NetBSD: rdcphy.c,v 1.1 2011/01/26 18:48:12 bouyer Exp $        */
+/*      $NetBSD: rdcphy.c,v 1.3 2019/02/24 17:22:21 christos Exp $        */
 
 /*-
  * Copyright (c) 2010, Pyun YongHyeon <yongari@FreeBSD.org>
@@ -33,7 +33,7 @@
  * Driver for the RDC Semiconductor R6040 10/100 PHY.
  */
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rdcphy.c,v 1.1 2011/01/26 18:48:12 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rdcphy.c,v 1.3 2019/02/24 17:22:21 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,10 +74,8 @@ static const struct mii_phy_funcs rdcphy_funcs = {
 };
 
 static const struct mii_phydesc rdcphys[] = {
-	{ MII_OUI_RDC, MII_MODEL_RDC_R6040,
-	  MII_STR_RDC_R6040 },
-	{ 0,                    0,
-	  NULL },
+	MII_PHY_DESC(RDC, R6040),
+	MII_PHY_END,
 };
 
 static int
@@ -115,9 +113,10 @@ rdcphyattach(device_t parent, device_t self, void *aux)
 
 	PHY_RESET(sc);
 
-	sc->mii_capabilities = PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
+	PHY_READ(sc, MII_BMSR, &sc->mii_capabilities);
+	sc->mii_capabilities &= ma->mii_capmask;
 	if (sc->mii_capabilities & BMSR_EXTSTAT)
-		sc->mii_extcapabilities = PHY_READ(sc, MII_EXTSR);
+		PHY_READ(sc, MII_EXTSR, &sc->mii_extcapabilities);
 	aprint_normal_dev(self, "");
 	mii_phy_add_media(sc);
 	aprint_normal("\n");
@@ -206,18 +205,19 @@ static void
 rdcphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
-	int bmsr, bmcr, physts;
+	uint16_t bmsr, bmcr, physts;
 
 	mii->mii_media_status = IFM_AVALID;
 	mii->mii_media_active = IFM_ETHER;
 
-	bmsr = PHY_READ(sc, MII_BMSR) | PHY_READ(sc, MII_BMSR);
-	physts = PHY_READ(sc, MII_RDCPHY_STATUS);
+	PHY_READ(sc, MII_BMSR, &bmsr);
+	PHY_READ(sc, MII_BMSR, &bmsr);
+	PHY_READ(sc, MII_RDCPHY_STATUS, &physts);
 
 	if ((physts & STATUS_LINK_UP) != 0)
 		mii->mii_media_status |= IFM_ACTIVE;
 
-	bmcr = PHY_READ(sc, MII_BMCR);
+	PHY_READ(sc, MII_BMCR, &bmcr);
 	if ((bmcr & BMCR_ISO) != 0) {
 		mii->mii_media_active |= IFM_NONE;
 		mii->mii_media_status = 0;

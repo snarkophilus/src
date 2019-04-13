@@ -1,4 +1,4 @@
-/*	$NetBSD: inphy.c,v 1.55 2016/11/08 07:22:26 msaitoh Exp $	*/
+/*	$NetBSD: inphy.c,v 1.57 2019/02/24 17:22:21 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000 The NetBSD Foundation, Inc.
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.55 2016/11/08 07:22:26 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: inphy.c,v 1.57 2019/02/24 17:22:21 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -92,23 +92,12 @@ static const struct mii_phy_funcs inphy_funcs = {
 };
 
 static const struct mii_phydesc inphys[] = {
-	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82555,
-	  MII_STR_yyINTEL_I82555 },
-
-	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562EH,
-	  MII_STR_yyINTEL_I82562EH },
-
-	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562EM,
-	  MII_STR_yyINTEL_I82562EM },
-
-	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562ET,
-	  MII_STR_yyINTEL_I82562ET },
-
-	{ MII_OUI_yyINTEL,		MII_MODEL_yyINTEL_I82562G,
-	  MII_STR_yyINTEL_I82562G },
-
-	{ 0,				0,
-	  NULL },
+	MII_PHY_DESC(yyINTEL, I82555),
+	MII_PHY_DESC(yyINTEL, I82562EH),
+	MII_PHY_DESC(yyINTEL, I82562EM),
+	MII_PHY_DESC(yyINTEL, I82562ET),
+	MII_PHY_DESC(yyINTEL, I82562G),
+	MII_PHY_END,
 };
 
 static int
@@ -147,7 +136,8 @@ inphyattach(device_t parent, device_t self, void *aux)
 
 	PHY_RESET(sc);
 
-	sc->mii_capabilities = PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
+	PHY_READ(sc, MII_BMSR, &sc->mii_capabilities);
+	sc->mii_capabilities &= ma->mii_capmask;
 	aprint_normal_dev(self, "");
 	if ((sc->mii_capabilities & BMSR_MEDIAMASK) == 0)
 		aprint_error("no media present");
@@ -160,7 +150,7 @@ static int
 inphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 {
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
-	int reg;
+	uint16_t reg;
 
 	switch (cmd) {
 	case MII_POLLSTAT:
@@ -177,7 +167,7 @@ inphy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 		 * isolate ourselves.
 		 */
 		if (IFM_INST(ife->ifm_media) != sc->mii_inst) {
-			reg = PHY_READ(sc, MII_BMCR);
+			PHY_READ(sc, MII_BMCR, &reg);
 			PHY_WRITE(sc, MII_BMCR, reg | BMCR_ISO);
 			return (0);
 		}
@@ -220,17 +210,17 @@ inphy_status(struct mii_softc *sc)
 {
 	struct mii_data *mii = sc->mii_pdata;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
-	int bmsr, bmcr, scr;
+	uint16_t bmsr, bmcr, scr;
 
 	mii->mii_media_status = IFM_AVALID;
 	mii->mii_media_active = IFM_ETHER;
 
-	bmsr = PHY_READ(sc, MII_BMSR) |
-	    PHY_READ(sc, MII_BMSR);
+	PHY_READ(sc, MII_BMSR, &bmsr);
+	PHY_READ(sc, MII_BMSR, &bmsr);
 	if (bmsr & BMSR_LINK)
 		mii->mii_media_status |= IFM_ACTIVE;
 
-	bmcr = PHY_READ(sc, MII_BMCR);
+	PHY_READ(sc, MII_BMCR, &bmcr);
 	if (bmcr & BMCR_ISO) {
 		mii->mii_media_active |= IFM_NONE;
 		mii->mii_media_status = 0;
@@ -247,7 +237,7 @@ inphy_status(struct mii_softc *sc)
 			return;
 		}
 
-		scr = PHY_READ(sc, MII_INPHY_SCR);
+		PHY_READ(sc, MII_INPHY_SCR, &scr);
 		if (scr & SCR_S100)
 			mii->mii_media_active |= IFM_100_TX;
 		else if ((bmsr & BMSR_100T4) && (scr & SCR_T4))
