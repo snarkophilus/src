@@ -1,4 +1,4 @@
-/*	$NetBSD: refresh.c,v 1.105 2019/01/06 04:27:53 uwe Exp $	*/
+/*	$NetBSD: refresh.c,v 1.108 2019/04/24 07:09:44 blymn Exp $	*/
 
 /*
  * Copyright (c) 1981, 1993, 1994
@@ -34,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)refresh.c	8.7 (Berkeley) 8/13/94";
 #else
-__RCSID("$NetBSD: refresh.c,v 1.105 2019/01/06 04:27:53 uwe Exp $");
+__RCSID("$NetBSD: refresh.c,v 1.108 2019/04/24 07:09:44 blymn Exp $");
 #endif
 #endif				/* not lint */
 
@@ -251,14 +251,19 @@ _wnoutrefresh(WINDOW *win, int begy, int begx, int wbegy, int wbegx,
 		    "_wnoutrefresh: wy %d\tf %d\tl %d\tflags %x\n",
 		    wy, *wlp->firstchp, *wlp->lastchp, wlp->flags);
 
-		if ((dwin->flags & __ISDERWIN) != 0) {
-			__CTRACE(__CTRACE_REFRESH,
-			"_wnoutrefresh: derwin wy %d\tf %d\tl %d\tflags %x\n",
-			dy_off, *dwlp->firstchp, *dwlp->lastchp, dwlp->flags);
-			__CTRACE(__CTRACE_REFRESH,
-			"_wnoutrefresh: derwin maxx %d\tch_off %d\n",
-			dwin->maxx, dwin->ch_off);
-		}
+		char *_wintype;
+
+		if ((dwin->flags & __ISDERWIN) != 0)
+			_wintype = "derwin";
+		else
+			_wintype = "dwin";
+
+		__CTRACE(__CTRACE_REFRESH,
+		"_wnoutrefresh: %s wy %d\tf %d\tl %d\tflags %x\n",
+		_wintype, dy_off, *dwlp->firstchp, *dwlp->lastchp, dwlp->flags);
+		__CTRACE(__CTRACE_REFRESH,
+		"_wnoutrefresh: %s maxx %d\tch_off %d\n",
+		_wintype, dwin->maxx, dwin->ch_off);
 #endif
 		if (((wlp->flags & (__ISDIRTY | __ISFORCED)) == 0) &&
 		    ((dwlp->flags & (__ISDIRTY | __ISFORCED)) == 0))
@@ -1042,16 +1047,14 @@ putchbr(__LDATA *nsp, __LDATA *csp, __LDATA *psp, int wy, int wx)
 		return error;
 	}
 
-	/* We need to insert characters.
-	 * To do this, work out their widths.
-	 * XXX This does not work when the bottom right corner is an ACS. */
+	/* We need to insert characters. */
 #ifdef HAVE_WCHAR
-	cw = wcwidth(nsp->ch);
-	pcw = psp == NULL ? 0 : wcwidth(psp->ch);
-	if (pcw < 1)
+	cw = WCOL(*nsp);
+	pcw = WCOL(*psp);
+	if (cw < 1 || pcw < 1)
 		return ERR; /* Nothing to insert */
 
-	/* When wide characters we need something other than
+	/* When inserting a wide character, we need something other than
 	 * insert_character. */
 	if (pcw > 1 &&
 	    !(parm_ich != NULL ||
@@ -1317,7 +1320,9 @@ makech(int wy)
 			}
 
 #ifdef HAVE_WCHAR
-			chw = wcwidth(nsp->ch);
+			chw = WCOL(*nsp);
+			if (chw < 0)
+				chw = 0; /* match putch() */
 #else
 			chw = 1;
 #endif /* HAVE_WCHAR */

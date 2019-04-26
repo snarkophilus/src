@@ -1,4 +1,4 @@
-/*	$NetBSD: if_enet.c,v 1.17 2019/01/22 03:42:25 msaitoh Exp $	*/
+/*	$NetBSD: if_enet.c,v 1.19 2019/04/24 11:18:20 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 2014 Ryo Shimizu <ryo@nerv.org>
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_enet.c,v 1.17 2019/01/22 03:42:25 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_enet.c,v 1.19 2019/04/24 11:18:20 msaitoh Exp $");
 
 #include "vlan.h"
 
@@ -1041,7 +1041,6 @@ enet_ioctl(struct ifnet *ifp, u_long command, void *data)
 		}
 		break;
 	case SIOCSIFMEDIA:
-	case SIOCGIFMEDIA:
 		/* Flow control requires full-duplex mode. */
 		if (IFM_SUBTYPE(ifr->ifr_media) == IFM_AUTO ||
 		    (ifr->ifr_media & IFM_FDX) == 0)
@@ -1172,7 +1171,7 @@ enet_miibus_statchg(struct ifnet *ifp)
 		mii->mii_media_active &= ~IFM_ETH_FMASK;
 	}
 
-	if ((ife->ifm_media & IFM_GMASK) == IFM_FDX) {
+	if ((ife->ifm_media & IFM_FDX) != 0) {
 		tcr |= ENET_TCR_FDEN;	/* full duplex */
 		rcr &= ~ENET_RCR_DRT;;	/* enable receive on transmit */
 	} else {
@@ -1787,7 +1786,7 @@ enet_init_regs(struct enet_softc *sc, int init)
 		mii = &sc->sc_mii;
 		ife = mii->mii_media.ifm_cur;
 
-		if ((ife->ifm_media & IFM_GMASK) == IFM_FDX)
+		if ((ife->ifm_media & IFM_FDX) != 0)
 			fulldup = 1;
 		else
 			fulldup = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_media.c,v 1.38 2019/02/28 05:40:58 msaitoh Exp $	*/
+/*	$NetBSD: if_media.c,v 1.43 2019/04/23 07:29:04 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.38 2019/02/28 05:40:58 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.43 2019/04/23 07:29:04 msaitoh Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,14 +89,16 @@ __KERNEL_RCSID(0, "$NetBSD: if_media.c,v 1.38 2019/02/28 05:40:58 msaitoh Exp $"
 #include <net/if_media.h>
 #include <net/netisr.h>
 
-static void	ifmedia_status(struct ifmedia *, struct ifnet *, struct ifmediareq *);
-static int	_ifmedia_ioctl(struct ifnet *, struct ifreq *, struct ifmedia *, u_long);
+static void	ifmedia_status(struct ifmedia *, struct ifnet *,
+    struct ifmediareq *);
+static int	_ifmedia_ioctl(struct ifnet *, struct ifreq *,
+    struct ifmedia *, u_long);
 
 /*
  * Compile-time options:
  * IFMEDIA_DEBUG:
- *	turn on implementation-level debug printfs.
- * 	Useful for debugging newly-ported  drivers.
+ *	Turn on implementation-level debug printfs.
+ * 	Useful for debugging newly-ported drivers.
  */
 
 #ifdef IFMEDIA_DEBUG
@@ -248,24 +250,12 @@ _ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr, struct ifmedia *ifm,
 	struct ifmedia_entry *match;
 	struct ifmediareq *ifmr = (struct ifmediareq *)ifr;
 	int error = 0;
-#ifdef OSIOCSIFMEDIA
-	struct oifreq *oifr = (struct oifreq *)ifr;
-#endif
 
 	if (ifp == NULL || ifr == NULL || ifm == NULL)
-		return (EINVAL);
+		return EINVAL;
 
 	switch (cmd) {
-
-#ifdef OSIOCSIFMEDIA
-	case OSIOCSIFMEDIA:
-		ifr->ifr_media = oifr->ifr_media;
-		/*FALLTHROUGH*/
-#endif
-	/*
-	 * Set the current media.
-	 */
-	case SIOCSIFMEDIA:
+	case SIOCSIFMEDIA:	/* Set the current media. */
 	{
 		struct ifmedia_entry *oldentry;
 		u_int oldmedia;
@@ -317,9 +307,7 @@ _ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr, struct ifmedia *ifm,
 		break;
 	}
 
-	/*
-	 * Get list of available media and current media on interface.
-	 */
+	/* Get list of available media and current media on interface. */
 	case SIOCGIFMEDIA:
 	{
 		struct ifmedia_entry *ep;
@@ -348,9 +336,10 @@ _ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr, struct ifmedia *ifm,
 			    ? (size_t)ifmr->ifm_count : nwords;
 			int *kptr = malloc(minwords * sizeof(int), M_TEMP,
 			    M_WAITOK);
-			/*
-			 * Get the media words from the interface's list.
-			 */
+
+			if (kptr == NULL)
+				return ENOMEM;
+			/* Get the media words from the interface's list. */
 			ep = TAILQ_FIRST(&ifm->ifm_list);
 			for (count = 0; ep != NULL && count < minwords;
 			    ep = TAILQ_NEXT(ep, ifm_list), count++)
@@ -461,7 +450,7 @@ ifmedia_baudrate(int mword)
 	for (i = 0; ifmedia_baudrate_descriptions[i].ifmb_word != 0; i++) {
 		if ((mword & (IFM_NMASK|IFM_TMASK)) ==
 		    ifmedia_baudrate_descriptions[i].ifmb_word)
-			return (ifmedia_baudrate_descriptions[i].ifmb_baudrate);
+			return ifmedia_baudrate_descriptions[i].ifmb_baudrate;
 	}
 
 	/* Not known. */

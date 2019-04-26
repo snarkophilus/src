@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.45 2019/03/01 08:15:23 mrg Exp $
+#	$NetBSD: Makefile,v 1.47 2019/04/23 20:55:53 christos Exp $
 
 REQUIRETOOLS=	yes
 NOLINT=		# defined
@@ -17,6 +17,8 @@ LIBDPLIBS+=	m ${.CURDIR}/../../../../../lib/libm
 .if ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "x86_64"
 COPTS.random.cc+=	${${ACTIVE_CC} == "clang":? -mrdrnd :}
 .endif
+
+CSHLIBFLAGS+=	-D_GLIBCXX_COMPAT_
 
 DIST=		${GCCDIST}
 GNUVER=		${DIST}/libstdc++-v3/config/abi/pre/gnu.ver
@@ -53,8 +55,8 @@ CWARNFLAGS.clang+=	-Wno-logical-op-parentheses \
 .if exists(${.CURDIR}/arch/${LIBSTDCXX_MACHINE_ARCH}/defs.mk) && ${MKGCC} != "no"
 .include "${.CURDIR}/arch/${LIBSTDCXX_MACHINE_ARCH}/defs.mk"
 
-SHLIB_MAJOR=	8
-SHLIB_MINOR=	2
+SHLIB_MAJOR=	9
+SHLIB_MINOR=	0
 
 SUBDIR=		include
 

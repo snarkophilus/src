@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.371 2018/10/28 14:59:17 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.373 2019/04/23 11:21:21 bouyer Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -218,7 +218,11 @@
 #include <arm/locore.h>
 #include <arm/arm32/pmap_common.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.371 2018/10/28 14:59:17 skrll Exp $");
+#ifdef DDB
+#include <arm/db_machdep.h>
+#endif
+
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.373 2019/04/23 11:21:21 bouyer Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG
@@ -463,6 +467,7 @@ EVCNT_ATTACH_STATIC(pmap_ev_activations);
 #endif
 
 kmutex_t pmap_lock __cacheline_aligned;
+kmutex_t kpm_lock __cacheline_aligned;
 extern void *msgbufaddr;
 int pmap_kmpages;
 
@@ -480,25 +485,22 @@ bool pmap_initialized;
 static inline void
 pmap_acquire_pmap_lock(pmap_t pm)
 {
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_LOCK(1, NULL);
+#if defined(MULTIPROCESSOR) && defined(DDB)
+	if (__predict_false(db_onproc != NULL))
+		return;
 #endif
-	} else {
-		mutex_enter(pm->pm_lock);
-	}
+	
+	mutex_enter(pm->pm_lock);
 }
 
 static inline void
 pmap_release_pmap_lock(pmap_t pm)
 {
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_UNLOCK_ONE(NULL);
+#if defined(MULTIPROCESSOR) && defined(DDB)
+	if (__predict_false(db_onproc != NULL))
+		return;
 #endif
-	} else {
-		mutex_exit(pm->pm_lock);
-	}
+	mutex_exit(pm->pm_lock);
 }
 
 static inline void
@@ -2791,6 +2793,10 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 #else
 	const bool vector_page_p = (va == vector_page);
 #endif
+	struct pmap_page *pp = pmap_pv_tracked(pa);
+	struct pv_entry *new_pv = NULL;
+	struct pv_entry *old_pv = NULL;
+	int error = 0;
 
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 
@@ -2806,6 +2812,12 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 	 * test for a managed page by checking pg != NULL.
 	 */
 	pg = pmap_initialized ? PHYS_TO_VM_PAGE(pa) : NULL;
+	/*
+	 * if we may need a new pv entry allocate if now, as we can't do it
+	 * with the kernel_pmap locked
+	 */
+	if (pg || pp)
+		new_pv = pool_get(&pmap_pv_pool, PR_NOWAIT);
 
 	nflags = 0;
 	if (prot & VM_PROT_WRITE)
@@ -2829,7 +2841,8 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 	if (l2b == NULL) {
 		if (flags & PMAP_CANFAIL) {
 			pmap_release_pmap_lock(pm);
-			return (ENOMEM);
+			error = ENOMEM;
+			goto free_pv;
 		}
 		panic("pmap_enter: failed to allocate L2 bucket");
 	}
@@ -2851,8 +2864,6 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 			opg = pg;
 	} else
 		opg = NULL;
-
-	struct pmap_page *pp = pmap_pv_tracked(pa);
 
 	if (pg || pp) {
 		KASSERT((pg != NULL) != (pp != NULL));
@@ -2951,9 +2962,10 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 				}
 #endif
 			} else {
-				pmap_release_page_lock(md);
-				pv = pool_get(&pmap_pv_pool, PR_NOWAIT);
+				pv = new_pv;
+				new_pv = NULL;
 				if (pv == NULL) {
+					pmap_release_page_lock(md);
 					pmap_release_pmap_lock(pm);
 					if ((flags & PMAP_CANFAIL) == 0)
 						panic("pmap_enter: "
@@ -2964,7 +2976,6 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 					    0, 0, 0, 0);
 					return (ENOMEM);
 				}
-				pmap_acquire_page_lock(md);
 			}
 
 			pmap_enter_pv(md, pa, pv, pm, va, nflags);
@@ -2998,9 +3009,9 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 			paddr_t opa = VM_PAGE_TO_PHYS(opg);
 
 			pmap_acquire_page_lock(omd);
-			struct pv_entry *pv = pmap_remove_pv(omd, opa, pm, va);
+			old_pv = pmap_remove_pv(omd, opa, pm, va);
 			pmap_vac_me_harder(omd, opa, pm, 0);
-			oflags = pv->pv_flags;
+			oflags = old_pv->pv_flags;
 			pmap_release_page_lock(omd);
 
 #ifdef PMAP_CACHE_VIVT
@@ -3008,7 +3019,6 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 				pmap_cache_wbinv_page(pm, va, true, oflags);
 			}
 #endif
-			pool_put(&pmap_pv_pool, pv);
 		}
 	}
 
@@ -3089,7 +3099,13 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 
 	pmap_release_pmap_lock(pm);
 
-	return (0);
+
+	if (old_pv)
+		pool_put(&pmap_pv_pool, old_pv);
+free_pv:
+	if (new_pv)
+		pool_put(&pmap_pv_pool, new_pv);
+	return (error);
 }
 
 /*
@@ -3117,10 +3133,13 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 void
 pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
+	SLIST_HEAD(,pv_entry) opv_list;
+	struct pv_entry *pv, *npv;
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist, " (pm=%#jx, sva=%#jx, eva=%#jx)",
 	    (uintptr_t)pm, sva, eva, 0);
 
+	SLIST_INIT(&opv_list);
 	/*
 	 * we lock in the pmap => pv_head direction
 	 */
@@ -3177,7 +3196,6 @@ pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 			 */
 			if (pg != NULL) {
 				struct vm_page_md *md = VM_PAGE_TO_MD(pg);
-				struct pv_entry *pv;
 
 				pmap_acquire_page_lock(md);
 				pv = pmap_remove_pv(md, pa, pm, sva);
@@ -3187,7 +3205,8 @@ pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 					if (pm->pm_remove_all == false) {
 						flags = pv->pv_flags;
 					}
-					pool_put(&pmap_pv_pool, pv);
+					SLIST_INSERT_HEAD(&opv_list,
+					    pv, pv_link);
 				}
 			}
 			mappings += PAGE_SIZE / L2_S_SIZE;
@@ -3279,6 +3298,9 @@ pmap_remove(pmap_t pm, vaddr_t sva, vaddr_t eva)
 	}
 
 	pmap_release_pmap_lock(pm);
+	SLIST_FOREACH_SAFE(pv, &opv_list, pv_link, npv) {
+		pool_put(&pmap_pv_pool, pv);
+	}
 }
 
 #if defined(PMAP_CACHE_VIPT)
@@ -3494,15 +3516,15 @@ pmap_kremove(vaddr_t va, vsize_t len)
 	UVMHIST_LOG(maphist, " (va=%#jx, len=%#jx)", va, len, 0, 0);
 
 	const vaddr_t eva = va + len;
+	pmap_t kpm = pmap_kernel();
 
-	pmap_acquire_pmap_lock(pmap_kernel());
+	pmap_acquire_pmap_lock(kpm);
 
 	while (va < eva) {
 		vaddr_t next_bucket = L2_NEXT_BUCKET_VA(va);
 		if (next_bucket > eva)
 			next_bucket = eva;
 
-		pmap_t kpm = pmap_kernel();
 		struct l2_bucket * const l2b = pmap_get_l2_bucket(kpm, va);
 		KDASSERT(l2b != NULL);
 
@@ -3558,7 +3580,7 @@ pmap_kremove(vaddr_t va, vsize_t len)
 		total_mappings += mappings;
 #endif
 	}
-	pmap_release_pmap_lock(pmap_kernel());
+	pmap_release_pmap_lock(kpm);
 	cpu_cpwait();
 	UVMHIST_LOG(maphist, "  <--- done (%ju mappings removed)",
 	    total_mappings, 0, 0, 0);
@@ -4786,8 +4808,8 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	 * whoops!   we need to add kernel PTPs
 	 */
 
-	s = splhigh();	/* to be safe */
-	mutex_enter(kpm->pm_lock);
+	s = splvm();	/* to be safe */
+	mutex_enter(&kpm_lock);
 
 	/* Map 1MB at a time */
 	size_t l1slot = l1pte_index(pmap_curmaxkvaddr);
@@ -4817,7 +4839,7 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	cpu_cpwait();
 #endif
 
-	mutex_exit(kpm->pm_lock);
+	mutex_exit(&kpm_lock);
 	splx(s);
 
 out:
@@ -4954,8 +4976,6 @@ pmap_init_l1(struct l1_ttable *l1, pd_entry_t *l1pt)
 	SLIST_INSERT_HEAD(&l1_list, l1, l1_link);
 	TAILQ_INSERT_TAIL(&l1_lru_list, l1, l1_lru);
 }
-
-
 
 
 
@@ -5386,23 +5406,16 @@ pmap_impl_bootstrap(void)
 
 	pm->pm_l1 = l1;
 
-#ifdef VERBOSE_INIT_ARM
-	printf("locks ");
-#endif
-	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_NONE);
+	VPRINTF("locks ");
+	/*
+	 * pmap_kenter_pa() and pmap_kremove() may be called from interrupt
+	 * context, so its locks have to be at IPL_VM
+	 */
+	mutex_init(&pmap_lock, MUTEX_DEFAULT, IPL_VM);
+	mutex_init(&kpm_lock, MUTEX_DEFAULT, IPL_NONE);
+	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
 	uvm_obj_init(&pm->pm_obj, NULL, false, 1);
 	uvm_obj_setlock(&pm->pm_obj, &pm->pm_obj_lock);
-
-#if defined(PMAP_CACHE_VIPT)
-	if (arm_cache_prefer_mask != 0) {
-		mutex_init(&pmap_lock, MUTEX_DEFAULT, IPL_VM);
-	} else {
-#endif
-		mutex_init(&pmap_lock, MUTEX_DEFAULT, IPL_NONE);
-#if defined(PMAP_CACHE_VIPT)
-	}
-#endif
-
 }
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_media.h,v 1.61 2017/10/04 07:08:01 msaitoh Exp $	*/
+/*	$NetBSD: if_media.h,v 1.63 2019/04/24 05:07:20 msaitoh Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000, 2001 The NetBSD Foundation, Inc.
@@ -84,6 +84,12 @@
 #endif /*_KERNEL */
 
 /*
+ * Status bits. THIS IS NOT A MEDIA WORD.
+ */
+#define	IFM_AVALID	0x00000001	/* Active bit valid */
+#define	IFM_ACTIVE	0x00000002	/* Interface attached to working net */
+
+/*
  * if_media Options word:
  *	Bits	Use
  *	----	-------
@@ -91,16 +97,16 @@
  *	5-7	Media type
  *	8-15	Type specific options
  *	16-18	Mode (for multi-mode devices)
- *	19	RFU			(not used)
+ *	19	(Reserved for Future Use)
  *	20-27	Shared (global) options
  *	28-31	Instance
  *
  *   3                     2                   1
  *   1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
  *  +-------+---------------+-+-----+---------------+-----+---------+
- *  |       |               |R|     |               |     |     |STA|
- *  | IMASK |     GMASK     |F|MMASK|     OMASK     |NMASK|     +---|
- *  |       |               |U|     |               |     |  TMASK  |
+ *  |       |               |R|     |               |     |         |
+ *  | IMASK |     GMASK     |F|MMASK|     OMASK     |NMASK|  TMASK  |
+ *  |       |               |U|     |               |     |         |
  *  +-------+---------------+-+-----+---------------+-----+---------+
  *   <----->                   <--->                 <--->
  *  IFM_INST()               IFM_MODE()            IFM_TYPE()
@@ -172,12 +178,6 @@
 #define	IFM_AUTO	0		/* Autoselect best media */
 #define	IFM_MANUAL	1		/* Jumper/dipswitch selects media */
 #define	IFM_NONE	2		/* Deselect all media */
-
-/*
- * Status bits (IFM_TMASK)
- */
-#define	IFM_AVALID	0x00000001	/* Active bit valid */
-#define	IFM_ACTIVE	0x00000002	/* Interface attached to working net */
 
 /*
  * Shared (global) options (IFM_GMASK)
@@ -407,12 +407,12 @@ struct ifmedia_description {
 	{ IFM_ETHER | IFM_10G_SR | IFM_FDX,	"10GSR" },		\
 	{ IFM_ETHER | IFM_10G_SR | IFM_FDX,	"10GBASE-SR" },		\
 	{ IFM_ETHER | IFM_10G_LRM | IFM_FDX,	"10Gbase-LRM" },	\
-	{ IFM_ETHER | IFM_10G_TWINAX | IFM_FDX,	"10Gbase-Twinax" }, 	\
+	{ IFM_ETHER | IFM_10G_TWINAX | IFM_FDX,	"10Gbase-Twinax" },	\
 	{ IFM_ETHER | IFM_10G_TWINAX_LONG | IFM_FDX, "10Gbase-Twinax-Long" },\
 	{ IFM_ETHER | IFM_10G_T | IFM_FDX,	"10Gbase-T" },		\
 	{ IFM_ETHER | IFM_10G_CX4 | IFM_FDX,	"10GbaseCX4" },		\
 	{ IFM_ETHER | IFM_10G_CX4 | IFM_FDX,	"10GCX4" },		\
-	{ IFM_ETHER | IFM_10G_CX4 | IFM_FDX,	"10GBASE-CX4" }, 	\
+	{ IFM_ETHER | IFM_10G_CX4 | IFM_FDX,	"10GBASE-CX4" },	\
 	{ IFM_ETHER | IFM_2500_SX | IFM_FDX,	"2500baseSX" },		\
 	{ IFM_ETHER | IFM_2500_SX | IFM_FDX,	"2500SX" },		\
 									\
@@ -460,11 +460,11 @@ struct ifmedia_description {
 	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM48,	"OFDM48" },		\
 	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM54,	"OFDM54" },		\
 	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM72,	"OFDM72" },		\
-	{ IFM_IEEE80211 | IFM_IEEE80211_DS354k, "DS/354Kbps" },         \
-	{ IFM_IEEE80211 | IFM_IEEE80211_DS512k, "DS/512Kbps" },         \
-	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM3,  "OFDM/3Mbps" },         \
-	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM4,  "OFDM/4.5Mbps" },       \
-	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM27, "OFDM/27Mbps" },        \
+	{ IFM_IEEE80211 | IFM_IEEE80211_DS354k, "DS/354Kbps" },		\
+	{ IFM_IEEE80211 | IFM_IEEE80211_DS512k, "DS/512Kbps" },		\
+	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM3,	"OFDM/3Mbps" },		\
+	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM4,	"OFDM/4.5Mbps" },	\
+	{ IFM_IEEE80211 | IFM_IEEE80211_OFDM27, "OFDM/27Mbps" },	\
 									\
 	{ 0, NULL },							\
 }
@@ -514,7 +514,7 @@ struct ifmedia_description {
 	{ IFM_IEEE80211 | IFM_IEEE80211_MONITOR,"monitor" },		\
 	{ IFM_IEEE80211 | IFM_IEEE80211_TURBO,	"turbo" },		\
 	{ IFM_IEEE80211 | IFM_IEEE80211_IBSS,	"ibss" },		\
-	{ IFM_IEEE80211 | IFM_IEEE80211_WDS, 	"wds" },		\
+	{ IFM_IEEE80211 | IFM_IEEE80211_WDS,	"wds" },		\
 	{ IFM_IEEE80211 | IFM_IEEE80211_MBSS,	"mesh" },		\
 									\
 	{ 0, NULL },							\

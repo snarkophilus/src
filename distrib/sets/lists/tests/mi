@@ -1,4 +1,4 @@
-# $NetBSD: mi,v 1.809 2019/02/26 10:01:40 isaki Exp $
+# $NetBSD: mi,v 1.811 2019/04/24 11:43:20 kamil Exp $
 #
 # Note: don't delete entries from here - mark them as "obsolete" instead.
 #
@@ -3117,7 +3117,9 @@
 ./usr/tests/lib/libpthread/h_thread_local_dtor	tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_atexit		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_barrier		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libpthread/t_call_once		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_cancel		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libpthread/t_cnd		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_cond		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_condwait		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_detach		tests-lib-tests		compattestfile,atf
@@ -3127,6 +3129,7 @@
 ./usr/tests/lib/libpthread/t_fpu		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_join		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_kill		tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libpthread/t_mtx		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_mutex		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_name		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_once		tests-lib-tests		compattestfile,atf
@@ -3140,7 +3143,9 @@
 ./usr/tests/lib/libpthread/t_sleep		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_status		tests-obsolete		obsolete
 ./usr/tests/lib/libpthread/t_swapcontext	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libpthread/t_tss		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_thread_local_dtor	tests-lib-tests		compattestfile,atf
+./usr/tests/lib/libpthread/t_thrd		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread/t_timedmutex		tests-lib-tests		compattestfile,atf
 ./usr/tests/lib/libpthread_dbg			tests-obsolete		obsolete
 ./usr/tests/lib/libpthread_dbg/Atffile		tests-obsolete		obsolete
@@ -3822,6 +3827,54 @@
 ./usr/tests/usr.bin/id/t_groups			tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/id/t_id			tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/id/t_whoami			tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent			tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/Atffile		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/Kyuafile		tests-usr.bin-tests	compattestfile,atf,kyua
+./usr/tests/usr.bin/indent/t_indent		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/binary.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/binary.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/comments.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/comments.0.pro	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/comments.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/cs.0			tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/cs.0.pro		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/cs.0.stdout		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/declarations.0	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/declarations.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/elsecomment.0	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/elsecomment.0.pro	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/elsecomment.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/f_decls.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/f_decls.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/float.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/float.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/label.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/label.0.pro		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/label.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/list_head.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/list_head.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/ncs.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/ncs.0.pro		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/ncs.0.stdout		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/offsetof.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/offsetof.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/parens.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/parens.0.pro		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/parens.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/pcs.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/pcs.0.pro		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/pcs.0.stdout		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/struct.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/struct.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/surplusbad.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/surplusbad.0.pro	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/surplusbad.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/types_from_file.0	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/types_from_file.0.list	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/types_from_file.0.pro	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/types_from_file.0.stdout	tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/wchar.0		tests-usr.bin-tests	compattestfile,atf
+./usr/tests/usr.bin/indent/wchar.0.stdout	tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/infocmp			tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/infocmp/Atffile		tests-usr.bin-tests	compattestfile,atf
 ./usr/tests/usr.bin/infocmp/Kyuafile		tests-usr.bin-tests	compattestfile,atf,kyua

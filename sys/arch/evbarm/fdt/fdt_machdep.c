@@ -1,4 +1,4 @@
-/* $NetBSD: fdt_machdep.c,v 1.60 2019/03/16 10:45:06 skrll Exp $ */
+/* $NetBSD: fdt_machdep.c,v 1.62 2019/04/24 06:37:31 skrll Exp $ */
 
 /*-
  * Copyright (c) 2015-2017 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fdt_machdep.c,v 1.60 2019/03/16 10:45:06 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fdt_machdep.c,v 1.62 2019/04/24 06:37:31 skrll Exp $");
 
 #include "opt_machdep.h"
 #include "opt_bootconfig.h"
@@ -158,8 +158,7 @@ static struct consdev earlycons = {
 #endif
 
 /*
- * ARM: Get the first physically contiguous region of memory.
- * ARM64: Get all of physical memory, including holes.
+ * Get all of physical memory, including holes.
  */
 static void
 fdt_get_memory(uint64_t *pstart, uint64_t *pend)
@@ -184,14 +183,8 @@ fdt_get_memory(uint64_t *pstart, uint64_t *pend)
 		VPRINTF("FDT /memory [%d] @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
 		    index, cur_addr, cur_size);
 
-#ifdef __aarch64__
 		if (cur_addr + cur_size > *pend)
 			*pend = cur_addr + cur_size;
-#else
-		/* If subsequent entries follow the previous, append them. */
-		if (*pend == cur_addr)
-			*pend = cur_addr + cur_size;
-#endif
 	}
 }
 
@@ -258,14 +251,22 @@ static struct boot_physmem fdt_physmem[MAX_PHYSMEM];
 static void
 fdt_add_boot_physmem(const struct fdt_memory *m, void *arg)
 {
-	struct boot_physmem *bp = &fdt_physmem[nfdt_physmem++];
+	const paddr_t saddr = round_page(m->start);
+	const paddr_t eaddr = trunc_page(m->end);
 
-	VPRINTF("  %" PRIx64 " - %" PRIx64 "\n", m->start, m->end - 1);
+	VPRINTF("  %" PRIx64 " - %" PRIx64, m->start, m->end - 1);
+	if (saddr >= eaddr) {
+		VPRINTF(" skipped\n");
+		return;
+	}
+	VPRINTF("\n");
+
+	struct boot_physmem *bp = &fdt_physmem[nfdt_physmem++];
 
 	KASSERT(nfdt_physmem <= MAX_PHYSMEM);
 
-	bp->bp_start = atop(round_page(m->start));
-	bp->bp_pages = atop(trunc_page(m->end)) - bp->bp_start;
+	bp->bp_start = atop(saddr);
+	bp->bp_pages = atop(eaddr) - bp->bp_start;
 	bp->bp_freelist = VM_FREELIST_DEFAULT;
 
 #ifdef _LP64
