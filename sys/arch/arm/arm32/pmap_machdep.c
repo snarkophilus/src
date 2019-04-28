@@ -220,6 +220,11 @@
 
 __KERNEL_RCSID(0, "$NetBSD$");
 
+#ifdef VERBOSE_INIT_ARM
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
 
 #if 0
 
@@ -7178,7 +7183,6 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 void
 pmap_md_pdetab_deactivate(pmap_t pm)
 {
-
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 
 	kpreempt_disable();

@@ -137,8 +137,8 @@ void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
-
-
+void	pmap_md_pdetab_activate(pmap_t, struct lwp *);
+void	pmap_md_pdetab_deactivate(pmap_t);
 
 
 #define	__HAVE_PMAP_MD
@@ -274,6 +274,7 @@ pmap_md_setvirtualend(vaddr_t va)
 //XXX Move to sys/uvm/pmap/pmap.h
 void pmap_page_remove(struct vm_page *);
 
+#if 0
 static inline void
 pmap_pv_protect(paddr_t pa, vm_prot_t prot)
 {
@@ -282,6 +283,7 @@ pmap_pv_protect(paddr_t pa, vm_prot_t prot)
 	KASSERT(prot == VM_PROT_NONE);
  	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
 }
+#endif
 
 static inline bool
 pte_modified_p(pt_entry_t pte)
