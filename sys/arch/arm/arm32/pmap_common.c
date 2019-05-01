@@ -1193,6 +1193,50 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
 
 
 
+/*
+ * Fetch pointers to the PDE/PTE for the given pmap/VA pair.
+ * Returns true if the mapping exists, else false.
+ *
+ * NOTE: This function is only used by a couple of arm-specific modules.
+ * It is not safe to take any pmap locks here, since we could be right
+ * in the middle of debugging the pmap anyway...
+ *
+ * It is possible for this routine to return false even though a valid
+ * mapping does exist. This is because we don't lock, so the metadata
+ * state may be inconsistent.
+ *
+ * NOTE: We can return a NULL *ptp in the case where the L1 pde is
+ * a "section" mapping.
+ */
+bool
+pmap_get_pde_pte(pmap_t pm, vaddr_t va, pd_entry_t **pdp, pt_entry_t **ptp)
+{
+	struct l2_dtable *l2;
+	pd_entry_t *pdep, pde;
+	pt_entry_t *ptep;
+	u_short l1slot;
+
+	if (pm->pm_l1 == NULL)
+		return false;
+
+	l1slot = l1pte_index(va);
+	*pdp = pdep = pmap_l1_kva(pm) + l1slot;
+	pde = *pdep;
+
+	if (l1pte_section_p(pde)) {
+		*ptp = NULL;
+		return true;
+	}
+
+	l2 = pm->pm_l2[L2_IDX(l1slot)];
+	if (l2 == NULL ||
+	    (ptep = l2->l2_bucket[L2_BUCKET(l1slot)].l2b_kva) == NULL) {
+		return false;
+	}
+
+	*ptp = &ptep[l2pte_index(va)];
+	return true;
+}
 
 
 
@@ -2777,10 +2821,10 @@ SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
 
 
 
-
+#if 0
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *
-arm_pmap_md_alloc_poolpage(int flags)
+pmap_md_alloc_poolpage(int flags)
 {
 	/*
 	 * On some systems, only some pages may be "coherent" for dma and we
@@ -2794,6 +2838,7 @@ arm_pmap_md_alloc_poolpage(int flags)
 
 	return uvm_pagealloc(NULL, 0, NULL, flags);
 }
+#endif
 #endif
 
 #if defined(ARM_MMU_EXTENDED) && defined(MULTIPROCESSOR)
