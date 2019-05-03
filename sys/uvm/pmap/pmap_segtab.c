@@ -106,6 +106,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.7 2019/03/08 08:12:40 msaitoh Exp 
 #include <sys/atomic.h>
 
 #include <uvm/uvm.h>
+#include <uvm/pmap/pmap.h>
 
 
 #define MULT_CTASSERT(a,b)	__CTASSERT((a) < (b) || ((a) % (b) == 0))
@@ -118,14 +119,16 @@ __CTASSERT(sizeof(pmap_ptpage_t) == NBPG);
 MULT_CTASSERT(PMAP_PDETABSIZE, NPDEPG);
 MULT_CTASSERT(NPDEPG, PMAP_PDETABSIZE);
 MULT_CTASSERT(PMAP_PDETABSIZE, NPDEPG);
-#endif
+#endif /* _LP64 */
 MULT_CTASSERT(sizeof(pmap_pdetab_t *), sizeof(pd_entry_t));
 MULT_CTASSERT(sizeof(pd_entry_t), sizeof(pmap_pdetab_t));
 
+#if 0
 #ifdef _LP64
 static const bool separate_pdetab_root_p = NPDEPG != PMAP_PDETABSIZE;
 #else
 static const bool separate_pdetab_root_p = true;
+#endif /* _LP64 */
 #endif
 
 typedef struct {
@@ -138,9 +141,9 @@ typedef struct {
 #define	PDETAB_ADD(n, v)	(pmap_segtab_info.pdealloc.n += (v))
 #else
 #define	PDETAB_ADD(n, v)	((void) 0)
-#endif
+#endif /* DEBUG */
 } pmap_pdetab_alloc_t;
-#endif
+#endif /* PMAP_HWPAGEWALKER */
 
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 #ifdef _LP64
@@ -188,6 +191,7 @@ struct pmap_segtab_info {
 
 kmutex_t pmap_segtab_lock __cacheline_aligned;
 
+#ifndef PMAP_HWPAGEWALKER
 static void
 pmap_check_stp(pmap_segtab_t *stp, const char *caller, const char *why)
 {
@@ -205,6 +209,7 @@ pmap_check_stp(pmap_segtab_t *stp, const char *caller, const char *why)
 	}
 #endif
 }
+#endif /* PMAP_HWPAGEWALKER */
 
 static inline struct vm_page *
 pmap_pte_pagealloc(void)
@@ -223,6 +228,7 @@ pmap_pte_pagealloc(void)
 }
 
 #if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_POOLPAGE)
+#if 0
 static vaddr_t
 pmap_pde_to_va(pd_entry_t pde)
 {
@@ -245,11 +251,13 @@ pmap_pde_to_ptpage(pd_entry_t pde)
 	return (pmap_ptpage_t *) pmap_pde_to_va(pde);
 }
 #endif
+#endif
 
 #ifdef _LP64
 __CTASSERT((XSEGSHIFT - SEGSHIFT) % (PGSHIFT-3) == 0);
 #endif
 
+#if 0
 static inline pmap_ptpage_t *
 pmap_ptpage(struct pmap *pmap, vaddr_t va)
 {
@@ -264,7 +272,7 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 	     segshift > SEGSHIFT;
 	     segshift -= PGSHIFT - 3, pdetab_mask = NSEGPG - 1) {
 		ptb = pmap_pde_to_pdetab(ptb->pde_pde[(va >> segshift) & pdetab_mask]);
-		if (ptb == NULL);
+		if (ptb == NULL)
 			return NULL;
 	}
 #endif
@@ -287,7 +295,19 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 	return stb->seg_tab[(va >> SEGSHIFT) & segtab_mask];
 #endif
 }
+#endif
 
+#ifdef __riscv__
+#ifdef PMAP_HWPAGEWALKER
+static void
+pte_pde_set(pd_entry_t *oldpde, pd_entry_t newpde) {
+	/* XXX: PDE Setting code here? Based on function call below,
+	 * guessing this is a wrapper for pte_pde_cas() ? */
+	pte_pde_cas(oldpde, 0, newpde);
+}
+#endif
+
+// XXXNH
 #if defined(PMAP_HWPAGEWALKER)
 bool
 pmap_pdetab_fixup(struct pmap *pmap, vaddr_t va)
@@ -304,11 +324,11 @@ pmap_pdetab_fixup(struct pmap *pmap, vaddr_t va)
 	// Regardless of how many levels deep this page table deep, we only
 	// need to verify the first level PDEs match up.
 #ifdef XSEGSHIFT
-	pde_idx &= va >> XSEGSHIFT;
+	idx &= va >> XSEGSHIFT;
 #else
-	pde_idx &= va >> SEGSHIFT;
+	idx &= va >> SEGSHIFT;
 #endif
-	if (uptb->pde_pde[idx] != kptb->pde_pde[idx]) [
+	if (uptb->pde_pde[idx] != kptb->pde_pde[idx]) {
 		pte_pde_set(&uptb->pde_pde[idx], kptb->pde_pde[idx]);
 #if !defined(PMAP_MAP_POOLPAGE)
 		ustb->seg_seg[idx] = kstb->seg_seg[idx]; // copy KVA of PTP
@@ -318,7 +338,9 @@ pmap_pdetab_fixup(struct pmap *pmap, vaddr_t va)
 	return false;
 }
 #endif /* PMAP_HWPAGEWALKER */
+#endif
 
+#ifndef PMAP_HWPAGEWALKER
 static inline pt_entry_t *
 pmap_segmap(struct pmap *pmap, vaddr_t va)
 {
@@ -333,17 +355,24 @@ pmap_segmap(struct pmap *pmap, vaddr_t va)
 
 	return stp->seg_tab[(va >> SEGSHIFT) & (PMAP_SEGTABSIZE - 1)];
 }
+#endif /* PMAP_HWPAGEWALKER */
 
 pt_entry_t *
 pmap_pte_lookup(pmap_t pmap, vaddr_t va)
 {
+#ifdef PMAP_HWPAGEWALKER
+	return pmap_md_pdetab_lookup_ptep(pmap, va);
+#else
 	pt_entry_t *pte = pmap_segmap(pmap, va);
+
 	if (pte == NULL)
 		return NULL;
 
 	return pte + ((va >> PGSHIFT) & (NPTEPG - 1));
+#endif
 }
 
+#ifndef PMAP_HWPAGEWALKER
 static void
 pmap_segtab_free(pmap_segtab_t *stp)
 {
@@ -351,12 +380,20 @@ pmap_segtab_free(pmap_segtab_t *stp)
 	 * Insert the segtab into the segtab freelist.
 	 */
 	mutex_spin_enter(&pmap_segtab_lock);
-	stp->seg_seg[0] = pmap_segtab_info.free_segtab;
-	pmap_segtab_info.free_segtab = stp;
+#ifdef PMAP_HWPAGEWALKER
+	stp->seg_seg[0] = pmap_segtab_info.pdealloc.free_pdetab;
+	pmap_segtab_info.pdealloc.free_pdetab = stp;
+	PDETAB_ADD(nput, 1);
+#else
+	stp->seg_seg[0] = pmap_segtab_info.segalloc.free_segtab;
+	pmap_segtab_info.segalloc.free_segtab = stp;
 	SEGTAB_ADD(nput, 1);
+#endif
 	mutex_spin_exit(&pmap_segtab_lock);
 }
+#endif
 
+#ifndef PMAP_HWPAGEWALKER
 static void
 pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 	pte_callback_t callback, uintptr_t flags,
@@ -418,6 +455,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		*stp_p = NULL;
 	}
 }
+#endif
 
 /*
  *	Create and return a physical map.
@@ -431,6 +469,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
  *	the map will be used in software only, and
  *	is bounded by that size.
  */
+#ifndef PMAP_HWPAGEWALKER
 static pmap_segtab_t *
 pmap_segtab_alloc(void)
 {
@@ -439,10 +478,16 @@ pmap_segtab_alloc(void)
 
  again:
 	mutex_spin_enter(&pmap_segtab_lock);
-	if (__predict_true((stp = pmap_segtab_info.free_segtab) != NULL)) {
-		pmap_segtab_info.free_segtab = stp->seg_seg[0];
-		stp->seg_seg[0] = NULL;
+#ifdef PMAP_HWPAGEWALKER
+	if (__predict_true((stp = pmap_segtab_info.pdealloc.free_pdetab) != NULL)) {
+		pmap_segtab_info.pdealloc.free_pdetab = stp->seg_seg[0];
+		PDETAB_ADD(nget, 1);
+#else
+	if (__predict_true((stp = pmap_segtab_info.segalloc.free_segtab) != NULL)) {
+		pmap_segtab_info.segalloc.free_segtab = stp->seg_seg[0];
 		SEGTAB_ADD(nget, 1);
+#endif
+		stp->seg_seg[0] = NULL;
 		found_on_freelist = true;
 	}
 	mutex_spin_exit(&pmap_segtab_lock);
@@ -457,7 +502,11 @@ pmap_segtab_alloc(void)
 			uvm_wait("pmap_create");
 			goto again;
 		}
+#ifdef PMAP_HWPAGEWALKER
+		PDETAB_ADD(npage, 1);
+#else
 		SEGTAB_ADD(npage, 1);
+#endif
 		const paddr_t stp_pa = VM_PAGE_TO_PHYS(stp_pg);
 
 		stp = (pmap_segtab_t *)PMAP_MAP_POOLPAGE(stp_pa);
@@ -473,9 +522,15 @@ pmap_segtab_alloc(void)
 			 * Now link the new segtabs into the free segtab list.
 			 */
 			mutex_spin_enter(&pmap_segtab_lock);
-			stp[n-1].seg_seg[0] = pmap_segtab_info.free_segtab;
-			pmap_segtab_info.free_segtab = stp + 1;
+#ifdef PMAP_HWPAGEWALKER
+			stp[n-1].seg_seg[0] = pmap_segtab_info.pdealloc.free_pdetab;
+			pmap_segtab_info.pdealloc.free_pdetab = stp + 1;
+			PDETAB_ADD(nput, n - 1);
+#else
+			stp[n-1].seg_seg[0] = pmap_segtab_info.segalloc.free_segtab;
+			pmap_segtab_info.segalloc.free_segtab = stp + 1;
 			SEGTAB_ADD(nput, n - 1);
+#endif
 			mutex_spin_exit(&pmap_segtab_lock);
 		}
 	}
@@ -485,22 +540,26 @@ pmap_segtab_alloc(void)
 
 	return stp;
 }
+#endif
 
 /*
  * Allocate the top segment table for the pmap.
  */
+#ifndef PMAP_HWPAGEWALKER
 void
 pmap_segtab_init(pmap_t pmap)
 {
 
 	pmap->pm_segtab = pmap_segtab_alloc();
 }
+#endif
 
 /*
  *	Retire the given physical map from service.
  *	Should only be called if the map contains
  *	no valid mappings.
  */
+#ifndef PMAP_HWPAGEWALKER
 void
 pmap_segtab_destroy(pmap_t pmap, pte_callback_t func, uintptr_t flags)
 {
@@ -515,10 +574,12 @@ pmap_segtab_destroy(pmap_t pmap, pte_callback_t func, uintptr_t flags)
 	pmap_segtab_release(pmap, &pmap->pm_segtab,
 	    func == NULL, func, flags, pmap->pm_minaddr, vinc);
 }
+#endif
 
 /*
  *	Make a new pmap (vmspace) active for the given process.
  */
+#ifndef PMAP_HWPAGEWALKER
 void
 pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 {
@@ -538,6 +599,7 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 		}
 	}
 }
+#endif
 
 /*
  *	Act on the given range of addresses from the specified map.
@@ -584,6 +646,7 @@ pmap_pte_process(pmap_t pmap, vaddr_t sva, vaddr_t eva,
 pt_entry_t *
 pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 {
+#ifndef PMAP_HWPAGEWALKER
 	pmap_segtab_t *stp = pmap->pm_segtab;
 	pt_entry_t *pte;
 
@@ -664,4 +727,6 @@ pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 	}
 
 	return pte;
+#endif /* PMAP_HWPAGEWALKER */
+	return 0; /* TODO: FIX THIS ENTIRE FUNCTION for PDE */
 }
