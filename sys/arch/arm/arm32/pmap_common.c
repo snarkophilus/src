@@ -2068,7 +2068,7 @@ void		(*pmap_zero_page_func)(paddr_t);
 void
 pmap_pte_init_generic(void)
 {
-
+#ifdef ARM_MMU_EXTENDED
 	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
 	pte_l1_s_wc_mode = L1_S_B;
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
@@ -2103,7 +2103,42 @@ pmap_pte_init_generic(void)
 		pte_l2_l_cache_mode_pt = L2_C;		/* write through */
 		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
 	}
+#else
+	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
+	pte_l1_s_wc_mode = L1_S_B;
+	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
 
+	pte_l2_l_cache_mode = L2_B|L2_C;
+	pte_l2_l_wc_mode = L2_B;
+	pte_l2_l_cache_mask = L2_L_CACHE_MASK_generic;
+
+	pte_l2_s_cache_mode = L2_B|L2_C;
+	pte_l2_s_wc_mode = L2_B;
+	pte_l2_s_cache_mask = L2_S_CACHE_MASK_generic;
+
+	/*
+	 * If we have a write-through cache, set B and C.  If
+	 * we have a write-back cache, then we assume setting
+	 * only C will make those pages write-through (except for those
+	 * Cortex CPUs which can read the L1 caches).
+	 */
+	if (cpufuncs.cf_dcache_wb_range == (void *) cpufunc_nullop
+#if ARM_MMU_V7 > 0
+	    || CPU_ID_CORTEX_P(curcpu()->ci_arm_cpuid)
+#endif
+#if ARM_MMU_V6 > 0
+	    || CPU_ID_ARM11_P(curcpu()->ci_arm_cpuid) /* arm116 errata 399234 */
+#endif
+	    || false) {
+		pte_l1_s_cache_mode_pt = L1_S_B|L1_S_C;
+		pte_l2_l_cache_mode_pt = L2_B|L2_C;
+		pte_l2_s_cache_mode_pt = L2_B|L2_C;
+	} else {
+		pte_l1_s_cache_mode_pt = L1_S_C;	/* write through */
+		pte_l2_l_cache_mode_pt = L2_C;		/* write through */
+		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
+	}
+#endif
 	pte_l1_s_prot_u = L1_S_PROT_U_generic;
 	pte_l1_s_prot_w = L1_S_PROT_W_generic;
 	pte_l1_s_prot_ro = L1_S_PROT_RO_generic;
