@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_fork.c,v 1.209 2019/04/07 14:50:41 kamil Exp $	*/
+/*	$NetBSD: kern_fork.c,v 1.211 2019/05/01 18:01:54 kamil Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2001, 2004, 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_fork.c,v 1.209 2019/04/07 14:50:41 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_fork.c,v 1.211 2019/05/01 18:01:54 kamil Exp $");
 
 #include "opt_ktrace.h"
 #include "opt_dtrace.h"
@@ -203,6 +203,30 @@ sys___clone(struct lwp *l, const struct sys___clone_args *uap,
  */
 static struct timeval fork_tfmrate = { 10, 0 };
 
+static inline bool
+tracefork(struct proc *p, int flags)
+{
+
+	return (p->p_slflag & (PSL_TRACEFORK|PSL_TRACED)) ==
+	    (PSL_TRACEFORK|PSL_TRACED) && (flags & FORK_PPWAIT) == 0;
+}
+
+static inline bool
+tracevfork(struct proc *p, int flags)
+{
+
+	return (p->p_slflag & (PSL_TRACEVFORK|PSL_TRACED)) ==
+	    (PSL_TRACEVFORK|PSL_TRACED) && (flags & FORK_PPWAIT) != 0;
+}
+
+static inline bool
+tracevforkdone(struct proc *p, int flags)
+{
+
+	return (p->p_slflag & (PSL_TRACEVFORK_DONE|PSL_TRACED)) ==
+	    (PSL_TRACEVFORK_DONE|PSL_TRACED) && (flags & FORK_PPWAIT);
+}
+
 /*
  * General fork call.  Note that another LWP in the process may call exec()
  * or exit() while we are forking.  It's safe to continue here, because
@@ -219,7 +243,7 @@ fork1(struct lwp *l1, int flags, int exitsig, void *stack, size_t stacksize,
 	int		count;
 	vaddr_t		uaddr;
 	int		tnprocs;
-	int		tracefork, tracevfork, tracevforkdone;
+	bool		trace_fork, trace_vfork;
 	int		error = 0;
 
 	p1 = l1->l_proc;
@@ -477,19 +501,15 @@ fork1(struct lwp *l1, int flags, int exitsig, void *stack, size_t stacksize,
 	/*
 	 * Trace fork(2) and vfork(2)-like events on demand in a debugger.
 	 */
-	tracefork = (p1->p_slflag & (PSL_TRACEFORK|PSL_TRACED)) ==
-	    (PSL_TRACEFORK|PSL_TRACED) && (flags & FORK_PPWAIT) == 0;
-	tracevfork = (p1->p_slflag & (PSL_TRACEVFORK|PSL_TRACED)) ==
-	    (PSL_TRACEVFORK|PSL_TRACED) && (flags & FORK_PPWAIT) != 0;
-	tracevforkdone = (p1->p_slflag & (PSL_TRACEVFORK_DONE|PSL_TRACED)) ==
-	    (PSL_TRACEVFORK_DONE|PSL_TRACED) && (flags & FORK_PPWAIT);
-	if (tracefork || tracevfork)
+	trace_fork = tracefork(p1, flags);
+	trace_vfork = tracevfork(p1, flags);
+	if (trace_fork || trace_vfork)
 		proc_changeparent(p2, p1->p_pptr);
-	if (tracefork) {
+	if (trace_fork) {
 		p1->p_fpid = p2->p_pid;
 		p2->p_fpid = p1->p_pid;
 	}
-	if (tracevfork) {
+	if (trace_vfork) {
 		p1->p_vfpid = p2->p_pid;
 		p2->p_vfpid = p1->p_pid;
 	}
@@ -573,13 +593,9 @@ fork1(struct lwp *l1, int flags, int exitsig, void *stack, size_t stacksize,
 	/*
 	 * Let the parent know that we are tracing its child.
 	 */
-	if (tracefork || tracevfork) {
+	if (tracefork(p1, flags) || tracevfork(p1, flags)) {
 		mutex_enter(p1->p_lock);
-		p1->p_xsig = SIGTRAP;
-		p1->p_sigctx.ps_faked = true; // XXX
-		p1->p_sigctx.ps_info._signo = p1->p_xsig;
-		p1->p_sigctx.ps_info._code = TRAP_CHLD;
-		sigswitch(0, SIGTRAP, false);
+		eventswitch(SIGTRAP, TRAP_CHLD);
 		// XXX ktrpoint(KTR_PSIG)
 		mutex_exit(p1->p_lock);
 		mutex_enter(proc_lock);
@@ -595,14 +611,10 @@ fork1(struct lwp *l1, int flags, int exitsig, void *stack, size_t stacksize,
 	/*
 	 * Let the parent know that we are tracing its child.
 	 */
-	if (tracevforkdone) {
+	if (tracevforkdone(p1, flags)) {
 		mutex_enter(p1->p_lock);
-		p1->p_xsig = SIGTRAP;
-		p1->p_sigctx.ps_faked = true; // XXX
-		p1->p_sigctx.ps_info._signo = p1->p_xsig;
-		p1->p_sigctx.ps_info._code = TRAP_CHLD;
 		p1->p_vfpid_done = retval[0];
-		sigswitch(0, SIGTRAP, false);
+		eventswitch(SIGTRAP, TRAP_CHLD);
 		// XXX ktrpoint(KTR_PSIG)
 		mutex_exit(p1->p_lock);
 		// proc_lock unlocked
@@ -627,11 +639,7 @@ child_return(void *arg)
 		}
 
 		mutex_enter(p->p_lock);
-		p->p_xsig = SIGTRAP;
-		p->p_sigctx.ps_faked = true; // XXX
-		p->p_sigctx.ps_info._signo = p->p_xsig;
-		p->p_sigctx.ps_info._code = TRAP_CHLD;
-		sigswitch(0, SIGTRAP, false);
+		eventswitch(SIGTRAP, TRAP_CHLD);
 		// XXX ktrpoint(KTR_PSIG)
 		mutex_exit(p->p_lock);
 	}

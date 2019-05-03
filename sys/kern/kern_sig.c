@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sig.c,v 1.352 2019/04/03 08:34:33 kamil Exp $	*/
+/*	$NetBSD: kern_sig.c,v 1.356 2019/05/02 22:23:49 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.352 2019/04/03 08:34:33 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.356 2019/05/02 22:23:49 kamil Exp $");
 
 #include "opt_ptrace.h"
 #include "opt_dtrace.h"
@@ -913,11 +913,13 @@ trapsignal(struct lwp *l, ksiginfo_t *ksi)
 	mutex_enter(p->p_lock);
 
 	if (ISSET(p->p_slflag, PSL_TRACED) &&
-	    !(p->p_pptr == p->p_opptr && ISSET(p->p_lflag, PL_PPWAIT))) {
+	    !(p->p_pptr == p->p_opptr && ISSET(p->p_lflag, PL_PPWAIT)) &&
+	    p->p_xsig != SIGKILL &&
+	    !sigismember(&p->p_sigpend.sp_set, SIGKILL)) {
 		p->p_xsig = signo;
-		p->p_sigctx.ps_faked = true; // XXX
-		p->p_sigctx.ps_info._signo = signo;
-		p->p_sigctx.ps_info._code = ksi->ksi_code;
+		p->p_sigctx.ps_faked = true;
+		p->p_sigctx.ps_lwp = ksi->ksi_lid;
+		p->p_sigctx.ps_info = ksi->ksi_info;
 		sigswitch(0, signo, false);
 		// XXX ktrpoint(KTR_PSIG)
 		mutex_exit(p->p_lock);
@@ -1535,6 +1537,37 @@ proc_stop_done(struct proc *p, int ppmask)
 		child_psignal(p, ppmask);
 		cv_broadcast(&p->p_pptr->p_waitcv);
 	}
+}
+
+void
+eventswitch(int signo, int code)
+{
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
+
+	KASSERT(mutex_owned(proc_lock));
+	KASSERT(mutex_owned(p->p_lock));
+	KASSERT(l->l_stat == LSONPROC);
+	KASSERT((l->l_flag & LW_SYSTEM) == 0);
+	KASSERT(p->p_nrlwps > 0);
+
+	/*
+	 * If there's a pending SIGKILL process it immediately.
+	 */
+	if (p->p_xsig == SIGKILL ||
+	    sigismember(&p->p_sigpend.sp_set, SIGKILL)) {
+		mutex_exit(proc_lock);
+		return;
+	}
+
+	p->p_xsig = signo;
+	p->p_sigctx.ps_faked = true;
+	p->p_sigctx.ps_lwp = l->l_lid;
+	memset(&p->p_sigctx.ps_info, 0, sizeof(p->p_sigctx.ps_info));
+	p->p_sigctx.ps_info._signo = signo;
+	p->p_sigctx.ps_info._code = code;
+
+	sigswitch(0, signo, false);
 }
 
 /*
