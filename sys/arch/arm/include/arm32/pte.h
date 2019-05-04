@@ -332,6 +332,19 @@ typedef uint32_t	pt_entry_t;	/* L2 table entry */
  *    1 1   Write back, no write alloc
  */
 
-#define	TEX_ARMV6_TEX	0x07		/* 3 bits in TEX */
+#define	TEX_ARMV6_TEX0	__BIT(0)
+#define	TEX_ARMV6_TEX1	__BIT(1)
+#define	TEX_ARMV6_TEX2	__BIT(2)
+
+#ifdef ARM_MMU_EXTENDED
+/* 1 bit of TEX for memory attribute and 2 bits for OS */
+#define	TEX_ARMV6_TEX	TEX_ARMV6_TEX0
+#define	TEX_ARMV6_OS0	TEX_ARMV6_TEX1
+#define	TEX_ARMV6_OS1	TEX_ARMV6_TEX2
+#else
+/* 3 bits in TEX */
+#define	TEX_ARMV6_TEX	(TEX_ARMV6_TEX2 | TEX_ARMV6_TEX1 | TEX_ARMV6_TEX0)
+#endif
+
 
 #endif /* _ARM_PTE_H_ */

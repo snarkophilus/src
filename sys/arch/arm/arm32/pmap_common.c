@@ -1193,6 +1193,50 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
 
 
 
+/*
+ * Fetch pointers to the PDE/PTE for the given pmap/VA pair.
+ * Returns true if the mapping exists, else false.
+ *
+ * NOTE: This function is only used by a couple of arm-specific modules.
+ * It is not safe to take any pmap locks here, since we could be right
+ * in the middle of debugging the pmap anyway...
+ *
+ * It is possible for this routine to return false even though a valid
+ * mapping does exist. This is because we don't lock, so the metadata
+ * state may be inconsistent.
+ *
+ * NOTE: We can return a NULL *ptp in the case where the L1 pde is
+ * a "section" mapping.
+ */
+bool
+pmap_get_pde_pte(pmap_t pm, vaddr_t va, pd_entry_t **pdp, pt_entry_t **ptp)
+{
+	struct l2_dtable *l2;
+	pd_entry_t *pdep, pde;
+	pt_entry_t *ptep;
+	u_short l1slot;
+
+	if (pm->pm_l1 == NULL)
+		return false;
+
+	l1slot = l1pte_index(va);
+	*pdp = pdep = pmap_l1_kva(pm) + l1slot;
+	pde = *pdep;
+
+	if (l1pte_section_p(pde)) {
+		*ptp = NULL;
+		return true;
+	}
+
+	l2 = pm->pm_l2[L2_IDX(l1slot)];
+	if (l2 == NULL ||
+	    (ptep = l2->l2_bucket[L2_BUCKET(l1slot)].l2b_kva) == NULL) {
+		return false;
+	}
+
+	*ptp = &ptep[l2pte_index(va)];
+	return true;
+}
 
 
 
@@ -1215,7 +1259,7 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
  *  - vend
  *    1MB-aligned end of managed kernel virtual memory.
  *
- * We use kernel_l1pt to build the metadata (struct l1_ttable and
+ * We use 'kernel_l1pt' to build the metadata (struct l1_ttable and
  * struct l2_dtable) necessary to track kernel mappings.
  */
 #define	PMAP_STATIC_L2_SIZE 16
@@ -2024,7 +2068,7 @@ void		(*pmap_zero_page_func)(paddr_t);
 void
 pmap_pte_init_generic(void)
 {
-
+#ifdef ARM_MMU_EXTENDED
 	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
 	pte_l1_s_wc_mode = L1_S_B;
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
@@ -2059,7 +2103,42 @@ pmap_pte_init_generic(void)
 		pte_l2_l_cache_mode_pt = L2_C;		/* write through */
 		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
 	}
+#else
+	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
+	pte_l1_s_wc_mode = L1_S_B;
+	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
 
+	pte_l2_l_cache_mode = L2_B|L2_C;
+	pte_l2_l_wc_mode = L2_B;
+	pte_l2_l_cache_mask = L2_L_CACHE_MASK_generic;
+
+	pte_l2_s_cache_mode = L2_B|L2_C;
+	pte_l2_s_wc_mode = L2_B;
+	pte_l2_s_cache_mask = L2_S_CACHE_MASK_generic;
+
+	/*
+	 * If we have a write-through cache, set B and C.  If
+	 * we have a write-back cache, then we assume setting
+	 * only C will make those pages write-through (except for those
+	 * Cortex CPUs which can read the L1 caches).
+	 */
+	if (cpufuncs.cf_dcache_wb_range == (void *) cpufunc_nullop
+#if ARM_MMU_V7 > 0
+	    || CPU_ID_CORTEX_P(curcpu()->ci_arm_cpuid)
+#endif
+#if ARM_MMU_V6 > 0
+	    || CPU_ID_ARM11_P(curcpu()->ci_arm_cpuid) /* arm116 errata 399234 */
+#endif
+	    || false) {
+		pte_l1_s_cache_mode_pt = L1_S_B|L1_S_C;
+		pte_l2_l_cache_mode_pt = L2_B|L2_C;
+		pte_l2_s_cache_mode_pt = L2_B|L2_C;
+	} else {
+		pte_l1_s_cache_mode_pt = L1_S_C;	/* write through */
+		pte_l2_l_cache_mode_pt = L2_C;		/* write through */
+		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
+	}
+#endif
 	pte_l1_s_prot_u = L1_S_PROT_U_generic;
 	pte_l1_s_prot_w = L1_S_PROT_W_generic;
 	pte_l1_s_prot_ro = L1_S_PROT_RO_generic;
@@ -2777,10 +2856,10 @@ SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
 
 
 
-
+#if 0
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *
-arm_pmap_md_alloc_poolpage(int flags)
+pmap_md_alloc_poolpage(int flags)
 {
 	/*
 	 * On some systems, only some pages may be "coherent" for dma and we
@@ -2794,6 +2873,7 @@ arm_pmap_md_alloc_poolpage(int flags)
 
 	return uvm_pagealloc(NULL, 0, NULL, flags);
 }
+#endif
 #endif
 
 #if defined(ARM_MMU_EXTENDED) && defined(MULTIPROCESSOR)

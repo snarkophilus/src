@@ -263,7 +263,6 @@ int pmapdebug = 0;
 #define NPDEBUG(_lev_,_stat_) /* Nothing */
 #endif	/* PMAP_DEBUG */
 
-
 #ifdef VERBOSE_INIT_ARM
 #define VPRINTF(...)	printf(__VA_ARGS__)
 #else
@@ -489,7 +488,7 @@ pmap_acquire_pmap_lock(pmap_t pm)
 	if (__predict_false(db_onproc != NULL))
 		return;
 #endif
-	
+
 	mutex_enter(pm->pm_lock);
 }
 
@@ -2223,7 +2222,6 @@ pmap_clearbit(struct vm_page_md *md, paddr_t pa, u_int maskbits)
 				}
 				if (want_syncicache)
 					need_syncicache = true;
-				need_vac_me_harder = true;
 #endif /* PMAP_CACHE_VIPT */
 			}
 			pmap_release_page_lock(md);
@@ -2768,6 +2766,7 @@ arm32_mmap_flags(paddr_t pa)
 	 */
 	return (u_int)pa & PMAP_MD_MASK;
 }
+
 /*
  * int pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
  *      u_int flags)
@@ -2812,6 +2811,7 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 	 * test for a managed page by checking pg != NULL.
 	 */
 	pg = pmap_initialized ? PHYS_TO_VM_PAGE(pa) : NULL;
+
 	/*
 	 * if we may need a new pv entry allocate if now, as we can't do it
 	 * with the kernel_pmap locked
@@ -4890,6 +4890,7 @@ vector_page_setprot(int prot)
 }
 #endif
 
+#if 0
 /*
  * Fetch pointers to the PDE/PTE for the given pmap/VA pair.
  * Returns true if the mapping exists, else false.
@@ -4934,6 +4935,8 @@ pmap_get_pde_pte(pmap_t pm, vaddr_t va, pd_entry_t **pdp, pt_entry_t **ptp)
 	*ptp = &ptep[l2pte_index(va)];
 	return true;
 }
+#endif
+
 
 bool
 pmap_get_pde(pmap_t pm, vaddr_t va, pd_entry_t **pdp)

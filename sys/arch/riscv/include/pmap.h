@@ -110,7 +110,7 @@ void    pmap_md_init(void);
 bool    pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 //void    pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
 
-void	pmap_md_pdetab_activate(struct pmap *);
+void	pmap_md_pdetab_activate(struct pmap *, struct lwp *);
 void	pmap_md_pdetab_init(struct pmap *);
 
 #ifdef __PMAP_PRIVATE

@@ -77,6 +77,7 @@
 #endif
 
 #define PMAP_HWPAGEWALKER		1
+#define PMAP_NEED_ALLOC_POOLPAGE	1
 #define PMAP_TLB_MAX			1
 #if PMAP_TLB_MAX > 1
 #define PMAP_TLB_NEED_SHOOTDOWN		1
@@ -137,8 +138,13 @@ void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
+void	pmap_md_pdetab_activate(pmap_t, struct lwp *);
+void	pmap_md_pdetab_deactivate(pmap_t);
 
+vaddr_t pmap_md_direct_map_paddr(paddr_t);
 
+pt_entry_t *
+	pmap_md_pdetab_lookup_ptep(struct pmap *, vaddr_t);
 
 
 #define	__HAVE_PMAP_MD
@@ -152,16 +158,18 @@ struct pmap_md {
 #define pm_l1_pa	pm_md.pmd_l1_pa
 #define pm_l2		pm_md.pmd_l2
 
-#if 0
 #ifdef PMAP_CACHE_VIPT
 #define PMAP_VIRTUAL_CACHE_ALIASES
 #endif
+
+#ifdef MULTIPROCESSOR
+#define PMAP_NO_PV_UNCACHED
 #endif
 
 static inline bool
 pmap_md_virtual_cache_aliasing_p(void)
 {
-#if 0 && defined(PMAP_CACHE_VIPT)
+#if defined(PMAP_CACHE_VIPT)
 	return true;
 #else
 	return false;
@@ -171,7 +179,7 @@ pmap_md_virtual_cache_aliasing_p(void)
 static inline vsize_t
 pmap_md_cache_prefer_mask(void)
 {
-#if 0 && defined(PMAP_CACHE_VIPT)
+#if defined(PMAP_CACHE_VIPT)
 	return arm_cache_prefer_mask;
 #else
 	return 0;
@@ -191,6 +199,8 @@ pmap_md_cache_prefer_mask(void)
 
 #include <uvm/uvm_page.h>
 
+void pmap_md_pdetab_init(struct pmap *);
+
 vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
 struct vm_page *pmap_md_alloc_poolpage(int);
@@ -200,22 +210,15 @@ vaddr_t	pmap_md_pool_phystov(paddr_t);
 #define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
 #define	POOL_PHYSTOV(pa)	pmap_md_pool_phystov((paddr_t)pa)
 
-
-
-
 bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
 paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
 bool	pmap_md_io_vaddr_p(vaddr_t);
-
 
 struct pmap_page {
 	struct vm_page_md pp_md;
 };
 
 #define PMAP_PAGE_TO_MD(ppage)	((ppage)->pp_md)
-
-
-
 
 /*
  * If we have an EXTENDED MMU and the address space is split evenly between
@@ -236,12 +239,14 @@ extern bool arm_has_tlbiasid_p;	/* also in <arm/locore.h> */
 static __inline paddr_t
 pte_to_paddr(pt_entry_t pte)
 {
+
 	return l2pte_pa(pte);
 }
 
 static inline bool
 pte_valid_p(pt_entry_t pte)
 {
+
 	return l2pte_valid_p(pte);
 }
 
@@ -274,6 +279,7 @@ pmap_md_setvirtualend(vaddr_t va)
 //XXX Move to sys/uvm/pmap/pmap.h
 void pmap_page_remove(struct vm_page *);
 
+#if 0
 static inline void
 pmap_pv_protect(paddr_t pa, vm_prot_t prot)
 {
@@ -282,6 +288,7 @@ pmap_pv_protect(paddr_t pa, vm_prot_t prot)
 	KASSERT(prot == VM_PROT_NONE);
  	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
 }
+#endif
 
 static inline bool
 pte_modified_p(pt_entry_t pte)
@@ -297,43 +304,23 @@ pte_modified_p(pt_entry_t pte)
 static inline bool
 pte_wired_p(pt_entry_t pte)
 {
-#if 0
-	const paddr_t pa = pte_to_paddr(pte);
-	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-	KASSERT(pg);
 
-	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
-#endif
-
-	return false;
+        return (pte & L2_S_OSBIT0) != 0;
 }
+
 
 static inline pt_entry_t
 pte_wire_entry(pt_entry_t pte)
 {
-#if 0
-	const paddr_t pa = pte_to_paddr(pte);
-	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-	KASSERT(pg);
 
-	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
-#endif
-
-	return pte;
+        return pte | L2_S_OSBIT0;
 }
 
 static inline pt_entry_t
 pte_unwire_entry(pt_entry_t pte)
 {
-#if 0
-	const paddr_t pa = pte_to_paddr(pte);
-	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-	KASSERT(pg);
 
-	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
-#endif
-
-	return pte;
+        return pte & ~L2_S_OSBIT0;
 }
 
 static inline uint32_t
@@ -345,19 +332,18 @@ pte_value(pt_entry_t pte)
 static inline bool
 pte_readonly_p(pt_entry_t pte)
 {
-// 	return (pte & MIPS_MMU(PG_RO)) != 0;
-	return true;
+
+	//XXXNH check this logic works
+	return !l2pte_writable_p(pte);
 }
 
 static inline bool
 pte_cached_p(pt_entry_t pte)
 {
-// 	if (MIPS_HAS_R4K_MMU) {
-// 		return MIPS3_PG_TO_CCA(pte) == MIPS3_PG_TO_CCA(mips_options.mips3_pg_cached);
-// 	} else {
-// 		return (pte & MIPS1_PG_N) == 0;
-// 	}
-	return true;
+
+	// XXXNH depend which inex into PRRR/NMRR we use
+	// assume non-zero means cached for now
+	return (pte & L2_S_CACHE_MASK) != 0;
 }
 
 static inline bool
@@ -376,6 +362,7 @@ pte_nv_entry(bool kernel_p)
 static inline pt_entry_t
 pte_prot_downgrade(pt_entry_t pte, vm_prot_t prot)
 {
+
 // 	const uint32_t ro_bit = MIPS_MMU(PG_RO);
 // 	const uint32_t rw_bit = MIPS_MMU(PG_D);
 //
@@ -408,14 +395,68 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 }
 
 
+
+static inline pd_entry_t
+pte_invalid_pde(void)
+{
+	return 0;
+}
+
+//XXXNH is this used?
+static inline pd_entry_t
+pte_pde_pdetab(paddr_t pa)
+{
+//	return PTE_V | PTE_G | PTE_T | pa;
+	return pa;
+}
+
+static inline pd_entry_t
+pte_pde_ptpage(paddr_t pa)
+{
+//	return PTE_V | PTE_G | PTE_T | pa;
+	return pa;
+}
+
+static inline bool
+pte_pde_valid_p(pd_entry_t pde)
+{
+//	return (pde & (PTE_V|PTE_T)) == (PTE_V|PTE_T);
+	return (pde & 0x3);
+}
+
+static inline paddr_t
+pte_pde_to_paddr(pd_entry_t pde)
+{
+	return pde & ~PAGE_MASK;
+}
+
+static inline pd_entry_t
+pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
+{
+#ifdef MULTIPROCESSOR
+#ifdef _LP64
+	return atomic_cas_64(pdep, opde, npde);
+#else
+	return atomic_cas_32(pdep, opde, npde);
+#endif
+#else
+	*pdep = npde;
+	return 0;
+#endif
+}
+
+
+
 /*
  * Other hooks for the pool allocator.
  */
+
+#if 0
 paddr_t pmap_md_pool_vtophys(vaddr_t);
 vaddr_t pmap_md_pool_phystov(paddr_t);
 #define POOL_VTOPHYS(va)        pmap_md_pool_vtophys((vaddr_t)va)
 #define POOL_PHYSTOV(pa)        pmap_md_pool_phystov((paddr_t)pa)
-
+#endif
 
 #ifdef __PMAP_PRIVATE
 struct vm_page_md;

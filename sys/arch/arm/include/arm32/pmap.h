@@ -258,6 +258,14 @@ void	pmap_devmap_register(const struct pmap_devmap *);
 bool	pmap_pageidlezero(paddr_t);
 #define PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
+#if defined(ARM_MMU_EXTENDED)
+#define __HAVE_MM_MD_DIRECT_MAPPED_PHYS
+/*
+ * Ending VA of direct mapped memory (usually KERNEL_VM_BASE).
+ */
+extern vaddr_t pmap_directlimit;
+#endif
+
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 /*
  * For the pmap, this is a more useful way to map a direct mapped page.
@@ -275,13 +283,6 @@ uint32_t pmap_kernel_L1_addr(void);
  * The current top of kernel VM
  */
 extern vaddr_t	pmap_curmaxkvaddr;
-
-#if defined(ARM_MMU_EXTENDED) && defined(__HAVE_MM_MD_DIRECT_MAPPED_PHYS)
-/*
- * Ending VA of direct mapped memory (usually KERNEL_VM_BASE).
- */
-extern vaddr_t pmap_directlimit;
-#endif
 
 
 
@@ -640,6 +641,8 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #define	L1_S_CACHE_MASK_armv6	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX))
 #define	L1_S_CACHE_MASK_armv6n	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX)|L1_S_V6_S)
 #define	L1_S_CACHE_MASK_armv7	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX)|L1_S_V6_S)
+#define	L1_L_OSBIT0		L1_S_XS_TEX(TEX_ARMV6_TEX1)
+#define	L1_L_OSBIT1		L1_S_XS_TEX(TEX_ARMV6_TEX2)
 
 #define	L2_L_PROT_U_generic	(L2_AP(AP_U))
 #define	L2_L_PROT_W_generic	(L2_AP(AP_W))
@@ -666,6 +669,8 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #define	L2_L_CACHE_MASK_armv6	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX))
 #define	L2_L_CACHE_MASK_armv6n	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX)|L2_XS_S)
 #define	L2_L_CACHE_MASK_armv7	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX)|L2_XS_S)
+#define	L2_L_OSBIT0		L2_V6_L_TEX(TEX_ARMV6_TEX1)
+#define	L2_L_OSBIT1		L2_V6_L_TEX(TEX_ARMV6_TEX2)
 
 #define	L2_S_PROT_U_generic	(L2_AP(AP_U))
 #define	L2_S_PROT_W_generic	(L2_AP(AP_W))
@@ -697,7 +702,8 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #endif
 #define	L2_S_CACHE_MASK_armv6n	(L2_B|L2_C|L2_V6_XS_TEX(TEX_ARMV6_TEX)|L2_XS_S)
 #define	L2_S_CACHE_MASK_armv7	(L2_B|L2_C|L2_V6_XS_TEX(TEX_ARMV6_TEX)|L2_XS_S)
-
+#define	L2_S_OSBIT0		L2_V6_XS_TEX(TEX_ARMV6_TEX1)
+#define	L2_S_OSBIT1		L2_V6_XS_TEX(TEX_ARMV6_TEX2)
 
 #define	L1_S_PROTO_generic	(L1_TYPE_S | L1_S_IMP)
 #define	L1_S_PROTO_xscale	(L1_TYPE_S)
