@@ -1472,8 +1472,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	/*
 	 * Initialise the L2 descriptor table pool and cache
 	 */
-	pool_cache_bootstrap(&pmap_l2ptp_cache, L2_TABLE_SIZE_REAL, 0,
-	    L2_TABLE_SIZE_REAL, 0, "l2ptppl", NULL, IPL_NONE,
+	pool_cache_bootstrap(&pmap_l2ptp_cache, L2_TABLE_SIZE_REAL,
+	    L2_TABLE_SIZE_REAL, 0, 0, "l2ptppl", NULL, IPL_NONE,
 	    pmap_l2ptp_ctor, NULL, NULL);
 
 	mutex_init(&memlock, MUTEX_DEFAULT, IPL_NONE);
