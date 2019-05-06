@@ -116,7 +116,7 @@
  * three of these to map their whole working set.
  */
 #define	L2_BUCKET_XLOG2	(L1_S_SHIFT)
-#define L2_BUCKET_XSIZE	(1 << L2_BUCKET_XLOG2)
+#define	L2_BUCKET_XSIZE	(1 << L2_BUCKET_XLOG2)
 #define	L2_BUCKET_LOG2	4
 #define	L2_BUCKET_SIZE	(1 << L2_BUCKET_LOG2)
 
@@ -133,9 +133,9 @@
  * ARMv6 is physically-tagged but all others are virtually-tagged.
  */
 #if (ARM_MMU_V6 + ARM_MMU_V7) > 0
-#define PMAP_CACHE_VIPT
+#define	PMAP_CACHE_VIPT
 #else
-#define PMAP_CACHE_VIVT
+#define	PMAP_CACHE_VIVT
 #endif
 
 
@@ -208,13 +208,13 @@ extern int		pmap_debug_level; /* Only exists if PMAP_DEBUG */
 extern int		arm_poolpage_vmfreelist;
 
 
-#define pmap_phys_address(ppn)		(arm_ptob((ppn)))
+#define	pmap_phys_address(ppn)		(arm_ptob((ppn)))
 u_int arm32_mmap_flags(paddr_t);
-#define ARM32_MMAP_WRITECOMBINE		0x40000000
-#define ARM32_MMAP_CACHEABLE		0x20000000
-#define ARM_MMAP_WRITECOMBINE		ARM32_MMAP_WRITECOMBINE
-#define ARM_MMAP_CACHEABLE		ARM32_MMAP_CACHEABLE
-#define pmap_mmap_flags(ppn)		arm32_mmap_flags(ppn)
+#define	ARM32_MMAP_WRITECOMBINE		0x40000000
+#define	ARM32_MMAP_CACHEABLE		0x20000000
+#define	ARM_MMAP_WRITECOMBINE		ARM32_MMAP_WRITECOMBINE
+#define	ARM_MMAP_CACHEABLE		ARM32_MMAP_CACHEABLE
+#define	pmap_mmap_flags(ppn)		arm32_mmap_flags(ppn)
 
 #define	PMAP_PTE			0x10000000 /* kenter_pa */
 
@@ -256,10 +256,10 @@ void	pmap_devmap_register(const struct pmap_devmap *);
  * Special page zero routine for use by the idle loop (no cache cleans).
  */
 bool	pmap_pageidlezero(paddr_t);
-#define PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
+#define	PMAP_PAGEIDLEZERO(pa)	pmap_pageidlezero((pa))
 
 #if defined(ARM_MMU_EXTENDED)
-#define __HAVE_MM_MD_DIRECT_MAPPED_PHYS
+#define	__HAVE_MM_MD_DIRECT_MAPPED_PHYS
 /*
  * Ending VA of direct mapped memory (usually KERNEL_VM_BASE).
  */
@@ -413,15 +413,15 @@ pmap_ptesync(pt_entry_t *ptep, size_t cnt)
 #define	PTE_SYNC(ptep)			pmap_ptesync((ptep), PAGE_SIZE / L2_S_SIZE)
 #define	PTE_SYNC_RANGE(ptep, cnt)	pmap_ptesync((ptep), (cnt))
 
-#define l1pte_valid_p(pde)	((pde) != 0)
-#define l1pte_section_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_S)
-#define l1pte_supersection_p(pde) (l1pte_section_p(pde)	\
+#define	l1pte_valid_p(pde)	((pde) != 0)
+#define	l1pte_section_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_S)
+#define	l1pte_supersection_p(pde) (l1pte_section_p(pde)	\
 				&& ((pde) & L1_S_V6_SUPER) != 0)
-#define l1pte_page_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_C)
-#define l1pte_fpage_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_F)
-#define l1pte_pa(pde)		((pde) & L1_C_ADDR_MASK)
-#define l1pte_index(v)		((vaddr_t)(v) >> L1_S_SHIFT)
-#define l1pte_pgindex(v)	l1pte_index((v) & L1_ADDR_BITS \
+#define	l1pte_page_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_C)
+#define	l1pte_fpage_p(pde)	(((pde) & L1_TYPE_MASK) == L1_TYPE_F)
+#define	l1pte_pa(pde)		((pde) & L1_C_ADDR_MASK)
+#define	l1pte_index(v)		((vaddr_t)(v) >> L1_S_SHIFT)
+#define	l1pte_pgindex(v)	l1pte_index((v) & L1_ADDR_BITS \
 		& ~(PAGE_SIZE * PAGE_SIZE / sizeof(pt_entry_t) - 1))
 
 static inline void
@@ -448,11 +448,11 @@ l1pte_set(pt_entry_t *pdep, pt_entry_t pde)
 	}
 }
 
-#define l2pte_index(v)		((((v) & L2_ADDR_BITS) >> PGSHIFT) << (PGSHIFT-L2_S_SHIFT))
-#define l2pte_valid_p(pte)	(((pte) & L2_TYPE_MASK) != L2_TYPE_INV)
-#define l2pte_pa(pte)		((pte) & L2_S_FRAME)
-#define l1pte_lpage_p(pte)	(((pte) & L2_TYPE_MASK) == L2_TYPE_L)
-#define l2pte_minidata_p(pte)	(((pte) & \
+#define	l2pte_index(v)		((((v) & L2_ADDR_BITS) >> PGSHIFT) << (PGSHIFT-L2_S_SHIFT))
+#define	l2pte_valid_p(pte)	(((pte) & L2_TYPE_MASK) != L2_TYPE_INV)
+#define	l2pte_pa(pte)		((pte) & L2_S_FRAME)
+#define	l1pte_lpage_p(pte)	(((pte) & L2_TYPE_MASK) == L2_TYPE_L)
+#define	l2pte_minidata_p(pte)	(((pte) & \
 				 (L2_B | L2_C | L2_XS_T_TEX(TEX_XSCALE_X)))\
 				 == (L2_C | L2_XS_T_TEX(TEX_XSCALE_X)))
 
@@ -487,17 +487,17 @@ l2pte_reset(pt_entry_t *ptep)
 }
 
 /* L1 and L2 page table macros */
-#define pmap_pde_v(pde)		l1pte_valid(*(pde))
+#define	pmap_pde_v(pde)		l1pte_valid(*(pde))
 #define pmap_pde_section(pde)	l1pte_section_p(*(pde))
-#define pmap_pde_supersection(pde)	l1pte_supersection_p(*(pde))
-#define pmap_pde_page(pde)	l1pte_page_p(*(pde))
-#define pmap_pde_fpage(pde)	l1pte_fpage_p(*(pde))
+#define	pmap_pde_supersection(pde)	l1pte_supersection_p(*(pde))
+#define	pmap_pde_page(pde)	l1pte_page_p(*(pde))
+#define	pmap_pde_fpage(pde)	l1pte_fpage_p(*(pde))
 
 #define	pmap_pte_v(pte)		l2pte_valid_p(*(pte))
 #define	pmap_pte_pa(pte)	l2pte_pa(*(pte))
 
 /* Size of the kernel part of the L1 page table */
-#define KERNEL_PD_SIZE	\
+#define	KERNEL_PD_SIZE	\
 	(L1_TABLE_SIZE - (KERNEL_BASE >> L1_S_SHIFT) * sizeof(pd_entry_t))
 
 void	bzero_page(vaddr_t);
@@ -641,8 +641,16 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #define	L1_S_CACHE_MASK_armv6	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX))
 #define	L1_S_CACHE_MASK_armv6n	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX)|L1_S_V6_S)
 #define	L1_S_CACHE_MASK_armv7	(L1_S_B|L1_S_C|L1_S_XS_TEX(TEX_ARMV6_TEX)|L1_S_V6_S)
-#define	L1_L_OSBIT0		L1_S_XS_TEX(TEX_ARMV6_TEX1)
-#define	L1_L_OSBIT1		L1_S_XS_TEX(TEX_ARMV6_TEX2)
+#ifdef ARM_MMU_EXTENDED
+#define	L1_S_TRE(x)		(__SHIFTIN(__SHIFTOUT((x), __BIT(2)), L1_S_XS_TEX(1)) | __SHIFTIN(__SHIFTOUT((x), __BITS(1, 0)), L1_S_B|L1_S_C))
+#define	L1_S_NORMAL_NC		L1_S_TRE(TRE_NORMAL_NC)
+#define	L1_S_NORMAL_WB		L1_S_TRE(TRE_NORMAL_WB)
+#define	L1_S_NORMAL_WT		L1_S_TRE(TRE_NORMAL_WT)
+#define	L1_S_DEVICE		L1_S_TRE(TRE_DEVICE)
+#define	L1_S_STRONG		L1_S_TRE(TRE_STRONG)
+#define	L1_S_OSBIT0		L1_S_XS_TEX(TEX_ARMV6_TEX1)
+#define	L1_S_OSBIT1		L1_S_XS_TEX(TEX_ARMV6_TEX2)
+#endif
 
 #define	L2_L_PROT_U_generic	(L2_AP(AP_U))
 #define	L2_L_PROT_W_generic	(L2_AP(AP_W))
@@ -669,8 +677,16 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #define	L2_L_CACHE_MASK_armv6	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX))
 #define	L2_L_CACHE_MASK_armv6n	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX)|L2_XS_S)
 #define	L2_L_CACHE_MASK_armv7	(L2_B|L2_C|L2_V6_L_TEX(TEX_ARMV6_TEX)|L2_XS_S)
+#ifdef ARM_MMU_EXTENDED
+#define	L2_L_TRE(x)		(__SHIFTIN(__SHIFTOUT((x), __BIT(2)), L2_V6_L_TEX(TEX_ARMV6_TEX0)) | __SHIFTIN(__SHIFTOUT((x), __BITS(1, 0)), L2_B|L2_C))
+#define	L2_L_NORMAL_NC		L2_L_TRE(TRE_NORMAL_NC)
+#define	L2_L_NORMAL_WB		L2_L_TRE(TRE_NORMAL_WB)
+#define	L2_L_NORMAL_WT		L2_L_TRE(TRE_NORMAL_WT)
+#define	L2_L_DEVICE		L2_L_TRE(TRE_DEVICE)
+#define	L2_L_STRONG		L2_L_TRE(TRE_STRONG)
 #define	L2_L_OSBIT0		L2_V6_L_TEX(TEX_ARMV6_TEX1)
 #define	L2_L_OSBIT1		L2_V6_L_TEX(TEX_ARMV6_TEX2)
+#endif
 
 #define	L2_S_PROT_U_generic	(L2_AP(AP_U))
 #define	L2_S_PROT_W_generic	(L2_AP(AP_W))
@@ -702,8 +718,16 @@ extern void (*pmap_zero_page_func)(paddr_t);
 #endif
 #define	L2_S_CACHE_MASK_armv6n	(L2_B|L2_C|L2_V6_XS_TEX(TEX_ARMV6_TEX)|L2_XS_S)
 #define	L2_S_CACHE_MASK_armv7	(L2_B|L2_C|L2_V6_XS_TEX(TEX_ARMV6_TEX)|L2_XS_S)
+#ifdef ARM_MMU_EXTENDED
+#define	L2_S_TRE(x)		(__SHIFTIN(__SHIFTOUT((x), __BIT(2)), L2_V6_XS_TEX(TEX_ARMV6_TEX0)) | __SHIFTIN(__SHIFTOUT((x), __BITS(1,0)), L2_B|L2_C))
+#define	L2_S_NORMAL_NC		L2_S_TRE(TRE_NORMAL_NC)
+#define	L2_S_NORMAL_WB		L2_S_TRE(TRE_NORMAL_WB)
+#define	L2_S_NORMAL_WT		L2_S_TRE(TRE_NORMAL_WT)
+#define	L2_S_DEVICE		L2_S_TRE(TRE_DEVICE)
+#define	L2_S_STRONG		L2_S_TRE(TRE_STRONG)
 #define	L2_S_OSBIT0		L2_V6_XS_TEX(TEX_ARMV6_TEX1)
 #define	L2_S_OSBIT1		L2_V6_XS_TEX(TEX_ARMV6_TEX2)
+#endif
 
 #define	L1_S_PROTO_generic	(L1_TYPE_S | L1_S_IMP)
 #define	L1_S_PROTO_xscale	(L1_TYPE_S)
@@ -920,13 +944,13 @@ extern void (*pmap_zero_page_func)(paddr_t);
 /*
  * Macros to set and query the write permission on page descriptors.
  */
-#define l1pte_set_writable(pte)	(((pte) & ~L1_S_PROT_RO) | L1_S_PROT_W)
-#define l1pte_set_readonly(pte)	(((pte) & ~L1_S_PROT_W) | L1_S_PROT_RO)
+#define	l1pte_set_writable(pte)	(((pte) & ~L1_S_PROT_RO) | L1_S_PROT_W)
+#define	l1pte_set_readonly(pte)	(((pte) & ~L1_S_PROT_W) | L1_S_PROT_RO)
 
-#define l2pte_set_writable(pte)	(((pte) & ~L2_S_PROT_RO) | L2_S_PROT_W)
-#define l2pte_set_readonly(pte)	(((pte) & ~L2_S_PROT_W) | L2_S_PROT_RO)
+#define	l2pte_set_writable(pte)	(((pte) & ~L2_S_PROT_RO) | L2_S_PROT_W)
+#define	l2pte_set_readonly(pte)	(((pte) & ~L2_S_PROT_W) | L2_S_PROT_RO)
 
-#define l2pte_writable_p(pte)	(((pte) & L2_S_PROT_W) == L2_S_PROT_W && \
+#define	l2pte_writable_p(pte)	(((pte) & L2_S_PROT_W) == L2_S_PROT_W && \
 				 (L2_S_PROT_RO == 0 || \
 				  ((pte) & L2_S_PROT_RO) != L2_S_PROT_RO))
 
@@ -1084,14 +1108,14 @@ struct vm_page *pmap_md_alloc_poolpage(int);
 vaddr_t	pmap_map_poolpage(paddr_t);
 paddr_t	pmap_unmap_poolpage(vaddr_t);
 #define	PMAP_MAP_POOLPAGE(pa)	pmap_map_poolpage(pa)
-#define PMAP_UNMAP_POOLPAGE(va)	pmap_unmap_poolpage(va)
+#define	PMAP_UNMAP_POOLPAGE(va)	pmap_unmap_poolpage(va)
 #endif
 
-#define __HAVE_PMAP_PV_TRACK	1
+#define	__HAVE_PMAP_PV_TRACK	1
 
 void pmap_pv_protect(paddr_t, vm_prot_t);
 
-#define PVLIST_EMPTY(md)	SLIST_EMPTY(&md->pvh_list)
+#define	PVLIST_EMPTY(md)	SLIST_EMPTY(&md->pvh_list)
 
 
 
@@ -1129,7 +1153,7 @@ struct vm_page_md {
 #define	k_mappings	pp.k_u.i_mappings
 };
 
-#define PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
+#define	PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
 
 /*
  * Set the default color of each page.
@@ -1193,7 +1217,7 @@ typedef uint32_t	pmap_pdetab_t;	/* L1 table entry */
 #endif
 
 #ifndef __BSD_PTENTRY_T__
-#define __BSD_PTENTRY_T__
+#define	__BSD_PTENTRY_T__
 typedef uint32_t pt_entry_t;
 #define PRIxPTE		PRIx32
 #endif

@@ -342,6 +342,13 @@ typedef uint32_t	pt_entry_t;	/* L2 table entry */
 #define	TEX_ARMV6_TEX	TEX_ARMV6_TEX0
 #define	TEX_ARMV6_OS0	TEX_ARMV6_TEX1
 #define	TEX_ARMV6_OS1	TEX_ARMV6_TEX2
+
+#define	TRE_NORMAL_NC	0
+#define	TRE_NORMAL_WB	1
+#define	TRE_NORMAL_WT	2
+#define	TRE_DEVICE	3
+#define	TRE_STRONG	4
+
 #else
 /* 3 bits in TEX */
 #define	TEX_ARMV6_TEX	(TEX_ARMV6_TEX2 | TEX_ARMV6_TEX1 | TEX_ARMV6_TEX0)

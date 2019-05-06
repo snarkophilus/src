@@ -920,6 +920,30 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	VPRINTF(" ttb");
 
 #ifdef ARM_MMU_EXTENDED
+
+	armreg_prrr_write(
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(TRE_NORMAL_NC)) |
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(TRE_NORMAL_WB)) |
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(TRE_NORMAL_WT)) |
+	    __SHIFTIN(PRRR_TR_DEVICE, PRRR_TRn(TRE_DEVICE)) |
+	    __SHIFTIN(PRRR_TR_STRONG, PRRR_TRn(TRE_STRONG)) |
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(5)) |
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(6)) |
+	    __SHIFTIN(PRRR_TR_NORMAL, PRRR_TRn(7)) |
+	    PRRR_DS1 |
+	    PRRR_NS1 |
+	    0);
+
+	armreg_nmrr_write(
+	    __SHIFTIN(NMRR_NC, NMRR_IRn(TRE_NORMAL_NC)) |
+	    __SHIFTIN(NMRR_NC, NMRR_ORn(TRE_NORMAL_NC)) |
+	    __SHIFTIN(NMRR_WBWA, NMRR_IRn(TRE_NORMAL_WB)) |
+	    __SHIFTIN(NMRR_WBWA, NMRR_ORn(TRE_NORMAL_WB)) |
+	    __SHIFTIN(NMRR_WT, NMRR_IRn(TRE_NORMAL_WT)) |
+	    __SHIFTIN(NMRR_WT, NMRR_ORn(TRE_NORMAL_WT)) |
+	    0);
+
+
 	/*
 	 * TTBCR should have been initialized by the MD start code.
 	 */

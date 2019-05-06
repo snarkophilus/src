@@ -7202,6 +7202,17 @@ pmap_impl_bootstrap(void)
 	pm->pm_active = kcpuset_running;
 #endif
 
+	/*
+	 * Initialize `FYI' variables.	Note we're relying on
+	 * the fact that BSEARCH sorts the vm_physmem[] array
+	 * for us.  Must do this before uvm_pageboot_alloc()
+	 * can be called.
+	 */
+	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
+	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
+
+printf("%s: avail_start %lx avail_end %lx\n", __func__, pmap_limits.avail_start, pmap_limits.avail_end);
+//	pmap_limits.virtual_end = pmap_limits.virtual_start + (vaddr_t)sysmap_size * NBPG;
 }
 
 void
@@ -7213,13 +7224,22 @@ void
 pmap_impl_set_virtual_space(vaddr_t vs, vaddr_t ve)
 {
 
-        virtual_avail = vs;
-        virtual_end = ve;
+	pmap_limits.virtual_start = vs;
+	pmap_limits.virtual_end = ve;
 }
 
 void
 pmap_impl_bootstrap_pools(void)
 {
+
+	/*
+	 * Initialize the pools.
+	 */
+	pool_init(&pmap_pmap_pool, PMAP_SIZE, 0, 0, 0, "pmappl",
+	    &pool_allocator_nointr, IPL_NONE);
+	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
+	    &pmap_pv_page_allocator, IPL_NONE);
+
 }
 
 

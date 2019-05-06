@@ -2069,16 +2069,16 @@ void
 pmap_pte_init_generic(void)
 {
 #ifdef ARM_MMU_EXTENDED
-	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
-	pte_l1_s_wc_mode = L1_S_B;
+	pte_l1_s_cache_mode = L1_S_NORMAL_WB;
+	pte_l1_s_wc_mode = L1_S_NORMAL_NC;
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
 
-	pte_l2_l_cache_mode = L2_B|L2_C;
-	pte_l2_l_wc_mode = L2_B;
+	pte_l2_l_cache_mode = L2_L_NORMAL_WB;
+	pte_l2_l_wc_mode = L2_L_NORMAL_NC;
 	pte_l2_l_cache_mask = L2_L_CACHE_MASK_generic;
 
-	pte_l2_s_cache_mode = L2_B|L2_C;
-	pte_l2_s_wc_mode = L2_B;
+	pte_l2_s_cache_mode = L2_S_NORMAL_WB;
+	pte_l2_s_wc_mode = L2_S_NORMAL_NC;
 	pte_l2_s_cache_mask = L2_S_CACHE_MASK_generic;
 
 	/*
