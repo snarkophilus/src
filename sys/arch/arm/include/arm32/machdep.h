@@ -29,9 +29,9 @@ extern u_int prefetch_abort_handler_address;
 
 struct bootmem_info {
 	paddr_t bmi_start;
+	paddr_t bmi_end;
 	paddr_t bmi_kernelstart;
 	paddr_t bmi_kernelend;
-	paddr_t bmi_end;
 	pv_addrqh_t bmi_freechunks;
 	pv_addrqh_t bmi_chunks;		/* sorted list of memory to be mapped */
 	pv_addr_t bmi_freeblocks[4];
