@@ -6550,12 +6550,8 @@ pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 {
 	bool ok = false;
 	if (physical_start <= pa && pa < physical_end) {
-#ifdef KERNEL_BASE_VOFFSET
-		const vaddr_t newva = pa + KERNEL_BASE_VOFFSET;
-#else
-		const vaddr_t newva = KERNEL_BASE + pa - physical_start;
-#endif
-		if (newva >= KERNEL_BASE && newva < pmap_directlimit) {
+		const vaddr_t newva = KERNEL_DIRECTMAP_BASE + pa - physical_start;
+		if (newva >= KERNEL_DIRECTMAP_BASE && newva < pmap_directlimit) {
 			va = newva;
 			ok = true;
 		}
@@ -6581,11 +6577,7 @@ pmap_unmap_poolpage(vaddr_t va)
 #ifdef PMAP_CACHE_VIVT
 	cpu_idcache_wbinv_range(va, PAGE_SIZE);
 #endif
-#if defined(KERNEL_BASE_VOFFSET)
-        return va - KERNEL_BASE_VOFFSET;
-#else
-        return va - KERNEL_BASE + physical_start;
-#endif
+	return va - KERNEL_DIRECTMAP_BASE + physical_start;
 }
 #endif /* __HAVE_MM_MD_DIRECT_MAPPED_PHYS */
 
@@ -7098,11 +7090,12 @@ pmap_md_map_poolpage(paddr_t pa, size_t len)
 			pmap_md_vca_page_wbinv(pg, false);
 		}
 #endif
-		if (1 /* bad alias */)
+		if (0 /* bad alias */)
 			pmap_md_vca_page_wbinv(pg, false);
 
 		pv->pv_va = va;
 	}
+
 	return va;
 }
 
@@ -7136,7 +7129,7 @@ pmap_md_unmap_poolpage(vaddr_t va, size_t len)
 bool
 pmap_md_direct_mapped_vaddr_p(vaddr_t va)
 {
-	if (va >= KERNEL_BASE && va < pmap_directlimit) {
+	if (va >= KERNEL_DIRECTMAP_BASE && va < pmap_directlimit) {
 		return true;
 	}
 
@@ -7146,9 +7139,10 @@ pmap_md_direct_mapped_vaddr_p(vaddr_t va)
 paddr_t
 pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t va)
 {
-	if (va >= KERNEL_BASE && va < pmap_directlimit) {
 
-		return va - kern_vtopdiff;
+	if (va >= KERNEL_DIRECTMAP_BASE && va < pmap_directlimit) {
+
+		return va - KERNEL_DIRECTMAP_BASE + physical_start;
 	}
 	panic("%s: va %#" PRIxVADDR " not direct mapped!", __func__, va);
 
@@ -7158,6 +7152,7 @@ pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t va)
 bool
 pmap_md_io_vaddr_p(vaddr_t va)
 {
+
 	if (pmap_devmap_find_va(va, PAGE_SIZE)) {
 		return true;
 	}
@@ -7168,16 +7163,17 @@ pmap_md_io_vaddr_p(vaddr_t va)
 paddr_t
 pmap_md_pool_vtophys(vaddr_t va)
 {
-//	if (va >= KERNEL_BASE && va < pmap_directlimit) {
-//		return va - kern_vtopdiff;
-//	}
-	return KERN_VTOPHYS(va);
+
+	KASSERT(va >= KERNEL_DIRECTMAP_BASE && va < pmap_directlimit);
+
+	return va - KERNEL_DIRECTMAP_BASE + physical_start;
 }
 
 vaddr_t
 pmap_md_pool_phystov(paddr_t pa)
 {
-        return KERN_PHYSTOV(pa);
+
+        return (pa - physical_start) + KERNEL_DIRECTMAP_BASE;
 }
 
 

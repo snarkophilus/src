@@ -175,7 +175,7 @@ extern char __bss_start[], __bss_end__[];
 extern char _end[];
 
 /* Page tables for mapping kernel VM */
-#define KERNEL_L2PT_VMDATA_NUM	8	/* start with 32MB of KVM */
+#define KERNEL_L2PT_VMDATA_NUM	8	/* start with 32MB/64MB of KVM */
 
 u_long kern_vtopdiff __attribute__((__section__(".data")));
 
@@ -245,10 +245,7 @@ arm32_bootmem_init(paddr_t memstart, psize_t memsize, vsize_t kernelstart)
 	VPRINTF("%s: kernel phys start %#lx end %#lx\n", __func__, kernelstart,
 	    kernelend);
 
-#if 0
-	// XXX Makes RPI abort
 	KASSERT((kernelstart & (L2_S_SEGSIZE - 1)) == 0);
-#endif
 	/*
 	 * Now the rest of the free memory must be after the kernel.
 	 */
@@ -492,8 +489,6 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	pv_addr_t * const kernel_l2pt = bmi->bmi_l2pts;
 	pv_addr_t * const vmdata_l2pt = kernel_l2pt + KERNEL_L2PT_KERNEL_NUM;
 	pv_addr_t msgbuf;
-	pv_addr_t text;
-	pv_addr_t data;
 	pv_addr_t chunks[KERNEL_L2PT_KERNEL_NUM + KERNEL_L2PT_VMDATA_NUM + 11];
 #if ARM_MMU_XSCALE == 1
 	pv_addr_t minidataclean;
@@ -709,7 +704,7 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	textsize = (textsize + PGOFSET) & ~PGOFSET;
 
 	/* start at offset of kernel in RAM */
-
+	pv_addr_t text;
 	text.pv_pa = bmi->bmi_kernelstart;
 	text.pv_va = KERN_PHYSTOV(bmi->bmi_kernelstart);
 	text.pv_size = textsize;
@@ -721,6 +716,8 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 
 	add_pages(bmi, &text);
 
+	/* Data section */
+	pv_addr_t data;
 	data.pv_pa = text.pv_pa + textsize;
 	data.pv_va = text.pv_va + textsize;
 	data.pv_size = totalsize - textsize;
@@ -732,6 +729,20 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 
 	add_pages(bmi, &data);
 
+	/* Direct map (if we're doing that) */
+	if (mapallmem_p) {
+		VPRINTF("Mapping direct map\n");
+
+		pv_addr_t dm;
+		dm.pv_pa = bmi->bmi_start;
+		dm.pv_va = KERNEL_DIRECTMAP_BASE;
+		dm.pv_size = bmi->bmi_end - bmi->bmi_start;
+		dm.pv_prot = VM_PROT_READ | VM_PROT_WRITE;
+		dm.pv_cache = PTE_CACHE;
+
+		add_pages(bmi, &dm);
+	}
+
 	VPRINTF("Listing Chunks\n");
 
 	pv_addr_t *lpv;
@@ -741,61 +752,20 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 		    __func__, lpv, lpv->pv_va, lpv->pv_va + lpv->pv_size - 1,
 		    lpv->pv_pa, lpv->pv_prot, lpv->pv_cache);
 	}
-	VPRINTF("\nMapping Chunks\n");
 
-	pv_addr_t cur_pv;
+	VPRINTF("Mapping Chunks\n");
+
 	pv_addr_t *pv = SLIST_FIRST(&bmi->bmi_chunks);
-	if (!mapallmem_p || pv->pv_pa == bmi->bmi_start) {
-		cur_pv = *pv;
-		KASSERTMSG(cur_pv.pv_va >= KERNEL_BASE, "%#lx", cur_pv.pv_va);
-		pv = SLIST_NEXT(pv, pv_list);
-	} else {
-		cur_pv.pv_va = KERNEL_BASE;
-		cur_pv.pv_pa = KERN_VTOPHYS(cur_pv.pv_va);
-		cur_pv.pv_size = pv->pv_pa - cur_pv.pv_pa;
-		cur_pv.pv_prot = VM_PROT_READ | VM_PROT_WRITE;
-		cur_pv.pv_cache = PTE_CACHE;
-	}
+	pv_addr_t cur_pv = *pv;
+	KASSERTMSG(cur_pv.pv_va >= KERNEL_BASE, "%#lx", cur_pv.pv_va);
+
+	pv = SLIST_NEXT(pv, pv_list);
 	while (pv != NULL) {
-		if (mapallmem_p) {
-			if (concat_pvaddr(&cur_pv, pv)) {
-				cur_pv.pv_size += pv->pv_size;
+		if (concat_pvaddr(&cur_pv, pv)) {
+			cur_pv.pv_size += pv->pv_size;
 
-				pv = SLIST_NEXT(pv, pv_list);
-				continue;
-			}
-			if (cur_pv.pv_pa + cur_pv.pv_size < pv->pv_pa) {
-				/*
-				 * See if we can extend the current pv to emcompass the
-				 * hole, and if so do it and retry the concatenation.
-				 */
-				if (cur_pv.pv_prot == (VM_PROT_READ|VM_PROT_WRITE)
-				    && cur_pv.pv_cache == PTE_CACHE) {
-					cur_pv.pv_size = pv->pv_pa - cur_pv.pv_va;
-					continue;
-				}
-
-				/*
-				 * We couldn't so emit the current chunk and then
-				 */
-				VPRINTF("%s: mapping chunk VA %#lx..%#lx "
-				    "(PA %#lx, prot %d, cache %d)\n",
-				    __func__,
-				    cur_pv.pv_va, cur_pv.pv_va + cur_pv.pv_size - 1,
-				    cur_pv.pv_pa, cur_pv.pv_prot, cur_pv.pv_cache);
-				pmap_map_chunk(l1pt_va, cur_pv.pv_va, cur_pv.pv_pa,
-				    cur_pv.pv_size, cur_pv.pv_prot, cur_pv.pv_cache);
-
-				/*
-				 * set the current chunk to the hole and try again.
-				 */
-				cur_pv.pv_pa += cur_pv.pv_size;
-				cur_pv.pv_va += cur_pv.pv_size;
-				cur_pv.pv_size = pv->pv_pa - cur_pv.pv_va;
-				cur_pv.pv_prot = VM_PROT_READ | VM_PROT_WRITE;
-				cur_pv.pv_cache = PTE_CACHE;
-				continue;
-			}
+			pv = SLIST_NEXT(pv, pv_list);
+			continue;
 		}
 
 		/*
@@ -810,40 +780,6 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 		    cur_pv.pv_size, cur_pv.pv_prot, cur_pv.pv_cache);
 		cur_pv = *pv;
 		pv = SLIST_NEXT(pv, pv_list);
-	}
-
-	/*
-	 * If we are mapping all of memory, let's map the rest of memory.
-	 */
-	if (mapallmem_p && cur_pv.pv_pa + cur_pv.pv_size < bmi->bmi_end) {
-		if (cur_pv.pv_prot == (VM_PROT_READ | VM_PROT_WRITE)
-		    && cur_pv.pv_cache == PTE_CACHE) {
-			cur_pv.pv_size = bmi->bmi_end - cur_pv.pv_pa;
-		} else {
-			KASSERTMSG(cur_pv.pv_va + cur_pv.pv_size <= kernel_vm_base,
-			    "%#lx >= %#lx", cur_pv.pv_va + cur_pv.pv_size,
-			    kernel_vm_base);
-			VPRINTF("%s: mapping chunk VA %#lx..%#lx "
-			    "(PA %#lx, prot %d, cache %d)\n",
-			    __func__, cur_pv.pv_va, cur_pv.pv_va + cur_pv.pv_size - 1,
-			    cur_pv.pv_pa, cur_pv.pv_prot, cur_pv.pv_cache);
-			pmap_map_chunk(l1pt_va, cur_pv.pv_va, cur_pv.pv_pa,
-			    cur_pv.pv_size, cur_pv.pv_prot, cur_pv.pv_cache);
-			cur_pv.pv_pa += cur_pv.pv_size;
-			cur_pv.pv_va += cur_pv.pv_size;
-			cur_pv.pv_size = bmi->bmi_end - cur_pv.pv_pa;
-			cur_pv.pv_prot = VM_PROT_READ | VM_PROT_WRITE;
-			cur_pv.pv_cache = PTE_CACHE;
-		}
-	}
-
-	/*
-	 * The amount we can direct map is limited by the start of the
-	 * virtual part of the kernel address space.  Don't overrun
-	 * into it.
-	 */
-	if (mapallmem_p && cur_pv.pv_va + cur_pv.pv_size > kernel_vm_base) {
-		cur_pv.pv_size = kernel_vm_base - cur_pv.pv_va;
 	}
 
 	/*
@@ -891,12 +827,6 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	    "%20s: 0x%08lx 0x%08lx                       %zu\n";
 #endif
 
-#if 0
-	// XXX Doesn't make sense if kernel not at bottom of RAM
-	VPRINTF(mem_fmt, "SDRAM", bmi->bmi_start, bmi->bmi_end - 1,
-	    KERN_PHYSTOV(bmi->bmi_start), KERN_PHYSTOV(bmi->bmi_end - 1),
-	    (int)physmem);
-#endif
 	VPRINTF(mem_fmt, "text section",
 	       text.pv_pa, text.pv_pa + text.pv_size - 1,
 	       text.pv_va, text.pv_va + text.pv_size - 1,

@@ -46,7 +46,15 @@ void fdt_add_reserved_memory_range(uint64_t, uint64_t);
 #define KERNEL_IO_VSIZE		(KERNEL_IO_VBASE - VM_MAX_KERNEL_ADDRESS)
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-#define KERNEL_VM_BASE		0xc0000000
+/*
+ * Allow KERNEL_MAXSIZE (16MB) for the kernel and then map all of RAM at
+ * KERNEL_MAXSIZE above kernel.
+ *
+ * KERNEL_BASE				(0x8000_0000)  kernel
+ * KERNEL_BASE + KERNEL_MAXSIZE		(0x8100_0000)  direct map ram
+ * KERNEL_BASE + KERNEL_MAXSIZE + 1GB	(0xc100_0000)  kernel_vm_base
+ */
+#define KERNEL_VM_BASE		(0xc0000000 + KERNEL_MAXSIZE)
 #else
 #define KERNEL_VM_BASE		0x90000000
 #endif
