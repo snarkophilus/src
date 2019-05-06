@@ -463,7 +463,7 @@ pmap_growkernel(vaddr_t maxkvaddr)
  * memory system has been bootstrapped.  After that point, either kmem_alloc
  * or malloc should be used.  This function works by stealing pages from the
  * (to be) managed page pool, then implicitly mapping the pages (by using
- * their k0seg addresses) and zeroing them.
+ * their direct mapped addresses) and zeroing them.
  *
  * It may be used once the physical memory segments have been pre-loaded
  * into the vm_physmem[] array.  Early memory allocation MUST use this
