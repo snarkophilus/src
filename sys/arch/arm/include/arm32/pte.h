@@ -131,6 +131,7 @@ typedef uint32_t	pt_entry_t;	/* L2 table entry */
 
 #define	L1_TABLE_SIZE	0x4000		/* 16K */
 #define	L2_TABLE_SIZE	0x1000		/* 4K */
+
 /*
  * The new pmap deals with the 1KB coarse L2 tables by
  * allocating them from a pool. Until every port has been converted,
