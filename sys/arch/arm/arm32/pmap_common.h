@@ -148,9 +148,9 @@ pmap_pte_sync_current(pmap_t pm, pt_entry_t *ptep)
 struct l2_bucket *
 	pmap_alloc_l2_bucket(pmap_t, vaddr_t);
 void	pmap_free_l2_bucket(pmap_t, struct l2_bucket *, u_int);
+#if 0
 void	pmap_alloc_l1(pmap_t);
 void	pmap_free_l1(pmap_t);
-#if 0
 void	pmap_use_l1(pmap_t);
 #endif
 

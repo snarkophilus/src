@@ -175,7 +175,11 @@ extern char __bss_start[], __bss_end__[];
 extern char _end[];
 
 /* Page tables for mapping kernel VM */
+#if 1
+#define KERNEL_L2PT_VMDATA_NUM	(KERNEL_VM_SIZE / L2_S_SEGSIZE)
+#else
 #define KERNEL_L2PT_VMDATA_NUM	8	/* start with 32MB/64MB of KVM */
+#endif
 
 u_long kern_vtopdiff __attribute__((__section__(".data")));
 
@@ -729,6 +733,7 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 
 	add_pages(bmi, &data);
 
+#ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 	/* Direct map (if we're doing that) */
 	if (mapallmem_p) {
 		VPRINTF("Mapping direct map\n");
@@ -742,6 +747,7 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 
 		add_pages(bmi, &dm);
 	}
+#endif
 
 	VPRINTF("Listing Chunks\n");
 
@@ -758,13 +764,10 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	pv_addr_t *pv = SLIST_FIRST(&bmi->bmi_chunks);
 	pv_addr_t cur_pv = *pv;
 	KASSERTMSG(cur_pv.pv_va >= KERNEL_BASE, "%#lx", cur_pv.pv_va);
-
 	pv = SLIST_NEXT(pv, pv_list);
-	while (pv != NULL) {
-		if (concat_pvaddr(&cur_pv, pv)) {
-			cur_pv.pv_size += pv->pv_size;
 
-			pv = SLIST_NEXT(pv, pv_list);
+	for (; pv != NULL; pv = SLIST_NEXT(pv, pv_list)) {
+		if (concat_pvaddr(&cur_pv, pv)) {
 			continue;
 		}
 
@@ -779,7 +782,6 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 		pmap_map_chunk(l1pt_va, cur_pv.pv_va, cur_pv.pv_pa,
 		    cur_pv.pv_size, cur_pv.pv_prot, cur_pv.pv_cache);
 		cur_pv = *pv;
-		pv = SLIST_NEXT(pv, pv_list);
 	}
 
 	/*

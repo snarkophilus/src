@@ -40,7 +40,7 @@ struct bootmem_info {
 	 */
 	pv_addr_t bmi_vector_l2pt;
 	pv_addr_t bmi_io_l2pt;
-	pv_addr_t bmi_l2pts[32];	// for large memory disks.
+	pv_addr_t bmi_l2pts[256];	// for large memory disks.
 	u_int bmi_freepages;
 	u_int bmi_nfreeblocks;
 };

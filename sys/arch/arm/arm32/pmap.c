@@ -1105,7 +1105,7 @@ pmap_modify_pv(struct vm_page_md *md, paddr_t pa, pmap_t pm, vaddr_t va,
  * Allocate an L1 translation table for the specified pmap.
  * This is called at pmap creation time.
  */
-void
+static void
 pmap_alloc_l1(pmap_t pm)
 {
 	struct l1_ttable *l1;
@@ -1146,7 +1146,7 @@ pmap_alloc_l1(pmap_t pm)
  * Free an L1 translation table.
  * This is called at pmap destruction time.
  */
-void
+static void
 pmap_free_l1(pmap_t pm)
 {
 	struct l1_ttable *l1 = pm->pm_l1;

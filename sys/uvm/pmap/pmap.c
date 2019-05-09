@@ -658,10 +658,11 @@ pmap_destroy(pmap_t pmap)
 	kpreempt_disable();
 	pmap_md_tlb_miss_lock_enter();
 	pmap_tlb_asid_release_all(pmap);
-#ifndef PMAP_HWPAGEWALKER
-	pmap_segtab_destroy(pmap, NULL, 0);
+
+#ifdef PMAP_HWPAGEWALKER
+	pmap_md_pdetab_destroy(pmap);
 #else
-	/* TODO: PDE destroy code here */
+	pmap_segtab_destroy(pmap, NULL, 0);
 #endif
 	pmap_md_tlb_miss_lock_exit();
 

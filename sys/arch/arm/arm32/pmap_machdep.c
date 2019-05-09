@@ -214,6 +214,7 @@
 #include <uvm/uvm.h>
 #include <uvm/pmap/pmap_pvt.h>
 
+#include <arm/cpufunc.h>
 #include <arm/arm32/pmap_common.h>
 #include <arm/arm32/machdep.h>
 
@@ -1162,6 +1163,13 @@ pmap_modify_pv(struct vm_page_md *md, paddr_t pa, pmap_t pm, vaddr_t va,
 	return (oflags);
 }
 
+#endif
+
+
+
+
+
+
 /*
  * Allocate an L1 translation table for the specified pmap.
  * This is called at pmap creation time.
@@ -1215,6 +1223,10 @@ pmap_free_l1(pmap_t pm)
 	pm->pm_l1_pa = 0;
 }
 
+
+
+
+#if 0
 
 /*
  * void pmap_free_l2_ptp(pt_entry_t *, paddr_t *)
@@ -4707,6 +4719,7 @@ pmap_grow_l2_bucket(pmap_t pm, vaddr_t va)
 	return (l2b);
 }
 
+
 vaddr_t
 pmap_growkernel(vaddr_t maxkvaddr)
 {
@@ -6544,13 +6557,18 @@ pic_ipi_shootdown(void *arg)
 
 
 
+
+#endif
+
+
+
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 vaddr_t
 pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 {
 	bool ok = false;
 	if (physical_start <= pa && pa < physical_end) {
-		const vaddr_t newva = KERNEL_DIRECTMAP_BASE + pa - physical_start;
+		const vaddr_t newva = pa - physical_start + KERNEL_DIRECTMAP_BASE;
 		if (newva >= KERNEL_DIRECTMAP_BASE && newva < pmap_directlimit) {
 			va = newva;
 			ok = true;
@@ -6560,6 +6578,13 @@ pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 	*ok_p = ok;
 	return va;
 }
+#endif
+
+
+
+
+#if 0
+#ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 
 vaddr_t
 pmap_map_poolpage(paddr_t pa)
@@ -6593,7 +6618,7 @@ pmap_unmap_poolpage(vaddr_t va)
 
 
 
-
+#if 0
 
 
 
@@ -6681,7 +6706,6 @@ pmap_unmap_poolpage(vaddr_t va)
 
 
 #endif
-
 
 
 
@@ -7033,7 +7057,7 @@ pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
 
 #endif
 #endif
-
+#endif
 
 
 
@@ -7213,6 +7237,9 @@ pmap_impl_bootstrap(void)
 
 printf("%s: avail_start %lx avail_end %lx\n", __func__, pmap_limits.avail_start, pmap_limits.avail_end);
 //	pmap_limits.virtual_end = pmap_limits.virtual_start + (vaddr_t)sysmap_size * NBPG;
+
+
+//	pmap_pvlist_lock_init(arm_dcache_align);
 }
 
 void
@@ -7240,6 +7267,7 @@ pmap_impl_bootstrap_pools(void)
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
 	    &pmap_pv_page_allocator, IPL_NONE);
 
+	pmap_pvlist_lock_init(arm_dcache_align);
 }
 
 
@@ -7356,9 +7384,17 @@ pmap_md_init(void)
 }
 
 void
-pmap_md_pdetab_init(struct pmap *pmap)
+pmap_md_pdetab_init(struct pmap *pm)
 {
-	KASSERT(pmap != 0);
+	KASSERT(pm != NULL);
+
+        pmap_alloc_l1(pm);
+
+        /*
+         * Note: The pool cache ensures that the pm_l2[] array is already
+         * initialised to zero.
+         */
+
 //	pmap->pm_pdetab = pmap_md_alloc_pdp(pmap, &pmap->pm_pdetab);
 
 	/* for (int i = 0; i < NPDEPG; ++i) { */
@@ -7368,6 +7404,17 @@ pmap_md_pdetab_init(struct pmap *pmap)
 //	pmap->pm_md.md_ptbr =
 //	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_pdetab) >> PAGE_SHIFT;
 }
+
+
+void
+pmap_md_pdetab_destroy(struct pmap *pm)
+{
+	KASSERT(pm != NULL);
+
+	pmap_free_l1(pm);
+}
+
+
 
 
 #if 0

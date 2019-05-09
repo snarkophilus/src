@@ -189,7 +189,6 @@ pmap_md_cache_prefer_mask(void)
 
 #endif	/* __PMAP_PRIVATE */
 
-
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
 #include <uvm/pmap/pmap_pvt.h>
@@ -200,6 +199,7 @@ pmap_md_cache_prefer_mask(void)
 #include <uvm/uvm_page.h>
 
 void pmap_md_pdetab_init(struct pmap *);
+void pmap_md_pdetab_destroy(struct pmap *);
 
 vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);

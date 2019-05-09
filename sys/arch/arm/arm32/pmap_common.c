@@ -1262,7 +1262,7 @@ pmap_get_pde_pte(pmap_t pm, vaddr_t va, pd_entry_t **pdp, pt_entry_t **ptp)
  * We use 'kernel_l1pt' to build the metadata (struct l1_ttable and
  * struct l2_dtable) necessary to track kernel mappings.
  */
-#define	PMAP_STATIC_L2_SIZE 16
+#define	PMAP_STATIC_L2_SIZE 256
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
@@ -1308,7 +1308,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 		if ((pde & L1_TYPE_MASK) != L1_TYPE_C)
 			continue;
 
-		printf("%s: pde %p\n", __func__, (void *)pde);
 		/*
 		 * Lookup the KVA of this L2 descriptor table
 		 */
@@ -2894,6 +2893,12 @@ pic_ipi_shootdown(void *arg)
 #endif /* ARM_MMU_EXTENDED && MULTIPROCESSOR */
 
 
+
+
+
+
+#if 0
+
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 vaddr_t
 pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
@@ -2918,5 +2923,13 @@ pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 	*ok_p = ok;
 	return va;
 }
+
+#endif
+
+
+
+
+
+
 
 #endif /* __HAVE_MM_MD_DIRECT_MAPPED_PHYS */
