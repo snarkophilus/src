@@ -3131,10 +3131,10 @@ pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 {
 	paddr_t pa;
 
-#if 0
-	if (pmap == pmap_kernel()) {
+	if (pm == pmap_kernel()) {
 		if (pmap_md_direct_mapped_vaddr_p(va)) {
 			pa = pmap_md_direct_mapped_vaddr_to_paddr(va);
+			*coherentp = true;
 			goto done;
 		}
 		if (pmap_md_io_vaddr_p(va))
@@ -3144,20 +3144,19 @@ pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 			panic("%s: illegal kernel mapped address %#"PRIxVADDR,
 			    __func__, va);
 	}
-#endif
+
 	kpreempt_disable();
 	const pt_entry_t * const ptep = pmap_pte_lookup(pm, va);
 	if (ptep == NULL || !pte_valid_p(*ptep)) {
 		kpreempt_enable();
 		return false;
 	}
-	*coherentp = (*ptep & 1) ? true : false;
+	// XXXNH assume TRE index 0 is NC and !0 is cached.
+	*coherentp = (*ptep & L2_S_CACHE_MASK) ? true : false;
 
 	pa = pte_to_paddr(*ptep) | (va & PGOFSET);
 	kpreempt_enable();
-#if 0
 done:
-#endif
 	if (pap != NULL) {
 		*pap = pa;
 	}
@@ -7150,6 +7149,30 @@ pmap_md_unmap_poolpage(vaddr_t va, size_t len)
 }
 
 
+extern size_t kernel_size;
+bool
+pmap_md_kernel_vaddr_p(vaddr_t va)
+{
+	if (va >= KERNEL_BASE && va < KERNEL_BASE + kernel_size) {
+		return true;
+	}
+
+	return false;
+}
+
+paddr_t
+pmap_md_kernel_vaddr_to_paddr(vaddr_t va)
+{
+
+	if (va >= KERNEL_BASE && va < KERNEL_BASE + kernel_size) {
+
+		return KERN_VTOPHYS(va);
+	}
+	panic("%s: va %#" PRIxVADDR " not direct mapped!", __func__, va);
+
+}
+
+
 bool
 pmap_md_direct_mapped_vaddr_p(vaddr_t va)
 {
@@ -7235,7 +7258,6 @@ pmap_impl_bootstrap(void)
 	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
 	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
 
-printf("%s: avail_start %lx avail_end %lx\n", __func__, pmap_limits.avail_start, pmap_limits.avail_end);
 //	pmap_limits.virtual_end = pmap_limits.virtual_start + (vaddr_t)sysmap_size * NBPG;
 
 
@@ -7512,6 +7534,13 @@ pmap_md_ok_to_steal_p(const uvm_physseg_t bank, size_t npgs)
 		return false;
 	}
 #endif
+
+	if (uvm_physseg_get_avail_start(bank) + npgs >= atop(physical_start + 1 * 1024 * 1024 * 1024)) {
+		aprint_debug("%s: not enough space in direct map for %zu pages (%lx - %lx)\n",
+		    __func__, npgs, uvm_physseg_get_avail_start(bank), uvm_physseg_get_avail_end(bank));
+		return false;
+	}
+
 	return true;
 }
 

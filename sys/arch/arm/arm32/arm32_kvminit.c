@@ -169,6 +169,8 @@ paddr_t msgbufphys;
 paddr_t physical_start;
 paddr_t physical_end;
 
+size_t kernel_size;
+
 extern char etext[];
 extern char __data_start[], _edata[];
 extern char __bss_start[], __bss_end__[];
@@ -459,7 +461,7 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	 * kernel + data + stuff.  Assume 2 L2 pages for kernel, 1 for vectors,
 	 * and 1 for IO
 	 */
-	size_t kernel_size = bmi->bmi_kernelend;
+	kernel_size = bmi->bmi_kernelend;
 	kernel_size -= (bmi->bmi_kernelstart & -L2_S_SEGSIZE);
 	kernel_size += L1_TABLE_SIZE_REAL;
 	kernel_size += PAGE_SIZE * KERNEL_L2PT_VMDATA_NUM;
@@ -704,6 +706,9 @@ arm32_kernel_vm_init(vaddr_t kernel_vm_base, vaddr_t vectors, vaddr_t iovbase,
 	extern char etext[];
 	size_t totalsize = bmi->bmi_kernelend - bmi->bmi_kernelstart;
 	size_t textsize = KERN_VTOPHYS((uintptr_t)etext) - bmi->bmi_kernelstart;
+
+	kernel_size = totalsize;
+	KASSERT((kernel_size & PGOFSET) == 0);
 
 	textsize = (textsize + PGOFSET) & ~PGOFSET;
 

@@ -102,13 +102,23 @@
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)0xdeadbeef)
 #endif
 
+
+
+// XXXNH what is PTPSHIFT?
+//
+// For ARM and its 8KB PAGE_SIZE and 4K L2_S_SIZE we need NBSEG to be 
+
 #if 1
 #define PTPSHIFT        2
 #define PTPLENGTH       (PGSHIFT - PTPSHIFT)
 CTASSERT(NPTEPG ==   (1 << PTPLENGTH));
 
 #define	SEGSHIFT	(PGSHIFT + PTPLENGTH)	/* LOG2(NBSEG) */
+#if 1
+#define NBSEG		(1 << PGSHIFT)		// XXXNH seems to fix pmap_pte_process
+#else
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
+#endif
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #ifdef _LP64
@@ -147,17 +157,6 @@ pt_entry_t *
 	pmap_md_pdetab_lookup_ptep(struct pmap *, vaddr_t);
 
 
-#define	__HAVE_PMAP_MD
-struct pmap_md {
-	pd_entry_t *		pmd_l1;
-	paddr_t			pmd_l1_pa;
-	struct l2_dtable *	pmd_l2[L2_SIZE];
-};
-
-#define pm_l1		pm_md.pmd_l1
-#define pm_l1_pa	pm_md.pmd_l1_pa
-#define pm_l2		pm_md.pmd_l2
-
 #ifdef PMAP_CACHE_VIPT
 #define PMAP_VIRTUAL_CACHE_ALIASES
 #endif
@@ -189,6 +188,17 @@ pmap_md_cache_prefer_mask(void)
 
 #endif	/* __PMAP_PRIVATE */
 
+#define	__HAVE_PMAP_MD
+struct pmap_md {
+	pd_entry_t *		pmd_l1;
+	paddr_t			pmd_l1_pa;
+	struct l2_dtable *	pmd_l2[L2_SIZE];
+};
+
+#define pm_l1		pm_md.pmd_l1
+#define pm_l1_pa	pm_md.pmd_l1_pa
+#define pm_l2		pm_md.pmd_l2
+
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
 #include <uvm/pmap/pmap_pvt.h>
@@ -210,6 +220,8 @@ vaddr_t	pmap_md_pool_phystov(paddr_t);
 #define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
 #define	POOL_PHYSTOV(pa)	pmap_md_pool_phystov((paddr_t)pa)
 
+bool	pmap_md_kernel_vaddr_p(vaddr_t);
+paddr_t	pmap_md_kernel_vaddr_to_paddr(vaddr_t);
 bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
 paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
 bool	pmap_md_io_vaddr_p(vaddr_t);
@@ -304,7 +316,6 @@ pte_modified_p(pt_entry_t pte)
 static inline bool
 pte_wired_p(pt_entry_t pte)
 {
-
         return (pte & L2_S_OSBIT0) != 0;
 }
 
@@ -312,14 +323,12 @@ pte_wired_p(pt_entry_t pte)
 static inline pt_entry_t
 pte_wire_entry(pt_entry_t pte)
 {
-
         return pte | L2_S_OSBIT0;
 }
 
 static inline pt_entry_t
 pte_unwire_entry(pt_entry_t pte)
 {
-
         return pte & ~L2_S_OSBIT0;
 }
 
@@ -332,7 +341,6 @@ pte_value(pt_entry_t pte)
 static inline bool
 pte_readonly_p(pt_entry_t pte)
 {
-
 	//XXXNH check this logic works
 	return !l2pte_writable_p(pte);
 }
@@ -340,8 +348,7 @@ pte_readonly_p(pt_entry_t pte)
 static inline bool
 pte_cached_p(pt_entry_t pte)
 {
-
-	// XXXNH depend which inex into PRRR/NMRR we use
+	// XXXNH depends which index into PRRR/NMRR we use
 	// assume non-zero means cached for now
 	return (pte & L2_S_CACHE_MASK) != 0;
 }
@@ -362,29 +369,22 @@ pte_nv_entry(bool kernel_p)
 static inline pt_entry_t
 pte_prot_downgrade(pt_entry_t pte, vm_prot_t prot)
 {
-
-// 	const uint32_t ro_bit = MIPS_MMU(PG_RO);
-// 	const uint32_t rw_bit = MIPS_MMU(PG_D);
-//
-// 	return (pte & ~(ro_bit|rw_bit))
-// 	    | ((prot & VM_PROT_WRITE) ? rw_bit : ro_bit);
-	return 0;
+	return (pte & ~(L2_S_PROT_W | L2_S_PROT_RO))
+	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? L2_S_PROT_RO : L2_S_PROT_W);
 }
 
 static inline pt_entry_t
 pte_prot_nowrite(pt_entry_t pte)
 {
-// 	return pte & ~MIPS_MMU(PG_D);
-	return 0;
+	return l2pte_set_readonly(pte);
 }
 
 static inline pt_entry_t
 pte_cached_change(pt_entry_t pte, bool cached)
 {
-// 	if (MIPS_HAS_R4K_MMU) {
-// 		pte &= ~MIPS3_PG_CACHEMODE;
-// 		pte |= (cached ? MIPS3_PG_CACHED : MIPS3_PG_UNCACHED);
-// 	}
+	pte &= ~L2_S_CACHE_MASK;
+	pte |= (cached ? pte_l2_s_cache_mode : 0);
+
 	return pte;
 }
 
@@ -393,8 +393,6 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
 	l2pte_set(ptep, pte, *ptep);
 }
-
-
 
 static inline pd_entry_t
 pte_invalid_pde(void)
