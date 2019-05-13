@@ -1394,7 +1394,11 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 
 	pt_entry_t npte = pte_make_kenter_pa(pa, mdpg, prot, flags);
 	kpreempt_disable();
+#ifdef PMAP_HWPAGEWALKER
+	pt_entry_t * const ptep = pmap_md_pdetab_lookup_create_ptep(pmap, va);
+#else
 	pt_entry_t * const ptep = pmap_pte_lookup(pmap, va);
+#endif
 	KASSERTMSG(ptep != NULL, "%#"PRIxVADDR " %#"PRIxVADDR, va,
 	    pmap_limits.virtual_end);
 	KASSERT(!pte_valid_p(*ptep));

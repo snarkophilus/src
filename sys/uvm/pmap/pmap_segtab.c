@@ -305,7 +305,6 @@ pte_pde_set(pd_entry_t *oldpde, pd_entry_t newpde) {
 	 * guessing this is a wrapper for pte_pde_cas() ? */
 	pte_pde_cas(oldpde, 0, newpde);
 }
-#endif
 
 // XXXNH
 #if defined(PMAP_HWPAGEWALKER)

@@ -35,124 +35,87 @@
 	.globl	_C_LABEL(cpu_Debugger_insn)
 
 ENTRY_NP(start)
-	// We get loaded and starting running at or near 0, not where we
-	// should be. We need to construct an initial PDETAB
-	
-#ifdef _LP64
-	li	t0, SR_U64|SR_S64
-	li	t1, SR_IM|SR_VM|SR_EI
+	/* Entry point from BBL.
+	 * Here's what we get for free:
+	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
+	 * Copy these to the s* registsers so they're saved.
+	*/
+
+	mv      s0, a0
+	mv      s1, a1
+
+        /* Save the phys addr from the start and end of the kernel */
+        la      s3, _C_LABEL(start)
+        la      s4, _C_LABEL(end)
+
+	/* Supervisor (Kernel) can access User Memory (SUM) */
+	li	t0, SR_SUM
 	csrs	sstatus, t0
-#else
-	li	t1, SR_IM|SR_VM|SR_U64|SR_S64|R_EI
-#endif
-	csrc	sstatus, t1
 
-	li	s11, VM_MAX_KERNEL_ADDRESS
-	li	s10, PAGE_SIZE
-	li	s9, USPACE
+	/* XXX: If doing SMP should probably park other cores here */
 
-#if 0
-	// The kernel doesn't use gp/_gp since we'd have to reload it on
-	// each exception.
-	PTR_LA	gp, _C_LABEL(_gp)
-#endif
+	mv	a0, a1 /* We need the DTB's PA passed in */
+        mv	a1, s4
+	call	_C_LABEL(init_mmu)
+	mv	s2, a0
 
-	PTR_LA	a0, _C_LABEL(__bss_start)
-	PTR_LA	s1, _C_LABEL(_end)
-	li	a1, 0
+        /* We'll trap to the VA */
+	la	t0, va
+	/* s2 is returned phys_base from init_mmu */
+	sub	t0, t0, s2
+	li	t1, VM_MIN_KERNEL_ADDRESS
+	add	t0, t0, t1
+	csrw	stvec, t0
 
-	add	s1, s1, s10		// PAGE_SIZE
-	addi	s1, s1, -1		//   -1 == PAGE_MASK
-	neg	a1, a0			// -PAGE_SIZE
-	and	s1, s1, a1		// s1 is page aligned end of kernel
-					// s1 = uarea
-	add	s2, s1, s9		// s2 = first PDE page
-#ifdef _LP64
-	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
-#else
-	move	s3, 22
-#endif
-	add	s4, s3, s10		// s4 = first kernel PTE page
-	add	s5, s1, s9		// s5 = kernel_end
-	sub	a2, s5, a0
-	call	memset			// zero through kernel_end
+	/* Set the Supervisor Address and Translation Register (Turn the MMU on) */
+	la	t0, l1_pte
+	srli	t0, t0, PAGE_SHIFT
+	li	t1, SATP_MODE_SV39
+	or	t0, t0, t1
+	sfence.vma
+	csrw	satp, t0
 
-	// As a temporary hack, word 0 contains the amount of memory in MB
-	INT_L	a7, (zero)		// load memory size
-	slli	a7, a7, (20-PGSHIFT)	// convert MB to pages
-.L01:	PTR_LA	t0, physmem
-	INT_S	a7, (t0)		// store it in physmem
+	.align 2
+va:
+        /* The MMU is on! We're running at a VA now! */
 
-	li	t4, PTE_V | PTE_SX | PTE_SW | PTE_SR | PTE_G
-#ifdef _LP64
-	REG_S	t4, 0(s2)		// keep a mapping for the first 8GB.
-	or	t0, s3, t4		// point to next page
-	or	t0, t0, PTE_T		// tranverse it.
-	REG_S	t0, -SZREG(s3)		// store in highest first level PDE
-#endif
+        /* Zero the sscratch for when we need to use it next */
+        csrw	sscratch, zero
 
-#if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
-#error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
-#endif
-	// We allocated the kernel first PTE page so let's insert in the
-	// page table.  For now, we assume it's in the same PDE page as the
-	// direct-mapped memory.
-	or	t0, s4, t4
-	or	t0, t0, PTE_T
-#if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	add	t1, t1, s3
-	REG_S	t0, 0(t1)
-#else
-	REG_S	t0, 0(s3)
-#endif
+	/* Setup the real supervisor trap vector */
+	la	t0, cpu_exception_handler
+	csrw	stvec, t0
 
-	li	t0, ((VM_MAX_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	add	s3, s3, t0
-	srli	a7, a7, (SEGSHIFT-PGSHIFT) // pages to segments
-	li	t3, NBSEG		// load for ease
+       /* Zero out BSS */
+	la	t0, __bss_start
+	la	t1, _end
+	beq	t0, t1, bss1	/* Skip if start == end */
+bss0:
+	sd	zero, (t0)
+	addi	t0, t0, 8
+	bltu	t0, t1, bss0
+bss1:
 
-	//
-	// Fill in the PDEs to direct map memory.
-	//
-.Lfill:	REG_S	t4, 0(s3)		// store PDE
-	add	t4, t4, t3		// advance PA in PDE to next segment
-	add	s3, s3, SZREG		// advance to next PDE slot
-	addi	a7, a7, -1		// count down segment
-	bgtz	a6, .Lfill		// loop if more
+	la	t0, _C_LABEL(cpu_exception_handler)
+	csrw	stvec, t0
 
-	csrw	sptbr, s1		// set the page table base
-	li	t0, SR_VM
-	csrs	sstatus, t0		// Enable VM
+        /* tp is curlwp, init it for the first time */
+        la      tp, _C_LABEL(lwp0)
 
-	// We should have a VM so let's start using our real addresses
-	lui	t0, %hi(.Lmmu_on)	// load hi part of absolute address
-	jr	t0, %lo(.Lmmu_on)	// jump to absolute address
-
-.Lmmu_on:
-	// MMU is on!
-	csrw	sscratch, zero		// zero in sscratch to mark kernel
-
-	PTR_LA	tp, _C_LABEL(lwp0)	// put curlwp in tp
-
-	PTR_LA	a0, _C_LABEL(cpu_exception_handler)
-	csrw	stvec, a0
-
-	PTR_S	s1, L_PCB(tp)		// set uarea of lwp (already zeroed)
-	addi	sp, s2, -TF_LEN		// switch to new stack
-	PTR_S	sp, L_MD_UTF(tp)	// store pointer to empty trapframe
-
-	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
-	add	t2, s2, s11 		// PA -> VA
-	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
-	PTR_S	s2, PM_MD_PTBR(t1)	// PA of kernel PDETAB
+	/* Setup the new stack pointer */
+	la 	t0, lwp0uspace
+	li	t1, (UPAGES * PAGE_SIZE) - TF_LEN
+	add	t0, t0, t1	/* lwp0space + USPACE - TF_LEN */
+	mv	sp, t0
 
 	// Now we should ready to start initializing the kernel.
-	PTR_LA	a0, _C_LABEL(start)	// kernel_start
-	add	a1, s5, s11		// kernel_end
+	mv      a0, s0                  // hartid
+	mv	a1, s1                  // dtb
+        mv      a2, s3                  // kernel start
+	mv	a3, s4                  // kernel end
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
-	// not reached
+	/* No return from main */
 END(start)
 
 //
@@ -178,12 +141,12 @@ ENTRY_NP(cpu_switchto)
 	REG_S	s11, TF_S11(sp)		// save callee saved address
 	csrr	t4, sstatus		// get status for intr state
 	REG_S	t4, TF_SR(sp)		// save it
-	
+
 	REG_S	sp, L_MD_KTF(a0)	// record trapframe pointer
 .Lswitchto_newlwp:
-	csrrci	t0, sstatus, SR_EI	// # disable interrupts
+	csrrci	t0, sstatus, SR_SIE	// # disable interrupts
 
-	move	tp, a1			// # put the new lwp in thread pointer
+	mv	tp, a1			// # put the new lwp in thread pointer
 
 	PTR_L	t1, L_CPU(tp)		// # get curcpu
 	PTR_S	tp, CI_CURLWP(t1)	// # update curcpu with the new curlwp
@@ -217,10 +180,10 @@ ENTRY_NP(cpu_switchto)
 END(cpu_switchto)
 
 ENTRY_NP(cpu_lwp_trampoline)
-	move	a1, tp			// get new lwp
+	mv	a1, tp			// get new lwp
 	call	_C_LABEL(lwp_startup)	// call lwp startup
 
-	move	a0, s1			// get saved arg
+	mv	a0, s1			// get saved arg
 	jalr	s0			// call saved func
 
 	// If the saved func returns, we are returning to user land.
@@ -228,13 +191,12 @@ ENTRY_NP(cpu_lwp_trampoline)
 END(cpu_lwp_trampoline)
 
 ENTRY_NP(cpu_fast_switchto_cleanup)
-	INT_L	t0, CI_MTX_COUNT(a1)	// get mutex count
-	REG_L	ra, CALLFRAME_RA(sp)	// get return address
-	REG_L	a0, CALLFRAME_S0(sp)	// get pinned LWP
-	addi	t0, t0, 1		// increment mutex count
-	INT_S	t0, CI_MTX_COUNT(a1)	// save it
+//	PTR_L	t0, L_CPU(tp)		// Get curcpu()
+//	INT_L	t1, CI_MTX_COUNT(t0)	// get mutex count
+//	addi	t1, t1, 1		// increment mutex count
+//	INT_S	t1, CI_MTX_COUNT(t0)	// save it
 	PTR_S	zero, L_CTXSWTCH(a0)	// clear l_ctxswitch
-	addi	sp, sp, CALLFRAME_SIZ	// remove callframe
+        mv	ra, a1			// Restore real RA
 #if IPL_SCHED != IPL_HIGH
 	tail	_C_LABEL(splhigh)	// go back to IPL HIGH
 #else
@@ -268,36 +230,40 @@ ENTRY_NP(cpu_fast_switchto)
 	csrr	t4, sstatus		// get status register (for intr state)
 	REG_S	t4, TF_SR(sp)		// save it
 
-	move	s0, tp			// remember curlwp
-	move	s1, sp			// remember kernel stack
+	mv	s0, tp			// remember curlwp
+	mv	s1, sp			// remember kernel stack
 
-#if 0
-	csrrci	t0, sstatus, SR_EI	// disable interrupts
-#endif
+//#if 0
+	csrrci	t0, sstatus, SR_SIE	// disable interrupts
+//#endif
 	PTR_L	t1, L_CPU(tp)		// get curcpu()
 
 	PTR_S	sp, L_MD_KTF(tp)	// save trapframe ptr in oldlwp
-	move	tp, a0			// set thread pointer to newlwp
+	mv	tp, a0			// set thread pointer to newlwp
 	PTR_S	tp, CI_CURLWP(t1)	// update curlwp
 	PTR_L	sp, L_MD_KTF(tp)	// switch to its stack
-#if 0
+//#if 0
 	csrw	sstatus, t0		// reenable interrupts
-#endif
+//#endif
+        mv	a0, s0                  // Pass the pinned lwp
 	call	_C_LABEL(softint_dispatch)
-#if 0
-	csrrci	t0, sstatus, SR_EI	// disable interrupts
-#endif
+//#if 0
+	csrrci	t0, sstatus, SR_SIE	// disable interrupts
+//#endif
 	PTR_L	t1, L_CPU(tp)		// get curcpu() again
-	move	tp, s0			// return to pinned lwp
+	mv	tp, s0			// return to pinned lwp
 	PTR_S	tp, CI_CURLWP(t1)	// restore curlwp
-#if 0
+//#if 0
 	csrw	sstatus, t0		// reeanble interrupts
-#endif
-	move	sp, s1			// restore stack pointer
+//#endif
+	mv	sp, s1			// restore stack pointer
 
-	REG_L	ra, (TF_RA + CALLFRAME_RA)(sp)	// get return address
+	REG_L	ra, TF_RA(sp)		// get return address
 	REG_L	s0, TF_S0(sp)		// restore register we used
 	REG_L	s1, TF_S1(sp)		// restore register we used
+
+	REG_L	a0, (TF_LEN + CALLFRAME_S0)(sp)	// Pass the softlwp
+	REG_L	a1, (TF_LEN + CALLFRAME_RA)(sp)	// Pass the real RA
 
 	addi	sp, sp, TF_LEN+CALLFRAME_SIZ	// drop trapframe/callframe
 	ret				// return
@@ -361,15 +327,15 @@ ENTRY_NP(cpu_exception_handler)
 	REG_S	t5, TF_T5(sp)		// save t5
 	REG_S	t6, TF_T6(sp)		// save t6
 
-	// Now we get the 
-	move	a0, sp			// trapframe pointer
+	// Now we get the
+	mv	a0, sp			// trapframe pointer
 	csrr	a1, sepc		// get execption pc
 	csrr	a2, sstatus		// get status
 	csrr	a3, scause		// get cause
 
 	REG_S	a1, TF_PC(sp)
-	INT_S	a2, TF_SR(sp)
-	INT_S	a3, TF_CAUSE(sp)	// save cause
+	REG_S	a2, TF_SR(sp)
+	REG_S	a3, TF_CAUSE(sp)	// save cause
 
 	// Now we've saved the trapfame, the cause is still in a3.
 
@@ -387,7 +353,7 @@ exception_kernexit:
 	// trap or interrupt).  Simply return the volatile registers and the
 	// exception PC and status, load the saved SP from the trapframe, and
 	// return from the exception
-	csrrci	zero, sstatus, SR_EI	// disable interrupts
+	csrrci	zero, sstatus, SR_SIE	// disable interrupts
 
 	REG_L	ra, TF_RA(sp)		// restore return address
 	REG_L	gp, TF_GP(sp)		// restore gp
@@ -430,7 +396,7 @@ trap_user:
 	REG_S	s10, TF_S10(sp)		// only save from userland
 	REG_S	s11, TF_S11(sp)		// only save from userland
 
-	csrsi	sstatus, SR_EI		// reenable interrupts
+	csrsi	sstatus, SR_SIE		// reenable interrupts
 
 	li	t0, CAUSE_SYSCALL	// let's see if this was a syscall
 	beq	a3, t0, trap_syscall	//   yes it was
@@ -439,7 +405,7 @@ trap_user:
 _C_LABEL(exception_userexit):
 	INT_L	t0, L_MD_ASTPENDING(tp)	// ast pending?
 	bnez	t0, trap_doast		//   yes, handle it.
-	csrrci	zero, sstatus, SR_EI	// disable interrupts
+	csrrci	zero, sstatus, SR_SIE	// disable interrupts
 	csrw	sscratch, tp		// show we are coming from userland
 	REG_L	tp, TF_TP(sp)		// only restore from userland
 	REG_L	s0, TF_S0(sp)		// only restore from userland
@@ -477,7 +443,7 @@ intr_usersave:
 	REG_S	s11, TF_S11(sp)		// only save from userland
 	PTR_LA	ra, exception_userexit
 trap_doast:
-	move	a0, sp			// only argument is trapframe
+	mv	a0, sp			// only argument is trapframe
 	tail	_C_LABEL(cpu_ast)
 
 intr_user:
@@ -552,7 +518,7 @@ ENTRY(longjmp)
 	REG_L	s10, FB_S10(a0)
 	REG_L	s11, FB_S11(a0)
 	REG_L	sp, FB_SP(a0)
-	move	a0, a1
+	mv	a0, a1
 	ret
 END(longjmp)
 
@@ -561,3 +527,32 @@ cpu_Debugger_insn:
 	sbreak
 	ret
 END(cpu_Debugger)
+
+ENTRY(mpentry)
+1:
+	wfi
+	j	1b
+END(mpentry)
+
+	/* Used for finding virtual / physical offsets */
+	.globl virt_map
+virt_map:
+	.quad   virt_map
+
+	.align PGSHIFT
+	.global _C_LABEL(lwp0uspace)
+_C_LABEL(lwp0uspace):
+	.space	UPAGES * PAGE_SIZE
+
+	.align PGSHIFT
+mmutables_start:
+	.global _C_LABEL(l1_pte)
+l1_pte:	
+	.space PAGE_SIZE
+	.global _C_LABEL(l2_pte)
+l2_pte:	
+	.space PAGE_SIZE
+	.global _C_LABEL(l2_dtb)
+l2_dtb:	
+	.space PAGE_SIZE
+mmutables_end:
