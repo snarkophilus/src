@@ -35,6 +35,8 @@
 #include <sys/param.h>
 #endif
 
+#include <riscv/reg.h>
+
 #define FCSR_FMASK	0	// no exception bits
 #define FCSR_FRM	__BITS(7,5)
 #define FCSR_FRM_RNE	0b000	// Round Nearest, ties to Even
@@ -100,26 +102,83 @@ riscvreg_fcsr_write_frm(uint32_t __new)
 	return __SHIFTOUT(__old, FCSR_FRM);
 }
 
-// Status Register
-#define SR_IP		__BITS(31,24)	// Pending interrupts
-#define SR_IM		__BITS(23,16)	// Interrupt Mask
-#define SR_VM		__BIT(7)	// MMU On
-#define SR_S64		__BIT(6)	// RV64 supervisor mode
-#define SR_U64		__BIT(5)	// RV64 user mode
-#define SR_EF		__BIT(4)	// Enable Floating Point
-#define SR_PEI		__BIT(3)	// Previous EI setting
-#define SR_EI		__BIT(2)	// Enable interrupts
-#define SR_PS		__BIT(1)	// Previous (S) supervisor setting
-#define SR_S		__BIT(0)	// Supervisor
+/* Old values from previous spec -- Not sure which one! */
+/* #define SR_IP		__BITS(31,24)	// Pending interrupts */
+/* #define SR_IM		__BITS(23,16)	// Interrupt Mask */
+/* #define SR_VM		__BIT(7)	// MMU On */
+/* #define SR_S64		__BIT(6)	// RV64 supervisor mode */
+/* #define SR_U64		__BIT(5)	// RV64 user mode */
+/* #define SR_EF		__BIT(4)	// Enable Floating Point */
+/* #define SR_PEI		__BIT(3)	// Previous EI setting */
+/* #define SR_EI		__BIT(2)	// Enable interrupts */
+/* #define SR_PS		__BIT(1)	// Previous (S) supervisor setting */
+/* #define SR_S		__BIT(0)	// Supervisor */
+
+/* #ifdef _LP64 */
+/* #define	SR_USER		(SR_EI|SR_U64|SR_S64|SR_VM|SR_IM) */
+/* #define	SR_USER32	(SR_USER & ~SR_U64) */
+/* #define	SR_KERNEL	(SR_S|SR_EI|SR_U64|SR_S64|SR_VM) */
+/* #else */
+/* #define	SR_USER		(SR_EI|SR_VM|SR_IM) */
+/* #define	SR_KERNEL	(SR_S|SR_EI|SR_VM) */
+/* #endif */
+
+/* Supervisor Status Register */
+#ifndef _LP64
+#define SR_WPRI __BITS(30,20) | __BIT(17) | __BITS(12,9) | \
+                 __BITS(7,6) | __BITS(3,2)
+#define SR_SD __BIT(31)
+/* Bits 30-20 are WPRI*/
+#endif /* !_LP64 */
 
 #ifdef _LP64
-#define	SR_USER		(SR_EI|SR_U64|SR_S64|SR_VM|SR_IM)
-#define	SR_USER32	(SR_USER & ~SR_U64)
-#define	SR_KERNEL	(SR_S|SR_EI|SR_U64|SR_S64|SR_VM)
-#else
-#define	SR_USER		(SR_EI|SR_VM|SR_IM)
-#define	SR_KERNEL	(SR_S|SR_EI|SR_VM)
-#endif
+#define SR_WPRI __BITS(62, 34) | __BITS(31,20) | __BIT(17) | \
+                 __BITS(12,9) | __BITS(7,6) | __BITS(3,2)
+#define SR_SD	__BIT(63)
+/* Bits 62-34 are WPRI */
+#define SR_UXL __BITS(33,32)
+/* Bits 31-20 are WPRI*/
+#endif /* _LP64 */
+
+/* Both RV32 and RV64 have the bottom 20 bits shared */
+#define SR_MXR __BIT(19)
+#define SR_SUM __BIT(18)
+/* Bit 17 is WPRI */
+#define SR_XS __BITS(16,15)
+#define SR_FS __BITS(14,13)
+/* Bits 12-9 are WPRI */
+#define SR_SPP __BIT(8)
+/* Bits 7-6 are WPRI */
+#define SR_SPIE __BIT(5)
+#define SR_UPIE __BIT(4)
+/* Bits 3-2 are WPRI */
+#define SR_SIE __BIT(1)
+#define SR_UIE __BIT(0)
+
+/* Bit (XLEN-1)-10 is WIRI */
+#define SIP_SEIP __BIT(9)_
+#define SIP_UEIP __BIT(8)_
+/* Bit 7-6 is WIRI */
+#define SIP_STIP __BIT(5)_
+#define SIP_UTIP __BIT(4)_
+/* Bit 3-2 is WIRI */
+#define SIP_SSIP __BIT(1)_
+#define SIP_USIP __BIT(0)_
+
+/* Bit (XLEN-1)-10 is WIRI */
+#define SIE_SEIE __BIT(9)_
+#define SIE_UEIE __BIT(8)_
+/* Bit 7-6 is WIRI */
+#define SIE_STIE __BIT(5)_
+#define SIE_UTIE __BIT(4)_
+/* Bit 3-2 is WIRI */
+#define SIE_SSIE __BIT(1)_
+#define SIE_USIE __BIT(0)_
+
+/* Mask for all interrupts */
+#define SIE_IM (SIE_SEI|SIE_UEIE|SIE_STIE|SIE_UTIE|SIE_SSIE|SIE_USIE)
+
+#define SR_USER SR_SIE
 
 static inline uint32_t
 riscvreg_status_read(void)
@@ -154,18 +213,21 @@ riscvreg_status_set(uint32_t __mask)
 }
 
 // Cause register
-#define CAUSE_MISALIGNED_FETCH		0
-#define CAUSE_FAULT_FETCH		1
-#define CAUSE_ILLEGAL_INSTRUCTION	2
-#define CAUSE_PRIVILEGED_INSTRUCTION	3
-#define CAUSE_MISALIGNED_LOAD		4
-#define CAUSE_FAULT_LOAD		5
-#define CAUSE_MISALIGNED_STORE		6
-#define CAUSE_FAULT_STORE		7
-#define CAUSE_SYSCALL			8
-#define CAUSE_BREAKPOINT		9
-#define CAUSE_FP_DISABLED		10
-#define CAUSE_ACCELERATOR_DISABLED	12
+#define CAUSE_INST_MISALIGNED 0
+#define CAUSE_INST_ACCESS_FAULT 1
+#define CAUSE_INST_ILLEGAL 2
+#define CAUSE_BREAKPOINT 3
+/* 4 is Reserved */
+#define CAUSE_LOAD_ACCESS_FAULT 5
+#define CAUSE_STORE_MISALIGNED 6
+#define CAUSE_STORE_ACCESS_FAULT 7
+#define CAUSE_SYSCALL 8
+/* 9-11 is Reserved */
+#define CAUSE_INST_PAGE_FAULT 12
+#define CAUSE_LOAD_PAGE_FAULT 13
+/* 14 is Reserved */
+#define CAUSE_STORE_PAGE_FAULT 15
+/* >= 16 is reserved */
 
 static inline uint64_t
 riscvreg_cycle_read(void)
@@ -178,7 +240,7 @@ riscvreg_cycle_read(void)
 	uint32_t __hi0, __hi1, __lo0;
 	do {
 		__asm __volatile(
-			"csrr\t%[__hi0], cycleh" 
+			"csrr\t%[__hi0], cycleh"
 		"\n\t"	"csrr\t%[__lo0], cycle"
 		"\n\t"	"csrr\t%[__hi1], cycleh"
 		   :	[__hi0] "=r"(__hi0),
@@ -189,32 +251,55 @@ riscvreg_cycle_read(void)
 #endif
 }
 
-static inline uintptr_t
-riscvreg_ptbr_read(void)
+static inline register_t
+riscvreg_satp_read(void)
 {
-	uintptr_t __ptbr;
-	__asm("csrr\t%0, sptbr" : "=r"(__ptbr));
-	return __ptbr;
+	register_t __satp;
+	__asm("csrr\t%0, satp" : "=r"(__satp));
+	return __satp;
 }
 
 static inline void
-riscvreg_ptbr_write(uint32_t __ptbr)
+riscvreg_satp_write(register_t __satp)
 {
-	__asm("csrw\tsptbr, %0" :: "r"(__ptbr));
+	__asm("csrw\tsatp, %0" :: "r"(__satp));
+	__asm __volatile("sfence.vma" ::: "memory");
+}
+
+static inline register_t
+riscvreg_satp_ppn_read(void)
+{
+	register_t __satp;
+	__asm("csrr\t%0, satp" : "=r"(__satp));
+	return __satp & SATP_PPN_MASK;
+}
+
+static inline void
+riscvreg_satp_ppn_write(register_t ppn)
+{
+	register_t __satp = riscvreg_satp_read();
+	__satp = (__satp & ~SATP_PPN_MASK) | (ppn & SATP_PPN_MASK);
+	__asm __volatile("csrw\tsatp, %0" :: "r"(__satp));
+	__asm __volatile("sfence.vma" ::: "memory");
 }
 
 static inline uint32_t
-riscvreg_asid_read(void)
+riscvreg_satp_asid_read(void)
 {
-	uint32_t __asid;
-	__asm __volatile("csrr\t%0, sasid" : "=r"(__asid));
-	return __asid;
+	register_t __asid;
+	__asm __volatile("csrr\t%0, satp" : "=r"(__asid));
+	return (uint32_t)(__asid >> SATP_ASID_SHIFT);
 }
 
 static inline void
-riscvreg_asid_write(uint32_t __asid)
+riscvreg_satp_asid_write(uint32_t __asid)
 {
-	__asm __volatile("csrw\tsasid, %0" :: "r"(__asid));
+	register_t satp, asid;
+	asid = __asid;
+	asid <<= SATP_ASID_SHIFT;
+	__asm __volatile("csrr\t%0, satp" : "=r"(satp));
+	satp = (satp & ~SATP_ASID_MASK) | asid;
+	riscvreg_satp_write(satp);
 }
 
 #endif /* _RISCV_SYSREG_H_ */

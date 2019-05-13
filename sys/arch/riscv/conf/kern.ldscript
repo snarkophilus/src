@@ -1,12 +1,11 @@
 /* Script for -n: mix text and data on same page */
-OUTPUT_FORMAT("elf64-littleriscv")
 OUTPUT_ARCH(riscv)
-ENTRY(_start)
+ENTRY(start)
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0xffffffff80000000)); . = SEGMENT_START("text-segment", 0xffffffff80000000) + SIZEOF_HEADERS;
-  .text           :
+/* PROVIDE (__executable_start = SEGMENT_START("text-segment", 0xffffffff80000000)); . = SEGMENT_START("text-segment", 0xffffffff80000000) + SIZEOF_HEADERS; */
+  .text :
   {
     _ftext = . ;
     *(.text)
@@ -33,11 +32,12 @@ SECTIONS
   .exception_ranges*) }
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
-  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
+  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1));
+  /*. = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));*/
   /* Exception handling  */
   .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
   .exception_ranges   : ONLY_IF_RW { *(.exception_ranges .exception_ranges*) }
-  . = DATA_SEGMENT_RELRO_END (0, .);
+/*  . = DATA_SEGMENT_RELRO_END (0, .);*/
   .data           :
   {
     _fdata = . ;
@@ -55,7 +55,7 @@ SECTIONS
     *(.sdata .sdata.* .gnu.linkonce.s.*)
   }
   _edata = .; PROVIDE (edata = .);
-  . = .;
+  . = ALIGN (8);
   __bss_start = .;
   _fbss = .;
   .sbss           :
@@ -78,5 +78,41 @@ SECTIONS
   }
   . = ALIGN(64 / 8);
   _end = .; PROVIDE (end = .);
-  . = DATA_SEGMENT_END (.);
+  . = ALIGN(4096);
+  /*  . = DATA_SEGMENT_END (.); */
+  /* Stabs debugging sections.  */
+  .stab 0 : { *(.stab) }
+  .stabstr 0 : { *(.stabstr) }
+  .stab.excl 0 : { *(.stab.excl) }
+  .stab.exclstr 0 : { *(.stab.exclstr) }
+  .stab.index 0 : { *(.stab.index) }
+  .stab.indexstr 0 : { *(.stab.indexstr) }
+  .comment 0 : { *(.comment) }
+  /* DWARF debug sections.
+     Symbols in the DWARF debugging sections are relative to the beginning
+     of the section so we begin them at 0.  */
+  /* DWARF 1 */
+  .debug          0 : { *(.debug) }
+  .line           0 : { *(.line) }
+  /* GNU DWARF 1 extensions */
+  .debug_srcinfo  0 : { *(.debug_srcinfo) }
+  .debug_sfnames  0 : { *(.debug_sfnames) }
+  /* DWARF 1.1 and DWARF 2 */
+  .debug_aranges  0 : { *(.debug_aranges) }
+  .debug_pubnames 0 : { *(.debug_pubnames) }
+  /* DWARF 2 */
+  .debug_info     0 : { *(.debug_info) }
+  .debug_abbrev   0 : { *(.debug_abbrev) }
+  .debug_line     0 : { *(.debug_line) }
+  .debug_frame    0 : { *(.debug_frame) }
+  .debug_str      0 : { *(.debug_str) }
+  .debug_loc      0 : { *(.debug_loc) }
+  .debug_macinfo  0 : { *(.debug_macinfo) }
+  /* SGI/MIPS DWARF 2 extensions */
+  .debug_weaknames 0 : { *(.debug_weaknames) }
+  .debug_funcnames 0 : { *(.debug_funcnames) }
+  .debug_typenames 0 : { *(.debug_typenames) }
+  .debug_varnames  0 : { *(.debug_varnames) }
+  /* These must appear regardless of  .  */
+  
 }

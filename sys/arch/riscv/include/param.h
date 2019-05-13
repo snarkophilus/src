@@ -63,14 +63,20 @@
 #define STACK_ALIGNBYTES	(__BIGGEST_ALIGNMENT__ - 1)
 #define	ALIGNBYTES32	__BIGGEST_ALIGNMENT__
 
-#define NKMEMPAGES_MAX_DEFAULT	(2048UL * 1024 * 1024)
-#define NKMEMPAGES_MIN_DEFAULT	(128UL * 1024 * 1024)
+#define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
+#define	DEV_BSIZE	(1 << DEV_BSHIFT)
+#define	BLKDEV_IOSIZE	2048
 
-#ifdef _LP64
-#define PGSHIFT		13
-#else
-#define PGSHIFT		12
+#ifndef MAXPHYS
+#define	MAXPHYS		65536		/* max I/O transfer size */
 #endif
+
+#define NKMEMPAGES_MAX_DEFAULT	((2048UL * 1024 * 1024) >> PAGE_SHIFT)
+#define NKMEMPAGES_MIN_DEFAULT	((128UL * 1024 * 1024) >> PAGE_SHIFT)
+
+/* Both RV64 and RV32 use 4K pages */
+#define PGSHIFT		12
+
 #define	NBPG		(1 << PGSHIFT)
 #define PGOFSET		(NBPG - 1)
 

@@ -51,18 +51,27 @@ options 	BUFQ_PRIOCSCAN
 # Diagnostic/debugging support options
 options 	DIAGNOSTIC	# inexpensive kernel consistency checks
 				# XXX to be commented out on release branch
-#options 	DEBUG		# expensive debugging checks/support
-#options 	LOCKDEBUG	# expensive locking checks/support
+#options  	DEBUG		# expensive debugging checks/support
+#options  	LOCKDEBUG	# expensive locking checks/support
+#options  	KERNHIST
+#options  	KERNHIST_PRINT
+#options  	UVMHIST
+#options  	UVMHIST_PRINT
+#options  	PMAPHIST
+#options  	PMAPHIST_PRINT
+#options  	SYSCTL_DEBUG
+#options  	SYSCTL_DEBUG_SETUP
+#options  	SYSCTL_DEBUG_CREATE
 
 #
 # Because gcc omits the frame pointer for any -O level, the line below
 # is needed to make backtraces in DDB work.
 #
-#makeoptions	COPTS="-O2 -fno-omit-frame-pointer"
+makeoptions	COPTS="-O2 -fno-omit-frame-pointer"
 makeoptions	COPY_SYMTAB=1
 options 	DDB		# in-kernel debugger
 #options	DDB_COMMANDONENTER="bt"	# execute command when ddb is entered
-#options 	DDB_ONPANIC=1	# see also sysctl(7): `ddb.onpanic'
+options 	DDB_ONPANIC=1	# see also sysctl(7): `ddb.onpanic'
 options 	DDB_HISTORY_SIZE=512	# enable history editing in DDB
 #options 	KGDB		# remote debugger
 #options 	KGDB_DEVNAME="\"com\"",KGDB_DEVADDR=0x3f8,KGDB_DEVRATE=9600
@@ -154,8 +163,10 @@ pseudo-device 	crypto			# /dev/crypto device
 pseudo-device	swcrypto		# software crypto implementation
 
 # disk/mass storage pseudo-devices
-#pseudo-device	md			# memory disk device (ramdisk)
-#options 	MEMORY_DISK_HOOKS	# enable root ramdisk
+pseudo-device	md			# memory disk device (ramdisk)
+options 	MEMORY_DISK_HOOKS	# enable root ramdisk
+options  	MEMORY_DISK_IS_ROOT
+options  	MEMORY_DISK_SIZE=1000
 #options 	MEMORY_DISK_DYNAMIC	# loaded via kernel module(7)
 
 pseudo-device	vnd			# disk-like interface to files
@@ -166,6 +177,7 @@ pseudo-device	pty			# pseudo-terminals
 pseudo-device	clockctl		# user control of clock subsystem
 pseudo-device	ksyms			# /dev/ksyms
 pseudo-device	lockstat		# lock profiling
+pseudo-device	tap			# virtual Ethernet
 
 # userland interface to drivers, including autoconf and properties retrieval
 pseudo-device	drvctl
