@@ -61,12 +61,9 @@ typedef struct pv_entry {
 	struct pmap *pv_pmap;
 	vaddr_t pv_va;
 #define	PV_KENTER		__BIT(0)
-#define	PV_WIRED		__BIT(1)
 } *pv_entry_t;
 
 #define	PV_ISKENTRY_P(pv)	(((pv->pv_va) & PV_KENTRY) != 0)
-#define	PV_ISWIRED_P(pv)	(((pv->pv_va) & PV_WIRED) != 0)
-
 
 #ifndef _MODULE
 
