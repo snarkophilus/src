@@ -38,6 +38,7 @@ __RCSID("$NetBSD: riscv_machdep.c,v 1.4 2019/04/06 11:54:20 kamil Exp $");
 #include <sys/cpu.h>
 #include <sys/exec.h>
 #include <sys/lwp.h>
+#include <sys/sysctl.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/module.h>
@@ -48,6 +49,8 @@ __RCSID("$NetBSD: riscv_machdep.c,v 1.4 2019/04/06 11:54:20 kamil Exp $");
 #include <uvm/uvm_extern.h>
 
 #include <riscv/locore.h>
+#include <riscv/pte.h>
+#include <riscv/umprintf.h>
 
 int cpu_printfataltraps;
 char machine[] = MACHINE;
@@ -66,6 +69,22 @@ const pcu_ops_t * const pcu_ops_md_defs[PCU_UNIT_COUNT] = {
 	[PCU_FPU] = &pcu_fpu_ops,
 };
 
+/* Used by PHYSTOV and VTOPHYS -- Will be set be BSS is zeroed so
+ * keep it in data */
+__uint64_t kern_vtopdiff __attribute__((__section__(".data")));
+
+/* XXX Find a better way */
+__uint64_t kern_vstart __attribute__((__section__(".data")));
+
+SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
+{
+	sysctl_createv(clog, 0, NULL, NULL,
+	    CTLFLAG_PERMANENT,
+	    CTLTYPE_NODE, "machdep", NULL,
+	    NULL, 0, NULL, 0,
+	    CTL_MACHDEP, CTL_EOL);
+}
+
 void
 delay(unsigned long us)
 {
@@ -80,7 +99,7 @@ delay(unsigned long us)
 
 #ifdef MODULAR
 /*
- * Push any modules loaded by the boot loader. 
+ * Push any modules loaded by the boot loader.
  */
 void
 module_init_md(void)
@@ -104,11 +123,7 @@ setregs(struct lwp *l, struct exec_package *pack, vaddr_t stack)
 	memset(tf, 0, sizeof(struct trapframe));
 	tf->tf_sp = (intptr_t)stack_align(stack);
 	tf->tf_pc = (intptr_t)pack->ep_entry & ~1;
-#ifdef _LP64
-	tf->tf_sr = (p->p_flag & PK_32) ? SR_USER32 : SR_USER;
-#else
 	tf->tf_sr = SR_USER;
-#endif
 	// Set up arguments for _start(obj, cleanup, ps_strings)
 	tf->tf_a0 = 0;			// obj
 	tf->tf_a1 = 0;			// cleanup
@@ -122,7 +137,7 @@ md_child_return(struct lwp *l)
 
 	tf->tf_a0 = 0;
 	tf->tf_a1 = 1;
-	tf->tf_sr &= ~SR_EF;		/* Disable FP as we can't be them. */
+	/* tf->tf_sr &= ~SR_EF;		/* Disable FP as we can't be them. */ */
 }
 
 void
@@ -131,7 +146,7 @@ cpu_spawn_return(struct lwp *l)
 	userret(l);
 }
 
-/* 
+/*
  * Start a new LWP
  */
 void
@@ -297,7 +312,7 @@ cpu_need_resched(struct cpu_info *ci, int flags)
 #ifdef MULTIPROCESSOR
 	if (ci != cur_ci && (flags & RESCHED_IMMED)) {
 		cpu_send_ipi(ci, IPI_AST);
-	} 
+	}
 #endif
 }
 
@@ -348,7 +363,8 @@ void
 cpu_startup(void)
 {
 	vaddr_t minaddr, maxaddr;
-	char pbuf[9];	/* "99999 MB" */
+	char pbuf[10];	/* "999999 MB" -- But Sv39 is max 512GB */
+
 
 	/*
 	 * Good {morning,afternoon,evening,night}.
@@ -368,7 +384,88 @@ cpu_startup(void)
 	printf("avail memory = %s\n", pbuf);
 }
 
-void
-init_riscv(vaddr_t kernstart, vaddr_t kernend)
+paddr_t
+init_mmu(paddr_t dtb, paddr_t end)
 {
+	extern paddr_t virt_map;
+	virt_map = (paddr_t)virt_map - (paddr_t)&virt_map;
+	extern __uint64_t l1_pte[512];
+	extern __uint64_t l2_pte[512];
+	extern __uint64_t l2_dtb[512];
+	__uint64_t phys_base = VM_MIN_KERNEL_ADDRESS - virt_map;
+	__uint64_t phys_base_2mb_chunk = phys_base >> 21;
+	__uint64_t l2_perms = PTE_V | PTE_D | PTE_A | PTE_R | PTE_W | PTE_X;
+	__uint64_t i = l1pde_index(VM_MIN_KERNEL_ADDRESS);
+	
+
+	end = (end + 0x200000 - 1) & -0x200000;
+
+	/* Global used later for VTOPHYS and PHYSTOV */
+	kern_vtopdiff = VM_MAX_KERNEL_ADDRESS - 0x80000000ULL;
+	kern_vstart = VM_MIN_KERNEL_ADDRESS - phys_base + end + 0x200000;
+
+	/* L1 PTE with entry for Kernel VA, pointing to L2 PTE */
+	l1_pte[i] = (((paddr_t)&l2_pte >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V;
+
+	/* Map all of memory into the last gig */
+	/* XXX THIS IS SUPER, SUPER WRONG. */
+	l1_pte[l1pde_index(VM_MAX_KERNEL_ADDRESS)] = ((0x80000000ULL >> PAGE_SHIFT) << PTE_PPN0_S) | l2_perms;
+
+	/* L1 PTE with entry for Kernel PA, pointing to L2 PTE */
+	/* i = ((paddr_t)&start >> L1_SHIFT) & Ln_ADDR_MASK; */
+	/* l1_pte[i] = (((paddr_t)&l2_pte >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V; */
+
+	/* XXX: This is the same index as the Kernel PA */
+
+	/* L1 PTE with entry for L2_DTB */
+	/* i = ((paddr_t)&l2_dtb >> L1_SHIFT) & Ln_ADDR_MASK; */
+	/* umprintf("i = %d\n", i); */
+	/* l1_pte[i] = (((paddr_t)&l2_dtb >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V; */
+	/* umprintf("l1_pte[%d]: 0x%x\n", i, l1_pte[i]); */
+
+	/* Build the L2 Page Table we just pointed to */
+	for (i = 0; ((phys_base_2mb_chunk + i) << 21) < end; ++i) {
+		l2_pte[i] = ((phys_base_2mb_chunk + i) << PTE_PPN1_S)
+		    | l2_perms;
+	}
+
+	/* umprintf("DTB: 0x%x\n", dtb); */
+
+	/* Put the DTB in the L2_DTB table */
+	/* i = ((paddr_t)dtb >> L1_SHIFT) & Ln_ADDR_MASK; */
+	/* l2_dtb[i] = (dtb << PTE_PPN0_S) | PTE_V | PTE_A | PTE_R; */
+
+	return phys_base;
+}
+
+void
+riscv_init_lwp0_uarea(void)
+{
+	extern char lwp0uspace[];
+
+	uvm_lwp_setuarea(&lwp0, (vaddr_t)lwp0uspace);
+	memset(&lwp0.l_md, 0, sizeof(lwp0.l_md));
+	memset(lwp_getpcb(&lwp0), 0, sizeof(struct pcb));
+
+	struct trapframe *tf = (struct trapframe *)(lwp0uspace + USPACE) - 1;
+	memset(tf, 0, sizeof(struct trapframe));
+	/* tf->tf_spsr = SPSR_M_EL0T; */
+	lwp0.l_md.md_utf = lwp0.l_md.md_ktf = tf;
+}
+
+void
+init_riscv(register_t hartid, paddr_t dtb, paddr_t kernstart, paddr_t kernend)
+{
+	/* Main screen turn on */
+	consinit();
+
+	/* SPAM me while testing */
+	boothowto |= AB_DEBUG;
+
+	/* Just pretend we have a gig of ram until FDT is implemented */
+	pmap_bootstrap(0x80000000ULL, 0xc0000000ULL, kern_vstart, kernend);
+
+	/* Finish setting up lwp0 on our end before we call main() */
+	riscv_init_lwp0_uarea();
+
 }

@@ -185,6 +185,11 @@ pmap_md_cache_prefer_mask(void)
 #endif
 }
 
+static inline pt_entry_t *
+pmap_md_nptep(pt_entry_t *ptep)
+{
+	return ptep + PAGE_SIZE / L2_S_SIZE;
+}
 
 #endif	/* __PMAP_PRIVATE */
 
@@ -391,7 +396,10 @@ pte_cached_change(pt_entry_t pte, bool cached)
 static inline void
 pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
-	l2pte_set(ptep, pte, *ptep);
+	if (pte == 0)
+		l2pte_reset(ptep);
+	else
+		l2pte_set(ptep, pte, *ptep);
 }
 
 static inline pd_entry_t

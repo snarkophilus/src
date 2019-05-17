@@ -939,7 +939,7 @@ pmap_pte_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
 
 	KASSERT(kpreempt_disabled());
 
-	for (; sva < eva; sva += NBPG, ptep++) {
+	for (; sva < eva; sva += NBPG, ptep = pmap_md_nptep(ptep)) {
 		const pt_entry_t pte = *ptep;
 		if (!pte_valid_p(pte))
 			continue;
@@ -1085,7 +1085,8 @@ pmap_pte_protect(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
 	/*
 	 * Change protection on every valid mapping within this segment.
 	 */
-	for (; sva < eva; sva += NBPG, ptep++) {
+
+	for (; sva < eva; sva += NBPG, ptep = pmap_md_nptep(ptep)) {
 		pt_entry_t pte = *ptep;
 		if (!pte_valid_p(pte))
 			continue;
@@ -1393,7 +1394,11 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 
 	pt_entry_t npte = pte_make_kenter_pa(pa, mdpg, prot, flags);
 	kpreempt_disable();
+#ifdef PMAP_HWPAGEWALKER
+	pt_entry_t * const ptep = pmap_md_pdetab_lookup_create_ptep(pmap, va);
+#else
 	pt_entry_t * const ptep = pmap_pte_lookup(pmap, va);
+#endif
 	KASSERTMSG(ptep != NULL, "%#"PRIxVADDR " %#"PRIxVADDR, va,
 	    pmap_limits.virtual_end);
 	KASSERT(!pte_valid_p(*ptep));
@@ -1450,7 +1455,7 @@ pmap_pte_kremove(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
 
 	KASSERT(kpreempt_disabled());
 
-	for (; sva < eva; sva += NBPG, ptep++) {
+	for (; sva < eva; sva += NBPG, ptep = pmap_md_nptep(ptep)) {
 		pt_entry_t pte = *ptep;
 		if (!pte_valid_p(pte))
 			continue;

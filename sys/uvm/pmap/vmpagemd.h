@@ -111,7 +111,7 @@ struct vm_page_md {
 #define	VM_PAGEMD_PVLIST_LOCKED_P(mdpg)	pmap_pvlist_locked_p(mdpg)
 #define	VM_PAGEMD_PVLIST_GEN(mdpg)	((mdpg)->mdpg_attrs >> 16)
 
-#define VM_PAGEMD_PVLIST_EMPTY_P(mdpg)	((mdpg)->mdpg_first.pv_pmap == NULL)
+#define	VM_PAGEMD_PVLIST_EMPTY_P(mdpg)	((mdpg)->mdpg_first.pv_pmap == NULL)
 
 #ifdef _KERNEL
 #if defined(MULTIPROCESSOR) || defined(MODULAR)

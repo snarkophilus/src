@@ -321,7 +321,7 @@ pmap_pdetab_fixup(struct pmap *pmap, vaddr_t va)
 	pmap_segtab_t * const ustb = pmap->pm_segtab;
 #endif
 
-	// Regardless of how many levels deep this page table deep, we only
+	// Regardless of how many levels deep this page table is, we only
 	// need to verify the first level PDEs match up.
 #ifdef XSEGSHIFT
 	idx &= va >> XSEGSHIFT;

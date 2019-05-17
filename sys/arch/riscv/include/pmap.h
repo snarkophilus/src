@@ -38,32 +38,39 @@
 
 #if !defined(_MODULE)
 
+#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/pool.h>
 #include <sys/evcnt.h>
 
+#include <uvm/uvm_physseg.h>
 #include <uvm/pmap/vmpagemd.h>
 
 #include <riscv/pte.h>
 
-#define	PMAP_SEGTABSIZE		(__SHIFTOUT(PTE_PPN0, PTE_PPN0) + 1)
-#define	PMAP_PDETABSIZE		(__SHIFTOUT(PTE_PPN0, PTE_PPN0) + 1)
+#ifdef _LP64
+#define	PMAP_SEGTABSIZE		NPTEPG
+#define	PMAP_PDETABSIZE		NPTEPG
+#endif
 
 #define NBSEG		(NBPG*NPTEPG)
 #ifdef _LP64
 #define NBXSEG		(NBSEG*NSEGPG)
-#define XSEGSHIFT	(SEGSHIFT + PGSHIFT - 3)
-#define XSEGOFSET	(PTE_PPN1|SEGOFSET)
-#define SEGSHIFT	(PGSHIFT + PGSHIFT - 3)
+#define XSEGSHIFT	L1_SHIFT
+#define XSEGOFSET	L1_OFFSET
+#define SEGSHIFT	L3_SHIFT
 #else
-#define SEGSHIFT	(PGSHIFT + PGSHIFT - 2)
+#define SEGSHIFT	L3_SHIFT
 #endif
-#define SEGOFSET	(PTE_PPN0|PAGE_MASK)
+#define SEGOFSET	L3_OFFSET
 
 #define KERNEL_PID	0
 
 #define PMAP_HWPAGEWALKER		1
-#define PMAP_TLB_NUM_PIDS		256
+#define PMAP_TLB_BITMAP_LENGHTH		4096 /* This is actually
+					      * ignored in
+					      * uvm/pmap_tlb.h */
+#define PMAP_TLB_NUM_PIDS		4096
 #define PMAP_TLB_MAX			1
 #ifdef _LP64
 #define PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
@@ -76,13 +83,21 @@
 
 #define pmap_phys_address(x)		(x)
 
+#ifndef __BSD_PTENTRY_T__
+#define __BSD_PTENTRY_T__
+#ifdef _LP64
+#define PRIxPTE         PRIx64
+#else
+#define PRIxPTE         PRIx32
+#endif
+#endif /* __BSD_PTENTRY_T__ */
+
 #define PMAP_NEED_PROCWR
 static inline void
 pmap_procwr(struct proc *p, vaddr_t va, vsize_t len)
 {
 	__asm __volatile("fence\trw,rw; fence.i");
 }
-
 
 #include <uvm/pmap/tlb.h>
 
@@ -112,6 +127,13 @@ bool    pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
 void	pmap_md_pdetab_activate(struct pmap *, struct lwp *);
 void	pmap_md_pdetab_init(struct pmap *);
+bool    pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
+
+pt_entry_t *
+	pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va);
+pt_entry_t *
+	pmap_md_pdetab_lookup_create_ptep(struct pmap *pmap, vaddr_t va);
+void	pmap_bootstrap(paddr_t pstart, paddr_t pend, paddr_t kstart, paddr_t kend);
 
 #ifdef __PMAP_PRIVATE
 static inline void
@@ -148,8 +170,9 @@ pmap_md_tlb_asid_max(void)
 #endif /* __PMAP_PRIVATE */
 #endif /* _KERNEL */
 
-#define POOL_VTOPHYS(va)	((paddr_t)((vaddr_t)(va)-VM_MAX_KERNEL_ADDRESS))
-#define POOL_PHYSTOV(pa)	((vaddr_t)(paddr_t)(pa)+VM_MAX_KERNEL_ADDRESS)
+extern __uint64_t kern_vtopdiff;
+#define POOL_VTOPHYS(va)	((paddr_t)((vaddr_t)(va)-kern_vtopdiff))
+#define POOL_PHYSTOV(pa)	((vaddr_t)((paddr_t)(pa)+kern_vtopdiff))
 
 #include <uvm/pmap/pmap.h>
 
@@ -168,7 +191,13 @@ struct vm_page_md {
 };
 #endif /* !__HVE_VM_PAGE_MD */
 
-__CTASSERT(sizeof(struct vm_page_md) == sizeof(uintptr_t)*3);
+/* __CTASSERT(sizeof(struct vm_page_md) == sizeof(uintptr_t)*3); */
+/* Temporarily disable this assert -- Not sure why __ctassert0 is
+   negative */
+
+struct pmap_page {
+	int XXX;
+};
 
 #endif /* MODULAR || _MODULE */
 

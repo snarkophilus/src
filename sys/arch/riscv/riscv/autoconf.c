@@ -45,6 +45,8 @@ cpu_configure(void)
 
 	if (config_rootfound("mainbus", NULL) == NULL)
 		panic("no mainbus found");
+
+	spl0();
 }
 
 void
@@ -56,10 +58,5 @@ cpu_rootconf(void)
 
 void
 device_register(device_t dv, void *aux)
-{
-}
-
-void
-consinit(void)
 {
 }
