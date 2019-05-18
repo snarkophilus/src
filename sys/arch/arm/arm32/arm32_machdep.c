@@ -1,4 +1,4 @@
-/*	$NetBSD: arm32_machdep.c,v 1.127 2019/02/04 13:12:03 skrll Exp $	*/
+/*	$NetBSD: arm32_machdep.c,v 1.128 2019/05/10 16:43:09 skrll Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -45,7 +45,7 @@
 #define __PMAP_PRIVATE
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.127 2019/02/04 13:12:03 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.128 2019/05/10 16:43:09 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_arm_start.h"
