@@ -220,6 +220,9 @@ vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
 struct vm_page *pmap_md_alloc_poolpage(int);
 
+/*
+ * Other hooks for the pool allocator.
+ */
 paddr_t	pmap_md_pool_vtophys(vaddr_t);
 vaddr_t	pmap_md_pool_phystov(paddr_t);
 #define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
@@ -408,32 +411,34 @@ pte_invalid_pde(void)
 	return 0;
 }
 
-//XXXNH is this used?
+// XXXNH only used in _LP64
 static inline pd_entry_t
 pte_pde_pdetab(paddr_t pa)
 {
-//	return PTE_V | PTE_G | PTE_T | pa;
-	return pa;
+
+	return 0;
 }
 
 static inline pd_entry_t
-pte_pde_ptpage(paddr_t pa)
+pte_pde_ptpage(paddr_t pa, bool kernel_p)
 {
-//	return PTE_V | PTE_G | PTE_T | pa;
-	return pa;
+	const uint8_t dom = kernel_p ? PMAP_DOMAIN_KERNEL : PMAP_DOMAIN_USER;
+
+	return L1_C_PROTO | L1_C_DOM(dom) | pa;
 }
 
 static inline bool
 pte_pde_valid_p(pd_entry_t pde)
 {
-//	return (pde & (PTE_V|PTE_T)) == (PTE_V|PTE_T);
-	return (pde & 0x3);
+
+	return l1pte_valid_p(pde);
 }
 
 static inline paddr_t
 pte_pde_to_paddr(pd_entry_t pde)
 {
-	return pde & ~PAGE_MASK;
+
+	return l1pte_pa(pde);
 }
 
 static inline pd_entry_t
@@ -451,18 +456,13 @@ pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 #endif
 }
 
+static inline void
+pte_pde_set(pd_entry_t *pdep, pd_entry_t npde)
+{
 
+	*pdep = npde;
+}
 
-/*
- * Other hooks for the pool allocator.
- */
-
-#if 0
-paddr_t pmap_md_pool_vtophys(vaddr_t);
-vaddr_t pmap_md_pool_phystov(paddr_t);
-#define POOL_VTOPHYS(va)        pmap_md_pool_vtophys((vaddr_t)va)
-#define POOL_PHYSTOV(pa)        pmap_md_pool_phystov((paddr_t)pa)
-#endif
 
 #ifdef __PMAP_PRIVATE
 struct vm_page_md;
