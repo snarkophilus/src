@@ -308,7 +308,7 @@ pte_pde_pdetab(paddr_t pa)
 }
 
 static inline pd_entry_t
-pte_pde_ptpage(paddr_t pa)
+pte_pde_ptpage(paddr_t pa, bool kernel_p)
 {
 	return PTE_V | PTE_G | (pa >> PAGE_SHIFT) << PTE_PPN2_S;
 }
@@ -340,6 +340,15 @@ pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 	return 0;
 #endif
 }
+
+static inline void
+pte_pde_set(pd_entry_t *pdep, pd_entry_t npde)
+{
+
+	*pdep = npde;
+}
+#endif
+
 
 static inline pt_entry_t
 pte_value(pt_entry_t pte)
