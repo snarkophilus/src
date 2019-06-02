@@ -7581,11 +7581,6 @@ process_g_packet (struct regcache *regcache)
 
   buf_len = strlen (rs->buf);
 
-  /* Further sanity checks, with knowledge of the architecture.  */
-  if (buf_len > 2 * rsa->sizeof_g_packet)
-    error (_("Remote 'g' packet reply is too long (expected %ld bytes, got %d "
-	     "bytes): %s"), rsa->sizeof_g_packet, buf_len / 2, rs->buf);
-
   /* Save the size of the packet sent to us by the target.  It is used
      as a heuristic when determining the max size of packets that the
      target can safely receive.  */
@@ -7596,7 +7591,7 @@ process_g_packet (struct regcache *regcache)
      update our records.  A 'g' reply that doesn't include a register's
      value implies either that the register is not available, or that
      the 'p' packet must be used.  */
-  if (buf_len < 2 * rsa->sizeof_g_packet)
+  if (buf_len != 2 * rsa->sizeof_g_packet)
     {
       long sizeof_g_packet = buf_len / 2;
 
