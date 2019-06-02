@@ -140,6 +140,14 @@ pmap_md_cache_prefer_mask(void)
 {
 	return MIPS_HAS_R4K_MMU ? mips_cache_info.mci_cache_prefer_mask : 0;
 }
+
+static inline pt_entry_t *
+pmap_md_nptep(pt_entry_t *ptep)
+{
+        return ptep + 1;
+}
+
+
 #endif /* __PMAP_PRIVATE */
 
 struct tlbmask {
@@ -228,6 +236,21 @@ void	pmap_prefer(vaddr_t, vaddr_t *, vsize_t, int);
 bool	pmap_md_direct_mapped_vaddr_p(register_t);
 paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(register_t);
 bool	pmap_md_io_vaddr_p(vaddr_t);
+
+static inline bool
+pmap_md_kernel_vaddr_p(vaddr_t va)
+{
+	return false;
+}
+
+static inline paddr_t
+pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
+{
+	/* Not used due to false from pmap_md_kernel_vaddr_p */
+
+	return 0;
+}
+
 
 /*
  * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.

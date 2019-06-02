@@ -165,6 +165,26 @@ pmap_md_tlb_asid_max(void)
 {
 	return PMAP_TLB_NUM_PIDS - 1;
 }
+
+static inline pt_entry_t *
+pmap_md_nptep(pt_entry_t *ptep)
+{
+        return ptep + 1;
+}
+
+static inline bool
+pmap_md_kernel_vaddr_p(vaddr_t va)
+{
+        return false;
+}
+
+static inline paddr_t
+pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
+{
+        /* Not used due to false from pmap_md_kernel_vaddr_p */
+
+        return 0;
+}
 #endif /* __PMAP_PRIVATE */
 #endif /* _KERNEL */
 

@@ -617,11 +617,19 @@ pmap_create(void)
 	pmap->pm_minaddr = VM_MIN_ADDRESS;
 	pmap->pm_maxaddr = VM_MAXUSER_ADDRESS;
 
-#ifndef PMAP_HWPAGEWALKER
-	pmap_segtab_init(pmap);
-#else
-	pmap_md_pdetab_init(pmap);
+	pmap->pm_uobject.vmobjlock = mutex_obj_alloc(MUTEX_DEFAULT, IPL_VM);
+//	TAILQ_INIT(&pmap->pm_pvp_list);
+	TAILQ_INIT(&pmap->pm_ptp_list);
+#ifdef _LP64
+#if defined(PMAP_HWPAGEWALKER)
+	TAILQ_INIT(&pmap->pm_pdetab_list);
 #endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+	TAILQ_INIT(&pmap->pm_segtab_list);
+#endif
+#endif
+
+	pmap_segtab_init(pmap);
 
 #ifdef MULTIPROCESSOR
 	kcpuset_create(&pmap->pm_active, true);
@@ -659,12 +667,22 @@ pmap_destroy(pmap_t pmap)
 	pmap_md_tlb_miss_lock_enter();
 	pmap_tlb_asid_release_all(pmap);
 
-#ifdef PMAP_HWPAGEWALKER
-	pmap_md_pdetab_destroy(pmap);
-#else
 	pmap_segtab_destroy(pmap, NULL, 0);
-#endif
 	pmap_md_tlb_miss_lock_exit();
+
+//	KASSERT(TAILQ_EMPTY(&pmap->pm_pvp_list));
+	KASSERT(TAILQ_EMPTY(&pmap->pm_ptp_list));
+#ifdef _LP64
+#if defined(PMAP_HWPAGEWALKER)
+	KASSERT(TAILQ_EMPTY(&pmap->pm_pdetab_list));
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+	KASSERT(TAILQ_EMPTY(&pmap->pm_segtab_list));
+#endif
+#endif
+	KASSERT(pmap->pm_uobject.uo_npages == 0);
+
+	mutex_obj_free(pmap->pm_uobject.vmobjlock);
 
 #ifdef MULTIPROCESSOR
 	kcpuset_destroy(pmap->pm_active);
@@ -713,11 +731,7 @@ pmap_activate(struct lwp *l)
 	pmap_md_tlb_miss_lock_enter();
 	pmap_tlb_asid_acquire(pmap, l);
 	if (l == curlwp) {
-#ifndef PMAP_HWPAGEWALKER
 		pmap_segtab_activate(pmap, l);
-#else
-		pmap_md_pdetab_activate(pmap, l);
-#endif
 	}
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
@@ -865,7 +879,7 @@ pmap_deactivate(struct lwp *l)
 	kpreempt_disable();
 	KASSERT(l == curlwp || l->l_cpu == curlwp->l_cpu);
 	pmap_md_tlb_miss_lock_enter();
-#if !defined(PMAP_HWPAGEWALKER) || !defined(POOL_VTOPHYS)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 	curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
 #ifdef _LP64
 	curcpu()->ci_pmap_user_seg0tab = NULL;
@@ -904,11 +918,7 @@ pmap_update(struct pmap *pmap)
 	if (__predict_false(pmap->pm_flags & PMAP_DEFERRED_ACTIVATE)) {
 		pmap->pm_flags ^= PMAP_DEFERRED_ACTIVATE;
 		pmap_tlb_asid_acquire(pmap, curlwp);
-#ifndef PMAP_HWPAGEWALKER
 		pmap_segtab_activate(pmap, curlwp);
-#else
-		pmap_md_pdetab_activate(pmap, curlwp);
-#endif
 	}
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
@@ -1394,11 +1404,8 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 
 	pt_entry_t npte = pte_make_kenter_pa(pa, mdpg, prot, flags);
 	kpreempt_disable();
-#ifdef PMAP_HWPAGEWALKER
-	pt_entry_t * const ptep = pmap_md_pdetab_lookup_create_ptep(pmap, va);
-#else
-	pt_entry_t * const ptep = pmap_pte_lookup(pmap, va);
-#endif
+	pt_entry_t * const ptep = pmap_pte_reserve(pmap, va, 0);
+
 	KASSERTMSG(ptep != NULL, "%#"PRIxVADDR " %#"PRIxVADDR, va,
 	    pmap_limits.virtual_end);
 	KASSERT(!pte_valid_p(*ptep));
@@ -1521,6 +1528,8 @@ pmap_remove_all(struct pmap *pmap)
 	pmap_tlb_asid_release_all(pmap);
 	pmap_md_tlb_miss_lock_exit();
 	pmap->pm_flags |= PMAP_DEFERRED_ACTIVATE;
+
+	pmap_segtab_remove_all(pmap);
 
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;

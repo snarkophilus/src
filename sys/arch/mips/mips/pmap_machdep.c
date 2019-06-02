@@ -471,7 +471,7 @@ pmap_bootstrap(void)
 			/*
 			 * Now set the page table pointer...
 			 */
-			stp->seg_tab[j] = &sysmap[i];
+			stp->seg_tab[j] = (pmap_ptpage_t *)&sysmap[i];
 #ifdef _LP64
 			/*
 			 * If we are at end of this XSEG, terminate the loop

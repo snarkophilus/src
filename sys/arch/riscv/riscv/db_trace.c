@@ -129,7 +129,7 @@ db_stack_trace_print(db_expr_t addr, bool have_addr, db_expr_t count,
 
 	printf("have_addr: %s\n", have_addr ? "true" : "false");
 	if (have_addr)
-		printf("addr: %p\n", addr);
+		printf("addr: %lx\n", addr);
 	printf("count: %zd\n", count);
 	printf("modif: %s\n", modif);
 

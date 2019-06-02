@@ -74,6 +74,7 @@
 #ifndef	_UVM_PMAP_PMAP_H_
 #define	_UVM_PMAP_PMAP_H_
 
+#include <uvm/uvm_object.h>
 #include <uvm/uvm_stat.h>
 #ifdef UVMHIST
 UVMHIST_DECL(pmapexechist);
@@ -92,29 +93,26 @@ UVMHIST_DECL(pmaphist);
 #define pmap_round_seg(x)	(((vaddr_t)(x) + SEGOFSET) & ~SEGOFSET)
 
 /*
- * Each seg_tab point an array of pt_entry [NPTEPG]
+ * Each ptpage maps a "segment" worth of address space.  That is
+ * NPTEPG * PAGE_SIZE.
  */
 
 typedef struct {
 	pt_entry_t ptp_ptes[NPTEPG];
 } pmap_ptpage_t;
 
-typedef struct {
-	pv_entry_t pvp_pvs[NPTEPG];
-} pmap_pvpage_t;
-
-//&& defined(PMAP_MAP_POOLPAGE)
 #if defined(PMAP_HWPAGEWALKER)
 typedef union pmap_pdetab {
 	pd_entry_t		pde_pde[PMAP_PDETABSIZE];
 	union pmap_pdetab *	pde_next;
 } pmap_pdetab_t;
-#else
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 typedef union pmap_segtab {
 #ifdef _LP64
 	union pmap_segtab *	seg_seg[PMAP_SEGTABSIZE];
 #endif
-	pt_entry_t *		seg_tab[PMAP_SEGTABSIZE];
+	pmap_ptpage_t *		seg_tab[PMAP_SEGTABSIZE];
 #ifdef PMAP_HWPAGEWALKER
 	pd_entry_t		seg_pde[PMAP_PDETABSIZE];
 #endif
@@ -134,6 +132,12 @@ void pmap_pte_process(struct pmap *, vaddr_t, vaddr_t, pte_callback_t,
 void pmap_segtab_activate(struct pmap *, struct lwp *);
 void pmap_segtab_init(struct pmap *);
 void pmap_segtab_destroy(struct pmap *, pte_callback_t, uintptr_t);
+//void pmap_segtab_destroy(struct pmap *);
+void pmap_segtab_remove_all(struct pmap *);
+#ifdef PMAP_HWPAGEWALKER
+pd_entry_t *pmap_pde_lookup(struct pmap *, vaddr_t, paddr_t *);
+bool pmap_pdetab_fixup(struct pmap *, vaddr_t);
+#endif
 extern kmutex_t pmap_segtab_lock;
 #endif /* _KERNEL */
 
@@ -146,17 +150,30 @@ extern kmutex_t pmap_segtab_lock;
  * Machine dependent pmap structure.
  */
 struct pmap {
+	struct uvm_object	pm_uobject;
+#define pm_count		pm_uobject.uo_refs /* pmap reference count */
+#define pm_pvp_list		pm_uobject.memq
+	struct pglist		pm_ptp_list;
+#ifdef _LP64
+#if defined(PMAP_HWPAGEWALKER)
+	struct pglist		pm_pdetab_list;
+#else
+	struct pglist		pm_segtab_list;
+#endif
+#endif /* _LP64 */
 #ifdef MULTIPROCESSOR
 	kcpuset_t		*pm_active;	/* pmap was active on ... */
 	kcpuset_t		*pm_onproc;	/* pmap is active on ... */
 	volatile u_int		pm_shootdown_pending;
 #endif
-#if defined(PMAP_HWPAGEWALKER)
+#if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_POOLPAGE)
 	pmap_pdetab_t *		pm_pdetab;	/* pointer to HW PDEs */
+#elif defined(PMAP_HWPAGEWALKER)
+	pmap_pdetab_t *		pm_pdetab;	/* pointer to HW PDEs */
+	pmap_segtab_t *		pm_segtab;	/* virtual shadow of HW PDEs */
 #else
 	pmap_segtab_t *		pm_segtab;	/* pointers to pages of PTEs */
 #endif
-	u_int			pm_count;	/* pmap reference count */
 	u_int			pm_flags;
 #define	PMAP_DEFERRED_ACTIVATE	__BIT(0)
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
