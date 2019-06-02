@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.3 2019/04/17 07:40:34 mrg Exp $
+#	$NetBSD: Makefile.inc,v 1.4 2019/06/01 12:42:27 maxv Exp $
 
 .for op in add and cas nand or sub swap xor
 sizes=32
