@@ -31,7 +31,7 @@
 
 #include <sys/cdefs.h>
 
-__RCSID("$NetBSD: pmap_machdep.c,v 1.2 2015/03/31 01:14:57 matt Exp $");
+__RCSID("$NetBSD: pmap_machdep.c,v 1.3 2019/06/01 12:42:28 maxv Exp $");
 
 #include <sys/param.h>
 
@@ -141,7 +141,7 @@ pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t va)
 {
 	KASSERT(VM_MAX_KERNEL_ADDRESS <= va && (intptr_t) va < 0);
 
-	pmap_pdetab_t *ptb = pmap_kernel()->pm_pdetab;
+	const pmap_pdetab_t *ptb = pmap_kernel()->pm_pdetab;
 	pd_entry_t *pdp;
 	pd_entry_t  pde;
 
@@ -353,6 +353,10 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	    &pmap_pv_page_allocator, IPL_NONE);
 
 	tlb_set_asid(0);
+
+	pmap->pm_pdetab[NPDEPG-1] = pmap_kernel()->pm_pdetab[NPDEPG-1];
+	pmap->pm_md.md_ptbr =
+	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_md.md_pdetab);
 }
 
 // TLB mainenance routines

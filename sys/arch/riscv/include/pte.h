@@ -1,4 +1,4 @@
-/* $NetBSD: pte.h,v 1.1 2014/09/19 17:36:26 matt Exp $ */
+/* $NetBSD: pte.h,v 1.2 2019/06/01 12:42:28 maxv Exp $ */
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.

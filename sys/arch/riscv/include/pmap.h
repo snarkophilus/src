@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.1 2014/09/19 17:36:26 matt Exp $ */
+/* $NetBSD: pmap.h,v 1.2 2019/06/01 12:42:28 maxv Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -48,10 +48,7 @@
 
 #include <riscv/pte.h>
 
-#ifdef _LP64
 #define	PMAP_SEGTABSIZE		NPTEPG
-#define	PMAP_PDETABSIZE		NPTEPG
-#endif
 
 #define NBSEG		(NBPG*NPTEPG)
 #ifdef _LP64
@@ -111,6 +108,7 @@ pmap_procwr(struct proc *p, vaddr_t va, vsize_t len)
 #define __HAVE_PMAP_MD
 struct pmap_md {
 	paddr_t md_ptbr;
+	pd_entry_t *md_pdetab;
 };
 
 struct vm_page *
@@ -189,15 +187,9 @@ extern __uint64_t kern_vtopdiff;
 struct vm_page_md {
 	uintptr_t mdpg_dummy[3];
 };
-#endif /* !__HVE_VM_PAGE_MD */
+__CTASSERT(sizeof(struct vm_page_md) == sizeof(uintptr_t)*3);
 
-/* __CTASSERT(sizeof(struct vm_page_md) == sizeof(uintptr_t)*3); */
-/* Temporarily disable this assert -- Not sure why __ctassert0 is
-   negative */
-
-struct pmap_page {
-	int XXX;
-};
+#endif /* !__HAVE_VM_PAGE_MD */
 
 #endif /* MODULAR || _MODULE */
 

@@ -1,4 +1,4 @@
-/* $NetBSD: param.h,v 1.2 2019/01/07 22:00:32 jdolecek Exp $ */
+/* $NetBSD: param.h,v 1.3 2019/06/01 12:42:28 maxv Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -67,16 +67,7 @@
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
 #define	BLKDEV_IOSIZE	2048
 
-#ifndef MAXPHYS
-#define	MAXPHYS		65536		/* max I/O transfer size */
-#endif
-
-#define NKMEMPAGES_MAX_DEFAULT	((2048UL * 1024 * 1024) >> PAGE_SHIFT)
-#define NKMEMPAGES_MIN_DEFAULT	((128UL * 1024 * 1024) >> PAGE_SHIFT)
-
-/* Both RV64 and RV32 use 4K pages */
 #define PGSHIFT		12
-
 #define	NBPG		(1 << PGSHIFT)
 #define PGOFSET		(NBPG - 1)
 
