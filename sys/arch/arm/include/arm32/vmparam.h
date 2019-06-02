@@ -78,7 +78,7 @@
 
 /*
  * While the ARM architecture defines Section mappings, large pages,
- * and small pages, the standard page size is (and will always be) 4K.
+ * and small pages, the standard MMU page size is (and will always be) 4K.
  */
 #define	PAGE_SHIFT	PGSHIFT
 #define	PAGE_SIZE	(1 << PAGE_SHIFT)

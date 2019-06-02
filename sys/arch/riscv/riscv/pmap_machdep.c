@@ -205,7 +205,7 @@ pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
 }
 
 void
-pmap_md_pdetab_activate(struct pmap *pmap)
+pmap_md_pdetab_activate(struct pmap *pmap, struct lwp *l)
 {
 	riscvreg_satp_ppn_write(pmap->pm_md.md_ptbr);
 	//OLD: __asm("csrw\tsptbr, %0" :: "r"(pmap->pm_md.md_ptbr));

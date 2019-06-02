@@ -347,7 +347,6 @@ pte_pde_set(pd_entry_t *pdep, pd_entry_t npde)
 
 	*pdep = npde;
 }
-#endif
 
 
 static inline pt_entry_t
