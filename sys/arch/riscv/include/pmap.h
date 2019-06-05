@@ -49,6 +49,7 @@
 #include <riscv/pte.h>
 
 #define	PMAP_SEGTABSIZE		NPTEPG
+#define	PMAP_PDETABSIZE		NPTEPG
 
 #define NBSEG		(NBPG*NPTEPG)
 #ifdef _LP64

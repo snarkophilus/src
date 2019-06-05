@@ -48,65 +48,65 @@ ENTRY_NP(start)
         la      s3, _C_LABEL(start)
         la      s4, _C_LABEL(end)
 
-	/*
-	 * XXX XXX XXX: This is completely broken and wrong, we should map only
-	 * the kernel sections, and the direct map should be mapped later in C.
-	 */
-#if 0 && (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
-#error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
-#endif
-	// We allocated the kernel first PTE page so let's insert in the
-	// page table.  For now, we assume it's in the same PDE page as the
-	// direct-mapped memory.
-	or	t0, s4, t4
-	or	t0, t0, PTE_T
-#if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	add	t1, t1, s3
-	REG_S	t0, 0(t1)
-#else
-	REG_S	t0, 0(s3)
-#endif
+	/* Supervisor (Kernel) can access User Memory (SUM) */
+	li	t0, SR_SUM
+	csrs	sstatus, t0
 
-	li	t0, ((VM_MAX_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	add	s3, s3, t0
-	srli	a7, a7, (SEGSHIFT-PGSHIFT) // pages to segments
-	li	t3, NBSEG		// load for ease
+	/* XXX: If doing SMP should probably park other cores here */
 
-	//
-	// Fill in the PDEs to direct map memory.
-	//
-.Lfill:	REG_S	t4, 0(s3)		// store PDE
-	add	t4, t4, t3		// advance PA in PDE to next segment
-	add	s3, s3, SZREG		// advance to next PDE slot
-	addi	a7, a7, -1		// count down segment
-	bgtz	a6, .Lfill		// loop if more
+	mv	a0, a1 /* We need the DTB's PA passed in */
+        mv	a1, s4
+	call	_C_LABEL(init_mmu)
+	mv	s2, a0
 
-	csrw	sptbr, s1		// set the page table base
-	li	t0, SR_VM
-	csrs	sstatus, t0		// Enable VM
+        /* We'll trap to the VA */
+	la	t0, va
+	/* s2 is returned phys_base from init_mmu */
+	sub	t0, t0, s2
+	li	t1, VM_MIN_KERNEL_ADDRESS
+	add	t0, t0, t1
+	csrw	stvec, t0
 
-	// We should have a VM so let's start using our real addresses
-	lui	t0, %hi(.Lmmu_on)	// load hi part of absolute address
-	jr	t0, %lo(.Lmmu_on)	// jump to absolute address
+	/* Set the Supervisor Address and Translation Register (Turn the MMU on) */
+	la	t0, l1_pte
+	srli	t0, t0, PAGE_SHIFT
+	li	t1, SATP_MODE_SV39
+	or	t0, t0, t1
+	sfence.vma
+	csrw	satp, t0
 
-.Lmmu_on:
-	// MMU is on!
-	csrw	sscratch, zero		// zero in sscratch to mark kernel
+	.align 2
+va:
+        /* The MMU is on! We're running at a VA now! */
 
-	PTR_LA	tp, _C_LABEL(lwp0)	// put curlwp in tp
+        /* Zero the sscratch for when we need to use it next */
+        csrw	sscratch, zero
 
-	PTR_LA	a0, _C_LABEL(cpu_exception_handler)
-	csrw	stvec, a0
+	/* Setup the real supervisor trap vector */
+	la	t0, cpu_exception_handler
+	csrw	stvec, t0
 
-	PTR_S	s1, L_PCB(tp)		// set uarea of lwp (already zeroed)
-	addi	sp, s2, -TF_LEN		// switch to new stack
-	PTR_S	sp, L_MD_UTF(tp)	// store pointer to empty trapframe
+       /* Zero out BSS */
+	la	t0, __bss_start
+	la	t1, _end
+	beq	t0, t1, bss1	/* Skip if start == end */
+bss0:
+	sd	zero, (t0)
+	addi	t0, t0, 8
+	bltu	t0, t1, bss0
+bss1:
 
-	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
-	add	t2, s2, s11 		// PA -> VA
-	PTR_S	t2, PM_MD_PDETAB(t1)	// VA of kernel PDETAB
-	PTR_S	s2, PM_MD_PTBR(t1)	// PA of kernel PDETAB
+	la	t0, _C_LABEL(cpu_exception_handler)
+	csrw	stvec, t0
+
+        /* tp is curlwp, init it for the first time */
+        la      tp, _C_LABEL(lwp0)
+
+	/* Setup the new stack pointer */
+	la 	t0, lwp0uspace
+	li	t1, (UPAGES * PAGE_SIZE) - TF_LEN
+	add	t0, t0, t1	/* lwp0space + USPACE - TF_LEN */
+	mv	sp, t0
 
 	// Now we should ready to start initializing the kernel.
 	mv      a0, s0                  // hartid
