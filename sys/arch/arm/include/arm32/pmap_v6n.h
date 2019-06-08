@@ -103,22 +103,17 @@
 #endif
 
 
+#define	NPDEPG		(PAGE_SIZE / sizeof(pd_entry_t))
 
-// XXXNH what is PTPSHIFT?
+// 1MB NBSEG. SEGSHIFT is 20, I think
 //
-// For ARM and its 8KB PAGE_SIZE and 4K L2_S_SIZE we need NBSEG to be 
 
-#if 1
-#define PTPSHIFT        2
-#define PTPLENGTH       (PGSHIFT - PTPSHIFT)
-CTASSERT(NPTEPG ==   (1 << PTPLENGTH));
+#define	PTPSHIFT        2
+#define	PTPLENGTH       (L2_S_SHIFT - PTPSHIFT)
+//CTASSERT(NPTEPG == (1 << PTPLENGTH));
 
-#define	SEGSHIFT	(PGSHIFT + PTPLENGTH)	/* LOG2(NBSEG) */
-#if 1
-#define NBSEG		(1 << PGSHIFT)		// XXXNH seems to fix pmap_pte_process
-#else
+#define	SEGSHIFT	(L2_S_SHIFT + PTPLENGTH)/* LOG2(NBSEG) */
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
-#endif
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #ifdef _LP64
@@ -132,7 +127,6 @@ CTASSERT(NPTEPG ==   (1 << PTPLENGTH));
 #define	SEGLENGTH	(31 - SEGSHIFT)
 #endif
 #define	NSEGPG		(1 << SEGLENGTH)
-#endif
 
 #if defined(__PMAP_PRIVATE)
 
@@ -413,7 +407,7 @@ pte_invalid_pde(void)
 
 // XXXNH only used in _LP64
 static inline pd_entry_t
-pte_pde_pdetab(paddr_t pa)
+pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
 
 	return 0;
