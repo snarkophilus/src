@@ -7480,6 +7480,12 @@ pmap_md_vca_page_wbinv(struct vm_page *pg, bool locked_p)
 #endif
 }
 
+vaddr_t
+pmap_md_direct_map_paddr(paddr_t pa)
+{
+        return POOL_PHYSTOV(pa);
+}
+
 void
 pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
 {
