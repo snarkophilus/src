@@ -137,7 +137,7 @@ md_child_return(struct lwp *l)
 
 	tf->tf_a0 = 0;
 	tf->tf_a1 = 1;
-	/* tf->tf_sr &= ~SR_EF;		/* Disable FP as we can't be them. */ */
+//	tf->tf_sr &= ~SR_EF;		/* Disable FP as we can't be them. */
 }
 
 void
@@ -391,7 +391,7 @@ init_mmu(paddr_t dtb, paddr_t end)
 	virt_map = (paddr_t)virt_map - (paddr_t)&virt_map;
 	extern __uint64_t l1_pte[512];
 	extern __uint64_t l2_pte[512];
-	extern __uint64_t l2_dtb[512];
+//	extern __uint64_t l2_dtb[512];
 	__uint64_t phys_base = VM_MIN_KERNEL_ADDRESS - virt_map;
 	__uint64_t phys_base_2mb_chunk = phys_base >> 21;
 	__uint64_t l2_perms = PTE_V | PTE_D | PTE_A | PTE_R | PTE_W | PTE_X;
@@ -438,7 +438,7 @@ init_mmu(paddr_t dtb, paddr_t end)
 	return phys_base;
 }
 
-void
+static void
 riscv_init_lwp0_uarea(void)
 {
 	extern char lwp0uspace[];

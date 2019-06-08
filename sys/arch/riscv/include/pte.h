@@ -302,7 +302,7 @@ pte_invalid_pde(void)
 }
 
 static inline pd_entry_t
-pte_pde_pdetab(paddr_t pa)
+pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
 	return PTE_V | PTE_G | (pa >> PAGE_SHIFT) << PTE_PPN0_S;
 }
