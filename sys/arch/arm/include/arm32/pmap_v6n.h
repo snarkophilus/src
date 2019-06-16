@@ -92,8 +92,7 @@
 #endif
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
-/* XXX What is this??? */
-#define PMAP_PDETABSIZE	4096
+#define PMAP_PDETABSIZE	(L1_TABLE_SIZE / sizeof(pd_entry_t))
 #ifdef _LP64
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
@@ -101,7 +100,6 @@
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)0xdeadbeef)
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)0xdeadbeef)
 #endif
-
 
 #define	NPDEPG		(PAGE_SIZE / sizeof(pd_entry_t))
 
@@ -112,7 +110,8 @@
 #define	PTPLENGTH       (L2_S_SHIFT - PTPSHIFT)
 //CTASSERT(NPTEPG == (1 << PTPLENGTH));
 
-#define	SEGSHIFT	(L2_S_SHIFT + PTPLENGTH)/* LOG2(NBSEG) */
+//XXXNH what's the real definition. 20 is right answer.
+#define	SEGSHIFT	(PTPLENGTH + PTPLENGTH)	/* LOG2(NBSEG) */
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
@@ -303,6 +302,13 @@ pmap_pv_protect(paddr_t pa, vm_prot_t prot)
  	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
 }
 #endif
+
+
+static inline size_t
+pte_index(vaddr_t va)
+{
+	return l2pte_index(va);
+}
 
 static inline bool
 pte_modified_p(pt_entry_t pte)

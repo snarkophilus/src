@@ -297,7 +297,8 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 bool
 pmap_pdetab_fixup(struct pmap *pmap, vaddr_t va)
 {
-	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
+	struct pmap * const kpm = pmap_kernel();
+	pmap_pdetab_t * const kptb = kpm->pm_pdetab;
 	pmap_pdetab_t * const uptb = pmap->pm_pdetab;
 	size_t idx = PMAP_PDETABSIZE - 1;
 #if !defined(PMAP_MAP_POOLPAGE)
@@ -424,7 +425,7 @@ pmap_pte_lookup(pmap_t pmap, vaddr_t va)
 	if (ptp == NULL)
 		return NULL;
 
-	const size_t pte_idx = ((va >> PGSHIFT) & (NPTEPG - 1));
+	const size_t pte_idx = pte_index(va);
 
 	return ptp->ptp_ptes + pte_idx;
 }
@@ -902,7 +903,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 	ptb = pmap_pde_to_pdetab(opde);
 	segtab_mask = NSEGPG - 1;
 #endif /* _LP64 */
-	size_t idx = (va >> SEGSHIFT) & segtab_mask;
+	const size_t idx = (va >> SEGSHIFT) & segtab_mask;
 	return &ptb->pde_pde[idx];
 #else
 	pmap_segtab_t *stb = pmap->pm_segtab;
@@ -1010,7 +1011,7 @@ pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 #endif /* PMAP_HWPAGEWALKER && PMAP_MAP_POOLPAGE */
 	}
 
-	const size_t pte_idx = ((va >> PGSHIFT) & (NPTEPG - 1));
+	const size_t pte_idx = pte_index(va);
 
 	return ptp->ptp_ptes + pte_idx;
 }

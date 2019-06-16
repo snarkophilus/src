@@ -768,9 +768,6 @@ static u_int		pmap_modify_pv(struct vm_page_md *, paddr_t, pmap_t, vaddr_t,
 static void		pmap_pinit(pmap_t);
 static int		pmap_pmap_ctor(void *, void *, int);
 
-static void		pmap_alloc_l1(pmap_t);
-static void		pmap_free_l1(pmap_t);
-
 static struct l2_bucket *pmap_get_l2_bucket(pmap_t, vaddr_t);
 static struct l2_bucket *pmap_alloc_l2_bucket(pmap_t, vaddr_t);
 static void		pmap_free_l2_bucket(pmap_t, struct l2_bucket *, u_int);
@@ -2315,7 +2312,7 @@ pmap_create(void)
 	kcpuset_create(&pm->pm_active, true);
 	kcpuset_create(&pm->pm_onproc, true);
 #endif
-	pmap_alloc_l1(pm);
+	pmap_md_pdetab_init(pm)
 
 	/*
 	 * Note: The pool cache ensures that the pm_l2[] array is already
@@ -2324,7 +2321,7 @@ pmap_create(void)
 
 	pmap_pinit(pm);
 
-	return (pm);
+	return pm;
 }
 
 u_int
@@ -7237,8 +7234,29 @@ pmap_impl_bootstrap(void)
 
 	pmap_t pm = pmap_kernel();
 
+	pm->pm_pdetab = (pmap_pdetab_t *)kernel_l1pt.pv_va;
 	pm->pm_l1 = (pd_entry_t *)kernel_l1pt.pv_va;
 	pm->pm_l1_pa = kernel_l1pt.pv_pa;
+
+
+        VPRINTF("locks ");
+        mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
+        uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
+        uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
+
+
+//      TAILQ_INIT(&pmap->pm_pvp_list);
+        TAILQ_INIT(&pm->pm_ptp_list);
+#ifdef _LP64
+#if defined(PMAP_HWPAGEWALKER)
+        TAILQ_INIT(&pm->pm_pdetab_list);
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+        TAILQ_INIT(&pm->pm_segtab_list);
+#endif
+#endif
+
+
 
 	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);
@@ -7410,7 +7428,9 @@ pmap_md_pdetab_init(struct pmap *pm)
 {
 	KASSERT(pm != NULL);
 
-        pmap_alloc_l1(pm);
+	pm->pm_l1 = (pd_entry_t *)pm->pm_pdetab;
+	pmap_extract(pmap_kernel(), (vaddr_t)pm->pm_l1, &pm->pm_l1_pa);
+	PTE_SYNC_RANGE(pm->pm_l1, PMAP_PDETABSIZE);
 
         /*
          * Note: The pool cache ensures that the pm_l2[] array is already
@@ -7433,7 +7453,6 @@ pmap_md_pdetab_destroy(struct pmap *pm)
 {
 	KASSERT(pm != NULL);
 
-	pmap_free_l1(pm);
 }
 
 

@@ -617,7 +617,14 @@ pmap_create(void)
 	pmap->pm_minaddr = VM_MIN_ADDRESS;
 	pmap->pm_maxaddr = VM_MAXUSER_ADDRESS;
 
-	pmap->pm_uobject.vmobjlock = mutex_obj_alloc(MUTEX_DEFAULT, IPL_VM);
+//	pmap->pm_uobject.vmobjlock = mutex_obj_alloc(MUTEX_DEFAULT, IPL_VM);
+
+
+        mutex_init(&pmap->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
+        uvm_obj_init(&pmap->pm_uobject, NULL, false, 1);
+        uvm_obj_setlock(&pmap->pm_uobject, &pmap->pm_obj_lock);
+
+
 //	TAILQ_INIT(&pmap->pm_pvp_list);
 	TAILQ_INIT(&pmap->pm_ptp_list);
 #ifdef _LP64
