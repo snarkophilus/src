@@ -1165,7 +1165,7 @@ pmap_modify_pv(struct vm_page_md *md, paddr_t pa, pmap_t pm, vaddr_t va,
 
 
 
-
+#if 0
 
 /*
  * Allocate an L1 translation table for the specified pmap.
@@ -1220,7 +1220,7 @@ pmap_free_l1(pmap_t pm)
 	pm->pm_l1_pa = 0;
 }
 
-
+#endif
 
 
 #if 0
