@@ -257,6 +257,12 @@ mips_paddr_to_tlbpfn(paddr_t pa)
 
 #if defined(_KERNEL) && !defined(_LOCORE)
 #define MIPS_MMU(X)	(MIPS_HAS_R4K_MMU ? MIPS3_##X : MIPS1_##X)
+static inline const size_t
+pte_index(vaddr_t va)
+{
+	return ((va >> PGSHIFT) & (NPTEPG - 1));
+}
+
 static inline bool
 pte_valid_p(pt_entry_t pte)
 {
