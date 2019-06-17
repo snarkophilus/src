@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.4 2019/06/01 12:42:28 maxv Exp $
+#	$NetBSD: genassym.cf,v 1.5 2019/06/16 07:42:52 maxv Exp $
 #-
 # Copyright (c) 2014 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -199,9 +199,6 @@ define	NPDEPG		NPDEPG
 define	NBSEG		NBSEG
 
 # Constants from pte.h
-
-define	PTE_WIRED	PTE_WIRED
-define	PTE_NX		PTE_NX
 define	PTE_D		PTE_D
 define	PTE_A		PTE_A
 define	PTE_G		PTE_G

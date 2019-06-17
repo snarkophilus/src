@@ -1,11 +1,11 @@
-/* $NetBSD: pmap.h,v 1.2 2019/06/01 12:42:28 maxv Exp $ */
+/* $NetBSD: pmap.h,v 1.3 2019/06/16 07:42:52 maxv Exp $ */
 
-/*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+/*
+ * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Matt Thomas (of 3am Software Foundry) and Maxime Villard.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,18 +48,20 @@
 
 #include <riscv/pte.h>
 
-#define	PMAP_SEGTABSIZE		NPTEPG
+#define	PMAP_SEGTABSIZE	NPTEPG
 
-#define NBSEG		(NBPG*NPTEPG)
+#define NBSEG		(PAGE_SIZE * NPTEPG)
+
 #ifdef _LP64
-#define NBXSEG		(NBSEG*NSEGPG)
-#define XSEGSHIFT	L1_SHIFT
-#define XSEGOFSET	L1_OFFSET
-#define SEGSHIFT	L3_SHIFT
+#define NBXSEG		(NBSEG * NSEGPG)
+#define XSEGSHIFT	(SEGSHIFT + PGSHIFT - 3)
+#define XSEGOFSET	(PTE_PPN1 | SEGOFSET)
+#define SEGSHIFT	(PGSHIFT + PGSHIFT - 3)
 #else
 #define SEGSHIFT	L3_SHIFT
 #endif
-#define SEGOFSET	L3_OFFSET
+
+#define SEGOFSET	(PTE_PPN0|PAGE_MASK)
 
 #define KERNEL_PID	0
 
@@ -97,7 +99,6 @@ pmap_procwr(struct proc *p, vaddr_t va, vsize_t len)
 }
 
 #include <uvm/pmap/tlb.h>
-
 #include <uvm/pmap/pmap_tlb.h>
 
 #define PMAP_GROWKERNEL
@@ -132,6 +133,11 @@ pt_entry_t *
 pt_entry_t *
 	pmap_md_pdetab_lookup_create_ptep(struct pmap *pmap, vaddr_t va);
 void	pmap_bootstrap(paddr_t pstart, paddr_t pend, paddr_t kstart, paddr_t kend);
+
+extern vaddr_t pmap_direct_base;
+extern vaddr_t pmap_direct_end;
+#define PMAP_DIRECT_MAP(pa)	(pmap_direct_base + (pa))
+#define PMAP_DIRECT_UNMAP(va)	((paddr_t)(va) - pmap_direct_base)
 
 #ifdef __PMAP_PRIVATE
 static inline void
@@ -187,10 +193,6 @@ pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
 }
 #endif /* __PMAP_PRIVATE */
 #endif /* _KERNEL */
-
-extern __uint64_t kern_vtopdiff;
-#define POOL_VTOPHYS(va)	((paddr_t)((vaddr_t)(va)-kern_vtopdiff))
-#define POOL_PHYSTOV(pa)	((vaddr_t)((paddr_t)(pa)+kern_vtopdiff))
 
 #include <uvm/pmap/pmap.h>
 

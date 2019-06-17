@@ -1,10 +1,11 @@
-/* $NetBSD: pte.h,v 1.2 2019/06/01 12:42:28 maxv Exp $ */
-/*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+/* $NetBSD: pte.h,v 1.3 2019/06/16 07:42:52 maxv Exp $ */
+
+/*
+ * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Matt Thomas (of 3am Software Foundry) and Maxime Villard.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,68 +32,37 @@
 #ifndef _RISCV_PTE_H_
 #define _RISCV_PTE_H_
 
-/*
-  Sv39 Page Table Entry (512 GB VA Space)
-    [63..54] = 0
-    [53..28] = PPN[2]
-    [27..19] = PPN[1]
-    [18..10] = PPN[0]
-
-  Sv32 Page Table Entry (4 GB VA Space)
-    [31..20] = PPN[1]
-    [19..10] = PPN[0]
-
-  Common to both:
-    [9] = NetBSD specific (Wired = Do Not Delete)
-    [8] = NetBSD specific (Not eXecuted)
-    [7] = D
-    [6] = A
-    [5] = G
-    [4] = U
-    [3] = X
-    [2] = W
-    [1] = R
-    [0] = V
-*/
-
-#define NPTEPG		(NBPG / sizeof(void *))	// PTEs per Page
-
-#define NSEGPG		NPTEPG
-#define NPDEPG		NPTEPG
-
-#ifdef _LP64 /* Sv39 */
-/*
- * XXX --- WARNING
- * These are numbered backwards from the numbering in the Privilege Spec 1.10!
- * 0 = PrivSpec 2
- * 1 = PrivSpec 1
- * 2 = PrivSpec 0
- */
-#define	PTE_PPN		__BITS(53, 10)	// Physical Page Number
-#define	PTE_PPN0	__BITS(53, 28)	// 512 8-byte SDEs / PAGE
-#define	PTE_PPN1	__BITS(27, 19)	// 512 8-byte PDEs / PAGE
-#define	PTE_PPN2	__BITS(18, 10)	// 512 8-byte PTEs / PAGE
+#ifdef _LP64	/* Sv39 */
+#define PTE_PPN		__BITS(53, 10)
+#define	PTE_PPN0	__BITS(18, 10)
+#define	PTE_PPN1	__BITS(27, 19)
+#define	PTE_PPN2	__BITS(53, 28)
 typedef __uint64_t pt_entry_t;
 typedef __uint64_t pd_entry_t;
 #define atomic_cas_pte	atomic_cas_64
-#define atomic_cas_pde	atomic_cas_64
-#else
-/*
- * WARNING -- Same as above, but 0 = PS 1, 1 = PS 0
- */
-#define PTE_PPN		__BITS(31, 10)	// Physical Page Number
-#define	PTE_PPN0	__BITS(31, 20)	// 1K 4-byte PDEs / PAGE
-#define	PTE_PPN1	__BITS(19, 10)	// 1K 4-byte PTEs / PAGE
+#else		/* Sv32 */
+#define PTE_PPN		__BITS(31, 10)
+#define	PTE_PPN0	__BITS(19, 10)
+#define	PTE_PPN1	__BITS(31, 20)
 typedef __uint32_t pt_entry_t;
 typedef __uint32_t pd_entry_t;
 #define atomic_cas_pte	atomic_cas_32
-#define atomic_cas_pde	atomic_cas_32
 #endif
 
 // These only mean something to NetBSD
 #define	PTE_WIRED	__BIT(9)	// Do Not Delete
 #define	PTE_NX		__BIT(8)	// Not eXecuted?
 
+#define PTE_PPN_SHIFT	10
+
+#define NPTEPG		(PAGE_SIZE / sizeof(pt_entry_t))
+#define NSEGPG		NPTEPG
+#define NPDEPG		NPTEPG
+
+/* Software PTE bits. */
+#define	PTE_WIRED	__BIT(8)
+
+/* Hardware PTE bits. */
 // These are hardware defined bits
 #define	PTE_D		__BIT(7)	// Dirty
 #define	PTE_A		__BIT(6)	// Accessed
@@ -102,6 +72,28 @@ typedef __uint32_t pd_entry_t;
 #define	PTE_W		__BIT(2)	// Write
 #define	PTE_R		__BIT(1)	// Read
 #define	PTE_V		__BIT(0)	// Valid
+
+#define PA_TO_PTE(pa)	(((pa) >> PAGE_SHIFT) << PTE_PPN_SHIFT)
+#define PTE_TO_PA(pte)	(((pte) >> PTE_PPN_SHIFT) << PAGE_SHIFT)
+
+#define	L2_SHIFT	30
+#define	L1_SHIFT	21
+#define	L0_SHIFT	12
+
+#define	L2_SIZE 	(1 << L2_SHIFT)
+#define	L1_SIZE 	(1 << L1_SHIFT)
+#define	L0_SIZE 	(1 << L0_SHIFT)
+
+#define	L2_OFFSET 	(L2_SIZE - 1)
+#define	L1_OFFSET 	(L1_SIZE - 1)
+#define	L0_OFFSET 	(L0_SIZE - 1)
+
+#define	Ln_ENTRIES	(1 << 9)
+#define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
+
+#define pl2_i(va)	(((va) >> L2_SHIFT) & Ln_ADDR_MASK)
+#define pl1_i(va)	(((va) >> L1_SHIFT) & Ln_ADDR_MASK)
+#define pl0_i(va)	(((va) >> L0_SHIFT) & Ln_ADDR_MASK)
 
 /*
   Helper macro for determining if on a "Transit" (non-leaf) page.
@@ -172,7 +164,7 @@ pte_cached_p(pt_entry_t pte)
 static inline bool
 pte_deferred_exec_p(pt_entry_t pte)
 {
-	return (pte & PTE_NX) != 0;
+	return false;
 }
 
 static inline pt_entry_t
@@ -208,35 +200,31 @@ pte_prot_nowrite(pt_entry_t pte)
 static inline pt_entry_t
 pte_prot_downgrade(pt_entry_t pte, vm_prot_t newprot)
 {
-	pte &= ~PTE_W;
+	if ((newprot & VM_PROT_READ) == 0)
+		pte &= ~PTE_R;
+	if ((newprot & VM_PROT_WRITE) == 0)
+		pte &= ~PTE_W;
 	if ((newprot & VM_PROT_EXECUTE) == 0)
-		pte &= ~(PTE_NX|PTE_X);
+		pte &= ~PTE_X;
 	return pte;
 }
 
 static inline pt_entry_t
 pte_prot_bits(struct vm_page_md *mdpg, vm_prot_t prot, bool kernel_p)
 {
+	pt_entry_t pte;
+
 	KASSERT(prot & VM_PROT_READ);
-	pt_entry_t pt_entry = PTE_R | (kernel_p ? PTE_G : PTE_U);
+
+	pte = PTE_R;
 	if (prot & VM_PROT_EXECUTE) {
-		if (mdpg != NULL && !VM_PAGEMD_EXECPAGE_P(mdpg))
-			pt_entry |= PTE_NX;
-		else
-			pt_entry |= kernel_p ? PTE_G : PTE_U;
+		pte |= PTE_X;
 	}
 	if (prot & VM_PROT_WRITE) {
-		if (mdpg != NULL && !VM_PAGEMD_MODIFIED_P(mdpg))
-			/*
-			  TODO: Mark page as not dirty? Was
-			  previously "Not Written" (PTE_NW) which no
-			  longer exists
-			*/
-			pt_entry &= ~PTE_D;
-		else
-			pt_entry |= PTE_W | (kernel_p ? PTE_G : PTE_U);
+		pte |= PTE_W;
 	}
-	return pt_entry;
+
+	return pte;
 }
 
 static inline pt_entry_t
@@ -263,9 +251,9 @@ pte_flag_bits(struct vm_page_md *mdpg, int flags, bool kernel_p)
 
 static inline pt_entry_t
 pte_make_enter(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
-	int flags, bool kernel_p)
+    int flags, bool kernel_p)
 {
-	pt_entry_t pte = (((pt_entry_t)pa) >> PAGE_SHIFT) << PTE_PPN0_S;
+	pt_entry_t pte = (pt_entry_t)PA_TO_PTE(pa);
 
 	pte |= pte_flag_bits(mdpg, flags, kernel_p);
 	pte |= pte_prot_bits(mdpg, prot, kernel_p);
@@ -278,9 +266,9 @@ pte_make_enter(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
 
 static inline pt_entry_t
 pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
-	int flags)
+    int flags)
 {
-	pt_entry_t pte = (((pt_entry_t)pa) >> PAGE_SHIFT) << PTE_PPN0_S;
+	pt_entry_t pte = (pt_entry_t)PA_TO_PTE(pa);
 
 	pte |= PTE_WIRED | PTE_G | PTE_V;
 	pte |= pte_flag_bits(NULL, flags, true);

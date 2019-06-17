@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.8 2019/06/01 12:42:28 maxv Exp $ */
+/* $NetBSD: locore.S,v 1.9 2019/06/16 07:42:52 maxv Exp $ */
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -41,18 +41,26 @@ ENTRY_NP(start)
 	 * Copy these to the s* registsers so they're saved.
 	*/
 
-	mv      s0, a0
-	mv      s1, a1
-
-        /* Save the phys addr from the start and end of the kernel */
-        la      s3, _C_LABEL(start)
-        la      s4, _C_LABEL(end)
+	li	s11, VM_MAX_KERNEL_ADDRESS
+	li	s10, PAGE_SIZE
+	li	s9, USPACE
 
 	/*
 	 * XXX XXX XXX: This is completely broken and wrong, we should map only
 	 * the kernel sections, and the direct map should be mapped later in C.
 	 */
-#if 0 && (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
+#if 0
+#if 0
+	// The kernel doesn't use gp/_gp since we'd have to reload it on
+	// each exception.
+	PTR_LA	gp, _C_LABEL(_gp)
+#endif
+
+        /* Save the phys addr from the start and end of the kernel */
+        la      s3, _C_LABEL(start)
+        la      s4, _C_LABEL(end)
+
+#if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
 #error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
 #endif
 	// We allocated the kernel first PTE page so let's insert in the
@@ -81,6 +89,7 @@ ENTRY_NP(start)
 	add	s3, s3, SZREG		// advance to next PDE slot
 	addi	a7, a7, -1		// count down segment
 	bgtz	a6, .Lfill		// loop if more
+#endif
 
 	csrw	sptbr, s1		// set the page table base
 	li	t0, SR_VM

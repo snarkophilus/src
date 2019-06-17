@@ -1,5 +1,6 @@
-/* $NetBSD: sysreg.h,v 1.3 2015/03/31 01:14:02 matt Exp $ */
-/*-
+/* $NetBSD: sysreg.h,v 1.4 2019/06/16 07:42:52 maxv Exp $ */
+
+/*
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -251,55 +252,32 @@ riscvreg_cycle_read(void)
 #endif
 }
 
-static inline register_t
-riscvreg_satp_read(void)
-{
-	register_t __satp;
-	__asm("csrr\t%0, satp" : "=r"(__satp));
-	return __satp;
-}
-
-static inline void
-riscvreg_satp_write(register_t __satp)
-{
-	__asm("csrw\tsatp, %0" :: "r"(__satp));
-	__asm __volatile("sfence.vma" ::: "memory");
-}
-
-static inline register_t
-riscvreg_satp_ppn_read(void)
-{
-	register_t __satp;
-	__asm("csrr\t%0, satp" : "=r"(__satp));
-	return __satp & SATP_PPN_MASK;
-}
-
-static inline void
-riscvreg_satp_ppn_write(register_t ppn)
-{
-	register_t __satp = riscvreg_satp_read();
-	__satp = (__satp & ~SATP_PPN_MASK) | (ppn & SATP_PPN_MASK);
-	__asm __volatile("csrw\tsatp, %0" :: "r"(__satp));
-	__asm __volatile("sfence.vma" ::: "memory");
-}
+#ifdef _LP64
+#define SATP_MODE	__BITS(63,60)
+#define SATP_ASID	__BITS(59,44)
+#define SATP_PPN	__BITS(43,0)
+#else
+#define SATP_MODE	__BIT(31)
+#define SATP_ASID	__BITS(30,22)
+#define SATP_PPN	__BITS(21,0)
+#endif
 
 static inline uint32_t
 riscvreg_satp_asid_read(void)
 {
-	register_t __asid;
-	__asm __volatile("csrr\t%0, satp" : "=r"(__asid));
-	return (uint32_t)(__asid >> SATP_ASID_SHIFT);
+	uintptr_t satp;
+	__asm __volatile("csrr	%0, satp" : "=r" (satp));
+	return __SHIFTOUT(satp, SATP_ASID);
 }
 
 static inline void
-riscvreg_satp_asid_write(uint32_t __asid)
+riscvreg_asid_write(uint32_t asid)
 {
-	register_t satp, asid;
-	asid = __asid;
-	asid <<= SATP_ASID_SHIFT;
-	__asm __volatile("csrr\t%0, satp" : "=r"(satp));
-	satp = (satp & ~SATP_ASID_MASK) | asid;
-	riscvreg_satp_write(satp);
+	uintptr_t satp;
+	__asm __volatile("csrr	%0, satp" : "=r" (satp));
+	satp &= ~SATP_ASID;
+	satp |= __SHIFTIN((uintptr_t)asid, SATP_ASID);
+	__asm __volatile("csrw	satp, %0" :: "r" (satp));
 }
 
 #endif /* _RISCV_SYSREG_H_ */
