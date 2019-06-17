@@ -151,8 +151,11 @@ extern kmutex_t pmap_segtab_lock;
  */
 struct pmap {
 	struct uvm_object	pm_uobject;
+#define pm_lock			pm_uobject.vmobjlock
 #define pm_count		pm_uobject.uo_refs /* pmap reference count */
 #define pm_pvp_list		pm_uobject.memq
+
+	kmutex_t		pm_obj_lock;
 	struct pglist		pm_ptp_list;
 #ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)

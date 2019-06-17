@@ -226,8 +226,5 @@ define	PTE_PPN2_S	PTE_PPN2_S
 define	PTE_PPN3_S	PTE_PPN3_S
 define	PTE_SIZE	PTE_SIZE
 
-
-
-
-#define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
-#define	PM_MD_PTBR	offsetof(struct pmap, pm_md.md_ptbr)
+define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
+define	PM_MD_PTBR	offsetof(struct pmap, pm_md.md_ptbr)

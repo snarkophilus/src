@@ -67,46 +67,6 @@ pmap_copy_page(paddr_t src, paddr_t dst)
 #endif
 }
 
-pd_entry_t *
-pmap_md_alloc_pdp(struct pmap *pm, paddr_t *pap)
-{
-	paddr_t pa;
-
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
-
-	if (uvm.page_init_done) {
-		struct vm_page *pg;
-
-		pg = uvm_pagealloc(NULL, 0, NULL,
-		    UVM_PGA_USERESERVE | UVM_PGA_ZERO);
-		if (pg == NULL)
-			panic("%s: cannot allocate L3 table", __func__);
-		pa = VM_PAGE_TO_PHYS(pg);
-
-		/* TODO: Track the pg on the vmlist? pmap_enter_pv()? */
-		/* SLIST_INSERT_HEAD(&pm->pm_vmlist, pg, mdpage.mdpg_vmlist); */
-
-		/* TODO: Find/create the appropriate counter in
-		   uvm/pmap.c */
-		/* PMAP_COUNT(pdp_alloc); */
-
-	} else {
-		/* uvm_pageboot_alloc() returns KSEG address */
-		pa = POOL_VTOPHYS(uvm_pageboot_alloc(PAGE_SIZE));
-		/* TODO: Find/create the appropriate counter in
-		   uvm/pmap.c */
-		/* PMAP_COUNT(pdp_alloc_boot); */
-	}
-	if (pap != NULL)
-		*pap = pa;
-
-	UVMHIST_LOG(pmaphist, "pa=%llx, va=%llx",
-	    pa, POOL_PHYSTOV(pa), 0, 0);
-
-	return (void *)POOL_PHYSTOV(pa);
-}
-
 struct vm_page *
 pmap_md_alloc_poolpage(int flags)
 {
@@ -185,13 +145,14 @@ pmap_md_pdetab_activate(struct pmap *pmap, struct lwp *l)
 void
 pmap_md_pdetab_init(struct pmap *pmap)
 {
-	KASSERT(pmap != 0);
-	pmap->pm_pdetab = pmap_md_alloc_pdp(pmap, &pmap->pm_pdetab);
+	KASSERT(pmap != NULL);
 
 	/* for (int i = 0; i < NPDEPG; ++i) { */
 	/* 	pmap->pm_pdetab[i] = pmap_kernel()->pm_pdetab[i]; */
 	/* } */
 
+
+	pmap->pm_md.md_pdetab[NPDEPG-1] = pmap_kernel()->pm_md.md_pdetab[NPDEPG-1];
 	pmap->pm_md.md_ptbr =
 	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_pdetab) >> PAGE_SHIFT;
 }
@@ -211,7 +172,7 @@ pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
 	if ((pde & PTE_V) == 0)
 		return NULL;
 	if (!PTE_IS_T(pde))
-		return POOL_PHYSTOV(pdp);
+		return (pt_entry_t *)POOL_PHYSTOV(pdp);
 	/* L2 */
 	pdp = (pd_entry_t *)POOL_PHYSTOV(pte_pde_to_paddr((pd_entry_t)pde)) + l2pde_index(va);
 	pde = *(pd_entry_t *)pdp;
@@ -228,65 +189,18 @@ pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
 	return NULL;
 }
 
-pt_entry_t *
-pmap_md_pdetab_lookup_create_ptep(struct pmap *pmap, vaddr_t va)
-{
-	pmap_pdetab_t *ptb = pmap->pm_pdetab;
-	pd_entry_t *pdp;
-	pd_entry_t pde;
-	paddr_t	pdppa;
-
-#ifdef _LP64
-	/* L1 -> L3 */
-	/* L1 */
-	pdp = (pd_entry_t *)ptb->pde_pde + l1pde_index(va);
-	pde = *(pd_entry_t *)pdp;
-	if ((pde & PTE_V) == 0) {
-		/* Not valid. Alloc a page to point to, then insert it
-		   into the table */
-		pmap_md_alloc_pdp(pmap, &pdppa);
-		KASSERT(pdppa != POOL_PADDR_INVALID);
-		atomic_swap_64(pdp, ((pdppa >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V);
-		pde = *(pd_entry_t *)pdp;
-	}
-	if (!PTE_IS_T(pde))
-		return POOL_PHYSTOV(pdp);
-	/* L2 */
-	pdp = (pd_entry_t *)POOL_PHYSTOV(pte_pde_to_paddr(pde)) + l2pde_index(va);
-	pde = *(pd_entry_t *)pdp;
-	if ((pde & PTE_V) == 0) {
-		/* Not valid. Alloc a page to point to, then insert it
-		   into the directory */
-		pmap_md_alloc_pdp(pmap, &pdppa);
-		KASSERT(pdppa != POOL_PADDR_INVALID);
-		atomic_swap_64(pdp, ((pdppa >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V);
-		pde = *(pd_entry_t *)pdp;
-	}
-	if (!PTE_IS_T(pde))
-		return pdp;
-	/* L3 */
-	pdp = (pd_entry_t *)POOL_PHYSTOV(pte_to_paddr((pt_entry_t)pde)) + l3pte_index(va);
-	return pdp;
-#else
-	/* XXX 32-bit code here */
-#endif
-	/* Things have gone wrong */
-	return NULL;
-}
-
 void
 pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 {
 	extern __uint64_t l1_pte[512];
 	extern __uint64_t virt_map;
-	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
+//	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
 	pmap_t pm = pmap_kernel();
-	paddr_t pa;
 
 	kend = (kend + 0x200000 - 1) & -0x200000;
 
 	/* Use the tables we already built in init_mmu() */
-	pm->pm_pdetab = &l1_pte;
+	pm->pm_pdetab = (pmap_pdetab_t *)&l1_pte;
 
 	/* Get the PPN for l1_pte */
 	/* XXX HACK */
@@ -324,10 +238,6 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	    &pmap_pv_page_allocator, IPL_NONE);
 
 	tlb_set_asid(0);
-
-	pmap->pm_pdetab[NPDEPG-1] = pmap_kernel()->pm_pdetab[NPDEPG-1];
-	pmap->pm_md.md_ptbr =
-	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_md.md_pdetab);
 }
 
 /* -------------------------------------------------------------------------- */

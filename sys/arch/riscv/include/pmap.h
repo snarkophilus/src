@@ -48,8 +48,8 @@
 
 #include <riscv/pte.h>
 
-#define	PMAP_SEGTABSIZE	NPTEPG
-
+#define	PMAP_SEGTABSIZE		NPTEPG
+#define	PMAP_PDETABSIZE		NPTEPG
 #define NBSEG		(PAGE_SIZE * NPTEPG)
 
 #ifdef _LP64
@@ -130,8 +130,6 @@ bool    pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 
 pt_entry_t *
 	pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va);
-pt_entry_t *
-	pmap_md_pdetab_lookup_create_ptep(struct pmap *pmap, vaddr_t va);
 void	pmap_bootstrap(paddr_t pstart, paddr_t pend, paddr_t kstart, paddr_t kend);
 
 extern vaddr_t pmap_direct_base;

@@ -92,8 +92,7 @@
 #endif
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
-/* XXX What is this??? */
-#define PMAP_PDETABSIZE	4096
+#define PMAP_PDETABSIZE	(L1_TABLE_SIZE / sizeof(pd_entry_t))
 #ifdef _LP64
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
@@ -102,23 +101,18 @@
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)0xdeadbeef)
 #endif
 
+#define	NPDEPG		(PAGE_SIZE / sizeof(pd_entry_t))
 
-
-// XXXNH what is PTPSHIFT?
+// 1MB NBSEG. SEGSHIFT is 20, I think
 //
-// For ARM and its 8KB PAGE_SIZE and 4K L2_S_SIZE we need NBSEG to be 
 
-#if 1
-#define PTPSHIFT        2
-#define PTPLENGTH       (PGSHIFT - PTPSHIFT)
-CTASSERT(NPTEPG ==   (1 << PTPLENGTH));
+#define	PTPSHIFT        2
+#define	PTPLENGTH       (L2_S_SHIFT - PTPSHIFT)
+//CTASSERT(NPTEPG == (1 << PTPLENGTH));
 
-#define	SEGSHIFT	(PGSHIFT + PTPLENGTH)	/* LOG2(NBSEG) */
-#if 1
-#define NBSEG		(1 << PGSHIFT)		// XXXNH seems to fix pmap_pte_process
-#else
+//XXXNH what's the real definition. 20 is right answer.
+#define	SEGSHIFT	(PTPLENGTH + PTPLENGTH)	/* LOG2(NBSEG) */
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
-#endif
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #ifdef _LP64
@@ -132,7 +126,6 @@ CTASSERT(NPTEPG ==   (1 << PTPLENGTH));
 #define	SEGLENGTH	(31 - SEGSHIFT)
 #endif
 #define	NSEGPG		(1 << SEGLENGTH)
-#endif
 
 #if defined(__PMAP_PRIVATE)
 
@@ -310,6 +303,13 @@ pmap_pv_protect(paddr_t pa, vm_prot_t prot)
 }
 #endif
 
+
+static inline size_t
+pte_index(vaddr_t va)
+{
+	return l2pte_index(va);
+}
+
 static inline bool
 pte_modified_p(pt_entry_t pte)
 {
@@ -413,7 +413,7 @@ pte_invalid_pde(void)
 
 // XXXNH only used in _LP64
 static inline pd_entry_t
-pte_pde_pdetab(paddr_t pa)
+pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
 
 	return 0;
