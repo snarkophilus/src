@@ -144,6 +144,12 @@ typedef __uint32_t pd_entry_t;
 #define l2pde_index(v)	(((vaddr_t)(v) >> L2_SHIFT) & Ln_ADDR_MASK)
 #define l3pte_index(v)	(((vaddr_t)(v) >> L3_SHIFT) & Ln_ADDR_MASK)
 
+static inline const size_t
+pte_index(vaddr_t va)
+{
+	return ((va >> PGSHIFT) & (NPTEPG - 1));
+}
+
 static inline bool
 pte_valid_p(pt_entry_t pte)
 {
