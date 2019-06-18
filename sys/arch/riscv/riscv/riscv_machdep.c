@@ -389,14 +389,14 @@ init_mmu(paddr_t dtb, paddr_t end)
 {
 	extern paddr_t virt_map;
 	virt_map = (paddr_t)virt_map - (paddr_t)&virt_map;
-	extern __uint64_t l1_pte[512];
 	extern __uint64_t l2_pte[512];
+	extern __uint64_t l1_pte[512];
 //	extern __uint64_t l2_dtb[512];
 	__uint64_t phys_base = VM_MIN_KERNEL_ADDRESS - virt_map;
 	__uint64_t phys_base_2mb_chunk = phys_base >> 21;
-	__uint64_t l2_perms = PTE_V | PTE_D | PTE_A | PTE_R | PTE_W | PTE_X;
-	__uint64_t i = l1pde_index(VM_MIN_KERNEL_ADDRESS);
-	
+	__uint64_t l1_perms = PTE_V | PTE_D | PTE_A | PTE_R | PTE_W | PTE_X;
+	__uint64_t i = pl2_i(VM_MIN_KERNEL_ADDRESS);
+
 
 	end = (end + 0x200000 - 1) & -0x200000;
 
@@ -404,36 +404,36 @@ init_mmu(paddr_t dtb, paddr_t end)
 	kern_vtopdiff = VM_MAX_KERNEL_ADDRESS - 0x80000000ULL;
 	kern_vstart = VM_MIN_KERNEL_ADDRESS - phys_base + end + 0x200000;
 
-	/* L1 PTE with entry for Kernel VA, pointing to L2 PTE */
-	l1_pte[i] = (((paddr_t)&l2_pte >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V;
+	/* L2 PTE with entry for Kernel VA, pointing to L2 PTE */
+	l2_pte[i] = (((paddr_t)&l1_pte >> PAGE_SHIFT) << L0_SHIFT) | PTE_V;
 
 	/* Map all of memory into the last gig */
 	/* XXX THIS IS SUPER, SUPER WRONG. */
-	l1_pte[l1pde_index(VM_MAX_KERNEL_ADDRESS)] = ((0x80000000ULL >> PAGE_SHIFT) << PTE_PPN0_S) | l2_perms;
+	l2_pte[pl2_i(VM_MAX_KERNEL_ADDRESS)] = ((0x80000000ULL >> PAGE_SHIFT) << L0_SHIFT) | l1_perms;
 
-	/* L1 PTE with entry for Kernel PA, pointing to L2 PTE */
-	/* i = ((paddr_t)&start >> L1_SHIFT) & Ln_ADDR_MASK; */
-	/* l1_pte[i] = (((paddr_t)&l2_pte >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V; */
+	/* L2 PTE with entry for Kernel PA, pointing to L1 PTE */
+	/* i = ((paddr_t)&start >> L2_SHIFT) & Ln_ADDR_MASK; */
+	/* l2_pte[i] = (((paddr_t)&l1_pte >> PAGE_SHIFT) << L0_SHIFT) | PTE_V; */
 
 	/* XXX: This is the same index as the Kernel PA */
 
-	/* L1 PTE with entry for L2_DTB */
-	/* i = ((paddr_t)&l2_dtb >> L1_SHIFT) & Ln_ADDR_MASK; */
+	/* L2 PTE with entry for L1_DTB */
+	/* i = ((paddr_t)&l1_dtb >> L2_SHIFT) & Ln_ADDR_MASK; */
 	/* umprintf("i = %d\n", i); */
-	/* l1_pte[i] = (((paddr_t)&l2_dtb >> PAGE_SHIFT) << PTE_PPN0_S) | PTE_V; */
-	/* umprintf("l1_pte[%d]: 0x%x\n", i, l1_pte[i]); */
+	/* l2_pte[i] = (((paddr_t)&l1_dtb >> PAGE_SHIFT) << L0_SHIFT) | PTE_V; */
+	/* umprintf("l2_pte[%d]: 0x%x\n", i, l2_pte[i]); */
 
-	/* Build the L2 Page Table we just pointed to */
+	/* Build the L1 Page Table we just pointed to */
 	for (i = 0; ((phys_base_2mb_chunk + i) << 21) < end; ++i) {
-		l2_pte[i] = ((phys_base_2mb_chunk + i) << PTE_PPN1_S)
-		    | l2_perms;
+		l1_pte[i] = ((phys_base_2mb_chunk + i) << L0_SHIFT)
+		    | l1_perms;
 	}
 
 	/* umprintf("DTB: 0x%x\n", dtb); */
 
-	/* Put the DTB in the L2_DTB table */
-	/* i = ((paddr_t)dtb >> L1_SHIFT) & Ln_ADDR_MASK; */
-	/* l2_dtb[i] = (dtb << PTE_PPN0_S) | PTE_V | PTE_A | PTE_R; */
+	/* Put the DTB in the L1_DTB table */
+	/* i = ((paddr_t)dtb >> L2_SHIFT) & Ln_ADDR_MASK; */
+	/* l1_dtb[i] = (dtb << PTE_PPN0_S) | PTE_V | PTE_A | PTE_R; */
 
 	return phys_base;
 }

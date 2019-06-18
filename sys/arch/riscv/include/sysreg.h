@@ -103,26 +103,26 @@ riscvreg_fcsr_write_frm(uint32_t __new)
 	return __SHIFTOUT(__old, FCSR_FRM);
 }
 
-/* Old values from previous spec -- Not sure which one! */
-/* #define SR_IP		__BITS(31,24)	// Pending interrupts */
-/* #define SR_IM		__BITS(23,16)	// Interrupt Mask */
-/* #define SR_VM		__BIT(7)	// MMU On */
-/* #define SR_S64		__BIT(6)	// RV64 supervisor mode */
-/* #define SR_U64		__BIT(5)	// RV64 user mode */
-/* #define SR_EF		__BIT(4)	// Enable Floating Point */
-/* #define SR_PEI		__BIT(3)	// Previous EI setting */
-/* #define SR_EI		__BIT(2)	// Enable interrupts */
-/* #define SR_PS		__BIT(1)	// Previous (S) supervisor setting */
-/* #define SR_S		__BIT(0)	// Supervisor */
+// Status Register
+#define SR_IP		__BITS(31,24)	// Pending interrupts
+#define SR_IM		__BITS(23,16)	// Interrupt Mask
+#define SR_VM		__BIT(7)	// MMU On
+#define SR_S64		__BIT(6)	// RV64 supervisor mode
+#define SR_U64		__BIT(5)	// RV64 user mode
+#define SR_EF		__BIT(4)	// Enable Floating Point
+#define SR_PEI		__BIT(3)	// Previous EI setting
+#define SR_EI		__BIT(2)	// Enable interrupts
+#define SR_PS		__BIT(1)	// Previous (S) supervisor setting
+#define SR_S		__BIT(0)	// Supervisor
 
-/* #ifdef _LP64 */
-/* #define	SR_USER		(SR_EI|SR_U64|SR_S64|SR_VM|SR_IM) */
-/* #define	SR_USER32	(SR_USER & ~SR_U64) */
-/* #define	SR_KERNEL	(SR_S|SR_EI|SR_U64|SR_S64|SR_VM) */
-/* #else */
-/* #define	SR_USER		(SR_EI|SR_VM|SR_IM) */
-/* #define	SR_KERNEL	(SR_S|SR_EI|SR_VM) */
-/* #endif */
+#ifdef _LP64
+#define	SR_USER		(SR_EI|SR_U64|SR_S64|SR_VM|SR_IM)
+#define	SR_USER32	(SR_USER & ~SR_U64)
+#define	SR_KERNEL	(SR_S|SR_EI|SR_U64|SR_S64|SR_VM)
+#else
+#define	SR_USER		(SR_EI|SR_VM|SR_IM)
+#define	SR_KERNEL	(SR_S|SR_EI|SR_VM)
+#endif
 
 /* Supervisor Status Register */
 #ifndef _LP64
@@ -178,8 +178,6 @@ riscvreg_fcsr_write_frm(uint32_t __new)
 
 /* Mask for all interrupts */
 #define SIE_IM (SIE_SEI|SIE_UEIE|SIE_STIE|SIE_UTIE|SIE_SSIE|SIE_USIE)
-
-#define SR_USER SR_SIE
 
 static inline uint32_t
 riscvreg_status_read(void)
@@ -252,6 +250,20 @@ riscvreg_cycle_read(void)
 #endif
 }
 
+static inline uintptr_t
+riscvreg_ptbr_read(void)
+{
+	uintptr_t __ptbr;
+	__asm("csrr\t%0, sptbr" : "=r"(__ptbr));
+	return __ptbr;
+}
+
+static inline void
+riscvreg_ptbr_write(uint32_t __ptbr)
+{
+	__asm("csrw\tsptbr, %0" :: "r"(__ptbr));
+}
+
 #ifdef _LP64
 #define SATP_MODE	__BITS(63,60)
 #define SATP_ASID	__BITS(59,44)
@@ -263,7 +275,7 @@ riscvreg_cycle_read(void)
 #endif
 
 static inline uint32_t
-riscvreg_satp_asid_read(void)
+riscvreg_asid_read(void)
 {
 	uintptr_t satp;
 	__asm __volatile("csrr	%0, satp" : "=r" (satp));

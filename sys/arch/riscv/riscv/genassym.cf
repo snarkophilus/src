@@ -50,7 +50,7 @@ include <riscv/sysreg.h>
 # define	SR_IM		SR_IM
 # define	SR_IM_LSHIFT	__SIZEOF_LONG__ * 8 - (ilog2(SR_IM) + 1)
 # define	SR_IM_RSHIFT	ilog2(__LOWEST_SET_BIT(SR_IM))
-# define	SR_VM		SR_VM
+define	SR_VM		SR_VM
 # define	SR_U64		SR_U64
 # define	SR_S64		SR_S64
 # define	SR_EF		SR_EF
@@ -215,16 +215,16 @@ define	L1_OFFSET	L1_OFFSET
 define	L2_SHIFT	L2_SHIFT
 define	L2_SIZE		L2_SIZE
 define	L2_OFFSET	L2_OFFSET
-define	L3_SHIFT	L3_SHIFT
-define	L3_SIZE		L3_SIZE
-define	L3_OFFSET	L3_OFFSET
+#define	L3_SHIFT	L3_SHIFT
+#define	L3_SIZE		L3_SIZE
+#define	L3_OFFSET	L3_OFFSET
 define	Ln_ENTRIES	Ln_ENTRIES
 define	Ln_ADDR_MASK	Ln_ADDR_MASK
-define	PTE_PPN0_S	PTE_PPN0_S
-define	PTE_PPN1_S	PTE_PPN1_S
-define	PTE_PPN2_S	PTE_PPN2_S
-define	PTE_PPN3_S	PTE_PPN3_S
-define	PTE_SIZE	PTE_SIZE
+#define	PTE_PPN0_S	PTE_PPN0_S
+#define	PTE_PPN1_S	PTE_PPN1_S
+#define	PTE_PPN2_S	PTE_PPN2_S
+#define	PTE_PPN3_S	PTE_PPN3_S
+#define	PTE_SIZE	PTE_SIZE
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PTBR	offsetof(struct pmap, pm_md.md_ptbr)

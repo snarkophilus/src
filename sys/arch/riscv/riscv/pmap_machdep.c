@@ -138,8 +138,7 @@ pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
 void
 pmap_md_pdetab_activate(struct pmap *pmap, struct lwp *l)
 {
-	riscvreg_satp_ppn_write(pmap->pm_md.md_ptbr);
-	//OLD: __asm("csrw\tsptbr, %0" :: "r"(pmap->pm_md.md_ptbr));
+	riscvreg_ptbr_write(pmap->pm_md.md_ptbr);
 }
 
 void
@@ -165,22 +164,22 @@ pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
 	pd_entry_t  pde;
 
 #ifdef _LP64
-	/* L1 -> L3 */
-	/* L1 */
-	pdp = (pd_entry_t *)ptb->pde_pde + l1pde_index(va);
+	/* L2 -> L0 */
+	/* L2 */
+	pdp = (pd_entry_t *)ptb->pde_pde + pl2_i(va);
 	pde = *(pd_entry_t *)pdp;
 	if ((pde & PTE_V) == 0)
 		return NULL;
-	if (!PTE_IS_T(pde))
-		return (pt_entry_t *)POOL_PHYSTOV(pdp);
-	/* L2 */
-	pdp = (pd_entry_t *)POOL_PHYSTOV(pte_pde_to_paddr((pd_entry_t)pde)) + l2pde_index(va);
+	if (!pte_pde_valid_p(pde))
+		return (pt_entry_t *)PMAP_DIRECT_MAP(pdp);
+	/* L1 */
+	pdp = (pd_entry_t *)PMAP_DIRECT_MAP(pte_pde_to_paddr((pd_entry_t)pde)) + pl1_i(va);
 	pde = *(pd_entry_t *)pdp;
-	if (!PTE_IS_T(pde))
+	if (!pte_pde_valid_p(pde))
 		return pdp;
 
-	/* L3 */
-	pdp = (pd_entry_t *)POOL_PHYSTOV(pte_pde_to_paddr((pd_entry_t)pde)) + l3pte_index(va);
+	/* L0 */
+	pdp = (pd_entry_t *)PMAP_DIRECT_MAP(pte_pde_to_paddr((pd_entry_t)pde)) + pl0_i(va);
 	return pdp;
 #else
 	/* XXX 32-bit code here */
@@ -245,13 +244,13 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 tlb_asid_t
 tlb_get_asid(void)
 {
-	return riscvreg_satp_asid_read();
+	return riscvreg_asid_read();
 }
 
 void
 tlb_set_asid(tlb_asid_t asid)
 {
-	riscvreg_satp_asid_write(asid);
+	riscvreg_asid_write(asid);
 }
 
 #if 0
