@@ -49,10 +49,6 @@ typedef __uint32_t pd_entry_t;
 #define atomic_cas_pte	atomic_cas_32
 #endif
 
-// These only mean something to NetBSD
-#define	PTE_WIRED	__BIT(9)	// Do Not Delete
-#define	PTE_NX		__BIT(8)	// Not eXecuted?
-
 #define PTE_PPN_SHIFT	10
 
 #define NPTEPG		(PAGE_SIZE / sizeof(pt_entry_t))
@@ -60,7 +56,8 @@ typedef __uint32_t pd_entry_t;
 #define NPDEPG		NPTEPG
 
 /* Software PTE bits. */
-#define	PTE_WIRED	__BIT(8)
+#define	PTE_WIRED	__BIT(9)
+#define	PTE_NX		__BIT(8)	// Not eXecuted?
 
 /* Hardware PTE bits. */
 // These are hardware defined bits
@@ -94,47 +91,6 @@ typedef __uint32_t pd_entry_t;
 #define pl2_i(va)	(((va) >> L2_SHIFT) & Ln_ADDR_MASK)
 #define pl1_i(va)	(((va) >> L1_SHIFT) & Ln_ADDR_MASK)
 #define pl0_i(va)	(((va) >> L0_SHIFT) & Ln_ADDR_MASK)
-
-/*
-  Helper macro for determining if on a "Transit" (non-leaf) page.
-  A previous spec had PTE_T for this.
-*/
-#define PTE_IS_T(pte)	(((pd_entry_t)(pte) & PTE_V) && !((pd_entry_t)(pte) & (PTE_W|PTE_R|PTE_X)))
-
-/* Constants From FreeBSD RISC-V Port */
-
-/* Level 0 table, 512GiB per entry */
-#define	L0_SHIFT	39
-
-/* Level 1 table, 1GiB per entry */
-#define	L1_SHIFT	30
-#define	L1_SIZE 	(1 << L1_SHIFT)
-#define	L1_OFFSET 	(L1_SIZE - 1)
-
-/* Level 2 table, 2MiB per entry */
-#define	L2_SHIFT	21
-#define	L2_SIZE 	(1 << L2_SHIFT)
-#define	L2_OFFSET 	(L2_SIZE - 1)
-
-/* Level 3 table, 4KiB per entry */
-#define	L3_SHIFT	12
-#define	L3_SIZE 	(1 << L3_SHIFT)
-#define	L3_OFFSET 	(L3_SIZE - 1)
-
-#define	Ln_ENTRIES	(1 << 9)
-#define	Ln_ADDR_MASK	(Ln_ENTRIES - 1)
-
-#define	PTE_PPN0_S	10
-#define	PTE_PPN1_S	19
-#define	PTE_PPN2_S	28
-#define	PTE_PPN3_S	37
-#define	PTE_SIZE	8
-
-/* End FreeBSD RISC-V Constants */
-
-#define l1pde_index(v)	(((vaddr_t)(v) >> L1_SHIFT) & Ln_ADDR_MASK)
-#define l2pde_index(v)	(((vaddr_t)(v) >> L2_SHIFT) & Ln_ADDR_MASK)
-#define l3pte_index(v)	(((vaddr_t)(v) >> L3_SHIFT) & Ln_ADDR_MASK)
 
 static inline const size_t
 pte_index(vaddr_t va)
@@ -188,7 +144,7 @@ pte_unwire_entry(pt_entry_t pte)
 static inline paddr_t
 pte_to_paddr(pt_entry_t pte)
 {
-	return (pte >> PTE_PPN0_S) * PAGE_SIZE;
+	return PTE_TO_PA(pte);
 }
 
 static inline pt_entry_t
@@ -298,20 +254,19 @@ pte_invalid_pde(void)
 static inline pd_entry_t
 pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
-	return PTE_V | PTE_G | (pa >> PAGE_SHIFT) << PTE_PPN0_S;
+	return PTE_V | (pa >> PAGE_SHIFT) << L2_SHIFT;
 }
 
 static inline pd_entry_t
 pte_pde_ptpage(paddr_t pa, bool kernel_p)
 {
-	return PTE_V | PTE_G | (pa >> PAGE_SHIFT) << PTE_PPN2_S;
+	return PTE_V | PTE_X | PTE_W | PTE_R | (pa >> PAGE_SHIFT) << L2_SHIFT;
 }
 
 static inline bool
 pte_pde_valid_p(pd_entry_t pde)
 {
-	/* OLD: return (pde & (PTE_V|PTE_T)) == (PTE_V|PTE_T); */
-	return PTE_IS_T(pde);
+	return (pde & (PTE_X | PTE_W | PTE_R)) == 0;
 }
 
 static inline paddr_t
