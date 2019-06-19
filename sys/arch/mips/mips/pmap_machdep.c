@@ -179,8 +179,8 @@ pmap_md_map_ephemeral_page(struct vm_page *pg, bool locked_p, int prot,
 	register_t va = 0;
 
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(pg=%p, prot=%d, ptep=%p)",
-	    pg, prot, old_pte_p, 0);
+	UVMHIST_LOG(pmaphist, "(pg=%#jx, prot=%d, ptep=%#jx)",
+	    (uintptr_t)pg, prot, (uintptr_t)old_pte_p, 0);
 
 	KASSERT(!locked_p || VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
 
@@ -267,8 +267,8 @@ pmap_md_unmap_ephemeral_page(struct vm_page *pg, bool locked_p, register_t va,
 	pv_entry_t pv = &mdpg->mdpg_first;
 
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(pg=%p, va=%#lx, pte=%#"PRIxPTE")",
-	    pg, va, pte_value(old_pte), 0);
+	UVMHIST_LOG(pmaphist, "(pg=%#jx, va=%#lx, pte=%#"PRIxPTE")",
+	    (uintptr_t)pg, va, pte_value(old_pte), 0);
 
 	KASSERT(!locked_p || VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
 
@@ -1003,7 +1003,7 @@ pmap_md_vca_clean(struct vm_page *pg, int op)
 	if (!MIPS_HAS_R4K_MMU || !MIPS_CACHE_VIRTUAL_ALIAS)
 		return;
 
-	UVMHIST_LOG(pmaphist, "(pg=%p, op=%d)", pg, op, 0, 0);
+	UVMHIST_LOG(pmaphist, "(pg=%#jx, op=%d)", (uintptr_t)pg, op, 0, 0);
 	KASSERT(VM_PAGEMD_PVLIST_LOCKED_P(VM_PAGE_TO_MD(pg)));
 
 	if (op == PMAP_WB || op == PMAP_WBINV) {

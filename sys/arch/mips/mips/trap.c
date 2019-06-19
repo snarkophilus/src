@@ -279,8 +279,8 @@ trap(uint32_t status, uint32_t cause, vaddr_t vaddr, vaddr_t pc,
 			}
 		}
 		UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
-		UVMHIST_LOG(maphist, "%ctlbmod(va=%#lx, pc=%#lx, tf=%p)",
-		    user_p ? 'u' : 'k', vaddr, pc, tf);
+		UVMHIST_LOG(maphist, "%ctlbmod(va=%#lx, pc=%#lx, tf=%#jx)",
+		    user_p ? 'u' : 'k', vaddr, pc, (uintptr_t)tf);
 		if (!pte_modified_p(pte)) {
 			pte |= mips_pg_m_bit();
 #ifdef MULTIPROCESSOR
