@@ -1,4 +1,4 @@
-/*	$NetBSD: mips_param.h,v 1.39 2019/05/11 06:50:42 skrll Exp $	*/
+/*	$NetBSD: mips_param.h,v 1.40 2019/06/19 09:55:27 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2013 The NetBSD Foundation, Inc.
