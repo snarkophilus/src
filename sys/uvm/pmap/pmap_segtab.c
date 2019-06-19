@@ -161,10 +161,10 @@ typedef struct  {
 	pmap_segtab_t *free_segtab0;	/* free list kept locally */
 	pmap_segtab_t *free_segtab;	/* free list kept locally */
 #ifdef DEBUG
-	uint32_t nget_segtab;
-	uint32_t nput_segtab;
-	uint32_t npage_segtab;
-#define	SEGTAB_ADD(n, v)	(pmap_segtab_info.n ## _segtab += (v))
+	uint32_t nget;
+	uint32_t nput;
+	uint32_t npage;
+#define	SEGTAB_ADD(n, v)	(pmap_segtab_info.segalloc.n += (v))
 #else
 #define	SEGTAB_ADD(n, v)	((void) 0)
 #endif
@@ -591,9 +591,9 @@ pmap_segtab_alloc(void)
  again:
 	mutex_spin_enter(&pmap_segtab_lock);
 	if (__predict_true((stp = pmap_segtab_info.segalloc.free_segtab) != NULL)) {
-		pmap_segtab_info.segalloc.free_segtab = stp->seg_seg[0];
+		pmap_segtab_info.segalloc.free_segtab = stp->seg_next;
 		SEGTAB_ADD(nget, 1);
-		stp->seg_seg[0] = NULL;
+		stp->seg_next = NULL;
 		found_on_freelist = true;
 	}
 	mutex_spin_exit(&pmap_segtab_lock);
@@ -618,13 +618,13 @@ pmap_segtab_alloc(void)
 			 * link all the segtabs in this page together
 			 */
 			for (size_t i = 1; i < n - 1; i++) {
-				stp[i].seg_seg[0] = &stp[i + 1];
+				stp[i].seg_next = &stp[i + 1];
 			}
 			/*
 			 * Now link the new segtabs into the free segtab list.
 			 */
 			mutex_spin_enter(&pmap_segtab_lock);
-			stp[n - 1].seg_seg[0] = pmap_segtab_info.segalloc.free_segtab;
+			stp[n - 1].seg_next = pmap_segtab_info.segalloc.free_segtab;
 			pmap_segtab_info.segalloc.free_segtab = stp + 1;
 			SEGTAB_ADD(nput, n - 1);
 			mutex_spin_exit(&pmap_segtab_lock);
@@ -905,7 +905,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 #endif /* _LP64 */
 	const size_t idx = (va >> SEGSHIFT) & segtab_mask;
 	return &ptb->pde_pde[idx];
-#else
+#else /* PMAP_HWPAGEWALKER && PMAP_MAP_POOLPAGE */
 	pmap_segtab_t *stb = pmap->pm_segtab;
 	vaddr_t segtab_mask = PMAP_SEGTABSIZE - 1;
 #ifdef _LP64
@@ -930,13 +930,13 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 #endif
 		}
 	}
-#else
+#elif defined(PMAP_HWPAGEWALKER)
 	pmap_segtab_t opde = ptb->pde_pde[(va >> segshift) & segtab_mask];
 	KASSERT(pte_pde_valid_p(opde));
 	ptb = pmap_pde_to_pdetab(opde);
 	segtab_mask = NSEGPG - 1;
 
-#endif /* _LP64 */
+#endif /* PMAP_HWPAGEWALKER */
 	size_t idx = (va >> SEGSHIFT) & segtab_mask;
 #if defined(PMAP_HWPAGEWALKER)
 #if defined(XSEGSHIFT) && XSEGSHIFT != SEGSHIFT)
