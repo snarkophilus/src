@@ -44,6 +44,8 @@ __RCSID("$NetBSD: trap.c,v 1.3 2019/06/16 07:42:52 maxv Exp $");
 
 #include <uvm/uvm.h>
 
+#include <machine/db_machdep.h>
+
 #include <riscv/locore.h>
 
 #define	INSTRUCTION_TRAP_MASK	__BIT(CAUSE_INST_ILLEGAL)

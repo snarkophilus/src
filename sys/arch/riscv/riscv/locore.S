@@ -114,7 +114,7 @@ ENTRY_NP(start)
 
 	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
 	add	t2, s2, s11 		// PA -> VA
-	PTR_S	t2, PM_MD_PDETAB(t1)	// VA of kernel PDETAB
+	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
 	PTR_S	s2, PM_MD_PTBR(t1)	// PA of kernel PDETAB
 
 	// Now we should ready to start initializing the kernel.
@@ -555,13 +555,13 @@ _C_LABEL(lwp0uspace):
 
 	.align PGSHIFT
 mmutables_start:
-	.global _C_LABEL(l1_pte)
-l1_pte:	
-	.space PAGE_SIZE
 	.global _C_LABEL(l2_pte)
-l2_pte:	
+l2_pte:
 	.space PAGE_SIZE
-	.global _C_LABEL(l2_dtb)
-l2_dtb:	
+	.global _C_LABEL(l1_pte)
+l1_pte:
+	.space PAGE_SIZE
+	.global _C_LABEL(l21_dtb)
+l1_dtb:
 	.space PAGE_SIZE
 mmutables_end:
