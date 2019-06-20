@@ -231,8 +231,7 @@ struct pmap_kernel kernel_pmap_store = {
 		.pm_pdetab = PMAP_INVALID_PDETAB_ADDRESS,
 #endif
 #if !defined(PMAP_HWPAGEWALKER) || !defined(POOL_PHYSTOV)
-		.pm_segtab = PMAP_INVALID_SEGTAB_ADDRESS,
-		//.pm_segtab = &pmap_kern_segtab,
+		.pm_segtab = &pmap_kern_segtab,
 #endif
 		.pm_minaddr = VM_MIN_KERNEL_ADDRESS,
 		.pm_maxaddr = VM_MAX_KERNEL_ADDRESS,
