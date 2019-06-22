@@ -103,15 +103,8 @@
 
 #define	NPDEPG		(PAGE_SIZE / sizeof(pd_entry_t))
 
-// 1MB NBSEG. SEGSHIFT is 20, I think
-//
-
-#define	PTPSHIFT        2
-#define	PTPLENGTH       (L2_S_SHIFT - PTPSHIFT)
-//CTASSERT(NPTEPG == (1 << PTPLENGTH));
-
-//XXXNH what's the real definition. 20 is right answer.
-#define	SEGSHIFT	(PTPLENGTH + PTPLENGTH)	/* LOG2(NBSEG) */
+/* ARM short descriptor translation table format */
+#define	SEGSHIFT	20			/* LOG2(NBSEG) */
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
