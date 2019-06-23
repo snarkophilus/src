@@ -768,8 +768,8 @@ pmap_zero_page_generic(paddr_t pa)
 #endif
 	pt_entry_t * const ptep = cpu_cdst_pte(va_offset);
 
-	KDASSERT();
 #if 0
+	KDASSERT();
 #ifdef DEBUG
 	if (!SLIST_EMPTY(&md->pvh_list))
 		panic("pmap_zero_page: page has mappings");
@@ -884,7 +884,6 @@ pmap_pageidlezero(paddr_t pa)
 	bool rv = true;
 #if defined(PMAP_CACHE_VIPT) || defined(DEBUG)
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-//	struct vm_page_md *md = VM_PAGE_TO_MD(pg);
 #endif
 #ifdef PMAP_CACHE_VIPT
 	/* Choose the last page color it had, if any */
@@ -905,9 +904,12 @@ pmap_pageidlezero(paddr_t pa)
 	pt_entry_t * const ptep = cpu_cdst_pte(va_offset);
 
 
+#if 0
 #ifdef DEBUG
+	struct vm_page_md *md = VM_PAGE_TO_MD(pg);
 	if (!SLIST_EMPTY(&md->pvh_list))
 		panic("pmap_pageidlezero: page has mappings");
+#endif
 #endif
 
 	KDASSERT((pa & PGOFSET) == 0);
