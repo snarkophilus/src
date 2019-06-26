@@ -63,7 +63,7 @@ typedef struct pv_entry {
 #define	PV_KENTER		__BIT(0)
 } *pv_entry_t;
 
-#define	PV_ISKENTRY_P(pv)	(((pv->pv_va) & PV_KENTRY) != 0)
+#define	PV_ISKENTER_P(pv)	(((pv->pv_va) & PV_KENTER) != 0)
 
 #ifndef _MODULE
 

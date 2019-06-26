@@ -349,8 +349,9 @@ pmap_bootstrap(void)
 		    mips_cache_info.mci_icache_alias_mask);
 	}
 
-#ifdef MULTIPROCESSOR
 	pmap_t pm = pmap_kernel();
+
+#ifdef MULTIPROCESSOR
 	kcpuset_create(&pm->pm_onproc, true);
 	kcpuset_create(&pm->pm_active, true);
 	KASSERT(pm->pm_onproc != NULL);
@@ -358,6 +359,22 @@ pmap_bootstrap(void)
 	kcpuset_set(pm->pm_onproc, cpu_number());
 	kcpuset_set(pm->pm_active, cpu_number());
 #endif
+
+	//XXXNH create a sys/uvm/pmap bootstrap func
+	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
+	uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
+	uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
+
+	TAILQ_INIT(&pm->pm_ptp_list);
+#ifdef _LP64
+#if defined(PMAP_HWPAGEWALKER)
+	TAILQ_INIT(&pm->pm_pdetab_list);
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+	TAILQ_INIT(&pm->pm_segtab_list);
+#endif
+#endif
+
 	pmap_tlb_info_init(&pmap_tlb0_info);		/* init the lock */
 
 	/*

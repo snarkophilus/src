@@ -106,57 +106,14 @@ pmap_is_current(pmap_t pm)
 	return false;
 }
 
-#if 1
 bool pmap_is_cached(pmap_t pm);
-#else
-static inline bool
-pmap_is_cached(pmap_t pm)
-{
-	struct cpu_info * const ci = curcpu();
-	if (pm == pmap_kernel() || ci->ci_pmap_lastuser == NULL
-	    || ci->ci_pmap_lastuser == pm)
-		return true;
 
-	return false;
-}
-#endif
 
-/*
- * PTE_SYNC_CURRENT:
- *
- *     Make sure the pte is written out to RAM.
- *     We need to do this for one of two cases:
- *       - We're dealing with the kernel pmap
- *       - There is no pmap active in the cache/tlb.
- *       - The specified pmap is 'active' in the cache/tlb.
- */
-
-#ifdef PMAP_INCLUDE_PTE_SYNC
-static inline void
-pmap_pte_sync_current(pmap_t pm, pt_entry_t *ptep)
-{
-	if (PMAP_NEEDS_PTE_SYNC && pmap_is_cached(pm))
-		PTE_SYNC(ptep);
-	arm_dsb();
-}
-
-# define PTE_SYNC_CURRENT(pm, ptep)	pmap_pte_sync_current(pm, ptep)
-#else
-# define PTE_SYNC_CURRENT(pm, ptep)	__nothing
-#endif
 
 struct l2_bucket *
 	pmap_alloc_l2_bucket(pmap_t, vaddr_t);
 void	pmap_free_l2_bucket(pmap_t, struct l2_bucket *, u_int);
-#if 0
-void	pmap_alloc_l1(pmap_t);
-void	pmap_free_l1(pmap_t);
-void	pmap_use_l1(pmap_t);
-#endif
 
-#if 0
-void	pmap_pinit(pmap_t);
-#endif
 
 
 void	pmap_impl_bootstrap(void);

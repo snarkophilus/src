@@ -278,10 +278,6 @@ static struct pmap	kernel_pmap_store = {
 	.pm_cstate.cs_all = PMAP_CACHE_STATE_ALL,
 };
 struct pmap * const	kernel_pmap_ptr = &kernel_pmap_store;
-#if 0
-#undef pmap_kernel
-#define pmap_kernel()	(&kernel_pmap_store)
-#endif
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 int			arm_poolpage_vmfreelist = VM_FREELIST_DEFAULT;
 #endif
@@ -748,16 +744,6 @@ pmap_l1_kva(pmap_t pm)
 	return pm->pm_l1->l1_kva;
 }
 
-#if 0
-static inline bool
-pmap_is_current(pmap_t pm)
-{
-	if (pm == pmap_kernel() || curproc->p_vmspace->vm_map.pmap == pm)
-		return true;
-
-	return false;
-}
-#endif
 
 bool
 pmap_is_cached(pmap_t pm)
@@ -769,8 +755,6 @@ pmap_is_cached(pmap_t pm)
 
 	return false;
 }
-
-#if 0
 
 /*
  * PTE_SYNC_CURRENT:
@@ -794,7 +778,6 @@ pmap_pte_sync_current(pmap_t pm, pt_entry_t *ptep)
 # define PTE_SYNC_CURRENT(pm, ptep)	pmap_pte_sync_current(pm, ptep)
 #else
 # define PTE_SYNC_CURRENT(pm, ptep)	__nothing
-#endif
 #endif
 
 /*
@@ -1222,268 +1205,6 @@ pmap_use_l1(pmap_t pm)
 
 
 
-#if 0
-
-/*
- * void pmap_free_l2_ptp(pt_entry_t *, paddr_t *)
- *
- * Free an L2 descriptor table.
- */
-static inline void
-#if defined(PMAP_INCLUDE_PTE_SYNC) && defined(PMAP_CACHE_VIVT)
-pmap_free_l2_ptp(bool need_sync, pt_entry_t *l2, paddr_t pa)
-#else
-pmap_free_l2_ptp(pt_entry_t *l2, paddr_t pa)
-#endif
-{
-#if defined(PMAP_INCLUDE_PTE_SYNC) && defined(PMAP_CACHE_VIVT)
-	/*
-	 * Note: With a write-back cache, we may need to sync this
-	 * L2 table before re-using it.
-	 * This is because it may have belonged to a non-current
-	 * pmap, in which case the cache syncs would have been
-	 * skipped for the pages that were being unmapped. If the
-	 * L2 table were then to be immediately re-allocated to
-	 * the *current* pmap, it may well contain stale mappings
-	 * which have not yet been cleared by a cache write-back
-	 * and so would still be visible to the mmu.
-	 */
-	if (need_sync)
-		PTE_SYNC_RANGE(l2, L2_TABLE_SIZE_REAL / sizeof(pt_entry_t));
-#endif /* PMAP_INCLUDE_PTE_SYNC && PMAP_CACHE_VIVT */
-	pool_cache_put_paddr(&pmap_l2ptp_cache, (void *)l2, pa);
-}
-
-/*
- * Returns a pointer to the L2 bucket associated with the specified pmap
- * and VA, or NULL if no L2 bucket exists for the address.
- */
-static inline struct l2_bucket *
-pmap_get_l2_bucket(pmap_t pm, vaddr_t va)
-{
-	const size_t l1slot = l1pte_index(va);
-	struct l2_dtable *l2;
-	struct l2_bucket *l2b;
-
-	if ((l2 = pm->pm_l2[L2_IDX(l1slot)]) == NULL ||
-	    (l2b = &l2->l2_bucket[L2_BUCKET(l1slot)])->l2b_kva == NULL)
-		return (NULL);
-
-	return (l2b);
-}
-
-/*
- * Returns a pointer to the L2 bucket associated with the specified pmap
- * and VA.
- *
- * If no L2 bucket exists, perform the necessary allocations to put an L2
- * bucket/page table in place.
- *
- * Note that if a new L2 bucket/page was allocated, the caller *must*
- * increment the bucket occupancy counter appropriately *before*
- * releasing the pmap's lock to ensure no other thread or cpu deallocates
- * the bucket/page in the meantime.
- */
-static struct l2_bucket *
-pmap_alloc_l2_bucket(pmap_t pm, vaddr_t va)
-{
-	const size_t l1slot = l1pte_index(va);
-	struct l2_dtable *l2;
-
-	if ((l2 = pm->pm_l2[L2_IDX(l1slot)]) == NULL) {
-		/*
-		 * No mapping at this address, as there is
-		 * no entry in the L1 table.
-		 * Need to allocate a new l2_dtable.
-		 */
-		if ((l2 = pmap_alloc_l2_dtable()) == NULL)
-			return (NULL);
-
-		/*
-		 * Link it into the parent pmap
-		 */
-		pm->pm_l2[L2_IDX(l1slot)] = l2;
-	}
-
-	struct l2_bucket * const l2b = &l2->l2_bucket[L2_BUCKET(l1slot)];
-
-	/*
-	 * Fetch pointer to the L2 page table associated with the address.
-	 */
-	if (l2b->l2b_kva == NULL) {
-		pt_entry_t *ptep;
-
-		/*
-		 * No L2 page table has been allocated. Chances are, this
-		 * is because we just allocated the l2_dtable, above.
-		 */
-		if ((ptep = pmap_alloc_l2_ptp(&l2b->l2b_pa)) == NULL) {
-			/*
-			 * Oops, no more L2 page tables available at this
-			 * time. We may need to deallocate the l2_dtable
-			 * if we allocated a new one above.
-			 */
-			if (l2->l2_occupancy == 0) {
-				pm->pm_l2[L2_IDX(l1slot)] = NULL;
-				pmap_free_l2_dtable(l2);
-			}
-			return (NULL);
-		}
-
-		l2->l2_occupancy++;
-		l2b->l2b_kva = ptep;
-		l2b->l2b_l1slot = l1slot;
-
-	}
-
-	return (l2b);
-}
-
-/*
- * One or more mappings in the specified L2 descriptor table have just been
- * invalidated.
- *
- * Garbage collect the metadata and descriptor table itself if necessary.
- *
- * The pmap lock must be acquired when this is called (not necessary
- * for the kernel pmap).
- */
-static void
-pmap_free_l2_bucket(pmap_t pm, struct l2_bucket *l2b, u_int count)
-{
-	KDASSERT(count <= l2b->l2b_occupancy);
-
-	/*
-	 * Update the bucket's reference count according to how many
-	 * PTEs the caller has just invalidated.
-	 */
-	l2b->l2b_occupancy -= count;
-
-	/*
-	 * Note:
-	 *
-	 * Level 2 page tables allocated to the kernel pmap are never freed
-	 * as that would require checking all Level 1 page tables and
-	 * removing any references to the Level 2 page table. See also the
-	 * comment elsewhere about never freeing bootstrap L2 descriptors.
-	 *
-	 * We make do with just invalidating the mapping in the L2 table.
-	 *
-	 * This isn't really a big deal in practice and, in fact, leads
-	 * to a performance win over time as we don't need to continually
-	 * alloc/free.
-	 */
-	if (l2b->l2b_occupancy > 0 || pm == pmap_kernel())
-		return;
-
-	/*
-	 * There are no more valid mappings in this level 2 page table.
-	 * Go ahead and NULL-out the pointer in the bucket, then
-	 * free the page table.
-	 */
-	const size_t l1slot = l2b->l2b_l1slot;
-	pt_entry_t * const ptep = l2b->l2b_kva;
-	l2b->l2b_kva = NULL;
-
-	pd_entry_t * const pdep = pmap_l1_kva(pm) + l1slot;
-	pd_entry_t pde __diagused = *pdep;
-
-	/*
-	 * If the L1 slot matches the pmap's domain number, then invalidate it.
-	 */
-	if ((pde & (L1_C_DOM_MASK|L1_TYPE_MASK))
-	    == (L1_C_DOM(pmap_domain(pm))|L1_TYPE_C)) {
-		l1pte_setone(pdep, 0);
-		PDE_SYNC(pdep);
-	}
-
-	/*
-	 * Release the L2 descriptor table back to the pool cache.
-	 */
-#if defined(PMAP_INCLUDE_PTE_SYNC) && defined(PMAP_CACHE_VIVT)
-	pmap_free_l2_ptp(!pmap_is_cached(pm), ptep, l2b->l2b_pa);
-#else
-	pmap_free_l2_ptp(ptep, l2b->l2b_pa);
-#endif
-
-	/*
-	 * Update the reference count in the associated l2_dtable
-	 */
-	struct l2_dtable * const l2 = pm->pm_l2[L2_IDX(l1slot)];
-	if (--l2->l2_occupancy > 0)
-		return;
-
-	/*
-	 * There are no more valid mappings in any of the Level 1
-	 * slots managed by this l2_dtable. Go ahead and NULL-out
-	 * the pointer in the parent pmap and free the l2_dtable.
-	 */
-	pm->pm_l2[L2_IDX(l1slot)] = NULL;
-	pmap_free_l2_dtable(l2);
-}
-
-
-
-
-
-
-
-#if 0
-/*
- * Pool cache constructors for L2 descriptor tables, metadata and pmap
- * structures.
- */
-static int
-pmap_l2ptp_ctor(void *arg, void *v, int flags)
-{
-#ifndef PMAP_INCLUDE_PTE_SYNC
-	vaddr_t va = (vaddr_t)v & ~PGOFSET;
-
-	/*
-	 * The mappings for these page tables were initially made using
-	 * pmap_kenter_pa() by the pool subsystem. Therefore, the cache-
-	 * mode will not be right for page table mappings. To avoid
-	 * polluting the pmap_kenter_pa() code with a special case for
-	 * page tables, we simply fix up the cache-mode here if it's not
-	 * correct.
-	 */
-	if (pte_l2_s_cache_mode != pte_l2_s_cache_mode_pt) {
-		const struct l2_bucket * const l2b =
-		    pmap_get_l2_bucket(pmap_kernel(), va);
-		KASSERTMSG(l2b != NULL, "%#lx", va);
-		pt_entry_t * const ptep = &l2b->l2b_kva[l2pte_index(va)];
-		const pt_entry_t opte = *ptep;
-
-		if ((opte & L2_S_CACHE_MASK) != pte_l2_s_cache_mode_pt) {
-			/*
-			 * Page tables must have the cache-mode set correctly.
-			 */
-			const pt_entry_t npte = (opte & ~L2_S_CACHE_MASK)
-			    | pte_l2_s_cache_mode_pt;
-			l2pte_set(ptep, npte, opte);
-			PTE_SYNC(ptep);
-			cpu_tlb_flushD_SE(va);
-			cpu_cpwait();
-		}
-	}
-#endif
-
-	memset(v, 0, L2_TABLE_SIZE_REAL);
-	PTE_SYNC_RANGE(v, L2_TABLE_SIZE_REAL / sizeof(pt_entry_t));
-	return (0);
-}
-
-
-static int
-pmap_l2dtable_ctor(void *arg, void *v, int flags)
-{
-
-	memset(v, 0, sizeof(struct l2_dtable));
-	return (0);
-}
-#endif
-
-#endif
 
 static int
 pmap_pmap_ctor(void *arg, void *v, int flags)
@@ -3794,48 +3515,6 @@ pmap_protect(pmap_t pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 	pmap_release_pmap_lock(pm);
 }
 
-#if 0
-void
-pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
-{
-	struct l2_bucket *l2b;
-	pt_entry_t *ptep;
-	vaddr_t next_bucket;
-	vsize_t page_size = trunc_page(sva) + PAGE_SIZE - sva;
-
-	NPDEBUG(PDB_EXEC,
-	    printf("pmap_icache_sync_range: pm %p sva 0x%lx eva 0x%lx\n",
-	    pm, sva, eva));
-
-	pmap_acquire_pmap_lock(pm);
-
-	while (sva < eva) {
-		next_bucket = L2_NEXT_BUCKET_VA(sva);
-		if (next_bucket > eva)
-			next_bucket = eva;
-
-		l2b = pmap_get_l2_bucket(pm, sva);
-		if (l2b == NULL) {
-			sva = next_bucket;
-			continue;
-		}
-
-		for (ptep = &l2b->l2b_kva[l2pte_index(sva)];
-		     sva < next_bucket;
-		     sva += page_size,
-		     ptep += PAGE_SIZE / L2_S_SIZE,
-		     page_size = PAGE_SIZE) {
-			if (l2pte_valid_p(*ptep)) {
-				cpu_icache_sync_range(sva,
-				    uimin(page_size, eva - sva));
-			}
-		}
-	}
-
-	pmap_release_pmap_lock(pm);
-}
-
-#endif
 
 void
 pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
@@ -4170,7 +3849,6 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, int user)
 	}
 
 #ifndef MULTIPROCESSOR
-#if defined(DEBUG) || 1
 	/*
 	 * If 'rv == 0' at this point, it generally indicates that there is a
 	 * stale TLB entry for the faulting address. This happens when two or
@@ -4228,7 +3906,6 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, int user)
 		}
 #endif
 	}
-#endif
 #endif
 
 	/* Flush the TLB in the shared L1 case - see comment above */
@@ -4362,15 +4039,6 @@ pmap_activate(struct lwp *l)
 	 * This will result in a few unnecessary cache flushes, but that's
 	 * better than silently corrupting data.
 	 */
-#if 0
-	if (npm != pmap_kernel() && rpm && npm != rpm &&
-	    rpm->pm_cstate.cs_cache) {
-		rpm->pm_cstate.cs_cache = 0;
-#ifdef PMAP_CACHE_VIVT
-		cpu_idcache_wbinv_all();
-#endif
-	}
-#else
 	if (rpm) {
 		rpm->pm_cstate.cs_cache = 0;
 		if (npm == pmap_kernel())
@@ -4379,7 +4047,6 @@ pmap_activate(struct lwp *l)
 		cpu_idcache_wbinv_all();
 #endif
 	}
-#endif
 
 	/* No interrupts while we frob the TTB/DACR */
 	uint32_t oldirqstate = disable_interrupts(IF32_bits);
@@ -4890,52 +4557,6 @@ vector_page_setprot(int prot)
 }
 #endif
 
-#if 0
-/*
- * Fetch pointers to the PDE/PTE for the given pmap/VA pair.
- * Returns true if the mapping exists, else false.
- *
- * NOTE: This function is only used by a couple of arm-specific modules.
- * It is not safe to take any pmap locks here, since we could be right
- * in the middle of debugging the pmap anyway...
- *
- * It is possible for this routine to return false even though a valid
- * mapping does exist. This is because we don't lock, so the metadata
- * state may be inconsistent.
- *
- * NOTE: We can return a NULL *ptp in the case where the L1 pde is
- * a "section" mapping.
- */
-bool
-pmap_get_pde_pte(pmap_t pm, vaddr_t va, pd_entry_t **pdp, pt_entry_t **ptp)
-{
-	struct l2_dtable *l2;
-	pd_entry_t *pdep, pde;
-	pt_entry_t *ptep;
-	u_short l1slot;
-
-	if (pm->pm_l1 == NULL)
-		return false;
-
-	l1slot = l1pte_index(va);
-	*pdp = pdep = pmap_l1_kva(pm) + l1slot;
-	pde = *pdep;
-
-	if (l1pte_section_p(pde)) {
-		*ptp = NULL;
-		return true;
-	}
-
-	l2 = pm->pm_l2[L2_IDX(l1slot)];
-	if (l2 == NULL ||
-	    (ptep = l2->l2_bucket[L2_BUCKET(l1slot)].l2b_kva) == NULL) {
-		return false;
-	}
-
-	*ptp = &ptep[l2pte_index(va)];
-	return true;
-}
-#endif
 
 
 bool
@@ -5088,13 +4709,6 @@ pmap_impl_postinit(void)
 	u_int loop, needed;
 	int error;
 
-#if 0
-	pool_cache_setlowat(&pmap_l2ptp_cache, (PAGE_SIZE / L2_TABLE_SIZE_REAL) * 4);
-printf("%s: %d\n", __func__, __LINE__);
-	pool_cache_setlowat(&pmap_l2dtable_cache,
-	    (PAGE_SIZE / sizeof(struct l2_dtable)) * 2);
-
-#endif
 	needed = (maxproc / PMAP_DOMAINS) + ((maxproc % PMAP_DOMAINS) ? 1 : 0);
 	needed -= 1;
 
