@@ -624,8 +624,6 @@ pmap_free_l2_bucket(pmap_t pm, struct l2_bucket *l2b, u_int count)
 	pm->pm_l2[L2_IDX(l1slot)] = NULL;
 	pmap_free_l2_dtable(l2);
 }
-#if 0
-#endif
 
 
 /*
@@ -691,11 +689,6 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 	vaddr_t next_bucket;
 	vsize_t page_size = trunc_page(sva) + PAGE_SIZE - sva;
 
-#if 0
-	NPDEBUG(PDB_EXEC,
-	    printf("pmap_icache_sync_range: pm %p sva 0x%lx eva 0x%lx\n",
-	    pm, sva, eva));
-#endif
 
 
 #ifndef ARM_MMU_EXTENDED
@@ -768,7 +761,7 @@ pmap_zero_page_generic(paddr_t pa)
 #endif
 	pt_entry_t * const ptep = cpu_cdst_pte(va_offset);
 
-#if 0
+#if comment
 	KDASSERT();
 #ifdef DEBUG
 	if (!SLIST_EMPTY(&md->pvh_list))
@@ -840,7 +833,7 @@ pmap_zero_page_generic(paddr_t pa)
 void
 pmap_zero_page_xscale(paddr_t pa)
 {
-#if 0
+#if comment
 #ifdef DEBUG
 	struct vm_page *pg = PHYS_TO_VM_PAGE(pa);
 	struct vm_page_md *md = VM_PAGE_TO_MD(pg);
@@ -904,7 +897,7 @@ pmap_pageidlezero(paddr_t pa)
 	pt_entry_t * const ptep = cpu_cdst_pte(va_offset);
 
 
-#if 0
+#if comment
 #ifdef DEBUG
 	struct vm_page_md *md = VM_PAGE_TO_MD(pg);
 	if (!SLIST_EMPTY(&md->pvh_list))
@@ -950,7 +943,7 @@ pmap_pageidlezero(paddr_t pa)
 		 */
 		cpu_dcache_wbinv_range(vdstp, PAGE_SIZE);
 
-#if 0
+#if comment
 #ifndef ARM_MMU_EXTENDED
 	pmap_impl_pageidlezero_done(pg);
 #elif defined(PMAP_CACHE_VIPT)
@@ -1102,7 +1095,7 @@ pmap_copy_page_generic(paddr_t src, paddr_t dst)
 		cpu_tlb_flushD_SE(vdstp);
 		cpu_cpwait();
 	}
-#if 0
+#if comment
 #ifndef ARM_MMU_EXTENDED
 	pmap_impl_copypage_done(dst_pg);
 #ifdef PMAP_CACHE_VIPT
@@ -1269,12 +1262,6 @@ void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
 	static struct l2_dtable static_l2[PMAP_STATIC_L2_SIZE];
-#if 0
-#ifndef ARM_MMU_EXTENDED
-	static struct l1_ttable static_l1;
-	struct l1_ttable *l1 = &static_l1;
-#endif
-#endif
 	struct l2_dtable *l2;
 	struct l2_bucket *l2b;
 	pd_entry_t *l1pt = (pd_entry_t *) kernel_l1pt.pv_va;
@@ -1580,61 +1567,6 @@ pmap_postinit(void)
 
 	pmap_impl_postinit();
 
-#if 0
-#ifndef ARM_MMU_EXTENDED
-	extern paddr_t physical_start, physical_end;
-	struct l1_ttable *l1;
-	struct pglist plist;
-	struct vm_page *m;
-	pd_entry_t *pdep;
-	vaddr_t va, eva;
-	u_int loop, needed;
-	int error;
-
-	needed = (maxproc / PMAP_DOMAINS) + ((maxproc % PMAP_DOMAINS) ? 1 : 0);
-	needed -= 1;
-
-	l1 = kmem_alloc(sizeof(*l1) * needed, KM_SLEEP);
-
-	for (loop = 0; loop < needed; loop++, l1++) {
-		/* Allocate a L1 page table */
-		va = uvm_km_alloc(kernel_map, L1_TABLE_SIZE, 0, UVM_KMF_VAONLY);
-		if (va == 0)
-			panic("Cannot allocate L1 KVM");
-
-		error = uvm_pglistalloc(L1_TABLE_SIZE, physical_start,
-		    physical_end, L1_TABLE_SIZE, 0, &plist, 1, 1);
-		if (error)
-			panic("Cannot allocate L1 physical pages");
-
-		m = TAILQ_FIRST(&plist);
-		eva = va + L1_TABLE_SIZE;
-		pdep = (pd_entry_t *)va;
-
-		while (m && va < eva) {
-			paddr_t pa = VM_PAGE_TO_PHYS(m);
-
-			pmap_kenter_pa(va, pa,
-			    VM_PROT_READ|VM_PROT_WRITE, PMAP_KMPAGE|PMAP_PTE);
-
-			va += PAGE_SIZE;
-			m = TAILQ_NEXT(m, pageq.queue);
-		}
-
-#ifdef DIAGNOSTIC
-		if (m)
-			panic("pmap_alloc_l1pt: pglist not empty");
-#endif	/* DIAGNOSTIC */
-
-		pmap_init_l1(l1, pdep);
-	}
-
-#ifdef DEBUG
-	printf("pmap_postinit: Allocated %d static L1 descriptor tables\n",
-	    needed);
-#endif
-#endif /* !ARM_MMU_EXTENDED */
-#endif
 }
 
 
@@ -2835,47 +2767,9 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 
 
 
-#if 0
-
-SYSCTL_SETUP(sysctl_machdep_pmap_setup, "sysctl machdep.kmpages setup")
-{
-	sysctl_createv(clog, 0, NULL, NULL,
-			CTLFLAG_PERMANENT,
-			CTLTYPE_NODE, "machdep", NULL,
-			NULL, 0, NULL, 0,
-			CTL_MACHDEP, CTL_EOL);
-
-	sysctl_createv(clog, 0, NULL, NULL,
-			CTLFLAG_PERMANENT,
-			CTLTYPE_INT, "kmpages",
-			SYSCTL_DESCR("count of pages allocated to kernel memory allocators"),
-			NULL, 0, &pmap_kmpages, 0,
-			CTL_MACHDEP, CTL_CREATE, CTL_EOL);
-}
-
-#endif
 
 
 
-#if 0
-#ifdef PMAP_NEED_ALLOC_POOLPAGE
-struct vm_page *
-pmap_md_alloc_poolpage(int flags)
-{
-	/*
-	 * On some systems, only some pages may be "coherent" for dma and we
-	 * want to prefer those for pool pages (think mbufs) but fallback to
-	 * any page if none is available.
-	 */
-	if (arm_poolpage_vmfreelist != VM_FREELIST_DEFAULT) {
-		return uvm_pagealloc_strat(NULL, 0, NULL, flags,
-		    UVM_PGA_STRAT_FALLBACK, arm_poolpage_vmfreelist);
-	}
-
-	return uvm_pagealloc(NULL, 0, NULL, flags);
-}
-#endif
-#endif
 
 #if defined(ARM_MMU_EXTENDED) && defined(MULTIPROCESSOR)
 void
@@ -2899,39 +2793,3 @@ pic_ipi_shootdown(void *arg)
 
 
 
-#if 0
-
-#ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-vaddr_t
-pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
-{
-	bool ok = false;
-	if (physical_start <= pa && pa < physical_end) {
-#ifdef KERNEL_BASE_VOFFSET
-		const vaddr_t newva = pa + KERNEL_BASE_VOFFSET;
-#else
-		const vaddr_t newva = KERNEL_BASE + pa - physical_start;
-#endif
-#ifdef ARM_MMU_EXTENDED
-		if (newva >= KERNEL_BASE && newva < pmap_directlimit) {
-#endif
-			va = newva;
-			ok = true;
-#ifdef ARM_MMU_EXTENDED
-		}
-#endif
-	}
-	KASSERT(ok_p);
-	*ok_p = ok;
-	return va;
-}
-
-#endif
-
-
-
-
-
-
-
-#endif /* __HAVE_MM_MD_DIRECT_MAPPED_PHYS */
