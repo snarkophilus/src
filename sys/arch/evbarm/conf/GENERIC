@@ -198,12 +198,15 @@ options 	MULTIPROCESSOR
 
 pseudo-device 	openfirm	# /dev/openfirm
 
-#options 	DIAGNOSTIC	# internal consistency checks
-#options 	DEBUG
+options 	DIAGNOSTIC	# internal consistency checks
+options 	DEBUG
 #options 	LOCKDEBUG
 #options 	PMAP_DEBUG	# Enable pmap_debug_level code
 
-#options 	VERBOSE_INIT_ARM # verbose bootstrapping messages
+options 	UVMHIST
+options 	UVMHIST_PRINT,KERNHIST_DELAY=0
+
+options 	VERBOSE_INIT_ARM # verbose bootstrapping messages
 
 # EARLYCONS is required for early init messages from VERBOSE_INIT_ARM.
 
@@ -229,7 +232,7 @@ pseudo-device 	openfirm	# /dev/openfirm
 #options 	EARLYCONS=tegra, CONSADDR=0x70006300
 
 #options 	EARLYCONS=vexpress, CONSADDR=0x1c090000
-#options 	EARLYCONS=virt, CONSADDR=0x09000000
+options 	EARLYCONS=virt, CONSADDR=0x09000000
 
 #options 	EARLYCONS=zynq, CONSADDR=0xe0001000
 
