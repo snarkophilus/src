@@ -158,10 +158,9 @@ pt_entry_t pmap_kvattr(vaddr_t, vm_prot_t);
 /* locore.S */
 pd_entry_t *bootpage_alloc(void);
 
-/* pmap_locore.c */
+/* pmapboot.c */
 int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
-    pt_entry_t, pd_entry_t *(*)(void),
-    void (*pr)(const char *, ...) __printflike(1, 2));
+    pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
 int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
 void pmap_db_pte_print(pt_entry_t, int,
     void (*pr)(const char *, ...) __printflike(1, 2));

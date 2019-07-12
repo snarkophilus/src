@@ -188,8 +188,7 @@ tlb_contiguous_p(vaddr_t addr, vaddr_t start, vaddr_t end, vsize_t blocksize)
  */
 int
 pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
-    pt_entry_t attr, pd_entry_t *(*physpage_allocator)(void),
-    void (*pr)(const char *, ...) __printflike(1, 2))
+    pt_entry_t attr, void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	int level, idx0, idx1, idx2, idx3, nskip = 0;
 	int ttbr __unused;
@@ -249,7 +248,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 
 		idx0 = l0pde_index(va);
 		if (l0[idx0] == 0) {
-			l1 = physpage_allocator();
+			l1 = bootpage_alloc();
 			if (l1 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L1 page\n");
 				return -1;
@@ -291,7 +290,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		}
 
 		if (!l1pde_valid(l1[idx1])) {
-			l2 = physpage_allocator();
+			l2 = bootpage_alloc();
 			if (l2 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L2 page\n");
 				return -1;
@@ -334,7 +333,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		}
 
 		if (!l2pde_valid(l2[idx2])) {
-			l3 = physpage_allocator();
+			l3 = bootpage_alloc();
 			if (l3 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L3 page\n");
 				return -1;
