@@ -364,7 +364,7 @@ ENTRY_NP(cpu_mpstart)
 	add	x1, x1, #1
 	cmp	x1, MAXCPUS		/* cpuindex >= MAXCPUS ? */
 	bge	toomanycpus
-	ldr	x2, [x0, x1, lsl #3]	/* cpu_mpidr[cpunidex] */
+	ldr	x2, [x0, x1, lsl #3]	/* cpu_mpidr[cpuindex] */
 	cmp	x2, x3			/* == mpidr_el1 & MPIDR_AFF ? */
 	bne	1b
 
