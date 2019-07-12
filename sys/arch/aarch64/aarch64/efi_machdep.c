@@ -40,7 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: efi_machdep.c,v 1.3 2018/10/31 14:15:12 jmcneill Exp
 
 void
 arm_efirt_md_map_range(vaddr_t va, paddr_t pa, size_t sz, enum arm_efirt_mem_type type)
-{       
+{
 	pt_entry_t attr;
 
 	switch (type) {
