@@ -68,7 +68,7 @@ __md_palloc(void)
 	paddr_t pa;
 
 	if (__predict_false(__md_early))
-		pa = (paddr_t)bootpage_alloc();
+		pa = (paddr_t)pmapboot_pagealloc();
 	else
 		pa = pmap_alloc_pdp(pmap_kernel(), NULL, 0, false);
 

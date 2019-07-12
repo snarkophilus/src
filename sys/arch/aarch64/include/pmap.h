@@ -155,10 +155,8 @@ void pmap_db_ttbrdump(bool, vaddr_t, void (*)(const char *, ...)
 pt_entry_t *kvtopte(vaddr_t);
 pt_entry_t pmap_kvattr(vaddr_t, vm_prot_t);
 
-/* locore.S */
-pd_entry_t *bootpage_alloc(void);
 
-/* pmapboot.c */
+pd_entry_t *pmapboot_pagealloc(void);
 int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
     pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
 int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);

@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmapboot.c,v 1.3 2018/12/29 19:53:38 alnsn Exp $");
 
 #include <aarch64/armreg.h>
 #include <aarch64/cpufunc.h>
+#include <aarch64/machdep.h>
 #include <aarch64/pmap.h>
 #include <aarch64/pte.h>
 
@@ -248,7 +249,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 
 		idx0 = l0pde_index(va);
 		if (l0[idx0] == 0) {
-			l1 = bootpage_alloc();
+			l1 = pmapboot_pagealloc();
 			if (l1 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L1 page\n");
 				return -1;
@@ -290,7 +291,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		}
 
 		if (!l1pde_valid(l1[idx1])) {
-			l2 = bootpage_alloc();
+			l2 = pmapboot_pagealloc();
 			if (l2 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L2 page\n");
 				return -1;
@@ -333,7 +334,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		}
 
 		if (!l2pde_valid(l2[idx2])) {
-			l3 = bootpage_alloc();
+			l3 = pmapboot_pagealloc();
 			if (l3 == NULL) {
 				VPRINTF("pmapboot_enter: cannot allocate L3 page\n");
 				return -1;
@@ -410,4 +411,31 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 	}
 
 	return nskip;
+}
+
+extern char ARM_BOOTSTRAP_LxPT[];
+static const vaddr_t pmapboot_pagebase = (vaddr_t)ARM_BOOTSTRAP_LxPT;
+
+pd_entry_t *
+pmapboot_pagealloc(void)
+{
+	extern long kernend_extra;
+
+	if (kernend_extra < 0)
+		return NULL;
+
+	/*
+	 * ARM_BOOTSTRAP_LxPT is determined via adrp, i.e. a PC relative
+	 * operation so this will be a PA.
+	 */
+	paddr_t pa = KERN_VTOPHYS(pmapboot_pagebase) + kernend_extra;
+	kernend_extra += PAGE_SIZE;
+
+	uint64_t *p = (uint64_t *)pa;
+	for (size_t i = 0; i < PAGE_SIZE / sizeof(uint64_t); i++)
+		*p++ = 0;
+
+	memset((void *)pa, 0, PAGE_SIZE);
+
+	return (pd_entry_t *)pa;
 }

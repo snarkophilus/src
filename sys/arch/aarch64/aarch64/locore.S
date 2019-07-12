@@ -49,7 +49,7 @@ RCSID("$NetBSD: locore.S,v 1.33 2019/01/27 02:08:36 pgoyette Exp $")
 #define LOCORE_EL2
 
 #define BOOT_AP_STACKSIZE	256	/* size of temporally stack for APs */
-#define BOOTPAGE_ALLOC_MAX	(1024 * 1024)	/* reserved size from _end[] */
+#define PMAPBOOT_PAGEALLOCMAX	(1024 * 1024)	/* reserved size from _end[] */
 
 #if (defined(VERBOSE_INIT_ARM) || defined(DEBUG_LOCORE)) && defined(EARLYCONS)
 #define VERBOSE_LOCORE
@@ -733,11 +733,11 @@ init_mmutable:
 	stp	x26, lr, [sp, #-16]!
 
 	/* first allocated page must be kernel l0pt = ARM_BOOTSTRAP_LxPT */
-	bl	bootpage_alloc
+	bl	pmapboot_pagealloc
 	cbz	x0, init_mmutable_error
 	msr	ttbr1_el1, x0
 
-	bl	bootpage_alloc
+	bl	pmapboot_pagealloc
 	cbz	x0, init_mmutable_error
 	msr	ttbr0_el1, x0
 
@@ -790,7 +790,7 @@ init_mmutable:
 	adr	x0, start			/* va = start */
 	ADDR	x2, _end
 	sub	x2, x2, x0			/* size = _end - start */
-	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for bootpage_alloc() */
+	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for pmapboot_pagealloc() */
 	mov	x1, x0				/* pa */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -830,40 +830,6 @@ init_mmutable_error:
 init_mmutable_done:
 	ldp	x26, lr, [sp], #16
 	ret
-
-/* return PA of allocated page */
-ENTRY_NP(bootpage_alloc)
-	/* x2 = kernend_extra */
-	ADDR	x3, kernend_extra
-	ldr	x2, [x3]
-	/* if (kernend_extra < 0) return NULL */
-	mov	x0, xzr
-	cmp	x2, xzr
-	bmi	bootpage_alloc_done
-
-	/* x0 = PA of _end[] */
-	ADDR	x1, kern_vtopdiff
-	ldr	x1, [x1]
-	ldr	x0, =ARM_BOOTSTRAP_LxPT
-	sub	x0, x0, x1
-
-	/* x0 = ARM_BOOTSTRAP_LxPT + kernend_extra */
-	add	x0, x0, x2
-
-	/* kernend_extra += PAGE_SIZE; */
-	add	x2, x2, #PAGE_SIZE
-	str	x2, [x3]
-
-	/* clear allocated page */
-	mov	x1, x0
-	add	x2, x1, #PAGE_SIZE
-1:	stp	xzr, xzr, [x1], #16
-	cmp	x1, x2
-	bcc	1b
-bootpage_alloc_done:
-	ret
-END(bootpage_alloc)
-
 
 mmu_disable:
 	dsb	sy
