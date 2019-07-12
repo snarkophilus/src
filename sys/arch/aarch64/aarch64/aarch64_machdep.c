@@ -135,8 +135,7 @@ cpu_kernel_vm_init(uint64_t memory_start, uint64_t memory_size)
 	    LX_BLKPAG_PXN |
 	    LX_BLKPAG_UXN;
 	pmapboot_enter(AARCH64_PA_TO_KVA(memory_start), memory_start,
-	    memory_size, L1_SIZE, ksegattr, PMAPBOOT_ENTER_NOOVERWRITE,
-	    bootpage_alloc, NULL);
+	    memory_size, L1_SIZE, ksegattr, bootpage_alloc, NULL);
 	aarch64_tlbi_all();
 
 	/*

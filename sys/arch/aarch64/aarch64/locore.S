@@ -755,17 +755,15 @@ init_mmutable:
 	 *     x2: psize_t size,
 	 *     x3: psize_t blocksize,  // L[123]_SIZE
 	 *     x4: pt_entry_t attr,    // pte attributes. LX_BLKPAG_*
-	 *     x5: flags,
-	 *     x6: pd_entry_t *(*physpage_allocator)(void),
-	 *     x7: void (*pr)(const char *, ...)
+	 *     x5: pd_entry_t *(*physpage_allocator)(void),
+	 *     x6: void (*pr)(const char *, ...)
 	 *  );
 	 */
 
 #ifdef CONSADDR
 	VPRINT("Creating VA=PA tables for CONSADDR\n")
-	mov	x7, x26				/* pr func */
-	adr	x6, bootpage_alloc		/* allocator */
-	mov	x5, xzr				/* flags = 0 */
+	mov	x6, x26				/* pr func */
+	adr	x5, bootpage_alloc		/* allocator */
 	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
 	mov	x2, #L2_SIZE			/* size */
@@ -776,11 +774,10 @@ init_mmutable:
 #elif defined(EARLYCONS)
 	/* CONSADDR is unknown, but need to map UART */
 	VPRINT("Creating VA=PA tables (0x00000000-0xffffffff)\n")
-	mov	x7, x26				/* pr func */
-	adr	x6, bootpage_alloc		/* allocator */
-	mov	x5, xzr				/* flags = 0 */
+	mov	x6, x26				/* pr func */
+	adr	x5, bootpage_alloc		/* allocator */
 	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
-	mov	x3, #L2_SIZE			/* blocksize */
+	mov	x3, #L1_SIZE			/* blocksize */
 	mov	x2, #(1024*1024*1024*4)		/* size */
 	mov	x1, xzr				/* pa */
 	mov	x0, xzr				/* va */
@@ -790,15 +787,21 @@ init_mmutable:
 
 	/* identity mapping for kernel image */
 	VPRINT("Creating VA=PA tables for kernel image\n")
-	mov	x7, x26				/* pr func */
-	adr	x6, bootpage_alloc		/* allocator */
-	mov	x5, xzr				/* flags = 0 */
+	mov	x6, x26				/* pr func */
+	adr	x5, bootpage_alloc		/* allocator */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
 	adr	x0, start			/* va = start */
+//	bic	x0, #L1_OFFSET
+
 	ADDR	x2, _end
+//	add	x2, #L1_OFFSET
+//	bic	x2, #L1_OFFSET
+
 	sub	x2, x2, x0			/* size = _end - start */
-	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for boopage_alloc() */
+
+//	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for bootpage_alloc() */
+
 	mov	x1, x0				/* pa */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -808,9 +811,8 @@ init_mmutable:
 	ldr	x8, [x8]
 
 	VPRINT("Creating VA=PA tables for FDT\n")
-	mov	x7, x26				/* pr func */
-	adr	x6, bootpage_alloc		/* allocator */
-	mov	x5, xzr				/* flags = 0 */
+	mov	x6, x26				/* pr func */
+	adr	x5, bootpage_alloc		/* allocator */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
 	mov	x2, #L2_SIZE			/* size */
@@ -821,9 +823,8 @@ init_mmutable:
 #endif
 
 	VPRINT("Creating KVA=PA tables\n")
-	mov	x7, x26				/* pr func */
-	adr	x6, bootpage_alloc		/* allocator */
-	mov	x5, xzr				/* flags = 0 */
+	mov	x6, x26				/* pr func */
+	adr	x5, bootpage_alloc		/* allocator */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB|LX_BLKPAG_AP_RW	/* attr */
 	orr	x4, x4, #LX_BLKPAG_UXN
 	mov	x3, #L2_SIZE			/* blocksize */

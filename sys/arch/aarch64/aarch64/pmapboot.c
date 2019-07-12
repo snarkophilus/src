@@ -188,14 +188,14 @@ tlb_contiguous_p(vaddr_t addr, vaddr_t start, vaddr_t end, vsize_t blocksize)
  */
 int
 pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
-    pt_entry_t attr, uint64_t flags, pd_entry_t *(*physpage_allocator)(void),
+    pt_entry_t attr, pd_entry_t *(*physpage_allocator)(void),
     void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	int level, idx0, idx1, idx2, idx3, nskip = 0;
 	int ttbr __unused;
 	vaddr_t va_end;
 	pd_entry_t *l0, *l1, *l2, *l3, pte;
-	bool noblock, nooverwrite;
+	bool nooverwrite = true;
 #ifdef OPTIMIZE_TLB_CONTIG
 	vaddr_t va_start;
 	pd_entry_t *ll;
@@ -216,13 +216,9 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		return -1;
 	}
 
-	noblock = flags & PMAPBOOT_ENTER_NOBLOCK;
-	nooverwrite = flags & PMAPBOOT_ENTER_NOOVERWRITE;
-
 	VPRINTF("pmapboot_enter: va=0x%lx, pa=0x%lx, size=0x%lx, "
-	    "blocksize=0x%lx, attr=0x%016lx, "
-	    "noblock=%d, nooverwrite=%d\n",
-	    va, pa, size, blocksize, attr, noblock, nooverwrite);
+	    "blocksize=0x%lx, attr=0x%016lx, nooverwrite=%d\n",
+	    va, pa, size, blocksize, attr, nooverwrite);
 
 	va_end = (va + size - 1) & ~(blocksize - 1);
 	pa &= ~(blocksize - 1);
@@ -269,8 +265,6 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 
 		idx1 = l1pde_index(va);
 		if (level == 1) {
-			if (noblock)
-				goto nextblk;
 			if (nooverwrite && l1pde_valid(l1[idx1])) {
 				nskip++;
 				goto nextblk;
@@ -314,8 +308,6 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 
 		idx2 = l2pde_index(va);
 		if (level == 2) {
-			if (noblock)
-				goto nextblk;
 			if (nooverwrite && l2pde_valid(l2[idx2])) {
 				nskip++;
 				goto nextblk;
@@ -358,8 +350,6 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		}
 
 		idx3 = l3pte_index(va);
-		if (noblock)
-			goto nextblk;
 		if (nooverwrite && l3pte_valid(l3[idx3])) {
 			nskip++;
 			goto nextblk;

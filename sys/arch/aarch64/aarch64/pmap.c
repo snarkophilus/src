@@ -290,7 +290,7 @@ pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
 		attr &= ~LX_BLKPAG_PXN;
 
 	rc = pmapboot_enter(va, pa, size, blocksize, attr,
-	    PMAPBOOT_ENTER_NOOVERWRITE, bootpage_alloc, NULL);
+	    bootpage_alloc, NULL);
 	if (rc != 0)
 		panic("%s: pmapboot_enter failed. %lx is already mapped?\n",
 		    __func__, va);
