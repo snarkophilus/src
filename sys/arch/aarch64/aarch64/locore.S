@@ -792,16 +792,9 @@ init_mmutable:
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
 	adr	x0, start			/* va = start */
-//	bic	x0, #L1_OFFSET
-
 	ADDR	x2, _end
-//	add	x2, #L1_OFFSET
-//	bic	x2, #L1_OFFSET
-
 	sub	x2, x2, x0			/* size = _end - start */
-
-//	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for bootpage_alloc() */
-
+	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for bootpage_alloc() */
 	mov	x1, x0				/* pa */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
