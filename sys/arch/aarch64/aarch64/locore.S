@@ -812,7 +812,7 @@ init_mmutable:
 	adr	x1, start			/* va = start */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
-	mov	x0, #VM_MIN_KERNEL_ADDRESS	/* va */
+	ldr	x0, =start			/* va */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 
