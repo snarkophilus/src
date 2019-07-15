@@ -735,6 +735,9 @@ init_mmutable:
 	cbz	x0, init_mmutable_error
 	msr	ttbr0_el1, x0
 
+	DPRINTSREG("TTBR0            = ", ttbr0_el1)
+	DPRINTSREG("TTBR1            = ", ttbr1_el1)
+
 #ifdef DEBUG_MMU
 	adr	x26, tinyprintf
 #else
