@@ -140,6 +140,9 @@ options 	EARLYCONS=virt, CONSADDR=0x09000000
 #options 	POOL_QUARANTINE	# optional
 #options 	KASAN_PANIC	# optional
 
+#options 	UVMHIST
+#options 	UVMHIST_PRINT,KERNHIST_DELAY=0
+
 makeoptions	DEBUG="-g"	# compile full symbol table
 makeoptions	COPY_SYMTAB=1
 
