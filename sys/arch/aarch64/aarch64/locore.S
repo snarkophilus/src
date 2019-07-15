@@ -784,11 +784,11 @@ init_mmutable:
 	mov	x5, x26				/* pr func */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
-	adrl	x0, start			/* pa = start */
 	adrl	x2, _end
 	sub	x2, x2, x0			/* size = _end - start */
 	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for pmapboot_pagealloc() */
-	mov	x1, x0				/* pa */
+	adrl	x1, start			/* pa = start */
+	mov	x0, x1				/* va */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 
@@ -812,7 +812,7 @@ init_mmutable:
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB|LX_BLKPAG_AP_RW	/* attr */
 	orr	x4, x4, #LX_BLKPAG_UXN
 	mov	x3, #L2_SIZE			/* blocksize */
-	adrl	x1, start			/* va = start */
+	adrl	x1, start			/* pa = start */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
 	ldr	x0, =start			/* va */
