@@ -558,6 +558,7 @@ initarm(void *arg)
 
 	if (error)
 		return sp;
+
 	/*
 	 * Now we have APs started the pages used for stacks and L1PT can
 	 * be given to uvm
@@ -571,9 +572,11 @@ initarm(void *arg)
 		const paddr_t spg = atop(spa);
 		const paddr_t epg = atop(epa);
 
+		VPRINTF("         start %08lx  end %08lx... "
+		    "loading in freelist %d\n", spa, epa, VM_FREELIST_DEFAULT);
+
 		uvm_page_physload(spg, epg, spg, epg, VM_FREELIST_DEFAULT);
 
-		VPRINTF("           start %08lx  end %08lx", ptoa(spa), ptoa(epa));
 	}
 
 	return sp;
