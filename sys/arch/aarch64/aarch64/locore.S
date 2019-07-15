@@ -781,7 +781,7 @@ init_mmutable:
 	mov	x5, x26				/* pr func */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
 	mov	x3, #L2_SIZE			/* blocksize */
-	adr	x0, start			/* va = start */
+	adr	x0, start			/* pa = start */
 	adrl	x2, _end
 	sub	x2, x2, x0			/* size = _end - start */
 	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for pmapboot_pagealloc() */
