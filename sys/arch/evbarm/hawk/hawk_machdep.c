@@ -286,7 +286,7 @@ hawk_device_register (device_t self, void *aux)
 }
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -298,7 +298,7 @@ hawk_device_register (device_t self, void *aux)
  *   Setting up page tables for the kernel
  *   Relocating the kernel to the bottom of physical memory
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	vaddr_t addr;

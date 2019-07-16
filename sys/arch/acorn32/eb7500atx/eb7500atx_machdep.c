@@ -359,7 +359,7 @@ canonicalise_bootconfig(struct bootconfig *bootconf, struct bootconfig *raw_boot
 }
 
 
-u_int
+vaddr_t
 initarm(void *cookie)
 {
 	struct bootconfig *raw_bootconf = cookie;

@@ -274,7 +274,7 @@ static struct pmap_devmap marvell_devmap[] = {
 extern uint32_t *u_boot_args[];
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -286,7 +286,7 @@ extern uint32_t *u_boot_args[];
  *   Setting up page tables for the kernel
  *   Relocating the kernel to the bottom of physical memory
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	int cs, cs_end, memtag = 0, iotag = 0;

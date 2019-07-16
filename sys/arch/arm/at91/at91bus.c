@@ -232,7 +232,7 @@ at91bus_init(void)
 	return 0;
 }
 
-u_int
+vaddr_t
 at91bus_setup(BootConfig *mem)
 {
 	int loop;

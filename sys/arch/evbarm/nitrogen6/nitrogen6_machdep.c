@@ -261,7 +261,7 @@ nitrogen6_mpstart(void)
 
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -272,7 +272,7 @@ nitrogen6_mpstart(void)
  *   Initialising the physical console so characters can be printed.
  *   Setting up page tables for the kernel
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	psize_t memsize;
@@ -384,7 +384,7 @@ initarm(void *arg)
 		nbp = 1;
 	}
 #endif
-	u_int sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, bp, nbp);
+	vaddr_t sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, bp, nbp);
 
 	/*
 	 * initarm_common flushes cache if required before AP start

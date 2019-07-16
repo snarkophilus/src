@@ -323,7 +323,7 @@ static const struct pmap_devmap ixm1200_devmap[] = {
  *   Setting up page tables for the kernel
  *   Relocating the kernel to the bottom of physical memory
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
         int loop;

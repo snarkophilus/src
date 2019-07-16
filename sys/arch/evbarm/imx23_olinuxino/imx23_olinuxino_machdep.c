@@ -130,7 +130,7 @@ static void bypass_ssp(void);
 /*
  * Initialize ARM and return new SVC stack pointer.
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
         psize_t ram_size;

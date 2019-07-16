@@ -146,7 +146,7 @@ cpu_reboot(int howto, char *bootstr)
  * Return the new stackptr (va) for the SVC frame.
  *
  */
-u_int
+vaddr_t
 initarm(void *cookie)
 {
 	ofw_handle_t ofw_handle = cookie;

@@ -358,7 +358,7 @@ static const struct pmap_devmap tsarm_devmap[] = {
 };
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -370,7 +370,7 @@ static const struct pmap_devmap tsarm_devmap[] = {
  *   Setting up page tables for the kernel
  *   Initialising interrupt controllers to a sane default state
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 #ifdef FIXME

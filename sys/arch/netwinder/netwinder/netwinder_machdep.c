@@ -368,7 +368,7 @@ struct l1_sec_map {
 };
 
 /*
- * u_int initarm(...);
+ * vaddr_t initarm(...);
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -381,7 +381,7 @@ struct l1_sec_map {
  *   Relocating the kernel to the bottom of physical memory
  */
 
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	int loop;

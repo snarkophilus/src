@@ -268,7 +268,7 @@ bcm53xx_mpstart(void)
 }
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -279,7 +279,7 @@ bcm53xx_mpstart(void)
  *   Initialising the physical console so characters can be printed.
  *   Setting up page tables for the kernel
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	/*
@@ -388,7 +388,7 @@ initarm(void *arg)
 	 * If we have more than 256MB of RAM, set aside the first 256MB for
 	 * non-default VM allocations.
 	 */
-	u_int sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE,
+	vaddr_t sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE,
 	    (bigmem_p ? &bp_first256 : NULL), (bigmem_p ? 1 : 0));
 
 	/*

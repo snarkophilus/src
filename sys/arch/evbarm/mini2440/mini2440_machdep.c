@@ -425,7 +425,7 @@ read_ttb(void)
 #define	ioreg_write32(a,v)  	(*(volatile uint32_t *)(a)=(v))
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -438,7 +438,7 @@ read_ttb(void)
  *   Relocating the kernel to the bottom of physical memory
  */
 
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	int loop;

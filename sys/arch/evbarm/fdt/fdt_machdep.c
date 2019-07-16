@@ -416,9 +416,7 @@ fdt_map_efi_runtime(const char *prop, enum arm_efirt_mem_type type)
 }
 #endif
 
-u_int initarm(void *arg);
-
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	const struct arm_platform *plat;
@@ -543,7 +541,7 @@ initarm(void *arg)
 	VPRINTF("Memory regions:\n");
 	fdt_memory_foreach(fdt_add_boot_physmem, &memory_size);
 
-	u_int sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, fdt_physmem,
+	vaddr_t sp = initarm_common(KERNEL_VM_BASE, KERNEL_VM_SIZE, fdt_physmem,
 	     nfdt_physmem);
 
 	/*

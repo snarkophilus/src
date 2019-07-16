@@ -117,7 +117,7 @@ extern struct arm32_bus_dma_tag at91_bd_tag;
 
 extern int at91bus_init(void);
 struct _BootConfig;
-extern u_int at91bus_setup(struct _BootConfig *);
+extern vaddr_t at91bus_setup(struct _BootConfig *);
 extern bus_dma_tag_t at91_bus_dma_init(struct arm32_bus_dma_tag *);
 
 static __inline const struct pmap_devmap *

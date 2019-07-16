@@ -330,7 +330,7 @@ static const struct pmap_devmap smdk2800_devmap[] = {
 #define	ioreg32(pa)	(*(volatile uint32_t *)ioreg_vaddr(pa))
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -343,7 +343,7 @@ static const struct pmap_devmap smdk2800_devmap[] = {
  *   Relocating the kernel to the bottom of physical memory
  */
 
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	int loop;

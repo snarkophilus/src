@@ -309,7 +309,7 @@ static const struct pmap_devmap integrator_devmap[] = {
 };
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -322,7 +322,7 @@ static const struct pmap_devmap integrator_devmap[] = {
  *   Relocating the kernel to the bottom of physical memory
  */
 
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	extern int KERNEL_BASE_phys[];

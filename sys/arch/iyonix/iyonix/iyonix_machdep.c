@@ -417,7 +417,7 @@ iyonix_pic_init(void)
 }
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -429,7 +429,7 @@ iyonix_pic_init(void)
  *   Setting up page tables for the kernel
  *   Initialising interrupt controllers to a sane default state
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	struct bootconfig *passed_bootconfig = arg;

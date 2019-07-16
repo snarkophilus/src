@@ -556,7 +556,7 @@ gemini_puthex(unsigned int val)
 #endif	/* VERBOSE_INIT_ARM */
 
 /*
- * u_int initarm(...)
+ * vaddr_t initarm(...)
  *
  * Initial entry point on startup. This gets called before main() is
  * entered.
@@ -568,7 +568,7 @@ gemini_puthex(unsigned int val)
  *   Setting up page tables for the kernel
  *   Relocating the kernel to the bottom of physical memory
  */
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	GEMINI_PUTCHAR('0');

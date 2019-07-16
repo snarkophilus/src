@@ -182,7 +182,7 @@ cpu_reboot(int howto, char *bootstr)
 }
 
 /*
- * u_int initarm(void *handle)
+ * vaddr_t initarm(void *handle)
  *
  * Initial entry point on startup for a GENERIC OFW
  * system.  Called with MMU on, running in the OFW
@@ -201,7 +201,7 @@ cpu_reboot(int howto, char *bootstr)
 struct fiqhandler shark_fiqhandler;
 struct fiqregs shark_fiqregs;
 
-u_int
+vaddr_t
 initarm(void *arg)
 {
 	ofw_handle_t ofw_handle = arg;

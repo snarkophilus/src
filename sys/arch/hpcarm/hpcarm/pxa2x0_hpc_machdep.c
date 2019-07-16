@@ -135,7 +135,7 @@ void prefetch_abort_handler(trapframe_t *);
 void undefinedinstruction_bounce(trapframe_t *);
 u_int cpu_get_control(void);
 
-u_int init_pxa2x0(int, char **, struct bootinfo *);
+vaddr_t init_pxa2x0(int, char **, struct bootinfo *);
 
 /* Machine dependent initialize function */
 extern void pxa2x0_machdep_init(void);
@@ -238,7 +238,7 @@ read_ttb(void)
  *   Initializing the physical console so characters can be printed.
  *   Setting up page tables for the kernel.
  */
-u_int
+vaddr_t
 init_pxa2x0(int argc, char **argv, struct bootinfo *bi)
 {
 #ifdef DIAGNOSTIC
