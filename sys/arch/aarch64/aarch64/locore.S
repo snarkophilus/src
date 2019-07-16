@@ -758,37 +758,37 @@ init_mmutable:
 
 #ifdef CONSADDR
 	VPRINT("Creating VA=PA tables for CONSADDR\n")
-	mov	x5, x26				/* pr func */
-	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
-	mov	x3, #L2_SIZE			/* blocksize */
+	ldr	x0, =CONSADDR			/* va = CONADDR (physical) */
+	mov	x1, x0				/* pa = va */
 	mov	x2, #L2_SIZE			/* size */
-	ldr	x1, =CONSADDR			/* pa */
-	mov	x0, x1				/* va */
+	mov	x3, #L2_SIZE			/* blocksize */
+	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
+	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 #elif defined(EARLYCONS)
 	/* CONSADDR is unknown, but need to map UART */
 	VPRINT("Creating VA=PA tables (0x00000000-0xffffffff)\n")
-	mov	x5, x26				/* pr func */
-	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
-	mov	x3, #L1_SIZE			/* blocksize */
-	mov	x2, #(1024*1024*1024*4)		/* size */
-	mov	x1, xzr				/* pa */
 	mov	x0, xzr				/* va */
+	mov	x1, xzr				/* pa */
+	mov	x2, #(1024*1024*1024*4)		/* size */
+	mov	x3, #L1_SIZE			/* blocksize */
+	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
+	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 #endif
 
 	/* identity mapping for kernel image */
 	VPRINT("Creating VA=PA tables for kernel image\n")
-	mov	x5, x26				/* pr func */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
-	mov	x3, #L2_SIZE			/* blocksize */
+	adrl	x0, start			/* va = start (physical) */
+	mov	x1, x0				/* pa = va */
 	adrl	x2, _end
-	sub	x2, x2, x0			/* size = _end - start */
+	sub	x2, x2, x1			/* size = _end - start */
 	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for pmapboot_pagealloc() */
-	adrl	x1, start			/* pa = start */
-	mov	x0, x1				/* va */
+	mov	x3, #L2_SIZE			/* blocksize */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
+	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 
@@ -797,25 +797,25 @@ init_mmutable:
 	ldr	x8, [x8]
 
 	VPRINT("Creating VA=PA tables for FDT\n")
-	mov	x5, x26				/* pr func */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
-	mov	x3, #L2_SIZE			/* blocksize */
-	mov	x2, #L2_SIZE			/* size */
-	mov	x1, x8				/* pa */
 	mov	x0, x8				/* va */
+	mov	x1, x8				/* pa */
+	mov	x2, #L2_SIZE			/* size */
+	mov	x3, #L2_SIZE			/* blocksize */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
+	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 #endif
 
 	VPRINT("Creating KVA=PA tables\n")
-	mov	x5, x26				/* pr func */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB|LX_BLKPAG_AP_RW	/* attr */
-	orr	x4, x4, #LX_BLKPAG_UXN
-	mov	x3, #L2_SIZE			/* blocksize */
-	adrl	x1, start			/* pa = start */
+	ldr	x0, =start			/* va */
+	adrl	x1, start			/* pa = start (physical) */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
-	ldr	x0, =start			/* va */
+	mov	x3, #L2_SIZE			/* blocksize */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB|LX_BLKPAG_AP_RW	/* attr */
+	orr	x4, x4, #LX_BLKPAG_UXN
+	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
 
