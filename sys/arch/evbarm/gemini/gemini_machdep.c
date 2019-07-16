@@ -759,7 +759,7 @@ initarm(void *arg)
 	printf("initarm done.\n");
 
 	/* We return the new stack pointer address */
-	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 static void

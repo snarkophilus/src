@@ -310,7 +310,7 @@ initarm(void *arg)
 #endif
 
 	/* Return the new stackbase. */
-	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 

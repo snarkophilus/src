@@ -871,7 +871,7 @@ initarm(void *arg)
 	evbarm_device_register = armadillo9_device_register;
 
 	/* We return the new stack pointer address */
-	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 void

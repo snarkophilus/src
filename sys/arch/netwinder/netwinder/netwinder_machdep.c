@@ -842,7 +842,7 @@ initarm(void *arg)
 	ISA_PUTBYTE(0x338, 0x06);
 
 	/* We return the new stack pointer address */
-	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 void

@@ -882,7 +882,7 @@ initarm(void *arg)
 	pldreg8_write(G42XXEB_LED, 0);
 
 	/* We return the new stack pointer address */
-	return(kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 #if 0

@@ -638,7 +638,7 @@ init_pxa2x0(int argc, char **argv, struct bootinfo *bi)
 #endif /* DDB */
 
 	/* We return the new stack pointer address */
-	return (kernelstack.pv_va + USPACE_SVC_STACK_TOP);
+	return kernelstack.pv_va + USPACE_SVC_STACK_TOP;
 }
 
 #ifdef DEBUG_BEFOREMMU
