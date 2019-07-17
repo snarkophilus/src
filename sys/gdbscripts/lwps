@@ -34,22 +34,6 @@ document lwps
 ps for lwps
 end
 
-define procs
-	set $p = allproc.lh_first
-
-	printf "           paddr   pid     flag  stat    n         firstlwp          command\n"                       
-	while ($p)
-		printf "%16lx %5d %8x %4x %5d %16lx %16s\n", \
-			$p, $p->p_pid, $p->p_flag, $p->p_stat, \
-			$nlwps, $p->p_lwps.lh_first, \
-			(char *) $p->p_comm
-		set $p = $p->p_list.le_next
-	end
-end
-document procs
-Show one line summary of all processes (ps)
-end
-
 define threadinfo
 	set $l = (struct lwp *)$arg0
 	set $pid = $arg1
