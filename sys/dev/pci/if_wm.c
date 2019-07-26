@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wm.c,v 1.641 2019/06/12 01:54:11 msaitoh Exp $	*/
+/*	$NetBSD: if_wm.c,v 1.643 2019/07/25 08:35:36 tnn Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Wasabi Systems, Inc.
@@ -82,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_wm.c,v 1.641 2019/06/12 01:54:11 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_wm.c,v 1.643 2019/07/25 08:35:36 tnn Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_net_mpsafe.h"
@@ -2889,9 +2889,11 @@ alloc_retry:
 	}
 
 	/* If we're a i82543 or greater, we can support VLANs. */
-	if (sc->sc_type >= WM_T_82543)
+	if (sc->sc_type >= WM_T_82543) {
 		sc->sc_ethercom.ec_capabilities |=
 		    ETHERCAP_VLAN_MTU | ETHERCAP_VLAN_HWTAGGING;
+		sc->sc_ethercom.ec_capenable |= ETHERCAP_VLAN_HWTAGGING;
+	}
 
 	if ((sc->sc_flags & WM_F_EEE) != 0)
 		sc->sc_ethercom.ec_capabilities |= ETHERCAP_EEE;
@@ -5139,8 +5141,12 @@ wm_add_rxbuf(struct wm_rxqueue *rxq, int idx)
 	rxs->rxs_mbuf = m;
 
 	m->m_len = m->m_pkthdr.len = m->m_ext.ext_size;
-	error = bus_dmamap_load_mbuf(sc->sc_dmat, rxs->rxs_dmamap, m,
-	    BUS_DMA_READ | BUS_DMA_NOWAIT);
+	/*
+	 * Cannot use bus_dmamap_load_mbuf() here because m_data may be
+	 * sc_align_tweak'd between bus_dmamap_load() and bus_dmamap_sync().
+	 */
+	error = bus_dmamap_load(sc->sc_dmat, rxs->rxs_dmamap, m->m_ext.ext_buf,
+	    m->m_ext.ext_size, NULL, BUS_DMA_READ | BUS_DMA_NOWAIT);
 	if (error) {
 		/* XXX XXX XXX */
 		aprint_error_dev(sc->sc_dev,

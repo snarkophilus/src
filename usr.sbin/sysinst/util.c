@@ -1,4 +1,4 @@
-/*	$NetBSD: util.c,v 1.25 2019/06/22 20:46:07 christos Exp $	*/
+/*	$NetBSD: util.c,v 1.29 2019/07/24 10:22:04 roy Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -954,7 +954,7 @@ extract_file(distinfo *dist, int update)
 
 	/* now extract set files into "./". */
 	rval = run_program(RUN_DISPLAY | RUN_PROGRESS,
-			"progress -zf %s tar --chroot -xhepf -", path);
+			"progress -zf %s tar --chroot -xpf -", path);
 
 	chdir(owd);
 	free(owd);
@@ -1351,14 +1351,20 @@ tzm_set_names(menudesc *m, void *arg)
 			if (stat(zoneinfo_dir, &sb) == -1)
 				continue;
 			if (nfiles >= maxfiles) {
-				p = realloc(tz_menu, 2 * maxfiles * sizeof *tz_menu);
+				p = realloc(tz_menu,
+				    2 * maxfiles * sizeof *tz_menu);
 				if (p == NULL)
 					break;
 				tz_menu = p;
-				p = realloc(tz_names, 2 * maxfiles * sizeof *tz_names);
+				memset(tz_menu + maxfiles, 0,
+				    maxfiles * sizeof *tz_menu);
+				p = realloc(tz_names,
+				    2 * maxfiles * sizeof *tz_names);
 				if (p == NULL)
 					break;
 				tz_names = p;
+				memset(tz_names + maxfiles, 0,
+				    maxfiles * sizeof *tz_names);
 				maxfiles *= 2;
 			}
 			if (S_ISREG(sb.st_mode))
@@ -1463,11 +1469,13 @@ done:
 void
 scripting_vfprintf(FILE *f, const char *fmt, va_list ap)
 {
+	va_list ap2;
 
+	va_copy(ap2, ap);
 	if (f)
 		(void)vfprintf(f, fmt, ap);
 	if (script)
-		(void)vfprintf(script, fmt, ap);
+		(void)vfprintf(script, fmt, ap2);
 }
 
 void
