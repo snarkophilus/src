@@ -155,15 +155,10 @@ void pmap_db_ttbrdump(bool, vaddr_t, void (*)(const char *, ...)
 pt_entry_t *kvtopte(vaddr_t);
 pt_entry_t pmap_kvattr(vaddr_t, vm_prot_t);
 
-/* locore.S */
-pd_entry_t *bootpage_alloc(void);
 
-/* pmap_locore.c */
+pd_entry_t *pmapboot_pagealloc(void);
 int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
-    pt_entry_t, uint64_t, pd_entry_t *(*)(void),
-    void (*pr)(const char *, ...) __printflike(1, 2));
-#define PMAPBOOT_ENTER_NOBLOCK		0x00000001
-#define PMAPBOOT_ENTER_NOOVERWRITE	0x00000002
+    pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
 int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
 void pmap_db_pte_print(pt_entry_t, int,
     void (*pr)(const char *, ...) __printflike(1, 2));

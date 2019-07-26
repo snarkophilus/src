@@ -69,6 +69,11 @@ extern char *booted_kernel;
 #ifdef MULTIPROCESSOR
 extern u_int arm_cpu_max;
 #endif
+/*
+ * note that we use void * as all the platforms have different ideas on what
+ * the structure is
+ */
+vaddr_t initarm(void *);
 
 /*
  * note that we use void * as all the platforms have different ideas on what

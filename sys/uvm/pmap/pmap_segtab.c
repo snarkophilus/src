@@ -334,7 +334,7 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 	if (pg == NULL) {
 		paddr_t pa;
 
-		bool ok = pmap_extract(pmap_kernel(), kva, &pa);
+		bool ok __diagused = pmap_extract(pmap_kernel(), kva, &pa);
 		KASSERT(ok);
 
 		pg = PHYS_TO_VM_PAGE(pa);
@@ -362,7 +362,7 @@ pmap_segtab_pageclean(pmap_t pmap, struct pglist *list, vaddr_t va)
 
 	paddr_t pa;
 
-	bool ok = pmap_extract(pmap_kernel(), va, &pa);
+	bool ok __diagused = pmap_extract(pmap_kernel(), va, &pa);
 	KASSERT(ok);
 
 //	const paddr_t pa = kvtophys(va);
@@ -470,7 +470,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 		pa = VM_PAGE_TO_PHYS(pg);
 		ptp = (pmap_ptpage_t *)PMAP_MAP_POOLPAGE(pa);
 	} else {
-		bool ok = pmap_extract(pmap_kernel(), (vaddr_t)ptp, &pa);
+		bool ok __diagused = pmap_extract(pmap_kernel(), (vaddr_t)ptp, &pa);
 		KASSERT(ok);
 	}
 

@@ -556,6 +556,7 @@ initarm(void *arg)
 
 	if (error)
 		return sp;
+
 	/*
 	 * Now we have APs started the pages used for stacks and L1PT can
 	 * be given to uvm

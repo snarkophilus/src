@@ -5,6 +5,13 @@
 
 #include <arm/asm.h>
 
+#ifdef _LOCORE
+.macro	adrl 	reg, addr
+	adrp	\reg, \addr
+	add	\reg, \reg, #:lo12:\addr
+.endm
+#endif
+
 #define	fp	x29
 #define	lr	x30
 

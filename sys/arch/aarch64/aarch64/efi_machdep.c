@@ -40,7 +40,7 @@ __KERNEL_RCSID(0, "$NetBSD: efi_machdep.c,v 1.3 2018/10/31 14:15:12 jmcneill Exp
 
 void
 arm_efirt_md_map_range(vaddr_t va, paddr_t pa, size_t sz, enum arm_efirt_mem_type type)
-{       
+{
 	pt_entry_t attr;
 
 	switch (type) {
@@ -63,7 +63,7 @@ arm_efirt_md_map_range(vaddr_t va, paddr_t pa, size_t sz, enum arm_efirt_mem_typ
 		panic("arm_efirt_md_map_range: unsupported type %d", type);
 	}
 
-	pmapboot_enter(va, pa, sz, L3_SIZE, attr, 0, bootpage_alloc, NULL);
+	pmapboot_enter(va, pa, sz, L3_SIZE, attr, NULL);
 	while (sz >= PAGE_SIZE) {
 		aarch64_tlbi_by_va(va);
 		va += PAGE_SIZE;
