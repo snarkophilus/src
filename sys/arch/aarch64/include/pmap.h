@@ -191,10 +191,11 @@ paddr_t pmap_alloc_pdp(struct pmap *, struct vm_page **, int, bool);
 #define L1_ROUND_BLOCK(x)	L1_TRUNC_BLOCK((x) + L1_SIZE - 1)
 #define L2_TRUNC_BLOCK(x)	((x) & L2_FRAME)
 #define L2_ROUND_BLOCK(x)	L2_TRUNC_BLOCK((x) + L2_SIZE - 1)
+#define L3_TRUNC_BLOCK(x)	((x) & L3_FRAME)
+#define L3_ROUND_BLOCK(x)	L3_TRUNC_BLOCK((x) + L3_SIZE - 1)
 
-/* devmap use L2 blocks. (2Mbyte) */
-#define DEVMAP_TRUNC_ADDR(x)	L2_TRUNC_BLOCK((x))
-#define DEVMAP_ROUND_SIZE(x)	L2_ROUND_BLOCK((x))
+#define DEVMAP_TRUNC_ADDR(x)	L3_TRUNC_BLOCK((x))
+#define DEVMAP_ROUND_SIZE(x)	L3_ROUND_BLOCK((x))
 
 #define	DEVMAP_ENTRY(va, pa, sz)			\
 	{						\
