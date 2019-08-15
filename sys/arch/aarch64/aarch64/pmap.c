@@ -2365,11 +2365,9 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 		pr(", PA=%lx", l3pte_pa(pte));
 
 		pr(", %s", (pte & LX_BLKPAG_UXN) ?
-		    "UXN      " :
-		    "user-exec");
+		    "UXN" : "UX ");
 		pr(", %s", (pte & LX_BLKPAG_PXN) ?
-		   "PXN        " :
-		   "kernel-exec");
+		   "PXN" :  "PX ");
 
 		if (pte & LX_BLKPAG_CONTIG)
 			pr(", CONTIG");
@@ -2400,13 +2398,13 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 
 		switch (pte & LX_BLKPAG_ATTR_MASK) {
 		case LX_BLKPAG_ATTR_NORMAL_WB:
-			pr(", WRITEBACK");
+			pr(", WB");
 			break;
 		case LX_BLKPAG_ATTR_NORMAL_NC:
-			pr(", NOCACHE");
+			pr(", NC");
 			break;
 		case LX_BLKPAG_ATTR_NORMAL_WT:
-			pr(", WHITETHRU");
+			pr(", WT");
 			break;
 		case LX_BLKPAG_ATTR_DEVICE_MEM:
 			pr(", DEVICE");
@@ -2420,7 +2418,7 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 		if (pte & LX_BLKPAG_OS_WRITE)
 			pr(", pmap_write");
 		if (pte & LX_BLKPAG_OS_WIRED)
-			pr(", pmap_wired");
+			pr(", wired");
 	} else {
 		pr(" **ILLEGAL TYPE**");
 	}
