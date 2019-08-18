@@ -761,7 +761,8 @@ init_mmutable:
 	mov	x1, x0				/* pa = va */
 	mov	x2, #L2_SIZE			/* size */
 	mov	x3, #L2_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
+	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM | LX_BLKPAG_AP_RW
+	orr	x4, x4, #LX_BLKPAG_UXN | LX_BLKPAG_PXN	/* attr */
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -772,7 +773,8 @@ init_mmutable:
 	mov	x1, xzr				/* pa */
 	mov	x2, #(1024*1024*1024*4)		/* size */
 	mov	x3, #L1_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM|LX_BLKPAG_AP_RW	/* attr */
+	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM | LX_BLKPAG_AP_RW
+	orr	x4, x4, #LX_BLKPAG_UXN | LX_BLKPAG_PXN	/* attr */
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -786,7 +788,7 @@ init_mmutable:
 	sub	x2, x2, x1			/* size = _end - start */
 	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for pmapboot_pagealloc() */
 	mov	x3, #L2_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC | LX_BLKPAG_AP_RW	/* attr */
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -800,7 +802,8 @@ init_mmutable:
 	mov	x1, x8				/* pa */
 	mov	x2, #L2_SIZE			/* size */
 	mov	x3, #L2_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC|LX_BLKPAG_AP_RW	/* attr */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_NC | LX_BLKPAG_AP_RW
+	orr	x4, x4, #LX_BLKPAG_UXN | LX_BLKPAG_PXN	/* attr */
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
@@ -812,7 +815,7 @@ init_mmutable:
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
 	mov	x3, #L2_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB|LX_BLKPAG_AP_RW	/* attr */
+	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB | LX_BLKPAG_AP_RW	/* attr */
 	orr	x4, x4, #LX_BLKPAG_UXN
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
