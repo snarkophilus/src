@@ -761,6 +761,22 @@ pmap_extract(struct pmap *pm, vaddr_t va, paddr_t *pap)
 	return true;
 }
 
+paddr_t
+vtophys(vaddr_t va)
+{
+	struct pmap *pm;
+	paddr_t pa;
+
+	if (va & TTBR_SEL_VA)
+		pm = pmap_kernel();
+	else
+		pm = curlwp->l_proc->p_vmspace->vm_map.pmap;
+
+	if (pmap_extract(pm, va, &pa) == false)
+		return VTOPHYS_FAILED;
+	return pa;
+}
+
 /*
  * return pointer of the pte. regardess of whether the entry is valid or not.
  */
