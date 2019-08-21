@@ -45,7 +45,7 @@ arm_efirt_md_map_range(vaddr_t va, paddr_t pa, size_t sz, enum arm_efirt_mem_typ
 
 	switch (type) {
 	case ARM_EFIRT_MEM_CODE:
-		attr = LX_BLKPAG_AF | LX_BxxLKPAG_AP_RW | LX_BLKPAG_UXN |
+		attr = LX_BLKPAG_AF | LX_BLKPAG_AP_RW | LX_BLKPAG_UXN |
 		       LX_BLKPAG_ATTR_NORMAL_WB;
 		break;
 	case ARM_EFIRT_MEM_DATA:
