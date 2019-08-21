@@ -478,6 +478,13 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	atomic_dec_ulong(&(pm)->pm_stats.resident_count)
 }
 
+pd_entry_t *
+pmap_l0table(struct pmap *pm)
+{
+
+	return pm->pm_l0table;
+}
+
 inline static int
 _pmap_color(vaddr_t addr)	/* or paddr_t */
 {
