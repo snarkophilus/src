@@ -135,33 +135,10 @@ vaddr_t virtual_avail;
 vaddr_t virtual_end;
 vaddr_t pmap_curmaxkvaddr;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
  * Virtual end of direct-mapped memory
  */
 vaddr_t pmap_directlimit;
-
-
-
-
-
-
 
 paddr_t
 vtophys(vaddr_t va)
@@ -172,15 +149,6 @@ vtophys(vaddr_t va)
 		return 0;
 	return pa;
 }
-
-
-
-
-
-
-
-
-
 
 bool
 pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
