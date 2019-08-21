@@ -103,9 +103,6 @@ pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
 #endif
 #endif
 
-
-
-
 pd_entry_t *pmap_l0table(struct pmap *);
 
 bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
@@ -331,7 +328,7 @@ void	pmap_icache_sync_range(pmap_t, vaddr_t, vaddr_t);
 
 #define	PMAP_MAPSIZE1	L2_SIZE
 
-#endif	/* PMAP_COMMON */
+#endif	/* !PMAP_COMMON */
 
 #endif /* _KERNEL */
 
