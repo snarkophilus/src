@@ -81,6 +81,17 @@ UVMHIST_DECL(pmapexechist);
 UVMHIST_DECL(pmaphist);
 #endif
 
+//XXXNH KASAN
+/*
+ * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
+ */
+vaddr_t pmap_map_poolpage(paddr_t);
+paddr_t pmap_unmap_poolpage(vaddr_t);
+struct vm_page *pmap_md_alloc_poolpage(int);
+#define	PMAP_ALLOC_POOLPAGE(flags)	pmap_md_alloc_poolpage(flags)
+#define	PMAP_MAP_POOLPAGE(pa)		pmap_map_poolpage(pa)
+#define	PMAP_UNMAP_POOLPAGE(va)		pmap_unmap_poolpage(va)
+
 /*
  * The user address space is mapped using a two level structure where
  * virtual address bits 31..22 are used to index into a segment table which
@@ -256,21 +267,20 @@ kmutex_t *pmap_pvlist_lock_addr(struct vm_page_md *);
 #define	PMAP_STEAL_MEMORY	/* enable pmap_steal_memory() */
 #define	PMAP_GROWKERNEL		/* enable pmap_growkernel() */
 
-/*
- * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
- */
-vaddr_t pmap_map_poolpage(paddr_t);
-paddr_t pmap_unmap_poolpage(vaddr_t);
-struct vm_page *pmap_md_alloc_poolpage(int);
-#define	PMAP_ALLOC_POOLPAGE(flags)	pmap_md_alloc_poolpage(flags)
-#define	PMAP_MAP_POOLPAGE(pa)		pmap_map_poolpage(pa)
-#define	PMAP_UNMAP_POOLPAGE(va)		pmap_unmap_poolpage(va)
-
 #define PMAP_COUNT(name)	(pmap_evcnt_##name.ev_count++ + 0)
 #define PMAP_COUNTER(name, desc) \
 struct evcnt pmap_evcnt_##name = \
 	EVCNT_INITIALIZER(EVCNT_TYPE_MISC, NULL, "pmap", desc); \
 EVCNT_ATTACH_STATIC(pmap_evcnt_##name)
+
+
+static inline pt_entry_t *
+kvtopte(vaddr_t va)
+{
+
+	return pmap_pte_lookup(pmap_kernel(), va);
+}
+
 
 #endif	/* _KERNEL */
 #endif	/* _UVM_PMAP_PMAP_H_ */
