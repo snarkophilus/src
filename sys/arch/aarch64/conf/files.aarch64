@@ -58,6 +58,10 @@ defflag opt_pmap.h		PMAPHIST : KERNHIST
 defflag opt_pmap.h		PMAPCOUNTERS PMAP_STEAL_MEMORY
 				PMAP_NEED_ALLOC_POOLPAGE
 
+# Common PMAP transition flags
+#
+defflag	opt_pmap.h		PMAP_COMMON
+
 # MI support
 file	dev/cons.c
 #file	kern/kern_cctr.c
@@ -110,10 +114,15 @@ file	arch/aarch64/aarch64/vectors.S
 file	arch/aarch64/aarch64/vm_machdep.c
 
 # pmap
-file	arch/aarch64/aarch64/pmap.c
+file	arch/aarch64/aarch64/pmap.c		!pmap_common
 file	arch/aarch64/aarch64/pmapboot.c
 file	arch/aarch64/aarch64/pmap_page.S
-#file	uvm/pmap/pmap_pvt.c
+file	arch/aarch64/aarch64/aarch64_tlb.c	pmap_common
+file	arch/aarch64/aarch64/pmap_machdep.c	pmap_common
+file	uvm/pmap/pmap_pvt.c			pmap_common
+file	uvm/pmap/pmap.c				pmap_common
+file	uvm/pmap/pmap_segtab.c			pmap_common
+file	uvm/pmap/pmap_tlb.c			pmap_common
 
 # EFI runtime (machdep)
 file	arch/aarch64/aarch64/efi_machdep.c		efi_runtime

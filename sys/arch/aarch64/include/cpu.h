@@ -36,6 +36,7 @@
 
 #ifdef _KERNEL_OPT
 #include "opt_multiprocessor.h"
+#include "opt_pmap.h"
 #endif
 
 #include <sys/param.h>
@@ -85,6 +86,14 @@ struct cpu_info {
 	volatile u_int ci_softints;
 	volatile u_int ci_astpending;
 	volatile u_int ci_intr_depth;
+
+#if defined(PMAP_COMMON)
+        struct pmap_tlb_info *
+                        ci_tlb_info;
+        struct pmap *   ci_pmap_lastuser;
+        struct pmap *   ci_pmap_cur;
+        tlb_asid_t      ci_pmap_asid_cur;
+#endif
 
 	/* event counters */
 	struct evcnt ci_vfp_use;

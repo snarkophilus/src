@@ -37,6 +37,7 @@
 #ifdef _KERNEL
 #ifdef _KERNEL_OPT
 #include "opt_kasan.h"
+#include "opt_pmap.h"
 #endif
 
 #include <sys/types.h>
@@ -45,68 +46,6 @@
 #include <uvm/uvm_pglist.h>
 
 #include <aarch64/pte.h>
-
-#define PMAP_GROWKERNEL
-#define PMAP_STEAL_MEMORY
-
-#define __HAVE_VM_PAGE_MD
-
-#ifndef KASAN
-#define PMAP_MAP_POOLPAGE(pa)		AARCH64_PA_TO_KVA(pa)
-#define PMAP_UNMAP_POOLPAGE(va)		AARCH64_KVA_TO_PA(va)
-
-#define PMAP_DIRECT
-static __inline int
-pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
-    int (*process)(void *, size_t, void *), void *arg)
-{
-	vaddr_t va = AARCH64_PA_TO_KVA(pa);
-
-	return process((void *)(va + pgoff), len, arg);
-}
-#endif
-
-struct pmap {
-	kmutex_t pm_lock;
-	struct pool *pm_pvpool;
-	pd_entry_t *pm_l0table;			/* L0 table: 512G*512 */
-	paddr_t pm_l0table_pa;
-
-	TAILQ_HEAD(, vm_page) pm_vmlist;	/* for L[0123] tables */
-
-	struct pmap_statistics pm_stats;
-	unsigned int pm_refcnt;
-	unsigned int pm_idlepdp;
-	int pm_asid;
-	bool pm_activated;
-};
-
-struct pv_entry;
-struct vm_page_md {
-	kmutex_t mdpg_pvlock;
-	TAILQ_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
-	TAILQ_HEAD(, pv_entry) mdpg_pvhead;
-
-	pd_entry_t *mdpg_ptep_parent;	/* for page descriptor page only */
-
-	/* VM_PROT_READ means referenced, VM_PROT_WRITE means modified */
-	uint32_t mdpg_flags;
-};
-
-/* each mdpg_pvlock will be initialized in pmap_init() */
-#define VM_MDPAGE_INIT(pg)				\
-	do {						\
-		TAILQ_INIT(&(pg)->mdpage.mdpg_pvhead);	\
-		(pg)->mdpage.mdpg_flags = 0;		\
-	} while (/*CONSTCOND*/ 0)
-
-
-/* saved permission bit for referenced/modified emulation */
-#define LX_BLKPAG_OS_READ		LX_BLKPAG_OS_0
-#define LX_BLKPAG_OS_WRITE		LX_BLKPAG_OS_1
-#define LX_BLKPAG_OS_WIRED		LX_BLKPAG_OS_2
-#define LX_BLKPAG_OS_BOOT		LX_BLKPAG_OS_3
-#define LX_BLKPAG_OS_RWMASK		(LX_BLKPAG_OS_WRITE|LX_BLKPAG_OS_READ)
 
 /* memory attributes are configured MAIR_EL1 in locore */
 #define LX_BLKPAG_ATTR_NORMAL_WB	__SHIFTIN(0, LX_BLKPAG_ATTR_INDX)
@@ -145,28 +84,63 @@ struct vm_page_md {
 #define l3pte_is_page(pde)	(((pde) & LX_TYPE) == L3_TYPE_PAG)
 /* l3pte contains always page entries */
 
-void pmap_bootstrap(vaddr_t, vaddr_t);
-bool pmap_fault_fixup(struct pmap *, vaddr_t, vm_prot_t, bool user);
 
-/* for ddb */
-void pmap_db_pteinfo(vaddr_t, void (*)(const char *, ...) __printflike(1, 2));
-void pmap_db_ttbrdump(bool, vaddr_t, void (*)(const char *, ...)
-    __printflike(1, 2));
-pt_entry_t *kvtopte(vaddr_t);
-pt_entry_t pmap_kvattr(vaddr_t, vm_prot_t);
+// XXXNH WTF?
+#if 0
+#ifndef KASAN
+#define PMAP_MAP_POOLPAGE(pa)		AARCH64_PA_TO_KVA(pa)
+#define PMAP_UNMAP_POOLPAGE(va)		AARCH64_KVA_TO_PA(va)
+
+#define PMAP_DIRECT
+static __inline int
+pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
+    int (*process)(void *, size_t, void *), void *arg)
+{
+	vaddr_t va = AARCH64_PA_TO_KVA(pa);
+
+	return process((void *)(va + pgoff), len, arg);
+}
+#endif
+#endif
 
 
-pd_entry_t *pmapboot_pagealloc(void);
-int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
-    pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
-int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
-void pmap_db_pte_print(pt_entry_t, int,
-    void (*pr)(const char *, ...) __printflike(1, 2));
 
-/* Hooks for the pool allocator */
-paddr_t vtophys(vaddr_t);
-#define VTOPHYS_FAILED		((paddr_t)-1L)	/* POOL_PADDR_INVALID */
-#define POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
+
+pd_entry_t *pmap_l0table(struct pmap *);
+
+bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
+
+static inline pt_entry_t
+pmap_kvattr(pt_entry_t *ptep, vm_prot_t prot)
+{
+	pt_entry_t pte = *ptep;
+	pt_entry_t opte = pte;
+
+	pte &= ~(LX_BLKPAG_AF | LX_BLKPAG_AP);
+	switch (prot & (VM_PROT_READ | VM_PROT_WRITE)) {
+	case 0:
+		break;
+	case VM_PROT_READ:
+		pte |= LX_BLKPAG_AF | LX_BLKPAG_AP_RO;
+		break;
+	case VM_PROT_WRITE:
+	case VM_PROT_READ | VM_PROT_WRITE:
+		pte |= LX_BLKPAG_AF | LX_BLKPAG_AP_RW;
+		break;
+	}
+
+	if ((prot & VM_PROT_EXECUTE) == 0) {
+		pte |= LX_BLKPAG_PXN;
+	} else {
+		pte |= LX_BLKPAG_AF;
+		pte &= ~LX_BLKPAG_PXN;
+	}
+
+	*ptep = pte;
+
+	return opte;
+}
+
 
 
 /* devmap */
@@ -206,6 +180,20 @@ paddr_t pmap_alloc_pdp(struct pmap *, struct vm_page **, int, bool);
 		.pd_flags = PMAP_NOCACHE		\
 	}
 #define	DEVMAP_ENTRY_END	{ 0 }
+
+
+
+
+
+/* Hooks for the pool allocator */
+paddr_t vtophys(vaddr_t);
+
+#if defined(DDB)
+//XXXNH maybe this should be in a db_*.h file
+void pmap_db_pte_print(pt_entry_t, int, void (*)(const char *, ...) __printflike(1, 2));
+void pmap_db_pteinfo(vaddr_t, void (*)(const char *, ...) __printflike(1, 2));
+void pmap_db_ttbrdump(bool, vaddr_t, void (*)(const char *, ...) __printflike(1, 2));
+#endif
 
 /* mmap cookie and flags */
 #define AARCH64_MMAP_FLAG_SHIFT		(64 - PGSHIFT)
@@ -263,15 +251,87 @@ aarch64_mmap_flags(paddr_t mdpgno)
 #define pmap_phys_address(pa)		aarch64_ptob((pa))
 #define pmap_mmap_flags(ppn)		aarch64_mmap_flags((ppn))
 
+void pmap_bootstrap(vaddr_t, vaddr_t);
+bool pmap_fault_fixup(struct pmap *, vaddr_t, vm_prot_t, bool user);
+
+
+pd_entry_t *pmapboot_pagealloc(void);
+int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
+    pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
+int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
+
+/*
+ * XXXNH Maybe drop BOOT
+ */
+#define LX_BLKPAG_OS_WIRED		LX_BLKPAG_OS_2
+#define LX_BLKPAG_OS_BOOT		LX_BLKPAG_OS_3
+
+#if defined(PMAP_COMMON)
+#include <aarch64/pmap_common.h>
+#else
+
+#define PMAP_GROWKERNEL
+#define PMAP_STEAL_MEMORY
+
+#define __HAVE_VM_PAGE_MD
+
+struct pmap {
+	kmutex_t pm_lock;
+	struct pool *pm_pvpool;
+	pd_entry_t *pm_l0table;			/* L0 table: 512G*512 */
+	paddr_t pm_l0table_pa;
+
+	TAILQ_HEAD(, vm_page) pm_vmlist;	/* for L[0123] tables */
+
+	struct pmap_statistics pm_stats;
+	unsigned int pm_refcnt;
+	unsigned int pm_idlepdp;
+	int pm_asid;
+	bool pm_activated;
+};
+
+struct pv_entry;
+struct vm_page_md {
+	kmutex_t mdpg_pvlock;
+	TAILQ_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
+	TAILQ_HEAD(, pv_entry) mdpg_pvhead;
+
+	pd_entry_t *mdpg_ptep_parent;	/* for page descriptor page only */
+
+	/* VM_PROT_READ means referenced, VM_PROT_WRITE means modified */
+	uint32_t mdpg_flags;
+};
+
+/* each mdpg_pvlock will be initialized in pmap_init() */
+#define VM_MDPAGE_INIT(pg)				\
+	do {						\
+		TAILQ_INIT(&(pg)->mdpage.mdpg_pvhead);	\
+		(pg)->mdpage.mdpg_flags = 0;		\
+	} while (/*CONSTCOND*/ 0)
+
+
+/* saved permission bit for referenced/modified emulation */
+#define LX_BLKPAG_OS_READ		LX_BLKPAG_OS_0
+#define LX_BLKPAG_OS_WRITE		LX_BLKPAG_OS_1
+#define LX_BLKPAG_OS_RWMASK		(LX_BLKPAG_OS_WRITE|LX_BLKPAG_OS_READ)
+
+
+#define VTOPHYS_FAILED		((paddr_t)-1L)	/* POOL_PADDR_INVALID */
+#define POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
+
+pt_entry_t *kvtopte(vaddr_t);
+
+
 #define pmap_update(pmap)		((void)0)
 #define pmap_copy(dp,sp,d,l,s)		((void)0)
 #define pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 #define pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 
-bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
 void	pmap_icache_sync_range(pmap_t, vaddr_t, vaddr_t);
 
 #define	PMAP_MAPSIZE1	L2_SIZE
+
+#endif	/* PMAP_COMMON */
 
 #endif /* _KERNEL */
 

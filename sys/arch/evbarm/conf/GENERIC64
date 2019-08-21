@@ -116,9 +116,11 @@ options 	MULTIPROCESSOR
 
 pseudo-device 	openfirm	# /dev/openfirm
 
+options 	PMAP_COMMON
+
 options 	DIAGNOSTIC	# internal consistency checks
 options 	DEBUG
-#options 	LOCKDEBUG
+options 	LOCKDEBUG
 #options 	PMAP_DEBUG	# Enable pmap_debug_level code
 options 	VERBOSE_INIT_ARM # verbose bootstrapping messages
 options 	INCLUDE_CONFIG_FILE
@@ -148,7 +150,7 @@ makeoptions	COPY_SYMTAB=1
 
 config		netbsd		root on ? type ?
 
-options 	COMPAT_NETBSD32
+#options 	COMPAT_NETBSD32
 options 	EXEC_ELF32
 
 # EFI runtime support
