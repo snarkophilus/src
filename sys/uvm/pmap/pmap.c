@@ -1572,7 +1572,7 @@ pmap_unwire(pmap_t pmap, vaddr_t va)
 	    pmap, va);
 	pt_entry_t pte = *ptep;
 	KASSERTMSG(pte_valid_p(pte),
-	    "pmap %p va %#"PRIxVADDR" invalid PTE %#"PRIxPTE" @ %p",
+	    "pmap %p va %#" PRIxVADDR " invalid PTE %#" PRIxPTE " @ %p",
 	    pmap, va, pte_value(pte), ptep);
 
 	if (pte_wired_p(pte)) {
