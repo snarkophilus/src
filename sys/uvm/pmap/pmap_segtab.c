@@ -500,7 +500,7 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp)
 #ifdef DEBUG
 	for (size_t j = 0; j < NPTEPG; j++) {
 		if (ptp->ptp_ptes[j])
-			panic("%s: pte entry %p not 0 (%#x)",
+			panic("%s: pte entry %p not 0 (%#" PRIxPTE ")",
 			    __func__, &ptp->ptp_ptes[j],
 			    ptp->ptp_ptes[j]);
 	}
