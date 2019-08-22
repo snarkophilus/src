@@ -456,6 +456,8 @@ pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags)
 {
    	pt_entry_t pte = pa
+	    | LX_VALID
+	    | L3_TYPE_PAG
 	    | LX_BLKPAG_AF
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW)
@@ -476,9 +478,12 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags, bool is_kernel_pmap_p)
 {
 	pt_entry_t npte = pa
+	    | LX_VALID
+	    | L3_TYPE_PAG
 	    | LX_BLKPAG_AF
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW);
+
 //	const bool cached = (flags & PMAP_NOCACHE);
 
 	KASSERT((pa & ~LX_BLKPAG_AP) == 0);

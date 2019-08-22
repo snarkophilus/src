@@ -37,7 +37,6 @@
 #include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
 
-
 #define __PMAP_PRIVATE
 
 #include <sys/cdefs.h>
@@ -53,30 +52,9 @@ __KERNEL_RCSID(0, "$NetBSD$");
 
 #include <aarch64/cpufunc.h>
 
-
-#if 0
-#include <sys/kernel.h>
-#include <sys/proc.h>
-#include <sys/intr.h>
-#include <sys/pool.h>
-#include <sys/kmem.h>
-#include <sys/cdefs.h>
-#include <sys/sysctl.h>
-#include <sys/bus.h>
-#include <sys/atomic.h>
-#include <sys/kernhist.h>
-
-#endif
-
-#if 0
-#include <arm/arm32/pmap_common.h>
-#include <arm/arm32/machdep.h>
-#endif
-
 #include <arm/locore.h>
 
 __KERNEL_RCSID(0, "$NetBSD$");
-
 
 #ifdef VERBOSE_INIT_ARM
 #define VPRINTF(...)	printf(__VA_ARGS__)
@@ -84,49 +62,7 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #define VPRINTF(...)	__nothing
 #endif
 
-
-
 //static void	pmap_md_vca_page_wbinv(struct vm_page *, bool);
-
-
-
-#if comment
-
-// Global
-pmap_bootstrap(void)
-
-pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
-
-pmap_procwr(struct proc *p, vaddr_t va, size_t len)
-
-pmap_zero_page(paddr_t dst_pa)
-pmap_copy_page(paddr_t src_pa, paddr_t dst_pa)
-
-// Global - hmm
-pmap_md_icache_sync_range_index(vaddr_t va, vsize_t len)
-pmap_md_icache_sync_all(void)
-
-// Arch specific
-pmap_md_alloc_ephemeral_address_space(struct cpu_info *ci)
-
-
-// Local
-pmap_md_map_ephemeral_page(struct vm_page *pg, bool locked_p, int prot,
-pmap_md_unmap_ephemeral_page(struct vm_page *pg, bool locked_p, register_t va,
-pmap_md_vca_page_wbinv(struct vm_page *pg, bool locked_p)
-
-
-pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
-pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
-pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *ptep)
-pmap_md_vca_clean(struct vm_page *pg, int op)
-pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty, bool last)
-pmap_md_pool_vtophys(vaddr_t va)
-pmap_md_pool_phystov(paddr_t pa)
-
-#endif
-
-
 
 /*
  * Misc variables
@@ -186,15 +122,6 @@ done:
 	}
 	return true;
 }
-
-
-
-
-
-
-
-
-
 
 
 
@@ -532,14 +459,6 @@ out:
 
 
 
-
-
-
-
-
-
-
-
 #if 0
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 vaddr_t
@@ -561,29 +480,12 @@ pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 #endif
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct vm_page *
 pmap_md_alloc_poolpage(int flags)
 {
-        /*
-         * Any managed page works for us.
-         */
+	/*
+	 * Any managed page works for us.
+	 */
 	return uvm_pagealloc(NULL, 0, NULL, flags);
 }
 
@@ -604,20 +506,18 @@ pmap_md_map_poolpage(paddr_t pa, size_t len)
 		KASSERT(pv->pv_next == NULL);
 		KASSERT(!VM_PAGEMD_EXECPAGE_P(mdpg));
 
-#ifdef needtowrite
+#ifdef PMAP_VIRTUAL_CACHE_ALIASES
 		/*
 		 * If this page was last mapped with an address that
 		 * might cause aliases, flush the page from the cache.
 		 */
-		if (MIPS_CACHE_VIRTUAL_ALIAS
-		    && mips_cache_badalias(last_va, va)) {
+		if (AARCH64_CACHE_VIRTUAL_ALIAS
+		    && aarch64_cache_badalias(last_va, va)) {
 			pmap_md_vca_page_wbinv(pg, false);
 		}
-		if (0 /* bad alias */)
-			pmap_md_vca_page_wbinv(pg, false);
-#endif
 
 		pv->pv_va = va;
+#endif
 	}
 
 	return va;
@@ -681,15 +581,20 @@ pmap_md_kernel_vaddr_to_paddr(vaddr_t va)
 		return KERN_VTOPHYS(va);
 	}
 	panic("%s: va %#" PRIxVADDR " not direct mapped!", __func__, va);
-
 }
 
 
 bool
 pmap_md_direct_mapped_vaddr_p(vaddr_t va)
 {
+	if (!AARCH64_KVA_P(va))
+		return false;
 
-	return AARCH64_KVA_P(va);
+	paddr_t pa = AARCH64_KVA_TO_PA(va);
+	if (physical_start <= pa && pa < physical_end)
+		return true;
+
+	return false;
 }
 
 paddr_t
@@ -725,7 +630,7 @@ vaddr_t
 pmap_md_pool_phystov(paddr_t pa)
 {
 
-        return AARCH64_PA_TO_KVA(pa);
+	return AARCH64_PA_TO_KVA(pa);
 }
 
 
@@ -740,6 +645,12 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
 
+	pmap_t pm = pmap_kernel();
+
+	/*
+	 * Initialise the kernel pmap object
+	 */
+	curcpu()->ci_pmap_cur = pm;
 #if 0
 	/* uvmexp.ncolors = icachesize / icacheways / PAGE_SIZE; */
 	uvmexp.ncolors = aarch64_cache_vindexsize / PAGE_SIZE;
@@ -756,30 +667,27 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 	aarch64_tlbi_all();
 
-	pmap_t pm = pmap_kernel();
-
-        pm->pm_l0_pa = __SHIFTOUT(reg_ttbr1_el1_read(), TTBR_BADDR);
+	pm->pm_l0_pa = __SHIFTOUT(reg_ttbr1_el1_read(), TTBR_BADDR);
 	pm->pm_pdetab = (pmap_pdetab_t *)AARCH64_PA_TO_KVA(pm->pm_l0_pa);
 	pm->pm_l0 = (pd_entry_t *)pm->pm_pdetab;
 
 
-        VPRINTF("locks ");
-        mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
-        uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
-        uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
+	VPRINTF("locks ");
+	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
+	uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
+	uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
 
 
-//      TAILQ_INIT(&pmap->pm_pvp_list);
-        TAILQ_INIT(&pm->pm_ptp_list);
+//	TAILQ_INIT(&pmap->pm_pvp_list);
+	TAILQ_INIT(&pm->pm_ptp_list);
 #ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)
-        TAILQ_INIT(&pm->pm_pdetab_list);
+	TAILQ_INIT(&pm->pm_pdetab_list);
 #endif
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-        TAILQ_INIT(&pm->pm_segtab_list);
+	TAILQ_INIT(&pm->pm_segtab_list);
 #endif
 #endif
-
 
 
 	VPRINTF("tlb0 ");
@@ -791,6 +699,28 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pm->pm_active = kcpuset_running;
 #endif
 
+
+	VPRINTF("specials ");
+
+	/*
+	 * does VIPT exist for aarch64
+	 */
+	//nptes = 1
+
+#if 0
+	pmap_alloc_specials(&virtual_avail, nptes, &csrcp, &csrc_pte);
+	pmap_set_pt_cache_mode(l1pt, (vaddr_t)csrc_pte, nptes);
+	pmap_alloc_specials(&virtual_avail, nptes, &cdstp, &cdst_pte);
+	pmap_set_pt_cache_mode(l1pt, (vaddr_t)cdst_pte, nptes);
+	pmap_alloc_specials(&virtual_avail, nptes, &memhook, NULL);
+	if (msgbufaddr == NULL) {
+		pmap_alloc_specials(&virtual_avail,
+		    round_page(MSGBUFSIZE) / PAGE_SIZE,
+		    (void *)&msgbufaddr, NULL);
+	}
+#endif
+
+
 	/*
 	 * Initialize `FYI' variables.	Note we're relying on
 	 * the fact that BSEARCH sorts the vm_physmem[] array
@@ -800,8 +730,17 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
 	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
 
+
+        pmap_limits.virtual_start = virtual_avail;
+        pmap_limits.virtual_end = virtual_end;
+
 //	pmap_limits.virtual_end = pmap_limits.virtual_start + (vaddr_t)sysmap_size * NBPG;
 
+
+	pool_init(&pmap_pmap_pool, PMAP_SIZE, 0, 0, 0, "pmappl",
+	    &pool_allocator_nointr, IPL_NONE);
+	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
+	    &pmap_pv_page_allocator, IPL_NONE);
 
 //	pmap_pvlist_lock_init(arm_dcache_align);
 }
@@ -914,20 +853,6 @@ pmap_md_pdetab_init(struct pmap *pm)
 
 	pm->pm_l0 = (pd_entry_t *)pm->pm_pdetab;
 	pmap_extract(pmap_kernel(), (vaddr_t)pm->pm_l0, &pm->pm_l0_pa);
-
-        /*
-         * Note: The pool cache ensures that the pm_l2[] array is already
-         * initialised to zero.
-         */
-
-//	pmap->pm_pdetab = pmap_md_alloc_pdp(pmap, &pmap->pm_pdetab);
-
-	/* for (int i = 0; i < NPDEPG; ++i) { */
-	/* 	pmap->pm_pdetab[i] = pmap_kernel()->pm_pdetab[i]; */
-	/* } */
-
-//	pmap->pm_md.md_ptbr =
-//	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_pdetab) >> PAGE_SHIFT;
 }
 
 
@@ -1265,6 +1190,7 @@ pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
 		}
 
 		pt_entry_t pte = pte_make_kenter_pa(pa, NULL, prot, flags);
+		pte &= ~LX_TYPE;
 		attr |= pte;
 
 		rc = pmapboot_enter(va, pa, blocksize, blocksize, attr, NULL);
@@ -1338,8 +1264,9 @@ pmap_devmap_find_va(vaddr_t va, vsize_t size)
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
 		if ((va >= pmap_devmap_table[i].pd_va) &&
 		    (endva <= pmap_devmap_table[i].pd_va +
-		              pmap_devmap_table[i].pd_size))
+		              pmap_devmap_table[i].pd_size)) {
 			return &pmap_devmap_table[i];
+		}
 	}
 	return NULL;
 }
@@ -1357,7 +1284,7 @@ pmap_devmap_find_pa(paddr_t pa, psize_t size)
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
 		if (pa >= pmap_devmap_table[i].pd_pa &&
 		    (endpa <= pmap_devmap_table[i].pd_pa +
-		             pmap_devmap_table[i].pd_size))
+		              pmap_devmap_table[i].pd_size))
 			return (&pmap_devmap_table[i]);
 	}
 	return NULL;
@@ -1368,6 +1295,6 @@ pmap_devmap_find_pa(paddr_t pa, psize_t size)
 void
 pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
 {
-        /* nothing */
+	/* nothing */
 }
 #endif /* MULTIPROCESSOR */
