@@ -116,7 +116,7 @@ options 	MULTIPROCESSOR
 
 pseudo-device 	openfirm	# /dev/openfirm
 
-options 	PMAP_COMMON
+#options 	PMAP_COMMON
 
 options 	DIAGNOSTIC	# internal consistency checks
 options 	DEBUG
@@ -150,7 +150,7 @@ makeoptions	COPY_SYMTAB=1
 
 config		netbsd		root on ? type ?
 
-#options 	COMPAT_NETBSD32
+options 	COMPAT_NETBSD32
 options 	EXEC_ELF32
 
 # EFI runtime support
