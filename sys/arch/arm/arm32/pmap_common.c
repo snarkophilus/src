@@ -1544,12 +1544,6 @@ pmap_alloc_specials(vaddr_t *availp, int pages, vaddr_t *vap, pt_entry_t **ptep)
 }
 
 
-
-
-
-
-
-
 /*
  * pmap_postinit()
  *
@@ -1568,9 +1562,6 @@ pmap_postinit(void)
 	pmap_impl_postinit();
 
 }
-
-
-
 
 
 
@@ -2758,26 +2749,7 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 #endif /* PMAP_STEAL_MEMORY */
 #endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-#if defined(ARM_MMU_EXTENDED) && defined(MULTIPROCESSOR)
-void
-pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
-{
-        /* nothing */
-}
-
+#if defined(MULTIPROCESSOR)
 int
 pic_ipi_shootdown(void *arg)
 {
@@ -2786,10 +2758,4 @@ pic_ipi_shootdown(void *arg)
 #endif
 	return 1;
 }
-#endif /* ARM_MMU_EXTENDED && MULTIPROCESSOR */
-
-
-
-
-
-
+#endif /* MULTIPROCESSOR */

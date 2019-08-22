@@ -237,17 +237,6 @@ static void	pmap_md_vca_page_wbinv(struct vm_page *, bool);
 // Global
 pmap_bootstrap(void)
 
-pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
-
-pmap_procwr(struct proc *p, vaddr_t va, size_t len)
-
-pmap_zero_page(paddr_t dst_pa)
-pmap_copy_page(paddr_t src_pa, paddr_t dst_pa)
-
-// Global - hmm
-pmap_md_icache_sync_range_index(vaddr_t va, vsize_t len)
-pmap_md_icache_sync_all(void)
-
 // Arch specific
 pmap_md_alloc_ephemeral_address_space(struct cpu_info *ci)
 
@@ -1058,7 +1047,13 @@ pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
 
 
 
-
+#if defined(MULTIPROCESSOR)
+void
+pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
+{
+	/* nothing */
+}
+#endif
 
 
 
