@@ -1,0 +1,7 @@
+#
+
+include "arch/evbarm/conf/GENERIC64"
+
+options 	PMAP_COMMON
+
+no options 	COMPAT_NETBSD32
