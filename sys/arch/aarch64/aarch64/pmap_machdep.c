@@ -641,9 +641,7 @@ struct vm_page *pmap_md_alloc_poolpage(int);
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
-
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 
 	pmap_t pm = pmap_kernel();
 
@@ -788,8 +786,9 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 		reg_tcr_el1_write(old_tcrel1 & ~TCR_EPD0);
 	}
 
-	UVMHIST_LOG(maphist, " pm %#jx pm->pm_l1_pa %08jx asid %ju... done",
-	    (uintptr_t)pm, pm->pm_l1_pa, pai->pai_asid, 0);
+	UVMHIST_LOG(maphist, " pm %#jx pm->pm_l1 %016jx pm->pm_l0_pa %016jx asid %ju... done",
+	    (uintptr_t)pm, (uintptr_t)pm->pm_l0, (uintptr_t)pm->pm_l0_pa,
+	    (uintptr_t)pai->pai_asid);
 
 	KASSERTMSG(ci->ci_pmap_asid_cur == pai->pai_asid, "%u vs %u",
 	    ci->ci_pmap_asid_cur, pai->pai_asid);
