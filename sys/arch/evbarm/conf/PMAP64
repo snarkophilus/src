@@ -4,4 +4,10 @@ include "arch/evbarm/conf/GENERIC64"
 
 options 	PMAP_COMMON
 
+options 	VERBOSE_INIT_ARM # verbose bootstrapping messages
+options 	EARLYCONS=virt, CONSADDR=0x09000000
+
 no options 	COMPAT_NETBSD32
+
+options 	UVMHIST
+options 	UVMHIST_PRINT,KERNHIST_DELAY=0
