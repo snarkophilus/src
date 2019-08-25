@@ -65,6 +65,7 @@ tlb_set_asid(tlb_asid_t asid)
 
 	uint64_t ttbr = reg_ttbr0_el1_read();
 
+	ttbr &= ~TTBR_ASID;
 	ttbr |= __SHIFTIN(asid, TTBR_ASID);
 
 	cpu_set_ttbr0(ttbr);
