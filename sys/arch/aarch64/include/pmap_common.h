@@ -61,26 +61,26 @@
 #endif
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
-
-
-
 #define PMAP_PDETABSIZE	(PAGE_SIZE / sizeof(pd_entry_t))
 
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 
-
-
-
 #define	NPTEPG		(PAGE_SIZE / sizeof(pt_entry_t))
 #define	NPDEPG		(PAGE_SIZE / sizeof(pd_entry_t))
 
-#define	SEGSHIFT	20			/* LOG2(NBSEG) */
+#define	PTPSHIFT	3
+#define	PTPLENGTH	(PGSHIFT - PTPSHIFT)
+#define	SEGSHIFT	(PGSHIFT + PTPLENGTH)	/* LOG2(NBSEG) */
+
 #define	NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
 #define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #define	SEGLENGTH	(PGSHIFT - 3)
-#define	XSEGSHIFT	(SEGSHIFT + SEGLENGTH)	/* LOG2(NBXSEG) */
+
+#define	XSEGSHIFT	(SEGSHIFT + SEGLENGTH + SEGLENGTH)
+						/* LOG2(NBXSEG) */
+
 #define	NBXSEG		(1UL << XSEGSHIFT)	/* bytes/xsegment */
 #define	XSEGOFSET	(NBXSEG - 1)		/* byte offset into xsegment */
 #define	XSEGLENGTH	(PGSHIFT - 3)
@@ -93,7 +93,6 @@
 #endif /* __BSD_PTENTRY_T__ */
 
 #define KERNEL_PID	0
-
 
 #if defined(__PMAP_PRIVATE)
 
@@ -366,7 +365,6 @@ pte_cached_change(pt_entry_t pte, bool cached)
 static inline void
 pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
-
 	*ptep = pte;
 }
 
@@ -381,15 +379,14 @@ static inline pd_entry_t
 pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
 
-	//XXXNH need this...
-	return 0;
+	return LX_VALID | LX_TYPE_TBL | pa;
 }
 
 static inline pd_entry_t
 pte_pde_ptpage(paddr_t pa, bool kernel_p)
 {
 
-	return LX_TYPE_TBL | pa;
+	return LX_VALID | LX_TYPE_TBL | pa;
 }
 
 static inline bool
@@ -412,9 +409,8 @@ pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 #ifdef MULTIPROCESSOR
 	return atomic_cas_64(pdep, opde, npde);
 #else
-	//XXXNH return value?
 	*pdep = npde;
-	return 0;
+	return opde;
 #endif
 }
 
@@ -463,7 +459,6 @@ pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW)
 	    | LX_BLKPAG_OS_WIRED;
 
-//XXXNH
  	if (prot & VM_PROT_EXECUTE)
  		pte &= ~LX_BLKPAG_PXN;
 
@@ -487,6 +482,9 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 //	const bool cached = (flags & PMAP_NOCACHE);
 
 	KASSERT((pa & ~LX_BLKPAG_AP) == 0);
+
+//	if (mdpg == NULL) {
+//	}
 
 	if ((flags & VM_PROT_ALL) || VM_PAGEMD_REFERENCED_P(mdpg)) {
 		/*
