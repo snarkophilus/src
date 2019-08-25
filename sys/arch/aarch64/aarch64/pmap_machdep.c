@@ -740,7 +740,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
 	    &pmap_pv_page_allocator, IPL_NONE);
 
-//	pmap_pvlist_lock_init(arm_dcache_align);
+	pmap_pvlist_lock_init(arm_dcache_align);
 }
 
 
