@@ -34,7 +34,6 @@
 
 #define PMAP_HWPAGEWALKER		1
 
-
 //XXXNH
 //#define PMAP_NEED_ALLOC_POOLPAGE	1
 
@@ -43,13 +42,7 @@
 #define PMAP_TLB_NEED_SHOOTDOWN		1
 #endif
 
-
-// XXXNH
-#if 1
 #define PMAP_TLB_FLUSH_ASID_ON_RESET	(true)
-#else
-#define PMAP_TLB_FLUSH_ASID_ON_RESET	(arm_has_tlbiasid_p)
-#endif
 
 // XXXNH some implementations support 16bit asid
 #define PMAP_TLB_NUM_PIDS		256
@@ -365,7 +358,10 @@ pte_cached_change(pt_entry_t pte, bool cached)
 static inline void
 pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
+	//XXXNH compiler tricks?
 	*ptep = pte;
+
+	// dsb probably required
 }
 
 static inline pd_entry_t
@@ -451,6 +447,8 @@ static inline pt_entry_t
 pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags)
 {
+	KASSERTMSG((pa & ~L3_PAG_OA) == 0, "pa %" PRIxPADDR, pa);
+
    	pt_entry_t pte = pa
 	    | LX_VALID
 	    | L3_TYPE_PAG
@@ -472,6 +470,8 @@ static inline pt_entry_t
 pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags, bool is_kernel_pmap_p)
 {
+	KASSERTMSG((pa & ~L3_PAG_OA) == 0, "pa %" PRIxPADDR, pa);
+
 	pt_entry_t npte = pa
 	    | LX_VALID
 	    | L3_TYPE_PAG
@@ -480,8 +480,6 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW);
 
 //	const bool cached = (flags & PMAP_NOCACHE);
-
-	KASSERT((pa & ~LX_BLKPAG_AP) == 0);
 
 //	if (mdpg == NULL) {
 //	}
@@ -523,13 +521,13 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 	if (!cached)
 		npte &= ~L2_S_CACHE_MASK;
 
+#endif
 	/*
 	 * Make sure userland mappings get the right permissions
 	 */
 	if (!is_kernel_pmap_p) {
-		npte |= L2_S_PROT_U;
+		npte |= LX_BLKPAG_APUSER;
 	}
-#endif
 
 	return npte;
 }
