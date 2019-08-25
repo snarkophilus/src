@@ -818,6 +818,21 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 	}
 }
 
+void
+pmap_segtab_deactivate(pmap_t pm)
+{
+#if defined(PMAP_HWPAGEWALKER)
+	pmap_md_pdetab_deactivate(pm);
+#endif
+
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+        curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
+#ifdef _LP64
+        curcpu()->ci_pmap_user_seg0tab = NULL;
+#endif
+#endif
+}
+
 /*
  *	Act on the given range of addresses from the specified map.
  *

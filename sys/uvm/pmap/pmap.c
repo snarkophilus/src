@@ -736,9 +736,7 @@ pmap_activate(struct lwp *l)
 	kpreempt_disable();
 	pmap_md_tlb_miss_lock_enter();
 	pmap_tlb_asid_acquire(pmap, l);
-	if (l == curlwp) {
-		pmap_segtab_activate(pmap, l);
-	}
+	pmap_segtab_activate(pmap, l);
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
 
@@ -885,13 +883,8 @@ pmap_deactivate(struct lwp *l)
 	kpreempt_disable();
 	KASSERT(l == curlwp || l->l_cpu == curlwp->l_cpu);
 	pmap_md_tlb_miss_lock_enter();
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-	curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
-#ifdef _LP64
-	curcpu()->ci_pmap_user_seg0tab = NULL;
-#endif
-#endif
 	pmap_tlb_asid_deactivate(pmap);
+	pmap_segtab_deactivate(pmap);
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
 
