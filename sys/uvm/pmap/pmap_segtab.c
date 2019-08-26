@@ -199,10 +199,10 @@ pmap_check_stp(pmap_segtab_t *stp, const char *caller, const char *why)
 #ifdef DEBUG_NOISY
 			for (size_t j = i; j < PMAP_SEGTABSIZE; j++)
 				printf("%s: pm_segtab.seg_tab[%zu] = 0x%p\n",
-				       caller, j, stp->seg_tab[j]);
+				    caller, j, stp->seg_tab[j]);
 #endif
 			panic("%s: pm_segtab.seg_tab[%zu] != 0 (0x%p): %s",
-			      caller, i, stp->seg_tab[i], why);
+			    caller, i, stp->seg_tab[i], why);
 		}
 	}
 #endif
@@ -266,8 +266,8 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 
 #ifdef _LP64
 	for (size_t segshift = XSEGSHIFT;
-	     segshift > SEGSHIFT;
-	     segshift -= PGSHIFT - 3, pdetab_mask = NSEGPG - 1) {
+	    segshift > SEGSHIFT;
+	    segshift -= PGSHIFT - 3, pdetab_mask = NSEGPG - 1) {
 		ptb = pmap_pde_to_pdetab(ptb->pde_pde[(va >> segshift) & pdetab_mask]);
 		if (ptb == NULL)
 			return NULL;
@@ -282,8 +282,8 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 
 #ifdef _LP64
 	for (size_t segshift = XSEGSHIFT;
-	     segshift > SEGSHIFT;
-	     segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
+	    segshift > SEGSHIFT;
+	    segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
 		stb = stb->seg_seg[(va >> segshift) & segtab_mask];
 		if (stb == NULL)
 			return NULL;
@@ -632,7 +632,7 @@ pmap_segtab_alloc(void)
 	}
 
 	pmap_check_stp(stp, __func__,
-		       found_on_freelist ? "from free list" : "allocated");
+	    found_on_freelist ? "from free list" : "allocated");
 
 	return stp;
 }
@@ -648,8 +648,8 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 	pmap_segtab_t *stp = *stp_p;
 
 	for (size_t i = (va / vinc) & (PMAP_SEGTABSIZE - 1);
-	     i < PMAP_SEGTABSIZE;
-	     i++, va += vinc) {
+	    i < PMAP_SEGTABSIZE;
+	    i++, va += vinc) {
 #ifdef _LP64
 		if (vinc > NBSEG) {
 			if (stp->seg_seg[i] != NULL) {
@@ -696,7 +696,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 
 	if (free_stp) {
 		pmap_check_stp(stp, __func__,
-			       vinc == NBSEG ? "release seg" : "release xseg");
+		    vinc == NBSEG ? "release seg" : "release xseg");
 		pmap_segtab_free(stp);
 		*stp_p = NULL;
 	}
@@ -826,9 +826,9 @@ pmap_segtab_deactivate(pmap_t pm)
 #endif
 
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-        curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
+	curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
 #ifdef _LP64
-        curcpu()->ci_pmap_user_seg0tab = NULL;
+	curcpu()->ci_pmap_user_seg0tab = NULL;
 #endif
 #endif
 }
@@ -872,9 +872,6 @@ pmap_pte_process(pmap_t pmap, vaddr_t sva, vaddr_t eva,
 }
 
 
-
-
-
 #if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_POOLPAGE)
 static pd_entry_t *
 pmap_pdetab_reserve(struct pmap *pmap, vaddr_t va)
@@ -893,11 +890,12 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 	vaddr_t segtab_mask = PMAP_PDETABSIZE - 1;
 #ifdef _LP64
 	for (size_t segshift = XSEGSHIFT;
-	     segshift > SEGSHIFT;
-	     segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
+	    segshift > SEGSHIFT;
+	    segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
 		pd_entry_t * const pde_p =
-		     &ptb->pde_pde[(va >> segshift) & segtab_mask];
+		    &ptb->pde_pde[(va >> segshift) & segtab_mask];
 		pd_entry_t opde = *pde_p;
+
 		if (__predict_false(!pte_pde_valid_p(opde))) {
 			ptb = pmap_pdetab_alloc();
 			pd_entry_t npde = pte_pde_pdetab(
@@ -925,8 +923,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 	vaddr_t segtab_mask = PMAP_SEGTABSIZE - 1;
 #ifdef _LP64
 	for (size_t segshift = XSEGSHIFT;
-	     segshift > SEGSHIFT;
-	     segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
+	    segshift > SEGSHIFT;
+	    segshift -= PGSHIFT - 3, segtab_mask = NSEGPG - 1) {
 		size_t idx = (va >> segshift) & segtab_mask;
 		pmap_segtab_t ** const stb_p = &stb->seg_seg[idx];
 #if defined(PMAP_HWPAGEWALKER)
@@ -963,9 +961,6 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 	return &stb->seg_tab[idx];
 #endif
 }
-
-
-
 
 
 /*
