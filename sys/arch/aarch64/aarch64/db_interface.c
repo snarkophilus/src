@@ -57,7 +57,7 @@ db_validate_address(vaddr_t addr)
 	struct pmap *pmap;
 
 	if (!p || !p->p_vmspace || !p->p_vmspace->vm_map.pmap ||
-	    addr >= VM_MIN_KERNEL_ADDRESS)
+	    addr >= VM_MAXUSER_ADDRESS)
 		pmap = pmap_kernel();
 	else
 		pmap = p->p_vmspace->vm_map.pmap;
