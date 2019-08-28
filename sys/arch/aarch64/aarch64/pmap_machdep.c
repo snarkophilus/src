@@ -633,10 +633,7 @@ pmap_md_pool_phystov(paddr_t pa)
 	return AARCH64_PA_TO_KVA(pa);
 }
 
-
-
 struct vm_page *pmap_md_alloc_poolpage(int);
-
 
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
@@ -669,12 +666,10 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pm->pm_pdetab = (pmap_pdetab_t *)AARCH64_PA_TO_KVA(pm->pm_l0_pa);
 	pm->pm_l0 = (pd_entry_t *)pm->pm_pdetab;
 
-
 	VPRINTF("locks ");
 	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
 	uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
 	uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
-
 
 //	TAILQ_INIT(&pmap->pm_pvp_list);
 	TAILQ_INIT(&pm->pm_ptp_list);
@@ -693,10 +688,14 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 #ifdef MULTIPROCESSOR
 	VPRINTF("kcpusets ");
-	pm->pm_onproc = kcpuset_running;
-	pm->pm_active = kcpuset_running;
-#endif
 
+	kcpuset_create(&pm->pm_onproc, true);
+	kcpuset_create(&pm->pm_active, true);
+	KASSERT(pm->pm_onproc != NULL);
+	KASSERT(pm->pm_active != NULL);
+	kcpuset_set(pm->pm_onproc, cpu_number());
+	kcpuset_set(pm->pm_active, cpu_number());
+#endif
 
 	VPRINTF("specials ");
 
