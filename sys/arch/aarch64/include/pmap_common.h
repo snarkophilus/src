@@ -106,9 +106,6 @@ void	pmap_md_pdetab_deactivate(pmap_t);
 
 vaddr_t pmap_md_direct_map_paddr(paddr_t);
 
-pt_entry_t *
-	pmap_md_pdetab_lookup_ptep(struct pmap *, vaddr_t);
-
 #ifdef PMAP_CACHE_VIPT
 #define PMAP_VIRTUAL_CACHE_ALIASES
 #endif
@@ -241,23 +238,6 @@ pmap_md_setvirtualend(vaddr_t va)
 	pmap_limits.virtual_end = va;
 }
 #endif
-
-
-
-//XXX Move to sys/uvm/pmap/pmap.h
-void pmap_page_remove(struct vm_page *);
-
-#if 0
-static inline void
-pmap_pv_protect(paddr_t pa, vm_prot_t prot)
-{
-
-	/* the only case is remove at the moment */
-	KASSERT(prot == VM_PROT_NONE);
- 	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
-}
-#endif
-
 
 static inline size_t
 pte_index(vaddr_t va)

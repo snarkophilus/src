@@ -139,10 +139,6 @@ void	pmap_md_pdetab_deactivate(pmap_t);
 
 vaddr_t pmap_md_direct_map_paddr(paddr_t);
 
-pt_entry_t *
-	pmap_md_pdetab_lookup_ptep(struct pmap *, vaddr_t);
-
-
 #ifdef PMAP_CACHE_VIPT
 #define PMAP_VIRTUAL_CACHE_ALIASES
 #endif

@@ -1030,22 +1030,6 @@ pmap_md_pdetab_deactivate(pmap_t pm)
 	kpreempt_enable();
 }
 
-pt_entry_t *
-pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
-{
-	struct l2_bucket * const l2b = pmap_get_l2_bucket(pmap, va);
-	if (l2b == NULL)
-		return NULL;
-
-	pt_entry_t *ptep = &l2b->l2b_kva[l2pte_index(va)];
-
-	return ptep;
-}
-
-
-
-
-
 
 #if defined(MULTIPROCESSOR)
 void

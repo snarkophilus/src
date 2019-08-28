@@ -156,38 +156,6 @@ pmap_md_pdetab_init(struct pmap *pmap)
 	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_pdetab) >> PAGE_SHIFT;
 }
 
-pt_entry_t *
-pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
-{
-	pmap_pdetab_t *ptb = pmap->pm_pdetab;
-	pd_entry_t *pdp;
-	pd_entry_t  pde;
-
-#ifdef _LP64
-	/* L2 -> L0 */
-	/* L2 */
-	pdp = (pd_entry_t *)ptb->pde_pde + pl2_i(va);
-	pde = *(pd_entry_t *)pdp;
-	if ((pde & PTE_V) == 0)
-		return NULL;
-	if (!pte_pde_valid_p(pde))
-		return (pt_entry_t *)PMAP_DIRECT_MAP(pdp);
-	/* L1 */
-	pdp = (pd_entry_t *)PMAP_DIRECT_MAP(pte_pde_to_paddr((pd_entry_t)pde)) + pl1_i(va);
-	pde = *(pd_entry_t *)pdp;
-	if (!pte_pde_valid_p(pde))
-		return pdp;
-
-	/* L0 */
-	pdp = (pd_entry_t *)PMAP_DIRECT_MAP(pte_pde_to_paddr((pd_entry_t)pde)) + pl0_i(va);
-	return pdp;
-#else
-	/* XXX 32-bit code here */
-#endif
-	/* Things have gone wrong */
-	return NULL;
-}
-
 void
 pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 {

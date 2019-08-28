@@ -816,30 +816,6 @@ pmap_md_pdetab_deactivate(pmap_t pm)
 	kpreempt_enable();
 }
 
-pt_entry_t *
-pmap_md_pdetab_lookup_ptep(struct pmap *pmap, vaddr_t va)
-{
-#if 0
-	struct l2_bucket * const l2b = pmap_get_l2_bucket(pmap, va);
-	if (l2b == NULL)
-		return NULL;
-
-	pt_entry_t *ptep = &l2b->l2b_kva[l2pte_index(va)];
-
-	return ptep;
-#endif
-	return NULL;
-}
-
-
-
-
-
-
-
-
-
-
 void
 pmap_md_pdetab_init(struct pmap *pm)
 {
@@ -1117,12 +1093,6 @@ pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty, bool last)
 
 #endif
 
-
-
-
-
-
-
 pd_entry_t *
 pmap_l0table(struct pmap *pm)
 {
@@ -1131,28 +1101,8 @@ pmap_l0table(struct pmap *pm)
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static const struct pmap_devmap *pmap_devmap_table;
 static vaddr_t virtual_devmap_addr;
-
-
 
 #define	L1_BLK_MAPPABLE_P(va, pa, size)					\
     ((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
