@@ -109,7 +109,6 @@ aarch64_getcacheinfo(void)
 	KASSERT(cinfo != NULL);
 	curcpu()->ci_cacheinfo = cinfo;
 
-
 	/*
 	 * CTR - Cache Type Register
 	 */
