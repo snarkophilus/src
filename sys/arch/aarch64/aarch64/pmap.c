@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.41 2019/05/17 06:05:07 mrg Exp $	*/
+/*	$NetBSD: pmap.c,v 1.43 2019/08/15 10:24:26 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.41 2019/05/17 06:05:07 mrg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.43 2019/08/15 10:24:26 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
@@ -2285,4 +2285,3 @@ kvtopte(vaddr_t va)
 
 	return _pmap_pte_lookup_bs(pmap_kernel(), va, NULL);
 }
-
