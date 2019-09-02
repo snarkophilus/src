@@ -272,7 +272,7 @@ static inline pt_entry_t
 pte_unwire_entry(pt_entry_t pte)
 {
 
-        return pte & ~LX_BLKPAG_OS_0;
+        return pte & ~LX_BLKPAG_OS_2;
 }
 
 static inline uint64_t
