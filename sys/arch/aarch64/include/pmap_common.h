@@ -45,7 +45,7 @@
 #define PMAP_TLB_FLUSH_ASID_ON_RESET	(true)
 
 // XXXNH some implementations support 16bit asid
-#define PMAP_TLB_NUM_PIDS		256
+#define PMAP_TLB_NUM_PIDS		65536
 #define cpu_set_tlb_info(ci, ti)        ((void)((ci)->ci_tlb_info = (ti)))
 #if PMAP_TLB_MAX > 1
 #define cpu_tlb_info(ci)		((ci)->ci_tlb_info)
@@ -355,14 +355,14 @@ static inline pd_entry_t
 pte_pde_pdetab(paddr_t pa, bool kernel_p)
 {
 
-	return LX_VALID | LX_TYPE_TBL | pa;
+	return LX_VALID | LX_TYPE_TBL | (kernel_p ? 0 : LX_BLKPAG_NG) | pa;
 }
 
 static inline pd_entry_t
 pte_pde_ptpage(paddr_t pa, bool kernel_p)
 {
 
-	return LX_VALID | LX_TYPE_TBL | pa;
+	return LX_VALID | LX_TYPE_TBL | (kernel_p ? 0 : LX_BLKPAG_NG) | pa;
 }
 
 static inline bool
@@ -422,7 +422,6 @@ pte_memattr(u_int flags)
 }
 
 
-
 static inline pt_entry_t
 pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags)
@@ -431,6 +430,9 @@ pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
 
    	pt_entry_t pte = pa
 	    | LX_VALID
+#ifdef MULTIPROCESSOR
+	    | LX_BLKPAG_SH_IS
+#endif
 	    | L3_TYPE_PAG
 	    | LX_BLKPAG_AF
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
@@ -454,6 +456,9 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 
 	pt_entry_t npte = pa
 	    | LX_VALID
+#ifdef MULTIPROCESSOR
+	    | LX_BLKPAG_SH_IS
+#endif
 	    | L3_TYPE_PAG
 	    | LX_BLKPAG_AF
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
@@ -461,8 +466,9 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 
 //	const bool cached = (flags & PMAP_NOCACHE);
 
-//	if (mdpg == NULL) {
-//	}
+	if (mdpg == NULL) {
+		panic(__func__);
+	}
 
 	if ((flags & VM_PROT_ALL) || VM_PAGEMD_REFERENCED_P(mdpg)) {
 		/*
@@ -487,12 +493,14 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 			// XXX pte_set_writable(npte);
 			npte &= ~LX_BLKPAG_AP;
 			npte |= LX_BLKPAG_AP_RW;
+		} else {
+			npte &= ~LX_BLKPAG_AF;
 		}
 		if (prot & VM_PROT_EXECUTE)
 			npte &= (is_kernel_pmap_p ? ~LX_BLKPAG_PXN : ~LX_BLKPAG_UXN);
 	} else {
 		/*
-		 * Need to do page referenced emulation.
+		 * Need to do page referenced/modified emulation.
 		 */
 		npte &= ~LX_BLKPAG_AF;
 	}
@@ -506,7 +514,7 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 	 * Make sure userland mappings get the right permissions
 	 */
 	if (!is_kernel_pmap_p) {
-		npte |= LX_BLKPAG_APUSER;
+		npte |= LX_BLKPAG_NG | LX_BLKPAG_APUSER;
 	}
 
 	return npte;
