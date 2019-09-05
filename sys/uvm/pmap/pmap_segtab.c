@@ -123,7 +123,6 @@ __CTASSERT(sizeof(pmap_ptpage_t) == NBPG);
 #ifdef _LP64
 MULT_CTASSERT(PMAP_PDETABSIZE, NPDEPG);
 MULT_CTASSERT(NPDEPG, PMAP_PDETABSIZE);
-MULT_CTASSERT(PMAP_PDETABSIZE, NPDEPG);
 #endif /* _LP64 */
 MULT_CTASSERT(sizeof(pmap_pdetab_t *), sizeof(pd_entry_t));
 MULT_CTASSERT(sizeof(pd_entry_t), sizeof(pmap_pdetab_t));
