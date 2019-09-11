@@ -124,21 +124,10 @@ done:
 }
 
 
-
 bool
 pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 {
-	int rv = 0;
-
-#ifdef needtowrite
-	struct l2_dtable *l2;
-	struct l2_bucket *l2b;
-	paddr_t pa;
-	const size_t l1slot = l1pte_index(va);
-
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
-
-	va = trunc_page(va);
 
 	KASSERT(!user || (pm != pmap_kernel()));
 
@@ -149,311 +138,85 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 	    (uintptr_t)PMAP_PAI(pm, cpu_tlb_info(curcpu())),
 	    (uintptr_t)PMAP_PAI(pm, cpu_tlb_info(curcpu()))->pai_asid, 0);
 
-	pmap_acquire_pmap_lock(pm);
+	kpreempt_disable();
 
-	/*
-	 * If there is no l2_dtable for this address, then the process
-	 * has no business accessing it.
-	 *
-	 * Note: This will catch userland processes trying to access
-	 * kernel addresses.
-	 */
-	l2 = pm->pm_l2[L2_IDX(l1slot)];
-	if (l2 == NULL) {
-		UVMHIST_LOG(maphist, " no l2 for l1slot %#jx", l1slot, 0, 0, 0);
-		goto out;
+	bool fixed = false;
+	pt_entry_t * const ptep = pmap_pte_lookup(pm, va);
+	if (ptep == NULL) {
+		UVMHIST_LOG(pmaphist, "... no ptep", 0, 0, 0, 0);
+		goto done;
 	}
 
-	/*
-	 * Likewise if there is no L2 descriptor table
-	 */
-	l2b = &l2->l2_bucket[L2_BUCKET(l1slot)];
-	if (l2b->l2b_kva == NULL) {
-		UVMHIST_LOG(maphist, " <-- done (no ptep for l1slot %#jx)",
-		    l1slot, 0, 0, 0);
-		goto out;
+	pt_entry_t pte = *ptep;
+
+	if (!l3pte_valid(pte)) {
+		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
+		    pte, va, 0, 0);
+		goto done;
 	}
 
-	/*
-	 * Check the PTE itself.
-	 */
-	pt_entry_t * const ptep = &l2b->l2b_kva[l2pte_index(va)];
-	pt_entry_t const opte = *ptep;
-	if (opte == 0 || (opte & L2_TYPE_MASK) == L2_TYPE_L) {
-		UVMHIST_LOG(maphist, " <-- done (empty pde for l1slot %#jx)",
-		    l1slot, 0, 0, 0);
-		goto out;
+	pt_entry_t opte = *ptep;
+	paddr_t pa = l3pte_pa(opte);
+
+	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
+
+//	struct vm_page *pg = PHYS_TO_VM_PAGE(pa);
+	if (pg == NULL) {
+		UVMHIST_LOG(pmaphist, "pg not found: va=%016lx", va, 0, 0, 0);
+		goto done;
 	}
 
-#ifndef ARM_HAS_VBAR
-	/*
-	 * Catch a userland access to the vector page mapped at 0x0
-	 */
-	if (user && (opte & L2_S_PROT_U) == 0) {
-		UVMHIST_LOG(maphist, " <-- done (vector_page)", 0, 0, 0, 0);
-		goto out;
-	}
-#endif
+	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
 
-	pa = l2pte_pa(opte);
-
-	if ((ftype & VM_PROT_WRITE) && !l2pte_writable_p(opte)) {
+	if ((ftype & VM_PROT_WRITE) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
 		/*
 		 * This looks like a good candidate for "page modified"
 		 * emulation...
 		 */
-		struct pv_entry *pv;
-		struct vm_page *pg;
 
-		/* Extract the physical address of the page */
-		if ((pg = PHYS_TO_VM_PAGE(pa)) == NULL) {
-			UVMHIST_LOG(maphist, " <-- done (mod/ref unmanaged page)", 0, 0, 0, 0);
-			goto out;
-		}
-
-		struct vm_page_md *md = VM_PAGE_TO_MD(pg);
-
-		/* Get the current flags for this page. */
-		pmap_acquire_page_lock(md);
-		pv = pmap_find_pv(md, pm, va);
-		if (pv == NULL || PV_IS_KENTRY_P(pv->pv_flags)) {
-			pmap_release_page_lock(md);
-			UVMHIST_LOG(maphist, " <-- done (mod/ref emul: no PV)", 0, 0, 0, 0);
-			goto out;
-		}
+		pmap_page_set_attributes(mdpg, VM_PAGEMD_MODIFIED|VM_PAGEMD_REFERENCED);
+		//pmap_set_modified(pa);
 
 		/*
-		 * Do the flags say this page is writable? If not then it
-		 * is a genuine write fault. If yes then the write fault is
-		 * our fault as we did not reflect the write access in the
-		 * PTE. Now we know a write has occurred we can correct this
-		 * and also set the modified bit
+		 * Enable write permissions for the page by setting the Access Flag.
 		 */
-		if ((pv->pv_flags & PVF_WRITE) == 0) {
-			pmap_release_page_lock(md);
-			goto out;
-		}
+		const pt_entry_t npte = opte | LX_BLKPAG_AF;
 
-		md->pvh_attrs |= PVF_REF | PVF_MOD;
-		pv->pv_flags |= PVF_REF | PVF_MOD;
-		if (md->pvh_attrs & PVF_EXEC) {
-			md->pvh_attrs &= ~PVF_EXEC;
-			PMAPCOUNT(exec_discarded_modfixup);
-		}
-		pmap_release_page_lock(md);
+		atomic_swap_64(ptep, npte);
+		//AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
 
-		/*
-		 * Re-enable write permissions for the page.  No need to call
-		 * pmap_vac_me_harder(), since this is just a
-		 * modified-emulation fault, and the PVF_WRITE bit isn't
-		 * changing. We've already set the cacheable bits based on
-		 * the assumption that we can write to this page.
-		 */
-		const pt_entry_t npte =
-		    l2pte_set_writable((opte & ~L2_TYPE_MASK) | L2_S_PROTO)
-		    | (pm != pmap_kernel() ? L2_XS_nG : 0)
-		    | 0;
-		l2pte_reset(ptep);
-		PTE_SYNC(ptep);
-		pmap_tlb_invalidate_addr(pm, va,
-		    (ftype & VM_PROT_EXECUTE) ? PVF_EXEC | PVF_REF : PVF_REF);
-		l2pte_set(ptep, npte, 0);
-		PTE_SYNC(ptep);
-		PMAPCOUNT(fixup_mod);
-		rv = 1;
+		//PMAPCOUNT(fixup_mod);
+		fixed = true;
 		UVMHIST_LOG(maphist, " <-- done (mod/ref emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
-	} else if ((opte & L2_TYPE_MASK) == L2_TYPE_INV) {
+	} else if ((ftype & VM_PROT_WRITE) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
 		/*
 		 * This looks like a good candidate for "page referenced"
 		 * emulation.
 		 */
-		struct vm_page *pg;
 
-		/* Extract the physical address of the page */
-		if ((pg = PHYS_TO_VM_PAGE(pa)) == NULL) {
-			UVMHIST_LOG(maphist, " <-- done (ref emul: unmanaged page)", 0, 0, 0, 0);
-			goto out;
-		}
+		pmap_page_set_attributes(mdpg, VM_PAGEMD_REFERENCED);
 
-		struct vm_page_md *md = VM_PAGE_TO_MD(pg);
-
-		/* Get the current flags for this page. */
-		pmap_acquire_page_lock(md);
-		struct pv_entry *pv = pmap_find_pv(md, pm, va);
-		if (pv == NULL || PV_IS_KENTRY_P(pv->pv_flags)) {
-			pmap_release_page_lock(md);
-			UVMHIST_LOG(maphist, " <-- done (ref emul no PV)", 0, 0, 0, 0);
-			goto out;
-		}
-
-		md->pvh_attrs |= PVF_REF;
-		pv->pv_flags |= PVF_REF;
-
-		pt_entry_t npte =
-		    l2pte_set_readonly((opte & ~L2_TYPE_MASK) | L2_S_PROTO);
-		if (pm != pmap_kernel()) {
-			npte |= L2_XS_nG;
-		}
-		/*
-		 * If we got called from prefetch abort, then ftype will have
-		 * VM_PROT_EXECUTE set.  Now see if we have no-execute set in
-		 * the PTE.
-		 */
-		if (user && (ftype & VM_PROT_EXECUTE) && (npte & L2_XS_XN)) {
-			/*
-			 * Is this a mapping of an executable page?
-			 */
-			if ((pv->pv_flags & PVF_EXEC) == 0) {
-				pmap_release_page_lock(md);
-				UVMHIST_LOG(maphist, " <-- done (ref emul: no exec)",
-				    0, 0, 0, 0);
-				goto out;
-			}
-			/*
-			 * If we haven't synced the page, do so now.
-			 */
-			if ((md->pvh_attrs & PVF_EXEC) == 0) {
-				UVMHIST_LOG(maphist, " ref emul: syncicache "
-				    "page #%#jx", pa, 0, 0, 0);
-				pmap_syncicache_page(md, pa);
-				PMAPCOUNT(fixup_exec);
-			}
-			npte &= ~L2_XS_XN;
-		}
-		pmap_release_page_lock(md);
-		l2pte_reset(ptep);
-		PTE_SYNC(ptep);
-		pmap_tlb_invalidate_addr(pm, va,
-		    (ftype & VM_PROT_EXECUTE) ? PVF_EXEC | PVF_REF : PVF_REF);
-		l2pte_set(ptep, npte, 0);
-		PTE_SYNC(ptep);
-		PMAPCOUNT(fixup_ref);
-		rv = 1;
-		UVMHIST_LOG(maphist, " <-- done (ref emul: changed pte from "
-		    "%#jx to %#jx)", opte, npte, 0, 0);
-	} else if (user && (ftype & VM_PROT_EXECUTE) && (opte & L2_XS_XN)) {
-		struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-		if (pg == NULL) {
-			UVMHIST_LOG(maphist, " <-- done (unmanaged page)", 0, 0, 0, 0);
-			goto out;
-		}
-
-		struct vm_page_md * const md = VM_PAGE_TO_MD(pg);
-
-		/* Get the current flags for this page. */
-		pmap_acquire_page_lock(md);
-		struct pv_entry * const pv = pmap_find_pv(md, pm, va);
-		if (pv == NULL || (pv->pv_flags & PVF_EXEC) == 0) {
-			pmap_release_page_lock(md);
-			UVMHIST_LOG(maphist, " <-- done (no PV or not EXEC)", 0, 0, 0, 0);
-			goto out;
-		}
 
 		/*
-		 * If we haven't synced the page, do so now.
+		 * Enable write permissions for the page by setting the Access Flag.
 		 */
-		if ((md->pvh_attrs & PVF_EXEC) == 0) {
-			UVMHIST_LOG(maphist, "syncicache page #%#jx",
-			    pa, 0, 0, 0);
-			pmap_syncicache_page(md, pa);
-		}
-		pmap_release_page_lock(md);
-		/*
-		 * Turn off no-execute.
-		 */
-		KASSERT(opte & L2_XS_nG);
-		l2pte_reset(ptep);
-		PTE_SYNC(ptep);
-		pmap_tlb_invalidate_addr(pm, va, PVF_EXEC | PVF_REF);
-		l2pte_set(ptep, opte & ~L2_XS_XN, 0);
-		PTE_SYNC(ptep);
-		rv = 1;
-		PMAPCOUNT(fixup_exec);
-		UVMHIST_LOG(maphist, "exec: changed pte from %#jx to %#jx",
-		    opte, opte & ~L2_XS_XN, 0, 0);
+		const pt_entry_t npte = opte | LX_BLKPAG_AF;
+
+		atomic_swap_64(ptep, npte);
+		//AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
+
+		//PMAPCOUNT(fixup_mod);
+		fixed = true;
+		UVMHIST_LOG(maphist, " <-- done (ref emul: changed pte "
+		    "from %#jx to %#jx)", opte, npte, 0, 0);
 	}
 
 
-#ifndef MULTIPROCESSOR
-	/*
-	 * If 'rv == 0' at this point, it generally indicates that there is a
-	 * stale TLB entry for the faulting address. This happens when two or
-	 * more processes are sharing an L1. Since we don't flush the TLB on
-	 * a context switch between such processes, we can take domain faults
-	 * for mappings which exist at the same VA in both processes. EVEN IF
-	 * WE'VE RECENTLY FIXED UP THE CORRESPONDING L1 in pmap_enter(), for
-	 * example.
-	 *
-	 * This is extremely likely to happen if pmap_enter() updated the L1
-	 * entry for a recently entered mapping. In this case, the TLB is
-	 * flushed for the new mapping, but there may still be TLB entries for
-	 * other mappings belonging to other processes in the 1MB range
-	 * covered by the L1 entry.
-	 *
-	 * Since 'rv == 0', we know that the L1 already contains the correct
-	 * value, so the fault must be due to a stale TLB entry.
-	 *
-	 * Since we always need to flush the TLB anyway in the case where we
-	 * fixed up the L1, or frobbed the L2 PTE, we effectively deal with
-	 * stale TLB entries dynamically.
-	 *
-	 * However, the above condition can ONLY happen if the current L1 is
-	 * being shared. If it happens when the L1 is unshared, it indicates
-	 * that other parts of the pmap are not doing their job WRT managing
-	 * the TLB.
-	 */
-	if (rv == 0
-	    && true) {
-#ifdef DEBUG
-		extern int last_fault_code;
-#else
-		int last_fault_code = ftype & VM_PROT_EXECUTE
-		    ? armreg_ifsr_read()
-		    : armreg_dfsr_read();
-#endif
-		printf("fixup: pm %p, va 0x%lx, ftype %d - nothing to do!\n",
-		    pm, va, ftype);
-		printf("fixup: l2 %p, l2b %p, ptep %p, pte %#x\n",
-		    l2, l2b, ptep, opte);
+done:
+	kpreempt_enable();
 
-		printf("fixup: pdep %p, pde %#x, ttbcr %#x\n",
-		    &pmap_l1_kva(pm)[l1slot], pmap_l1_kva(pm)[l1slot],
-		   armreg_ttbcr_read());
-		printf("fixup: fsr %#x cpm %p casid %#x contextidr %#x dacr %#x\n",
-		    last_fault_code, curcpu()->ci_pmap_cur,
-		    curcpu()->ci_pmap_asid_cur,
-		    armreg_contextidr_read(), armreg_dacr_read());
-#ifdef _ARM_ARCH_7
-		if (ftype & VM_PROT_WRITE)
-			armreg_ats1cuw_write(va);
-		else
-			armreg_ats1cur_write(va);
-		arm_isb();
-		printf("fixup: par %#x\n", armreg_par_read());
-#endif
-#ifdef DDB
-		extern int kernel_debug;
-
-		if (kernel_debug & 2) {
-			pmap_release_pmap_lock(pm);
-#ifdef UVMHIST
-			KERNHIST_DUMP(maphist);
-#endif
-			cpu_Debugger();
-			pmap_acquire_pmap_lock(pm);
-		}
-#endif
-	}
-#endif
-
-	rv = 1;
-
-out:
-	pmap_release_pmap_lock(pm);
-#endif
-
-	return rv;
+	return fixed;
 }
 
 
