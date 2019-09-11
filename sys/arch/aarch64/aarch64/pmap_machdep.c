@@ -1102,7 +1102,7 @@ pmap_l0table(struct pmap *pm)
 
 
 static const struct pmap_devmap *pmap_devmap_table;
-static vaddr_t virtual_devmap_addr;
+vaddr_t virtual_devmap_addr;
 
 #define	L1_BLK_MAPPABLE_P(va, pa, size)					\
     ((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
