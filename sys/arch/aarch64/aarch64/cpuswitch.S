@@ -283,6 +283,7 @@ ENTRY_NP(el0_trap)
 	nop				/* dummy for DDB backtrace (for lr-4) */
 #endif
 ENTRY_NP(el0_trap_exit)
+	DISABLE_INTERRUPT		/* make sure I|F marked */
 1:
 	/* while (curcpu()->ci_astpending & __BIT(0)) { */
 	mrs	x8, tpidr_el1
@@ -302,8 +303,6 @@ ENTRY_NP(el0_trap_exit)
 	b	1b
 	/* } */
 9:
-	DISABLE_INTERRUPT		/* make sure I|F marked */
-
 	mrs	x8, tpidr_el1
 	ldr	x9, [x8, #CI_CURLWP]
 	ldr	x23, [x9, #L_MD_CPACR]
