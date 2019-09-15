@@ -73,14 +73,15 @@ ENTRY_NP(cpu_switchto)
 	/* We are done with the old lwp */
 
 .Lrestore_lwp:
-	DISABLE_INTERRUPT
 	ldr	x6, [x1, #L_PCB]	/* x6 = lwp_getpcb(newlwp) */
 	ldr	x4, [x6, #PCB_TF]	/* get trapframe ptr (aka SP) */
 	ldr	x5, [x1, #L_MD_CPACR]	/* get cpacr_el1 */
+
+	mrs	x3, tpidr_el1
+	DISABLE_INTERRUPT
 	mov	sp, x4			/* restore stack pointer */
 	msr	cpacr_el1, x5		/* restore cpacr_el1 */
 
-	mrs	x3, tpidr_el1
 	str	x1, [x3, #CI_CURLWP]	/* switch curlwp to new lwp */
 	ENABLE_INTERRUPT
 
@@ -125,15 +126,14 @@ ENTRY_NP(cpu_switchto_softint)
 	stp	x27, x28, [sp, #TF_X27]
 	stp	x29, x2, [sp, #TF_X29]	/* tf->lr = softint_cleanup; */
 
-	mrs	x3, tpidr_el1		/* x3 := curcpu() */
-	DISABLE_INTERRUPT
-	ldr	x19, [x3, #CI_CURLWP]	/* x19 := curcpu()->ci_curlwp */
+	mrs	x20, tpidr_el1		/* x20 := curcpu() */
+	ldr	x19, [x20, #CI_CURLWP]	/* x19 := curcpu()->ci_curlwp */
 	mov	x4, sp
+
 	mrs	x5, cpacr_el1
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	str	x4, [x6, #PCB_TF]
 	str	x5, [x19, #L_MD_CPACR]
-	str	x0, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
 
 #ifdef KASAN
 	/* clear the new stack */
@@ -142,9 +142,15 @@ ENTRY_NP(cpu_switchto_softint)
 	ldp	x0, x1, [sp], #16
 #endif
 
-	/* onto new stack */
 	ldr	x4, [x0, #L_MD_UTF]
+
+	DISABLE_INTERRUPT
+	/* onto new stack */
+	str	x0, [x20, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
 	sub	sp, x4, #TF_SIZE	/* new sp := softlwp->l_md_utf - 1 */
+
+
+	// Why when interrupts are disabled?
 	mov	x5, #CPACR_FPEN_NONE
 	msr	cpacr_el1, x5		/* cpacr_el1 = CPACR_FPEN_NONE */
 	ENABLE_INTERRUPT
@@ -153,12 +159,13 @@ ENTRY_NP(cpu_switchto_softint)
 	mov	x0, x19			/* x0 := pinned_lwp */
 	bl	_C_LABEL(softint_dispatch)
 
-	mrs	x3, tpidr_el1
-	DISABLE_INTERRUPT
-	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
+	mrs	x20, tpidr_el1
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	ldr	x4, [x6, #PCB_TF]	/* x4 := pinned_lwp->l_addr->pcb_tf */
 	ldr	x5, [x19, #L_MD_CPACR]	/* x5 := pinned_lwp->l_md_cpacr */
+
+	DISABLE_INTERRUPT
+	str	x19, [x20, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
 	mov	sp, x4			/* restore pinned_lwp sp */
 	msr	cpacr_el1, x5		/* restore pinned_lwp cpacr */
 
@@ -185,10 +192,10 @@ END(cpu_switchto_softint)
 ENTRY_NP(softint_cleanup)
 	mov	lr, x20			/* restore original lr */
 
-	mrs	x3, tpidr_el1		/* curcpu() */
-	ldr	w2, [x3, #CI_MTX_COUNT]	/* ->ci_mtx_count */
+	mrs	x20, tpidr_el1		/* curcpu() */
+	ldr	w2, [x20, #CI_MTX_COUNT]/* ->ci_mtx_count */
 	add	w2, w2, #1
-	str	w2, [x3, #CI_MTX_COUNT]
+	str	w2, [x20, #CI_MTX_COUNT]
 	str	wzr, [x0, #L_CTXSWTCH]	/* softlwp->l_ctxswtch = 0 */
 
 	msr	daif, x19		/* restore interrupt mask */
