@@ -64,7 +64,7 @@ ENTRY_NP(cpu_switchto)
 	 * Save the current stack pointer and the CPACR and save them in
 	 * old lwp md area.
 	 */
-	mov	x4, sp 
+	mov	x4, sp
 	mrs	x5, cpacr_el1
 	str	x5, [x0, #L_MD_CPACR]
 	ldr	x6, [x0, #L_PCB]	/* x6 = lwp_getpcb(oldlwp) */
