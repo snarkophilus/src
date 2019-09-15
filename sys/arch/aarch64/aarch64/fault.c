@@ -126,8 +126,8 @@ is_fatal_abort(uint32_t esr)
 void
 data_abort_handler(struct trapframe *tf, uint32_t eclass)
 {
-	struct proc *p;
-	struct lwp *l;
+	struct lwp * const l = curlwp;
+	struct proc * const p = curproc;
 	struct vm_map *map;
 	struct faultbuf *fb;
 	vaddr_t va;
@@ -136,25 +136,26 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	int error = 0, len;
 	const bool user = IS_SPSR_USER(tf->tf_spsr) ? true : false;
 
-	bool fatalabort;
 	const char *faultstr;
 	static char panicinfo[256];
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
 
-	__asm __volatile ("clrex");
+#ifdef PMAP_FAULTINFO
+	struct pcb * const pcb = lwp_getpcb(l);
+	struct pcb_faultinfo * const pfi = &pcb->pcb_faultinfo;
+#endif
 
-	l = curlwp;
+	__asm __volatile ("clrex");
 
 	esr = tf->tf_esr;
 	rw = __SHIFTOUT(esr, ESR_ISS_DATAABORT_WnR); /* 0 if IFSC */
 
-	fatalabort = is_fatal_abort(esr);
+	bool fatalabort = is_fatal_abort(esr);
 	if (fatalabort)
 		goto do_fault;
 
-	p = l->l_proc;
 	va = trunc_page((vaddr_t)tf->tf_far);
 
 	if ((VM_MIN_KERNEL_ADDRESS <= va) && (va < VM_MAX_KERNEL_ADDRESS)) {
@@ -176,7 +177,6 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	else
 		ftype = (rw == 0) ? VM_PROT_READ : VM_PROT_WRITE;
 
-#ifdef UVMHIST
 	if (ftype & VM_PROT_EXECUTE) {
 		UVMHIST_LOG(pmaphist, "pagefault %016lx %016lx in %s EXEC",
 		    tf->tf_far, va, user ? "user" : "kernel", 0);
@@ -185,13 +185,39 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 		    tf->tf_far, va, user ? "user" : "kernel",
 		    (rw == 0) ? "read" : "write");
 	}
-#endif
 
 	/* reference/modified emulation */
 	if (pmap_fault_fixup(map->pmap, va, ftype, user)) {
 		UVMHIST_LOG(pmaphist, "fixed: va=%016llx", tf->tf_far, 0, 0, 0);
 		return;
 	}
+
+#ifdef PMAP_FAULTINFO
+	if (p->p_pid == pfi->pfi_lastpid && va == pfi->pfi_faultaddr) {
+		if (++pfi->pfi_repeats > 4) {
+			tlb_asid_t asid = tlb_get_asid();
+			pt_entry_t *ptep = pfi->pfi_faultpte;
+			printf("%s: fault #%u (%s/%s) for %#" PRIxVADDR
+			    "(%#"PRIxVADDR") at pc %#"PRIxVADDR" curpid=%u/%u "
+			    "ptep@%p=%#"PRIxPTE")\n", __func__,
+			    pfi->pfi_repeats, eclass_trapname(eclass),
+			    eclass_trapname(pfi->pfi_faulttype), tf->tf_far,
+			    va, 0L /* pc */, map->pmap->pm_pai[0].pai_asid,
+			    asid, ptep, ptep ? pte_value(*ptep) : 0);
+			if (pfi->pfi_repeats >= 4) {
+				cpu_Debugger();
+			} else {
+				pfi->pfi_faulttype = eclass;
+			}
+		}
+	} else {
+		pfi->pfi_lastpid = p->p_pid;
+		pfi->pfi_faultaddr = va;
+		pfi->pfi_repeats = 0;
+		pfi->pfi_faultpte = NULL;
+		pfi->pfi_faulttype = eclass;
+	}
+#endif /* PMAP_FAULTINFO */
 
 	fb = cpu_disable_onfault();
 	error = uvm_fault(map, va, ftype);
@@ -205,6 +231,12 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 		return;
 	}
 
+#ifdef PMAP_FAULTINFO
+	if (pfi->pfi_repeats == 0) {
+		pfi->pfi_faultpte = pmap_pte_lookup(map->pmap, va);
+	}
+	KASSERT(*(pt_entry_t *)pfi->pfi_faultpte);
+#endif
 
  do_fault:
 	/* faultbail path? */
