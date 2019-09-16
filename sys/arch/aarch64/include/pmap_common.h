@@ -169,6 +169,7 @@ vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
 struct vm_page *pmap_md_alloc_poolpage(int);
 
+// XXXNH remove?
 extern int arm_poolpage_vmfreelist;
 
 /*
@@ -198,9 +199,6 @@ extern bool arm_has_tlbiasid_p;	/* also in <arm/locore.h> */
 
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
 
-
-
-
 static __inline paddr_t
 pte_to_paddr(pt_entry_t pte)
 {
@@ -214,8 +212,6 @@ pte_valid_p(pt_entry_t pte)
 
 	return l3pte_valid(pte);
 }
-
-
 
 static inline int
 pmap_md_pagecolor(struct vm_page *pg)
@@ -235,6 +231,7 @@ pmap_md_clean_page(struct vm_page_md *md, bool is_src)
 static inline void
 pmap_md_setvirtualend(vaddr_t va)
 {
+
 	pmap_limits.virtual_end = va;
 }
 #endif
@@ -323,7 +320,7 @@ static inline pt_entry_t
 pte_prot_nowrite(pt_entry_t pte)
 {
 
-	return ((pte & LX_BLKPAG_AP) | LX_BLKPAG_AP_RO);
+	return pte & ~LX_BLKPAG_AF;
 }
 
 static inline pt_entry_t
@@ -460,7 +457,6 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 	    | LX_BLKPAG_SH_IS
 #endif
 	    | L3_TYPE_PAG
-	    | LX_BLKPAG_AF
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW);
 
@@ -470,40 +466,27 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 		panic(__func__);
 	}
 
-	if ((flags & VM_PROT_ALL) || VM_PAGEMD_REFERENCED_P(mdpg)) {
+	if ((prot & VM_PROT_WRITE) != 0 &&
+	    ((flags & VM_PROT_WRITE) != 0 || VM_PAGEMD_MODIFIED_P(mdpg))) {
 		/*
-		 * - The access type indicates that we don't need
-		 *   to do referenced emulation.
+		 * This is a writable mapping, and the page's mod state
+		 * indicates it has already been modified.  No need for
+		 * modified emulation.
+		 */
+		npte |= LX_BLKPAG_AF;
+	} else if ((flags & VM_PROT_ALL) || VM_PAGEMD_REFERENCED_P(mdpg)) {
+		/*
+		 * - The access type indicates that we don't need to do
+		 *   referenced emulation.
 		 * OR
-		 * - The physical page has already been referenced
-		 *   so no need to re-do referenced emulation here.
+		 * - The physical page has already been referenced so no need
+		 *   to re-do referenced emulation here.
 		 */
-		// XXX pte_set_readonly(npte);
-		npte &= ~LX_BLKPAG_AP;
-		npte |= LX_BLKPAG_AP_RO;
-
-		if ((prot & VM_PROT_WRITE) != 0 &&
-		    ((flags & VM_PROT_WRITE) != 0 || VM_PAGEMD_MODIFIED_P(mdpg))) {
-			/*
-			 * This is a writable mapping, and the
-			 * page's mod state indicates it has
-			 * already been modified. Make it
-			 * writable from the outset.
-			 */
-			// XXX pte_set_writable(npte);
-			npte &= ~LX_BLKPAG_AP;
-			npte |= LX_BLKPAG_AP_RW;
-		} else {
-			npte &= ~LX_BLKPAG_AF;
-		}
-		if (prot & VM_PROT_EXECUTE)
-			npte &= (is_kernel_pmap_p ? ~LX_BLKPAG_PXN : ~LX_BLKPAG_UXN);
-	} else {
-		/*
-		 * Need to do page referenced/modified emulation.
-		 */
-		npte &= ~LX_BLKPAG_AF;
+		npte |= LX_BLKPAG_AF;
 	}
+
+	if (prot & VM_PROT_EXECUTE)
+		npte &= (is_kernel_pmap_p ? ~LX_BLKPAG_PXN : ~LX_BLKPAG_UXN);
 #if 0
 
 	if (!cached)

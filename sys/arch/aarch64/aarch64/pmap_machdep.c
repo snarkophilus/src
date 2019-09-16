@@ -36,6 +36,7 @@
 #include "opt_ddb.h"
 #include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
+#include "opt_uvmhist.h"
 
 #define __PMAP_PRIVATE
 
@@ -180,23 +181,22 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		/*
 		 * Enable write permissions for the page by setting the Access Flag.
 		 */
-		const pt_entry_t npte = opte | LX_BLKPAG_AF;
+		const pt_entry_t npte = opte | LX_BLKPAG_AF | LX_BLKPAG_OS_0;
 
 		atomic_swap_64(ptep, npte);
 		//AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
 
 		//PMAPCOUNT(fixup_mod);
 		fixed = true;
-		UVMHIST_LOG(maphist, " <-- done (mod/ref emul: changed pte "
+		UVMHIST_LOG(maphist, " <-- done (mod emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
-	} else if ((ftype & VM_PROT_WRITE) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
+	} else if ((ftype & VM_PROT_READ) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
 		/*
 		 * This looks like a good candidate for "page referenced"
 		 * emulation.
 		 */
 
 		pmap_page_set_attributes(mdpg, VM_PAGEMD_REFERENCED);
-
 
 		/*
 		 * Enable write permissions for the page by setting the Access Flag.

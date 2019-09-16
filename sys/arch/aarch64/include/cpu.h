@@ -123,6 +123,7 @@ curcpu(void)
 	return ci;
 }
 #define curlwp			(curcpu()->ci_curlwp)
+#define curpcb			((struct pcb *)lwp_getpcb(curlwp))
 
 #define setsoftast(ci)		atomic_or_uint(&(ci)->ci_astpending, __BIT(0))
 #define cpu_signotify(l)	setsoftast((l)->l_cpu)
