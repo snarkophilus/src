@@ -1,4 +1,4 @@
-/* $NetBSD: atomic_or_64.S,v 1.1 2014/08/10 05:47:35 matt Exp $ */
+/* $NetBSD: atomic_or_64.S,v 1.2 2019/09/15 11:14:15 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
