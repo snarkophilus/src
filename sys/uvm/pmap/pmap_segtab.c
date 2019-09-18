@@ -856,7 +856,7 @@ pmap_pte_process(pmap_t pmap, vaddr_t sva, vaddr_t eva,
 		 * skip to the next segment boundary.
 		 */
 		pt_entry_t * const ptep = pmap_pte_lookup(pmap, sva);
-		if (pte != NULL) {
+		if (ptep != NULL) {
 			/*
 			 * Callback to deal with the ptes for this segment.
 			 */
