@@ -72,6 +72,8 @@ vaddr_t virtual_avail;
 vaddr_t virtual_end;
 vaddr_t pmap_curmaxkvaddr;
 
+bool pmap_devmap_bootstrap_done = false;
+
 /*
  * Virtual end of direct-mapped memory
  */
@@ -956,6 +958,8 @@ pmap_devmap_bootstrap(vaddr_t l0pt, const struct pmap_devmap *table)
 		    table[i].pd_prot,
 		    table[i].pd_flags);
 	}
+
+	pmap_devmap_bootstrap_done = true;
 }
 
 const struct pmap_devmap *
