@@ -366,7 +366,14 @@ trap(uint32_t status, uint32_t cause, vaddr_t vaddr, vaddr_t pc,
 			if (++pfi->pfi_repeats > 4) {
 				tlb_asid_t asid = tlb_get_asid();
 				pt_entry_t *ptep = pfi->pfi_faultpte;
-				printf("trap: fault #%u (%s/%s) for %#"PRIxVADDR" (%#"PRIxVADDR") at pc %#"PRIxVADDR" curpid=%u/%u ptep@%p=%#"PRIxPTE")\n", pfi->pfi_repeats, trap_names[TRAPTYPE(cause)], trap_names[pfi->pfi_faulttype], va, vaddr, pc, map->pmap->pm_pai[0].pai_asid, asid, ptep, ptep ? pte_value(*ptep) : 0);
+				printf("trap: fault #%u (%s/%s) for %#"
+				    PRIxVADDR" (%#"PRIxVADDR") at pc %#"
+				    PRIxVADDR" curpid=%u/%u ptep@%p=%#"
+				    PRIxPTE")\n", pfi->pfi_repeats,
+				    trap_names[TRAPTYPE(cause)],
+				    trap_names[pfi->pfi_faulttype], va,
+				    vaddr, pc, map->pmap->pm_pai[0].pai_asid,
+				    asid, ptep, ptep ? pte_value(*ptep) : 0);
 				if (pfi->pfi_repeats >= 4) {
 					cpu_Debugger();
 				} else {
