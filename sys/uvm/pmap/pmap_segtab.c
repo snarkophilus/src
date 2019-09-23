@@ -398,25 +398,6 @@ pmap_segtab_pagefree(pmap_t pmap, struct pglist *list, vaddr_t kva, size_t size)
 }
 #endif
 
-#if 0
-#ifndef PMAP_HWPAGEWALKER
-static inline pt_entry_t *
-pmap_segmap(struct pmap *pmap, vaddr_t va)
-{
-	pmap_segtab_t *stp = pmap->pm_segtab;
-	KASSERTMSG(pmap != pmap_kernel() || !pmap_md_direct_mapped_vaddr_p(va),
-	    "pmap %p va %#" PRIxVADDR, pmap, va);
-#ifdef _LP64
-	stp = stp->seg_seg[(va >> XSEGSHIFT) & (NSEGPG - 1)];
-	if (stp == NULL)
-		return NULL;
-#endif
-
-	return stp->seg_tab[(va >> SEGSHIFT) & (PMAP_SEGTABSIZE - 1)];
-}
-#endif /* PMAP_HWPAGEWALKER */
-#endif
-
 pt_entry_t *
 pmap_pte_lookup(pmap_t pmap, vaddr_t va)
 {
