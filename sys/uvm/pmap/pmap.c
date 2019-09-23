@@ -98,6 +98,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.42 2019/07/12 10:39:12 skrll Exp $");
 #include "opt_modular.h"
 #include "opt_multiprocessor.h"
 #include "opt_sysv.h"
+#include "opt_uvmhist.h"
 
 #define __PMAP_PRIVATE
 
@@ -379,6 +380,7 @@ pmap_page_set_attributes(struct vm_page_md *mdpg, u_int set_attributes)
 static void
 pmap_page_syncicache(struct vm_page *pg)
 {
+	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 #ifndef MULTIPROCESSOR
 	struct pmap * const curpmap = curlwp->l_proc->p_vmspace->vm_map.pmap;
 #endif
@@ -394,9 +396,15 @@ pmap_page_syncicache(struct vm_page *pg)
 	VM_PAGEMD_PVLIST_READLOCK(mdpg);
 	pmap_pvlist_check(mdpg);
 
+	UVMHIST_LOG(pmaphist, "pv %jx pv_pmap %jx\n", (uintptr_t)pv,
+	     (uintptr_t)pv->pv_pmap, 0, 0);
+
 	if (pv->pv_pmap != NULL) {
 		for (; pv != NULL; pv = pv->pv_next) {
 #ifdef MULTIPROCESSOR
+			UVMHIST_LOG(pmaphist, "pv_pmap %jx pm_onproc %jx\n",
+			    (uintptr_t)pv->pv_pmap,
+			    (uintptr_t)pv->pv_pmap->pm_onproc, 0, 0);
 			kcpuset_merge(onproc, pv->pv_pmap->pm_onproc);
 			if (kcpuset_match(onproc, kcpuset_running)) {
 				break;
@@ -935,7 +943,7 @@ pmap_update(struct pmap *pmap)
 
 static bool
 pmap_pte_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
-	uintptr_t flags)
+    uintptr_t flags)
 {
 	const pt_entry_t npte = flags;
 	const bool is_kernel_pmap_p = (pmap == pmap_kernel());
