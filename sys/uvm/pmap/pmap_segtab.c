@@ -774,10 +774,10 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 {
 	if (l == curlwp) {
 		KASSERT(pm == l->l_proc->p_vmspace->vm_map.pmap);
-		if (pm == pmap_kernel()) {
 #if defined(PMAP_HWPAGEWALKER)
-			pmap_md_pdetab_activate(pm, l);
+		pmap_md_pdetab_activate(pm, l);
 #endif
+		if (pm == pmap_kernel()) {
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 			l->l_cpu->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
 #ifdef _LP64
@@ -785,9 +785,6 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 #endif
 #endif
 		} else {
-#if defined(PMAP_HWPAGEWALKER)
-			pmap_md_pdetab_activate(pm, l);
-#endif
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 			l->l_cpu->ci_pmap_user_segtab = pm->pm_segtab;
 #ifdef _LP64
