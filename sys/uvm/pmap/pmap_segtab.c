@@ -642,25 +642,25 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		KASSERT(vinc == NBSEG);
 
 		/* get pointer to segment map */
-		pt_entry_t *pte = stp->seg_tab[i]->ptp_ptes;
-		if (pte == NULL)
+		pt_entry_t *ptep = stp->seg_tab[i]->ptp_ptes;
+		if (ptep == NULL)
 			continue;
 
 		/*
 		 * If our caller want a callback, do so.
 		 */
 		if (callback != NULL) {
-			(*callback)(pmap, va, va + vinc, pte, flags);
+			(*callback)(pmap, va, va + vinc, ptep, flags);
 		}
 #ifdef DEBUG
 		for (size_t j = 0; j < NPTEPG; j++) {
-			if (!pte_zero_p(pte[j]))
+			if (!pte_zero_p(ptep[j]))
 				panic("%s: pte entry %p not 0 (%#"PRIxPTE")",
-				    __func__, &pte[j], pte_value(pte[j]));
+				    __func__, &ptep[j], pte_value(ptep[j]));
 		}
 #endif
 		// PMAP_UNMAP_POOLPAGE should handle any VCA issues itself
-		paddr_t pa = PMAP_UNMAP_POOLPAGE((vaddr_t)pte);
+		paddr_t pa = PMAP_UNMAP_POOLPAGE((vaddr_t)ptep);
 		struct vm_page *pg = PHYS_TO_VM_PAGE(pa);
 #ifdef PMAP_PTP_CACHE
 		mutex_spin_enter(&pmap_segtab_lock);
