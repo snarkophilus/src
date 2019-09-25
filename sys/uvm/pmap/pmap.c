@@ -680,11 +680,9 @@ pmap_destroy(pmap_t pmap)
 	kpreempt_disable();
 	pmap_md_tlb_miss_lock_enter();
 	pmap_tlb_asid_release_all(pmap);
-
 	pmap_segtab_destroy(pmap, NULL, 0);
 	pmap_md_tlb_miss_lock_exit();
 
-//	KASSERT(TAILQ_EMPTY(&pmap->pm_pvp_list));
 	KASSERT(TAILQ_EMPTY(&pmap->pm_ptp_list));
 #ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)
@@ -891,8 +889,8 @@ pmap_deactivate(struct lwp *l)
 	kpreempt_disable();
 	KASSERT(l == curlwp || l->l_cpu == curlwp->l_cpu);
 	pmap_md_tlb_miss_lock_enter();
-	pmap_tlb_asid_deactivate(pmap);
 	pmap_segtab_deactivate(pmap);
+	pmap_tlb_asid_deactivate(pmap);
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
 
@@ -1536,7 +1534,7 @@ pmap_remove_all(struct pmap *pmap)
 	pmap_md_tlb_miss_lock_exit();
 	pmap->pm_flags |= PMAP_DEFERRED_ACTIVATE;
 
-	pmap_segtab_remove_all(pmap);
+//	pmap_segtab_remove_all(pmap);
 
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;
