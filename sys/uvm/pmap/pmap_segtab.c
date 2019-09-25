@@ -622,8 +622,7 @@ pmap_segtab_alloc(void)
 #ifndef PMAP_HWPAGEWALKER
 static void
 pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
-	pte_callback_t callback, uintptr_t flags,
-	vaddr_t va, vsize_t vinc)
+    pte_callback_t callback, uintptr_t flags, vaddr_t va, vsize_t vinc)
 {
 	pmap_segtab_t *stp = *stp_p;
 
