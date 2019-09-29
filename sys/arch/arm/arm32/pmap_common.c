@@ -1491,7 +1491,7 @@ pmap_set_pt_cache_mode(pd_entry_t *kl1, vaddr_t va, size_t nptes)
 		pd_entry_t pde = *pdep;
 
 		if (l1pte_section_p(pde)) {
-			__CTASSERT((L1_S_CACHE_MASK & L1_S_V6_SUPER) == 0);
+			KASSERT((L1_S_CACHE_MASK & L1_S_V6_SUPER) == 0);
 			if ((pde & L1_S_CACHE_MASK) != pte_l1_s_cache_mode_pt) {
 				*pdep = (pde & ~L1_S_CACHE_MASK) |
 				    pte_l1_s_cache_mode_pt;

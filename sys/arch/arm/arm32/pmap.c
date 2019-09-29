@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.373 2019/04/23 11:21:21 bouyer Exp $	*/
+/*	$NetBSD: pmap.c,v 1.374 2019/09/25 16:37:54 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -222,7 +222,7 @@
 #include <arm/db_machdep.h>
 #endif
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.373 2019/04/23 11:21:21 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.374 2019/09/25 16:37:54 skrll Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG
@@ -4600,13 +4600,6 @@ pmap_init_l1(struct l1_ttable *l1, pd_entry_t *l1pt)
 	SLIST_INSERT_HEAD(&l1_list, l1, l1_link);
 	TAILQ_INSERT_TAIL(&l1_lru_list, l1, l1_lru);
 }
-
-
-
-
-
-
-
 
 
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_segtab.c,v 1.7 2019/03/08 08:12:40 msaitoh Exp $	*/
+/*	$NetBSD: pmap_segtab.c,v 1.10 2019/09/23 18:20:07 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.7 2019/03/08 08:12:40 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.10 2019/09/23 18:20:07 skrll Exp $");
 
 /*
  *	Manages physical address maps.
@@ -585,7 +585,7 @@ pmap_segtab_alloc(void)
 			/*
 			 * XXX What else can we do?  Could we deadlock here?
 			 */
-			uvm_wait("pmap_create");
+			uvm_wait("segtab");
 			goto again;
 		}
 		SEGTAB_ADD(npage, 1);
