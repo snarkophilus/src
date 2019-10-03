@@ -584,6 +584,7 @@ pmap_md_pdetab_deactivate(pmap_t pm)
 void
 pmap_md_pdetab_init(struct pmap *pm)
 {
+
 	KASSERT(pm != NULL);
 
 	pm->pm_l0 = (pd_entry_t *)pm->pm_pdetab;
@@ -594,8 +595,8 @@ pmap_md_pdetab_init(struct pmap *pm)
 void
 pmap_md_pdetab_destroy(struct pmap *pm)
 {
-	KASSERT(pm != NULL);
 
+	KASSERT(pm != NULL);
 }
 
 
