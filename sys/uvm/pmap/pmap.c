@@ -694,7 +694,8 @@ pmap_destroy(pmap_t pmap)
 #endif
 	KASSERT(pmap->pm_uobject.uo_npages == 0);
 
-	mutex_obj_free(pmap->pm_uobject.vmobjlock);
+	uvm_obj_destroy(&pmap->pm_uobject, false);
+	mutex_destroy(&pmap->pm_obj_lock);
 
 #ifdef MULTIPROCESSOR
 	kcpuset_destroy(pmap->pm_active);
