@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.12 2019/10/02 02:54:35 mrg Exp $
+#	$NetBSD: Makefile,v 1.14 2019/10/04 08:51:33 mrg Exp $
 
 UNSUPPORTED_COMPILER.clang=	# defined
 LIBISCXX = yes

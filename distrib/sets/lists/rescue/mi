@@ -1,7 +1,8 @@
-# $NetBSD: rescue.mi,v 1.44 2018/12/12 07:04:05 maxv Exp $
+# $NetBSD: mi,v 1.1 2019/10/02 11:16:00 maya Exp $
 #
 # Note: don't delete entries from here - mark them as "obsolete" instead.
 #
+./etc/mtree/set.rescue				base-rescue-root
 ./rescue/[					base-rescue-root
 ./rescue/atactl					base-rescue-root
 ./rescue/badsect				base-rescue-root
@@ -33,6 +34,7 @@
 ./rescue/dumplfs				base-rescue-root
 ./rescue/echo					base-rescue-root
 ./rescue/ed					base-rescue-root
+./rescue/edlabel				base-obsolete	obsolete
 ./rescue/egrep					base-rescue-root
 ./rescue/ekermit				base-rescue-root
 ./rescue/ex					base-rescue-root
@@ -64,6 +66,7 @@
 ./rescue/ksh					base-rescue-root
 ./rescue/ktrace					base-rescue-root
 ./rescue/ktruss					base-rescue-root
+./rescue/ldconfig				base-obsolete	obsolete
 ./rescue/ldd					base-rescue-root
 ./rescue/less					base-rescue-root
 ./rescue/lfs_cleanerd				base-rescue-root
@@ -164,3 +167,4 @@
 ./rescue/zegrep					base-rescue-root
 ./rescue/zfgrep					base-rescue-root
 ./rescue/zgrep					base-rescue-root
+./var/db/obsolete/rescue			base-rescue-root

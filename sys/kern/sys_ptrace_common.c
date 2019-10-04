@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_ptrace_common.c,v 1.61 2019/10/01 21:49:50 kamil Exp $	*/
+/*	$NetBSD: sys_ptrace_common.c,v 1.63 2019/10/03 23:11:11 kamil Exp $	*/
 
 /*-
  * Copyright (c) 2008, 2009 The NetBSD Foundation, Inc.
@@ -118,7 +118,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.61 2019/10/01 21:49:50 kamil Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_ptrace_common.c,v 1.63 2019/10/03 23:11:11 kamil Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_ptrace.h"
@@ -702,6 +702,10 @@ ptrace_get_process_state(struct proc *t, void *addr, size_t data)
 		memset(&ps, 0, sizeof(ps));
 	} else {
 		si = &t->p_sigctx.ps_info;
+
+		KASSERT(si->_reason._ptrace_state._pe_report_event > 0);
+		KASSERT(si->_reason._ptrace_state._option._pe_other_pid > 0);
+
 		ps.pe_report_event = si->_reason._ptrace_state._pe_report_event;
 
 		CTASSERT(sizeof(ps.pe_other_pid) == sizeof(ps.pe_lwp));
@@ -787,9 +791,12 @@ ptrace_startstop(struct proc *t, struct lwp **lt, int rq, void *addr,
 	DPRINTF(("%s: lwp=%d request=%d\n", __func__, (*lt)->l_lid, rq));
 	lwp_lock(*lt);
 	if (rq == PT_SUSPEND)
-		(*lt)->l_flag |= LW_WSUSPEND;
-	else
-		(*lt)->l_flag &= ~LW_WSUSPEND;
+		(*lt)->l_flag |= LW_DBGSUSPEND;
+	else {
+		(*lt)->l_flag &= ~LW_DBGSUSPEND;
+		if ((*lt)->l_flag != LSSUSPENDED)
+			(*lt)->l_stat = LSSTOP;
+	}
 	lwp_unlock(*lt);
 	return 0;
 }
@@ -1233,7 +1240,8 @@ do_ptrace(struct ptrace_methods *ptm, struct lwp *l, int req, pid_t pid,
 		if (resume_all) {
 #ifdef PT_STEP
 			if (req == PT_STEP) {
-				if (lt->l_flag & LW_WSUSPEND) {
+				if (lt->l_flag &
+				    (LW_WSUSPEND | LW_DBGSUSPEND)) {
 					error = EDEADLK;
 					break;
 				}
@@ -1242,7 +1250,9 @@ do_ptrace(struct ptrace_methods *ptm, struct lwp *l, int req, pid_t pid,
 			{
 				error = EDEADLK;
 				LIST_FOREACH(lt2, &t->p_lwps, l_sibling) {
-					if ((lt2->l_flag & LW_WSUSPEND) == 0) {
+					if ((lt2->l_flag &
+					    (LW_WSUSPEND | LW_DBGSUSPEND)) == 0
+					    ) {
 						error = 0;
 						break;
 					}
@@ -1251,7 +1261,7 @@ do_ptrace(struct ptrace_methods *ptm, struct lwp *l, int req, pid_t pid,
 					break;
 			}
 		} else {
-			if (lt->l_flag & LW_WSUSPEND) {
+			if (lt->l_flag & (LW_WSUSPEND | LW_WSUSPEND)) {
 				error = EDEADLK;
 				break;
 			}
