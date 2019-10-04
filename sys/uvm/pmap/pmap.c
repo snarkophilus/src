@@ -694,7 +694,8 @@ pmap_destroy(pmap_t pmap)
 #endif
 	KASSERT(pmap->pm_uobject.uo_npages == 0);
 
-	mutex_obj_free(pmap->pm_uobject.vmobjlock);
+	uvm_obj_destroy(&pmap->pm_uobject, false);
+	mutex_destroy(&pmap->pm_obj_lock);
 
 #ifdef MULTIPROCESSOR
 	kcpuset_destroy(pmap->pm_active);
@@ -889,8 +890,8 @@ pmap_deactivate(struct lwp *l)
 	kpreempt_disable();
 	KASSERT(l == curlwp || l->l_cpu == curlwp->l_cpu);
 	pmap_md_tlb_miss_lock_enter();
-	pmap_segtab_deactivate(pmap);
 	pmap_tlb_asid_deactivate(pmap);
+	pmap_segtab_deactivate(pmap);
 	pmap_md_tlb_miss_lock_exit();
 	kpreempt_enable();
 

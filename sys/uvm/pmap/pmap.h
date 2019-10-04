@@ -81,7 +81,8 @@ UVMHIST_DECL(pmapexechist);
 UVMHIST_DECL(pmaphist);
 #endif
 
-//XXXNH KASAN
+#if !defined(KASAN)
+
 /*
  * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
  */
@@ -91,6 +92,7 @@ struct vm_page *pmap_md_alloc_poolpage(int);
 #define	PMAP_ALLOC_POOLPAGE(flags)	pmap_md_alloc_poolpage(flags)
 #define	PMAP_MAP_POOLPAGE(pa)		pmap_map_poolpage(pa)
 #define	PMAP_UNMAP_POOLPAGE(va)		pmap_unmap_poolpage(va)
+#endif
 
 /*
  * The user address space is mapped using a two level structure where
@@ -181,13 +183,12 @@ struct pmap {
 	kcpuset_t		*pm_onproc;	/* pmap is active on ... */
 	volatile u_int		pm_shootdown_pending;
 #endif
-#if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_POOLPAGE)
+#if defined(PMAP_HWPAGEWALKER)
 	pmap_pdetab_t *		pm_pdetab;	/* pointer to HW PDEs */
-#elif defined(PMAP_HWPAGEWALKER)
-	pmap_pdetab_t *		pm_pdetab;	/* pointer to HW PDEs */
-	pmap_segtab_t *		pm_segtab;	/* virtual shadow of HW PDEs */
-#else
-	pmap_segtab_t *		pm_segtab;	/* pointers to pages of PTEs */
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+	pmap_segtab_t *		pm_segtab;	/* pointers to pages of PTEs; or  */
+						/* virtual shadow of HW PDEs */
 #endif
 	u_int			pm_flags;
 #define	PMAP_DEFERRED_ACTIVATE	__BIT(0)
