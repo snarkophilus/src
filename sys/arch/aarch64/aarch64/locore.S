@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.40 2019/09/08 12:17:23 jmcneill Exp $	*/
+/*	$NetBSD: locore.S,v 1.41 2019/09/29 08:33:20 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -38,7 +38,7 @@
 #include <aarch64/hypervisor.h>
 #include "assym.h"
 
-RCSID("$NetBSD: locore.S,v 1.40 2019/09/08 12:17:23 jmcneill Exp $")
+RCSID("$NetBSD: locore.S,v 1.41 2019/09/29 08:33:20 skrll Exp $")
 
 
 /*#define DEBUG_LOCORE			/* debug print */
