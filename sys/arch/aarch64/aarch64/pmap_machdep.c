@@ -386,7 +386,7 @@ pmap_md_pool_vtophys(vaddr_t va)
 {
 
 	KASSERT(AARCH64_KVA_P(va));
-	//XXXNH Check actuall RAM size
+	//XXXNH Check actual RAM size
 
 	return AARCH64_KVA_TO_PA(va);
 }
