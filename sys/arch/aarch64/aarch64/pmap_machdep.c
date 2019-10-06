@@ -94,10 +94,13 @@ pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 {
 	paddr_t pa;
 
+	// XXXNH copy of ryopmap behaviour.
+	*coherentp = false;
+
 	if (pm == pmap_kernel()) {
 		if (pmap_md_direct_mapped_vaddr_p(va)) {
 			pa = pmap_md_direct_mapped_vaddr_to_paddr(va);
-			*coherentp = true;
+//			*coherentp = true;
 			goto done;
 		}
 		if (pmap_md_io_vaddr_p(va))
@@ -114,8 +117,6 @@ pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 		kpreempt_enable();
 		return false;
 	}
-	// XXXNH assume TRE index 0 is NC and !0 is cached.
-//	*coherentp = (*ptep & L2_S_CACHE_MASK) ? true : false;
 
 	pa = pte_to_paddr(*ptep) | (va & PGOFSET);
 	kpreempt_enable();
