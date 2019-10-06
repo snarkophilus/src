@@ -432,7 +432,11 @@ pmapboot_pagealloc(void)
 	paddr_t pa = KERN_VTOPHYS(pmapboot_pagebase) + kernend_extra;
 	kernend_extra += PAGE_SIZE;
 
-	memset((void *)pa, 0, PAGE_SIZE);
+	char *s = (char *)pa;
+	char *e = s + PAGE_SIZE;
+
+	while (s < e)
+	    *s++ = 0;
 
 	return (pd_entry_t *)pa;
 }
