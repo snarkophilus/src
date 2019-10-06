@@ -477,12 +477,10 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 
 	if (prot & VM_PROT_EXECUTE)
 		npte &= (is_kernel_pmap_p ? ~LX_BLKPAG_PXN : ~LX_BLKPAG_UXN);
-#if 0
 
-	if (!cached)
-		npte &= ~L2_S_CACHE_MASK;
+	npte &= ~LX_BLKPAG_ATTR_MASK;
+	npte |= pte_memattr(flags);
 
-#endif
 	/*
 	 * Make sure userland mappings get the right permissions
 	 */
