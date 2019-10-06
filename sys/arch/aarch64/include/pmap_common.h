@@ -151,7 +151,6 @@ struct pmap_md {
 
 #define pm_l0		pm_md.pmd_l0
 #define pm_l0_pa	pm_md.pmd_l0_pa
-//#define pm_l2		pm_md.pmd_l2
 
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
@@ -168,9 +167,6 @@ void pmap_md_pdetab_destroy(struct pmap *);
 vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
 struct vm_page *pmap_md_alloc_poolpage(int);
-
-// XXXNH remove?
-extern int arm_poolpage_vmfreelist;
 
 /*
  * Other hooks for the pool allocator.
@@ -191,11 +187,6 @@ struct pmap_page {
 };
 
 #define PMAP_PAGE_TO_MD(ppage)	((ppage)->pp_md)
-
-
-#if 0
-extern bool arm_has_tlbiasid_p;	/* also in <arm/locore.h> */
-#endif
 
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
 
@@ -335,6 +326,7 @@ pte_cached_change(pt_entry_t pte, bool cached)
 static inline void
 pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
+
 	//XXXNH compiler tricks?
 	*ptep = pte;
 
@@ -459,8 +451,6 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 	    | L3_TYPE_PAG
 	    | LX_BLKPAG_UXN | LX_BLKPAG_PXN
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW);
-
-//	const bool cached = (flags & PMAP_NOCACHE);
 
 	if (mdpg == NULL) {
 		panic(__func__);
