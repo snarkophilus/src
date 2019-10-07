@@ -1338,7 +1338,6 @@ pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty, bool last)
 		return;
 
 	KASSERT(kpreempt_disabled());
-	KASSERT(!VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
 	KASSERT((va & PAGE_MASK) == 0);
 
 	/*
