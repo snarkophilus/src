@@ -483,7 +483,7 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp)
 	UVMHIST_FUNC(__func__);
 	KERNHIST_CALLARGS(pmaphist, "pm %jx va %jx", (uintptr_t)pmap, (uintptr_t)ptp, 0, 0);
 
-	const vaddr_t kva = (vaddr_t) ptp;
+	const vaddr_t kva = (vaddr_t)ptp;
 
 #ifdef DEBUG
 	for (size_t j = 0; j < NPTEPG; j++) {
