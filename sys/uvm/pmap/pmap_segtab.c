@@ -715,29 +715,15 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptb_p, bool free_ptb,
 		KASSERT(vinc == NBSEG);
 
 		/* get pointer to PDE */
-		pmap_pdetab_t *ptb = pmap_pde_to_pdetab(ptp->pde_pde[i]);
+		pmap_ptpage_t *ptb = pmap_pde_to_ptpage(ptp->pde_pde[i]);
 		if (ptb == NULL)
 			continue;
 
-#ifdef DEBUG
-		for (size_t j = 0; j < NPTEPG; j++) {
-			if (!pte_zero_p(stb->ptp_ptes[j]))
-				panic("%s: pte entry %p not 0 (%#"PRIxPTE")",
-				    __func__, &stb->ptp_ptes[j],
-				    pte_value(stb->ptp_ptes[j]));
-		}
-#endif
-
-		const vaddr_t kva = (vaddr_t)ptb;
-		pmap_page_detach(pmap, &pmap->pm_ptp_list, kva);
-		pmap_pdetab_free(ptb);
-
+		pmap_ptpage_free(pmap, ptb);
 		ptp->pde_pde[i] = pte_invalid_pde();
 	}
 
 	if (free_ptb) {
-//		pmap_check_stp(stp, __func__,
-//		    vinc == NBSEG ? "release seg" : "release xseg");
 		const vaddr_t kva = (vaddr_t)ptp;
 		pmap_page_detach(pmap, &pmap->pm_pdetab_list, kva);
 		pmap_pdetab_free(ptp);
@@ -769,8 +755,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		KASSERT(vinc == NBSEG);
 
 		/* get pointer to segment map */
-//		pt_entry_t *ptep = stp->seg_tab[i]->ptp_ptes;
-		pmap_segtab_t *stb = stp->seg_tab[i];
+		pmap_ptpage_t *stb = stp->seg_tab[i];
 		if (stb == NULL)
 			continue;
 
@@ -780,19 +765,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		if (callback != NULL) {
 			(*callback)(pmap, va, va + vinc, stb->ptp_ptes, flags);
 		}
-#ifdef DEBUG
-		for (size_t j = 0; j < NPTEPG; j++) {
-			if (!pte_zero_p(stb->ptp_ptes[j]))
-				panic("%s: pte entry %p not 0 (%#"PRIxPTE")",
-				    __func__, &stb->ptp_ptes[j], pte_value(stb->ptp_ptes[j]));
-		}
-#endif
-
-
-		const vaddr_t kva = (vaddr_t)stb;
-		pmap_page_detach(pmap, &pmap->pm_segtab_list, kva);
-		pmap_segtab_free(stb);
-
+		pmap_ptpage_free(pmap, stb);
 		stp->seg_tab[i] = NULL;
 	}
 
