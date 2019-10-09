@@ -1099,7 +1099,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 	*pte_p = &pmap->pm_segtab
 #else /* XSEGSHIFT */
 	*pde_p = &ptb->pde_pde[idx];
-#endif /* PMAP_HWPAGEWALKER */
+#endif /* XSEGSHIFT */
 #endif /* PMAP_HWPAGEWALKER */
 	return &stb->seg_tab[idx];
 #endif
