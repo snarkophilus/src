@@ -348,7 +348,8 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 		KASSERT(pg != NULL);
 	}
 
-	KERNHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx list %jx", (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)uobj, (uintptr_t)pglist);
+	UVMHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx list %jx",
+	    (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)uobj, (uintptr_t)pglist);
 	mutex_spin_enter(uobj->vmobjlock);
 	TAILQ_INSERT_TAIL(pglist, pg, listq.queue);
 	uobj->uo_npages++;
@@ -377,7 +378,7 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
 	struct uvm_object * const uobj = &pmap->pm_uobject;
 
-	KERNHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx pa %jx", (uintptr_t)va,
+	UVMHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx pa %jx", (uintptr_t)va,
 	    (uintptr_t)uobj, (uintptr_t)pg, (uintptr_t)pa);
 
 	KASSERTMSG(pg->uobject == uobj, "pg->uobject %p vs uobj %p",
@@ -471,7 +472,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 	ptp = pmap_ptpage_t *)kva;
 #endif
 
-	UVMHIST_LOG(pmaphist, "... ptp %p", ptp, 0, 0, 0);
+	UVMHIST_LOG(pmaphist, "... ptp %p", (uintptr_t)ptp, 0, 0, 0);
 
 	return ptp;
 }
@@ -517,12 +518,12 @@ pmap_pdetab_alloc(struct pmap *pmap)
 
  again:
 	mutex_spin_enter(&pmap_segtab_lock);
-	KERNHIST_LOG(pmaphist, "free_pdetab %jx",
+	UVMHIST_LOG(pmaphist, "free_pdetab %jx",
 	    (uintptr_t)pmap_segtab_info.pdealloc.free_pdetab, 0, 0, 0);
 	if (__predict_true((ptb = pmap_segtab_info.pdealloc.free_pdetab) != NULL)) {
 		pmap_segtab_info.pdealloc.free_pdetab = ptb->pde_next;
 
-		KERNHIST_LOG(pmaphist, "ptb %jx free_pdetab %jx", ptb,
+		UVMHIST_LOG(pmaphist, "ptb %jx free_pdetab %jx", (uintptr_t)ptb,
 		    (uintptr_t)pmap_segtab_info.pdealloc.free_pdetab, 0, 0);
 
 		PDETAB_ADD(nget, 1);
@@ -556,8 +557,8 @@ pmap_pdetab_alloc(struct pmap *pmap)
 
 	pmap_page_attach(pmap, (vaddr_t)ptb, ptb_pg, &pmap->pm_pdetab_list, 0);
 
-	UVMHIST_LOG(pmaphist, "... ptb %p found on freelist %d", ptb,
-	    (uintptr_t)found_on_freelist, 0, 0);
+	UVMHIST_LOG(pmaphist, "... ptb %p found on freelist %d", (uintptr_t)ptb,
+	    found_on_freelist, 0, 0);
 
 	return ptb;
 }
@@ -635,8 +636,8 @@ pmap_segtab_alloc(struct pmap *pmap)
 	pmap_check_stp(stp, __func__,
 	    found_on_freelist ? "from free list" : "allocated");
 
-	UVMHIST_LOG(pmaphist, "... stp %p found on freelist %d", stp,
-	    (uintptr_t)found_on_freelist, 0, 0);
+	UVMHIST_LOG(pmaphist, "... stp %p found on freelist %d", (uintptr_t)stp,
+	    found_on_freelist, 0, 0);
 
 	return stp;
 }
@@ -827,7 +828,6 @@ pmap_segtab_init(pmap_t pmap)
 #if defined(PMAP_HWPAGEWALKER)
 	pmap->pm_pdetab = pmap_pdetab_alloc(pmap);
 	pmap_md_pdetab_init(pmap);
-	UVMHIST_LOG(pmaphist, "pm_pdetab %p", pmap->pm_pdetab, 0, 0, 0);
 #endif
 }
 
@@ -1021,7 +1021,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 
 #if defined(PMAP_HWPAGEWALKER)
 	pmap_pdetab_t *ptb = pmap->pm_pdetab;
-	UVMHIST_LOG(pmaphist, "pm_pdetab %p", ptb, 0, 0, 0);
+	UVMHIST_LOG(pmaphist, "pm_pdetab %p", (uintptr_t)ptb, 0, 0, 0);
 #endif
 #if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_POOLPAGE)
 	vaddr_t segtab_mask = PMAP_PDETABSIZE - 1;
