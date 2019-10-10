@@ -359,7 +359,7 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 	 * Now set each vm_page that maps this page to point to the
 	 * pmap and set the offset to what we want.
 	 */
-	KASSERT(pg->uobject == NULL);
+	KASSERTMSG(pg->uobject == NULL, "pg %p pg->uobject %p", pg, pg->uobject);
 	pg->uobject = uobj;
 	pg->offset = off;
 }
@@ -399,7 +399,7 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 static void
 pmap_segtab_pagefree(pmap_t pmap, struct pglist *list, vaddr_t kva, size_t size)
 {
-#ifdef POOL_VTOPHYS
+#ifdef PMAP_MAP_POOLPAGE
 	if (size == PAGE_SIZE) {
 		uvm_pagefree(pmap_page_detach(pmap, list, kva));
 		return;
@@ -611,7 +611,8 @@ pmap_segtab_alloc(struct pmap *pmap)
 		const paddr_t stp_pa = VM_PAGE_TO_PHYS(stp_pg);
 
 		stp = (pmap_segtab_t *)PMAP_MAP_POOLPAGE(stp_pa);
-
+#if 0
+CTASSERT(NBPG / sizeof(*stp) == 1);
 		const size_t n = NBPG / sizeof(*stp);
 		if (n > 1) {
 			/*
@@ -629,6 +630,7 @@ pmap_segtab_alloc(struct pmap *pmap)
 			SEGTAB_ADD(nput, n - 1);
 			mutex_spin_exit(&pmap_segtab_lock);
 		}
+#endif
 	}
 
 	pmap_page_attach(pmap, (vaddr_t)stp, stp_pg, &pmap->pm_segtab_list, 0);
@@ -636,8 +638,8 @@ pmap_segtab_alloc(struct pmap *pmap)
 	pmap_check_stp(stp, __func__,
 	    found_on_freelist ? "from free list" : "allocated");
 
-	UVMHIST_LOG(pmaphist, "... stp %p found on freelist %d", (uintptr_t)stp,
-	    found_on_freelist, 0, 0);
+	UVMHIST_LOG(pmaphist, "... stp %jx found on freelist %zu",
+	    (uintptr_t)stp, found_on_freelist, 0, 0);
 
 	return stp;
 }
@@ -684,14 +686,14 @@ pmap_segtab_free(pmap_segtab_t *stp)
 
 #if defined(PMAP_HWPAGEWALKER)
 static void
-pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptb_p, bool free_ptb,
+pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
     vaddr_t va, vsize_t vinc)
 {
 	const vaddr_t pdetab_mask = PMAP_PDETABSIZE - 1;
-	pmap_pdetab_t *ptp = *ptb_p;
+	pmap_pdetab_t *ptp = *ptp_p;
 
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx ptb %p va %jx vinc %jx",
+	KERNHIST_CALLARGS(pmaphist, "pm %jx ptp %p va %jx vinc %jx",
 	    (uintptr_t)pmap, (uintptr_t)ptp, va, vinc);
 
 	for (size_t i = (va / vinc) & pdetab_mask;
@@ -723,11 +725,11 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptb_p, bool free_ptb,
 		ptp->pde_pde[i] = pte_invalid_pde();
 	}
 
-	if (free_ptb) {
+	if (free_ptp) {
 		const vaddr_t kva = (vaddr_t)ptp;
 		pmap_page_detach(pmap, &pmap->pm_pdetab_list, kva);
 		pmap_pdetab_free(ptp);
-		*ptb_p = NULL;
+		*ptp_p = NULL;
 	}
 }
 #endif
@@ -772,6 +774,9 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 	if (free_stp) {
 		pmap_check_stp(stp, __func__,
 		    vinc == NBSEG ? "release seg" : "release xseg");
+
+		const vaddr_t kva = (vaddr_t)stp;
+		pmap_page_detach(pmap, &pmap->pm_segtab_list, kva);
 		pmap_segtab_free(stp);
 		*stp_p = NULL;
 	}
@@ -1015,6 +1020,9 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 			    pmap == pmap_kernel());
 			opde = pte_pde_cas(pde_p, opde, npde);
 			if (__predict_false(pte_pde_valid_p(opde))) {
+				const vaddr_t kva = (vaddr_t)ptb;
+				pmap_page_detach(pmap, &pmap->pm_pdetab_list,
+				    kva);
 				pmap_pdetab_free(ptb);
 			} else {
 				opde = npde;
@@ -1051,6 +1059,9 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 #ifdef MULTIPROCESSOR
 			pmap_segtab_t *ostb = atomic_cas_ptr(stb_p, NULL, stb);
 			if (__predict_false(ostb != NULL)) {
+				const vaddr_t kva = (vaddr_t)stb;
+				pmap_page_detach(pmap, &pmap->pm_segtab_list,
+				    kva);
 				pmap_segtab_free(stb);
 				stb = ostb;
 			}
