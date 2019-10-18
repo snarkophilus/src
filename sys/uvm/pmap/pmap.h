@@ -171,13 +171,12 @@ struct pmap {
 
 	kmutex_t		pm_obj_lock;
 	struct pglist		pm_ptp_list;
-#ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)
 	struct pglist		pm_pdetab_list;
-#else
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 	struct pglist		pm_segtab_list;
 #endif
-#endif /* _LP64 */
 #ifdef MULTIPROCESSOR
 	kcpuset_t		*pm_active;	/* pmap was active on ... */
 	kcpuset_t		*pm_onproc;	/* pmap is active on ... */

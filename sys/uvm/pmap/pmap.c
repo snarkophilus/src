@@ -1727,7 +1727,6 @@ pmap_clear_modify(struct vm_page *pg)
 	 * flush the VAC first if there is one.
 	 */
 	kpreempt_disable();
-	KASSERT(!VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
 	VM_PAGEMD_PVLIST_READLOCK(mdpg);
 	pmap_pvlist_check(mdpg);
 	for (; pv != NULL; pv = pv_next) {
