@@ -511,26 +511,20 @@ cpu_boot_secondary_processors(void)
 	VPRINTF("%s: starting secondary processors\n", __func__);
 
 	/* send mbox to have secondary processors do cpu_hatch() */
-	for (cpuno = 1; cpuno < ncpu; cpuno++) {
-		if (cpu_hatched_p(cpuno) == false)
-			continue;
+	for (size_t n = 0; n < __arraycount(arm_cpu_mbox); n++)
+		atomic_or_ulong(&arm_cpu_mbox[n], arm_cpu_hatched[n]);
 
-		const size_t idx = cpuno / CPUINDEX_DIVISOR;
-		const u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
-
-		atomic_or_ulong(&arm_cpu_mbox[idx], bit);
-	}
 	__asm __volatile ("sev; sev; sev");
 
 	/* wait all cpus have done cpu_hatch() */
 	for (cpuno = 1; cpuno < ncpu; cpuno++) {
-		if (cpu_hatched_p(cpuno) == 0)
+		if (!cpu_hatched_p(cpuno))
 			continue;
 
-		const size_t idx = cpuno / CPUINDEX_DIVISOR;
+		const size_t off = cpuno / CPUINDEX_DIVISOR;
 		const u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
 
-		while (membar_consumer(), arm_cpu_mbox[idx] & bit) {
+		while (membar_consumer(), arm_cpu_mbox[off] & bit) {
 			__asm __volatile ("wfe");
 		}
 		/* Add processor to kcpuset */
@@ -573,20 +567,20 @@ cpu_hatch(struct cpu_info *ci)
 	 * therefore we have to use device_unit instead of ci_index for mbox.
 	 */
 	const u_int cpuno = device_unit(ci->ci_dev);
-	const size_t idx = cpuno / CPUINDEX_DIVISOR;
+	const size_t off = cpuno / CPUINDEX_DIVISOR;
 	u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
 
-	atomic_and_ulong(&arm_cpu_mbox[idx], ~bit);
+	atomic_and_ulong(&arm_cpu_mbox[off], ~bit);
 	__asm __volatile ("sev; sev; sev");
 }
 
 bool
 cpu_hatched_p(u_int cpuindex)
 {
-	const size_t idx = cpuindex / CPUINDEX_DIVISOR;
+	const size_t off = cpuindex / CPUINDEX_DIVISOR;
 	u_long bit = __BIT(cpuindex % CPUINDEX_DIVISOR);
 
 	membar_consumer();
-	return (arm_cpu_mbox[idx] & bit) != 0;
+	return (arm_cpu_mbox[off] & bit) != 0;
 }
 #endif /* MULTIPROCESSOR */
