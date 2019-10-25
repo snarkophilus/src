@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.23 2019/10/19 18:04:26 jmcneill Exp $ */
+/* $NetBSD: cpu.c,v 1.25 2019/10/20 14:03:51 jmcneill Exp $ */
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.23 2019/10/19 18:04:26 jmcneill Exp $");
+__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.25 2019/10/20 14:03:51 jmcneill Exp $");
 
 #include "locators.h"
 #include "opt_arm_debug.h"
@@ -37,8 +37,8 @@ __KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.23 2019/10/19 18:04:26 jmcneill Exp $");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/atomic.h>
-#include <sys/device.h>
 #include <sys/cpu.h>
+#include <sys/device.h>
 #include <sys/kmem.h>
 #include <sys/reboot.h>
 #include <sys/sysctl.h>
@@ -69,9 +69,10 @@ static void cpu_setup_sysctl(device_t, struct cpu_info *);
 #ifdef MULTIPROCESSOR
 uint64_t cpu_mpidr[MAXCPUS];
 
-volatile u_int arm_cpu_mbox[MAXCPUS] __cacheline_aligned = { 0 };
-#define CPU_MBOX_HATCHED	__BIT(0)
-#define	CPU_MBOX_START		__BIT(1)
+#define	CPUINDEX_DIVISOR	(sizeof(u_long) * NBBY)
+
+volatile u_long arm_cpu_hatched[howmany(MAXCPUS, CPUINDEX_DIVISOR)] __cacheline_aligned = { 0 };
+volatile u_long arm_cpu_mbox[howmany(MAXCPUS, CPUINDEX_DIVISOR)] __cacheline_aligned = { 0 };
 u_int arm_cpu_max = 1;
 
 static kmutex_t cpu_hatch_lock;
@@ -513,7 +514,11 @@ cpu_boot_secondary_processors(void)
 	for (cpuno = 1; cpuno < ncpu; cpuno++) {
 		if (cpu_hatched_p(cpuno) == false)
 			continue;
-		atomic_or_uint(&arm_cpu_mbox[cpuno], CPU_MBOX_START);
+
+		const size_t idx = cpuno / CPUINDEX_DIVISOR;
+		const u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
+
+		atomic_or_ulong(&arm_cpu_mbox[idx], bit);
 	}
 	__asm __volatile ("sev; sev; sev");
 
@@ -521,7 +526,11 @@ cpu_boot_secondary_processors(void)
 	for (cpuno = 1; cpuno < ncpu; cpuno++) {
 		if (cpu_hatched_p(cpuno) == 0)
 			continue;
-		while (membar_consumer(), arm_cpu_mbox[cpuno] & CPU_MBOX_START) {
+
+		const size_t idx = cpuno / CPUINDEX_DIVISOR;
+		const u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
+
+		while (membar_consumer(), arm_cpu_mbox[idx] & bit) {
 			__asm __volatile ("wfe");
 		}
 		/* Add processor to kcpuset */
@@ -564,14 +573,20 @@ cpu_hatch(struct cpu_info *ci)
 	 * therefore we have to use device_unit instead of ci_index for mbox.
 	 */
 	const u_int cpuno = device_unit(ci->ci_dev);
-	atomic_and_uint(&arm_cpu_mbox[cpuno], ~(u_int)CPU_MBOX_START);
+	const size_t idx = cpuno / CPUINDEX_DIVISOR;
+	u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
+
+	atomic_and_ulong(&arm_cpu_mbox[idx], ~bit);
 	__asm __volatile ("sev; sev; sev");
 }
 
 bool
 cpu_hatched_p(u_int cpuindex)
 {
+	const size_t idx = cpuindex / CPUINDEX_DIVISOR;
+	u_long bit = __BIT(cpuindex % CPUINDEX_DIVISOR);
+
 	membar_consumer();
-	return (arm_cpu_mbox[cpuindex] & CPU_MBOX_HATCHED) != 0;
+	return (arm_cpu_mbox[idx] & bit) != 0;
 }
 #endif /* MULTIPROCESSOR */

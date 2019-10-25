@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.42 2019/10/19 18:04:26 jmcneill Exp $	*/
+/*	$NetBSD: locore.S,v 1.44 2019/10/20 14:03:51 jmcneill Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -38,7 +38,7 @@
 #include <aarch64/hypervisor.h>
 #include "assym.h"
 
-RCSID("$NetBSD: locore.S,v 1.42 2019/10/19 18:04:26 jmcneill Exp $")
+RCSID("$NetBSD: locore.S,v 1.44 2019/10/20 14:03:51 jmcneill Exp $")
 
 
 /*#define DEBUG_LOCORE			/* debug print */
@@ -355,15 +355,16 @@ ENTRY_NP(cpu_mpstart)
 	mov	x1, xzr
 1:
 	add	x1, x1, #1
-	cmp	x1, MAXCPUS		/* cpuindex >= MAXCPUS ? */
+	cmp	x1, #MAXCPUS		/* cpuindex >= MAXCPUS ? */
 	bge	toomanycpus
 	ldr	x2, [x0, x1, lsl #3]	/* cpu_mpidr[cpuindex] */
 	cmp	x2, x3			/* == mpidr_el1 & MPIDR_AFF ? */
 	bne	1b
 
 	mov	x27, x1			/* x27 = cpuindex */
+
 	adrl	x0, _C_LABEL(arm_cpu_mbox)
-	add	x28, x0, x27, lsl #2	/* x28 = &arm_cpu_mbox[cpuindex] */
+	add	x28, x0, x27, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex] */
 
 	/*
 	 * x27 = cpuindex
@@ -374,8 +375,8 @@ ENTRY_NP(cpu_mpstart)
 	mov	x1, #BOOT_AP_STACKSIZE
 	mul	x1, x1, x27
 
-	adrl	x0, bootstk_cpus
-	add	sp, x0, x1  /* sp = bootstk_cpus + (BOOT_AP_STACKSIZE * cpuindex) */
+	adrl	x0, bootstk
+	add	sp, x0, x1  /* sp = bootstk + (BOOT_AP_STACKSIZE * cpuindex) */
 
 	bl	1f
 1:	CPU_DPRINTREG("PC               = ", lr)
@@ -440,24 +441,39 @@ mp_vstart:
 	mrs	x1, mpidr_el1
 	str	x1, [x0, #CI_MPIDR]	/* curcpu()->ci_mpidr = mpidr_el1 */
 
+	// sizeof arm_cpu_hatched[0]) == 64. 1 << 6 is 64.
+
+	adrl	x0, _C_LABEL(arm_cpu_hatched)
+	mov	x1, x27, lsr #6
+	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_hatched[cpuindex / sizeof(unsigned long)] */
+
+	mov	x0, #1
+	bic	x2, x1, #63
+	lsl	x29, x0, x2		/* x29 = 1 << (cpuindex & 63) */
+
 	/*
-	 * atomic_or_uint(&arm_cpu_mbox[cpuindex], 1)
+	 * atomic_or_ulong(&arm_cpu_hatched[cpuindex / sizeof(u_long)], 1UL << cpuindex & (64 - 1))
 	 * to tell my activity to primary processor.
 	 */
+
 	adrl	x0, _C_LABEL(arm_cpu_hatched)
-	add	x28, x0, x27, lsl #2	/* x28 = &arm_cpu_hatched[cpuindex] */
+	add	x28, x0, x27, lsl #3	/* x28 = &arm_cpu_hatched[cpuindex / sizeof(u_long)] */
 
 	mov	x0, x28
-	mov	x1, #1
-	bl	_C_LABEL(atomic_or_uint)	/* hatched! */
+	mov	x1, x29
+	bl	_C_LABEL(atomic_or_ulong)	/* hatched! */
 	dsb	sy
 	sev
+
+	adrl	x0, _C_LABEL(arm_cpu_mbox)
+	mov	x1, x27, lsr #6
+	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex / sizeof(u_long)] */
 
 	/* wait for the mailbox start bit to become true */
 1:
 	dmb	sy
 	ldr	x20, [x28]
-	tst	x20, #2
+	tst	x20, x29
 	bne	9f
 	wfe
 	b	1b
@@ -993,7 +1009,6 @@ bootstk:
 
 #ifdef MULTIPROCESSOR
 	.space	BOOT_AP_STACKSIZE * (MAXCPUS - 1)
-bootstk_cpus:
 #endif
 
 	.section ".init_pagetable", "aw", %nobits
