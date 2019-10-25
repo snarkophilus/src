@@ -815,47 +815,6 @@ pmap_segtab_remove_all(pmap_t pmap)
 	UVMHIST_FUNC(__func__);
 	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
-//	struct pglist *list;
-//	struct vm_page *pg;
-
-// We're not destroying the PMAP here so we need to retain the pdetab_list
-// (or at least the top level one
-
-#if 0
-#if defined(PMAP_HWPAGEWALKER)
-	list = &pmap->pm_pdetab_list;
-
-	UVMHIST_LOG(pmaphist, "pm_pdetab_list %jx", (uintptr_t)list, 0, 0, 0);
-	while ((pg = TAILQ_FIRST(list)) != TAILQ_END(list)) {
-		vaddr_t kva = VM_PAGE_TO_MD(pg)->mdpg_first.pv_va;
-
-		UVMHIST_LOG(pmaphist, "... pg %jx pv_va %jx", (uintptr_t)pg, (uintptr_t)kva, 0, 0);
-		pmap_pdetab_t * const ptb = (pmap_pdetab_t *) kva;
-		pmap_page_detach(pmap, list, kva);
-		pmap_pdetab_free(ptb);
-	}
-#endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-	list = &pmap->pm_segtab_list;
-	UVMHIST_LOG(pmaphist, "pm_segtab_list %jx", (uintptr_t)list, 0, 0, 0);
-	while ((pg = TAILQ_FIRST(list)) != TAILQ_END(list)) {
-		vaddr_t kva = VM_PAGE_TO_MD(pg)->mdpg_first.pv_va;
-
-		UVMHIST_LOG(pmaphist, "... pg %jx pv_va %jx", (uintptr_t)pg, (uintptr_t)kva, 0, 0);
-		pmap_segtab_t * const stb = (pmap_segtab_t *) kva;
-		pmap_page_detach(pmap, list, kva);
-		pmap_segtab_free(stb);
-	}
-#endif
-	list = &pmap->pm_ptp_list;
-	UVMHIST_LOG(pmaphist, "pm_ptp_list %jx", (uintptr_t)list, 0, 0, 0);
-	while ((pg = TAILQ_FIRST(list)) != TAILQ_END(list)) {
-		vaddr_t kva = VM_PAGE_TO_MD(pg)->mdpg_first.pv_va;
-
-		UVMHIST_LOG(pmaphist, "... pg %jx pv_va %jx", (uintptr_t)pg, (uintptr_t)kva, 0, 0);
-		pmap_ptpage_free(pmap, (pmap_ptpage_t *) kva);
-	}
-#endif
 }
 
 /*
@@ -926,8 +885,6 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 		}
 	}
 }
-
-
 
 void
 pmap_segtab_deactivate(pmap_t pm)
