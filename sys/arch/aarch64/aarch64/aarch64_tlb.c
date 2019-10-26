@@ -41,16 +41,6 @@ __KERNEL_RCSID(1, "$NetBSD$");
 #include <arm/cpufunc.h>
 
 #include <aarch64/armreg.h>
-#if 0
-#include <arm/locore.h>
-
-
-bool arm_has_tlbiasid_p;	// CPU supports TLBIASID system coprocessor op
-#endif
-
-const bool arm_has_mpext_p = true;		// CPU supports MP extensions
-
-
 
 tlb_asid_t
 tlb_get_asid(void)
@@ -90,31 +80,23 @@ void
 tlb_invalidate_asids(tlb_asid_t lo, tlb_asid_t hi)
 {
 	for (; lo <= hi; lo++) {
-//		if (arm_has_mpext_p) {
-			aarch64_tlbi_by_asid(lo);
-//		} else {
-//			armreg_tlbiasid_write(lo);
-//		}
+		aarch64_tlbi_by_asid(lo);
 	}
 }
 
 void
 tlb_invalidate_addr(vaddr_t va, tlb_asid_t asid)
 {
-//	for (vaddr_t eva = va + PAGE_SIZE; va < eva; va += P) {
-//		if (arm_has_mpext_p) {
-			aarch64_tlbi_by_asid_va(asid, va);
-//		} else {
-//			armreg_tlbimva_write(va);
-//		}
-//	}
-//	arm_isb();
+
+	aarch64_tlbi_by_asid_va(asid, va);
 }
 
 bool
 tlb_update_addr(vaddr_t va, tlb_asid_t asid, pt_entry_t pte, bool insert_p)
 {
+
 	tlb_invalidate_addr(va, asid);
+
 	return true;
 }
 
