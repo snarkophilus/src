@@ -176,8 +176,8 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		 */
 		const pt_entry_t npte = opte | LX_BLKPAG_AF | LX_BLKPAG_OS_0;
 		atomic_swap_64(ptep, npte);
-
 		fixed = true;
+
 		UVMHIST_LOG(maphist, " <-- done (mod emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
 	} else if ((ftype & VM_PROT_READ) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
@@ -192,11 +192,9 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		 * Enable write permissions for the page by setting the Access Flag.
 		 */
 		const pt_entry_t npte = opte | LX_BLKPAG_AF;
-
 		atomic_swap_64(ptep, npte);
-
-		//PMAPCOUNT(fixup_mod);
 		fixed = true;
+
 		UVMHIST_LOG(maphist, " <-- done (ref emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
 	}
@@ -206,28 +204,6 @@ done:
 
 	return fixed;
 }
-
-
-
-#if 0
-#ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-vaddr_t
-pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
-{
-	bool ok = false;
-	if (physical_start <= pa && pa < physical_end) {
-		const vaddr_t newva = pa - physical_start + KERNEL_DIRECTMAP_BASE;
-		if (newva >= KERNEL_DIRECTMAP_BASE && newva < pmap_directlimit) {
-			va = newva;
-			ok = true;
-		}
-	}
-	KASSERT(ok_p);
-	*ok_p = ok;
-	return va;
-}
-#endif
-#endif
 
 
 struct vm_page *
