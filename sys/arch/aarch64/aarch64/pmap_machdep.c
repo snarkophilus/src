@@ -562,23 +562,6 @@ pmap_md_direct_map_paddr(paddr_t pa)
 	return AARCH64_PA_TO_KVA(pa);
 }
 
-
-#if 0
-
-//XXXNH see "common" comment above
-u_int
-arm32_mmap_flags(paddr_t pa)
-{
-	/*
-	 * the upper 8 bits in pmap_enter()'s flags are reserved for MD stuff
-	 * and we're using the upper bits in page numbers to pass flags around
-	 * so we might as well use the same bits
-	 */
-	return (u_int)pa & PMAP_MD_MASK;
-}
-#endif
-
-
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
 
 static void
