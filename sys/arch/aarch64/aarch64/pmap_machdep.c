@@ -146,17 +146,15 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		goto done;
 	}
 
-	pt_entry_t pte = *ptep;
+	pt_entry_t opte = *ptep;
 
-	if (!l3pte_valid(pte)) {
+	if (!l3pte_valid(opte)) {
 		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
-		    pte, va, 0, 0);
+		    opte, va, 0, 0);
 		goto done;
 	}
 
-	pt_entry_t opte = *ptep;
 	paddr_t pa = l3pte_pa(opte);
-
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
 	if (pg == NULL) {
 		UVMHIST_LOG(pmaphist, "pg not found: va=%016lx", va, 0, 0, 0);
@@ -165,7 +163,7 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 
 	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
 
-	if ((ftype & VM_PROT_WRITE) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
+	if ((ftype & VM_PROT_WRITE) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
 		/*
 		 * This looks like a good candidate for "page modified"
 		 * emulation...
@@ -182,7 +180,7 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		fixed = true;
 		UVMHIST_LOG(maphist, " <-- done (mod emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
-	} else if ((ftype & VM_PROT_READ) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
+	} else if ((ftype & VM_PROT_READ) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
 		/*
 		 * This looks like a good candidate for "page referenced"
 		 * emulation.
