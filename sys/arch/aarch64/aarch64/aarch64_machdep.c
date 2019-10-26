@@ -111,11 +111,6 @@ uint32_t dumpmag = 0x8fca0101;  /* magic number for savecore */
 int     dumpsize = 0;           /* also for savecore */
 long    dumplo = 0;
 
-//#ifdef PMAP_NEED_ALLOC_POOLPAGE
-//int	arm_poolpage_vmfreelist = VM_FREELIST_DEFAULT;
-//#endif
-
-
 void
 cpu_kernel_vm_init(uint64_t memory_start __unused, uint64_t memory_size __unused)
 {
