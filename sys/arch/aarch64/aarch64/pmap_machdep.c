@@ -29,12 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "opt_arm_debug.h"
-#include "opt_cpuoptions.h"
-#include "opt_pmap_debug.h"
-#include "opt_ddb.h"
-#include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
 #include "opt_uvmhist.h"
 
