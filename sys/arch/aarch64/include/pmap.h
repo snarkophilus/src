@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.25 2019/08/12 10:28:04 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.26 2019/10/29 20:01:22 maya Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -267,6 +267,7 @@ int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
 #include <aarch64/pmap_common.h>
 #else
 
+#define PMAP_NEED_PROCWR
 #define PMAP_GROWKERNEL
 #define PMAP_STEAL_MEMORY
 
@@ -324,6 +325,7 @@ pt_entry_t *kvtopte(vaddr_t);
 #define pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 #define pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 
+void	pmap_procwr(struct proc *, vaddr_t, int);
 void	pmap_icache_sync_range(pmap_t, vaddr_t, vaddr_t);
 
 #define	PMAP_MAPSIZE1	L2_SIZE
