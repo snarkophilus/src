@@ -29,12 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include "opt_arm_debug.h"
-#include "opt_cpuoptions.h"
-#include "opt_pmap_debug.h"
-#include "opt_ddb.h"
-#include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
 #include "opt_uvmhist.h"
 
@@ -151,20 +146,16 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		goto done;
 	}
 
-	pt_entry_t pte = *ptep;
+	pt_entry_t opte = *ptep;
 
-	if (!l3pte_valid(pte)) {
+	if (!l3pte_valid(opte)) {
 		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
-		    pte, va, 0, 0);
+		    opte, va, 0, 0);
 		goto done;
 	}
 
-	pt_entry_t opte = *ptep;
 	paddr_t pa = l3pte_pa(opte);
-
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-
-//	struct vm_page *pg = PHYS_TO_VM_PAGE(pa);
 	if (pg == NULL) {
 		UVMHIST_LOG(pmaphist, "pg not found: va=%016lx", va, 0, 0, 0);
 		goto done;
@@ -172,28 +163,24 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 
 	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
 
-	if ((ftype & VM_PROT_WRITE) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
+	if ((ftype & VM_PROT_WRITE) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
 		/*
 		 * This looks like a good candidate for "page modified"
 		 * emulation...
 		 */
 
 		pmap_page_set_attributes(mdpg, VM_PAGEMD_MODIFIED|VM_PAGEMD_REFERENCED);
-		//pmap_set_modified(pa);
 
 		/*
 		 * Enable write permissions for the page by setting the Access Flag.
 		 */
 		const pt_entry_t npte = opte | LX_BLKPAG_AF | LX_BLKPAG_OS_0;
-
 		atomic_swap_64(ptep, npte);
-		//AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
-
-		//PMAPCOUNT(fixup_mod);
 		fixed = true;
+
 		UVMHIST_LOG(maphist, " <-- done (mod emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
-	} else if ((ftype & VM_PROT_READ) && (pte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
+	} else if ((ftype & VM_PROT_READ) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RO) {
 		/*
 		 * This looks like a good candidate for "page referenced"
 		 * emulation.
@@ -205,16 +192,12 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 		 * Enable write permissions for the page by setting the Access Flag.
 		 */
 		const pt_entry_t npte = opte | LX_BLKPAG_AF;
-
 		atomic_swap_64(ptep, npte);
-		//AARCH64_TLBI_BY_ASID_VA(pm->pm_asid, va, true);
-
-		//PMAPCOUNT(fixup_mod);
 		fixed = true;
+
 		UVMHIST_LOG(maphist, " <-- done (ref emul: changed pte "
 		    "from %#jx to %#jx)", opte, npte, 0, 0);
 	}
-
 
 done:
 	kpreempt_enable();
@@ -223,32 +206,10 @@ done:
 }
 
 
-
-
-#if 0
-#ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-vaddr_t
-pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
-{
-	bool ok = false;
-	if (physical_start <= pa && pa < physical_end) {
-		const vaddr_t newva = pa - physical_start + KERNEL_DIRECTMAP_BASE;
-		if (newva >= KERNEL_DIRECTMAP_BASE && newva < pmap_directlimit) {
-			va = newva;
-			ok = true;
-		}
-	}
-	KASSERT(ok_p);
-	*ok_p = ok;
-	return va;
-}
-#endif
-#endif
-
-
 struct vm_page *
 pmap_md_alloc_poolpage(int flags)
 {
+
 	/*
 	 * Any managed page works for us.
 	 */
@@ -424,7 +385,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 	virtual_avail = vstart;
 	virtual_end = vend;
-//	pmap_maxkvaddr = vstart;
 
 	aarch64_tlbi_all();
 
@@ -439,15 +399,13 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 
 //	TAILQ_INIT(&pmap->pm_pvp_list);
 	TAILQ_INIT(&pm->pm_ptp_list);
-#ifdef _LP64
+
 #if defined(PMAP_HWPAGEWALKER)
 	TAILQ_INIT(&pm->pm_pdetab_list);
 #endif
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 	TAILQ_INIT(&pm->pm_segtab_list);
 #endif
-#endif
-
 
 	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);
@@ -466,7 +424,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	VPRINTF("specials ");
 
 	/*
-	 * does VIPT exist for aarch64
+	 * does VIPT exist for aarch64?
 	 */
 	//nptes = 1
 
@@ -497,9 +455,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
         pmap_limits.virtual_start = virtual_avail;
         pmap_limits.virtual_end = virtual_end;
 
-//	pmap_limits.virtual_end = pmap_limits.virtual_start + (vaddr_t)sysmap_size * NBPG;
-
-
 	pool_init(&pmap_pmap_pool, PMAP_SIZE, 0, 0, 0, "pmappl",
 	    &pool_allocator_nointr, IPL_NONE);
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
@@ -513,6 +468,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 void
 pmap_md_init(void)
 {
+
 	//XXXNH implement this.
 //	pmap_md_alloc_ephemeral_address_space(curcpu());
 }
@@ -592,7 +548,6 @@ pmap_md_pdetab_init(struct pmap *pm)
 	pmap_extract(pmap_kernel(), (vaddr_t)pm->pm_l0, &pm->pm_l0_pa);
 }
 
-
 void
 pmap_md_pdetab_destroy(struct pmap *pm)
 {
@@ -600,31 +555,12 @@ pmap_md_pdetab_destroy(struct pmap *pm)
 	KASSERT(pm != NULL);
 }
 
-
 vaddr_t
 pmap_md_direct_map_paddr(paddr_t pa)
 {
 
 	return AARCH64_PA_TO_KVA(pa);
 }
-
-
-
-#if 0
-
-//XXXNH see "common" comment above
-u_int
-arm32_mmap_flags(paddr_t pa)
-{
-	/*
-	 * the upper 8 bits in pmap_enter()'s flags are reserved for MD stuff
-	 * and we're using the upper bits in page numbers to pass flags around
-	 * so we might as well use the same bits
-	 */
-	return (u_int)pa & PMAP_MD_MASK;
-}
-#endif
-
 
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
 
