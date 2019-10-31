@@ -41,7 +41,7 @@
 #include <arm/locore.h>
 
 /* What size should this really be ? It is only used by init_arm() */
-#define INIT_ARM_STACK_SIZE	8192
+#define INIT_ARM_STACK_SIZE	2048
 
 	RCSID("$NetBSD: locore.S,v 1.40 2019/07/14 09:29:21 skrll Exp $")
 
