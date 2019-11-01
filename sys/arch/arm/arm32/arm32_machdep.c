@@ -41,9 +41,6 @@
  * Updated	: 18/04/01 updated for new wscons
  */
 
-// XXXNH
-#define __PMAP_PRIVATE
-
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.128 2019/05/10 16:43:09 skrll Exp $");
 
