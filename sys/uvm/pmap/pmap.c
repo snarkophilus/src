@@ -1006,7 +1006,7 @@ pmap_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva)
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;
 	curpcb->pcb_faultinfo.pfi_repeats = 0;
-	curpcb->pcb_faultinfo.pfi_faultpte = NULL;
+	curpcb->pcb_faultinfo.pfi_faultptep = NULL;
 #endif
 	kpreempt_disable();
 	pmap_addr_range_check(pmap, sva, eva, __func__);
@@ -1540,7 +1540,7 @@ pmap_remove_all(struct pmap *pmap)
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;
 	curpcb->pcb_faultinfo.pfi_repeats = 0;
-	curpcb->pcb_faultinfo.pfi_faultpte = NULL;
+	curpcb->pcb_faultinfo.pfi_faultptep = NULL;
 #endif
 	kpreempt_enable();
 
