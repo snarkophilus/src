@@ -713,7 +713,7 @@ ubc_release(void *va, int flags)
 			    inactive);
 		}
 	}
-	UVMHIST_LOG(ubchist, "umap %cw#jxp refs %jd", (uintptr_t)umap,
+	UVMHIST_LOG(ubchist, "umap %#jx refs %jd", (uintptr_t)umap,
 	    umap->refcount, 0, 0);
 	mutex_exit(ubc_object.uobj.vmobjlock);
 }
