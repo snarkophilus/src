@@ -534,6 +534,18 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 
 	return npte;
 }
+
+
+static inline void
+pmap_impl_pageidlezero_done(struct vm_page *pg)
+{
+}
+
+static inline void
+pmap_impl_copypage_done(struct vm_page *pg)
+{
+}
+
 #endif /* __PMAP_PRIVATE */
 
 #endif	/* _ARM32_PMAP_ARMV6N_H_ */
