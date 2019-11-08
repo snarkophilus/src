@@ -73,9 +73,6 @@ struct l2_dtable;
 
 #define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
 
-
-
-
 struct pmap_page {
 	SLIST_HEAD(,pv_entry) pvh_list;		/* pv_entry list */
 	int pvh_attrs;				/* page attributes */
