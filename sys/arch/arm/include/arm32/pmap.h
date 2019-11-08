@@ -323,20 +323,6 @@ extern size_t cnptes;
  * Useful macros and constants
  */
 
-/* Virtual address to page table entry */
-static inline pt_entry_t *
-vtopte(vaddr_t va)
-{
-	pd_entry_t *pdep;
-	pt_entry_t *ptep;
-
-	KASSERT(trunc_page(va) == va);
-
-	if (pmap_get_pde_pte(pmap_kernel(), va, &pdep, &ptep) == false)
-		return (NULL);
-	return (ptep);
-}
-
 /*
  * Virtual address to physical address
  */
