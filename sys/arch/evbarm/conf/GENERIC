@@ -280,6 +280,7 @@ options 	DIAGNOSTIC	# internal consistency checks
 options 	DEBUG
 #options 	LOCKDEBUG
 #options 	PMAP_DEBUG	# Enable pmap_debug_level code
+#options 	PMAP_FAULTINFO
 
 options 	UVMHIST
 options 	UVMHIST_PRINT,KERNHIST_DELAY=0
