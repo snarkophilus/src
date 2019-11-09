@@ -266,8 +266,6 @@ static size_t cnptes;
 #define	cpu_cdstp(o)	(cdstp + (o))
 #endif
 
-extern kmutex_t pmap_lock;
-
 vaddr_t memhook;			/* used by mem.c & others */
 kmutex_t memlock __cacheline_aligned;	/* used by mem.c & others */
 extern void *msgbufaddr;
@@ -277,57 +275,6 @@ extern void *msgbufaddr;
 #else
 #define VPRINTF(...)	__nothing
 #endif
-
-#ifndef ARM_MMU_EXTENDED
-/*
- * Misc. locking data structures
- */
-
-static inline void
-pmap_acquire_pmap_lock(pmap_t pm)
-{
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_LOCK(1, NULL);
-#endif
-	} else {
-		mutex_enter(pm->pm_lock);
-	}
-}
-
-static inline void
-pmap_release_pmap_lock(pmap_t pm)
-{
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_UNLOCK_ONE(NULL);
-#endif
-	} else {
-		mutex_exit(pm->pm_lock);
-	}
-}
-
-static inline void
-pmap_acquire_page_lock(struct vm_page_md *md)
-{
-	mutex_enter(&pmap_lock);
-}
-
-static inline void
-pmap_release_page_lock(struct vm_page_md *md)
-{
-	mutex_exit(&pmap_lock);
-}
-
-#ifdef DIAGNOSTIC
-static inline int
-pmap_page_locked_p(struct vm_page_md *md)
-{
-	return mutex_owned(&pmap_lock);
-}
-#endif
-#endif
-
 
 /*
  * Metadata for L1 translation tables.
@@ -681,6 +628,8 @@ pmap_l2dtable_ctor(void *arg, void *v, int flags)
 	return (0);
 }
 
+
+//XXXNH use pmap_page_syncicache for ARM_MMU_EXTENDED
 void
 pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
@@ -688,8 +637,6 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 	pt_entry_t *ptep;
 	vaddr_t next_bucket;
 	vsize_t page_size = trunc_page(sva) + PAGE_SIZE - sva;
-
-
 
 #ifndef ARM_MMU_EXTENDED
 	pmap_acquire_pmap_lock(pm);
@@ -806,8 +753,6 @@ pmap_zero_page_generic(paddr_t pa)
 		cpu_dcache_wbinv_range(vdstp, PAGE_SIZE);
 #endif
 	}
-
-
 
 #ifndef ARM_MMU_EXTENDED
 #ifdef PMAP_CACHE_VIPT
@@ -1134,16 +1079,6 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
 	PTE_SYNC(cdst_pte);
 }
 #endif /* ARM_MMU_XSCALE == 1 */
-
-
-
-
-
-
-
-
-
-
 
 
 /*

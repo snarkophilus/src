@@ -292,6 +292,57 @@ struct pv_entry {
 	u_int		pv_flags;       /* flags */
 };
 
+/*
+ * Move this back into pmap.c when pmap_icache_sync_range is pmap agnostic
+ */
+
+/*
+ * Misc. locking data structures
+ */
+
+extern kmutex_t pmap_lock;
+
+static inline void
+pmap_acquire_pmap_lock(pmap_t pm)
+{
+#if defined(MULTIPROCESSOR) && defined(DDB)
+	if (__predict_false(db_onproc != NULL))
+		return;
+#endif
+
+	mutex_enter(pm->pm_lock);
+}
+
+static inline void
+pmap_release_pmap_lock(pmap_t pm)
+{
+#if defined(MULTIPROCESSOR) && defined(DDB)
+	if (__predict_false(db_onproc != NULL))
+		return;
+#endif
+	mutex_exit(pm->pm_lock);
+}
+
+static inline void
+pmap_acquire_page_lock(struct vm_page_md *md)
+{
+	mutex_enter(&pmap_lock);
+}
+
+static inline void
+pmap_release_page_lock(struct vm_page_md *md)
+{
+	mutex_exit(&pmap_lock);
+}
+
+#ifdef DIAGNOSTIC
+static inline int
+pmap_page_locked_p(struct vm_page_md *md)
+{
+	return mutex_owned(&pmap_lock);
+}
+#endif
+
 
 /*
  * Useful macros and constants
@@ -374,10 +425,5 @@ pmap_impl_copypage_done(struct vm_page *pg)
 	pmap_release_page_lock(dst_md);
 #endif
 }
-
-
-
-
-
 
 #endif	/* _ARM32_PMAP_ARMV3_H_ */
