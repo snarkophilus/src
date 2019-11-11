@@ -1535,8 +1535,6 @@ pmap_remove_all(struct pmap *pmap)
 	pmap_md_tlb_miss_lock_exit();
 	pmap->pm_flags |= PMAP_DEFERRED_ACTIVATE;
 
-//	pmap_segtab_remove_all(pmap);
-
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;
 	curpcb->pcb_faultinfo.pfi_repeats = 0;

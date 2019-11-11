@@ -809,14 +809,6 @@ pmap_segtab_init(pmap_t pmap)
 #endif
 }
 
-void
-pmap_segtab_remove_all(pmap_t pmap)
-{
-	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
-
-}
-
 /*
  *	Retire the given physical map from service.
  *	Should only be called if the map contains

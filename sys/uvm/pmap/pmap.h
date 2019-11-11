@@ -147,7 +147,6 @@ void pmap_segtab_deactivate(struct pmap *);
 void pmap_segtab_init(struct pmap *);
 void pmap_segtab_destroy(struct pmap *, pte_callback_t, uintptr_t);
 //void pmap_segtab_destroy(struct pmap *);
-void pmap_segtab_remove_all(struct pmap *);
 #ifdef PMAP_HWPAGEWALKER
 pd_entry_t *pmap_pde_lookup(struct pmap *, vaddr_t, paddr_t *);
 bool pmap_pdetab_fixup(struct pmap *, vaddr_t);
