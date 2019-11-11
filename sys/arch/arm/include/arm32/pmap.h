@@ -1014,8 +1014,6 @@ paddr_t	pmap_unmap_poolpage(vaddr_t);
 
 void pmap_pv_protect(paddr_t, vm_prot_t);
 
-#define	PVLIST_EMPTY(md)	SLIST_EMPTY(&md->pvh_list)
-
 #ifdef ARM_MMU_EXTENDED
 #include <arm/arm32/pmap_v6n.h>
 #else
