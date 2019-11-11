@@ -65,8 +65,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_ARM32_PMAP_ARMV6N_H_
-#define	_ARM32_PMAP_ARMV6N_H_
+#ifndef	_ARM32_PMAP_V6N_H_
+#define	_ARM32_PMAP_V6N_H_
 
 #if 0
 // if system has too much ram to do direct map then it all turns to pot
@@ -274,17 +274,6 @@ pmap_md_setvirtualend(vaddr_t va)
 
 //XXX Move to sys/uvm/pmap/pmap.h
 void pmap_page_remove(struct vm_page *);
-
-#if 0
-static inline void
-pmap_pv_protect(paddr_t pa, vm_prot_t prot)
-{
-
-	/* the only case is remove at the moment */
-	KASSERT(prot == VM_PROT_NONE);
- 	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
-}
-#endif
 
 static inline size_t
 pte_index(vaddr_t va)
@@ -548,4 +537,4 @@ pmap_impl_copypage_done(struct vm_page *pg)
 
 #endif /* __PMAP_PRIVATE */
 
-#endif	/* _ARM32_PMAP_ARMV6N_H_ */
+#endif	/* _ARM32_PMAP_V6N_H_ */
