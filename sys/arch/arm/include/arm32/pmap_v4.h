@@ -65,8 +65,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_ARM32_PMAP_ARMV3_H_
-#define	_ARM32_PMAP_ARMV3_H_
+#ifndef	_ARM32_PMAP_V4_H_
+#define	_ARM32_PMAP_V4_H_
 
 struct l1_ttable;
 struct l2_dtable;
@@ -426,4 +426,4 @@ pmap_impl_copypage_done(struct vm_page *pg)
 #endif
 }
 
-#endif	/* _ARM32_PMAP_ARMV3_H_ */
+#endif	/* _ARM32_PMAP_V4_H_ */
