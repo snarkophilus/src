@@ -999,93 +999,6 @@ extern paddr_t physical_start, physical_end;
  */
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#if 0
-#define	POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 struct vm_page *pmap_md_alloc_poolpage(int);
 #define	PMAP_ALLOC_POOLPAGE	pmap_md_alloc_poolpage
@@ -1103,80 +1016,6 @@ void pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define	PVLIST_EMPTY(md)	SLIST_EMPTY(&md->pvh_list)
 
-
-
-
-
-
-
-
-
-
-#if 0
-struct pmap_page {
-	SLIST_HEAD(,pv_entry) pvh_list;		/* pv_entry list */
-	int pvh_attrs;				/* page attributes */
-	u_int uro_mappings;
-	u_int urw_mappings;
-	union {
-		u_short s_mappings[2];	/* Assume kernel count <= 65535 */
-		u_int i_mappings;
-	} k_u;
-};
-
-/*
- * pmap-specific data store in the vm_page structure.
- */
-#define	__HAVE_VM_PAGE_MD
-struct vm_page_md {
-	struct pmap_page pp;
-#define	pvh_list	pp.pvh_list
-#define	pvh_attrs	pp.pvh_attrs
-#define	uro_mappings	pp.uro_mappings
-#define	urw_mappings	pp.urw_mappings
-#define	kro_mappings	pp.k_u.s_mappings[0]
-#define	krw_mappings	pp.k_u.s_mappings[1]
-#define	k_mappings	pp.k_u.i_mappings
-};
-
-#define	PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
-
-/*
- * Set the default color of each page.
- */
-#if ARM_MMU_V6 > 0
-#define	VM_MDPAGE_PVH_ATTRS_INIT(pg) \
-	(pg)->mdpage.pvh_attrs = (pg)->phys_addr & arm_cache_prefer_mask
-#else
-#define	VM_MDPAGE_PVH_ATTRS_INIT(pg) \
-	(pg)->mdpage.pvh_attrs = 0
-#endif
-
-#define	VM_MDPAGE_INIT(pg)						\
-do {									\
-	SLIST_INIT(&(pg)->mdpage.pvh_list);				\
-	VM_MDPAGE_PVH_ATTRS_INIT(pg);					\
-	(pg)->mdpage.uro_mappings = 0;					\
-	(pg)->mdpage.urw_mappings = 0;					\
-	(pg)->mdpage.k_mappings = 0;					\
-} while (/*CONSTCOND*/0)
-#endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #ifdef ARM_MMU_EXTENDED
 #include <arm/arm32/pmap_v6n.h>
 #else
@@ -1185,50 +1024,13 @@ do {									\
 
 #endif /* !_LOCORE */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-#if 0
-typedef uint32_t	pmap_pdetab_t;	/* L1 table entry */
-#endif
-
 #ifndef __BSD_PTENTRY_T__
 #define	__BSD_PTENTRY_T__
 typedef uint32_t pt_entry_t;
 #define PRIxPTE		PRIx32
 #endif
 
-
-
 bool pmap_is_page_ro_p(struct pmap *pmap, vaddr_t, uint32_t);
-
-#if 0
-#define	pte_to_paddr(pte)	MIPS3_PTE_TO_PADDR((pte))
-
-#define	PAGE_IS_RDONLY(pte, va)	MIPS3_PAGE_IS_RDONLY((pte), (va))
-
-static __inline paddr_t
-pte_to_paddr(pt_entry_t pte)
-{
-	return l2pte_pa(pte);
-}
-
-static inline bool
-pte_valid_p(pt_entry_t pte)
-{
-	return l2pte_valid_p(pte);
-}
-#endif
 
 #endif /* _KERNEL */
 
