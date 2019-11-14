@@ -760,6 +760,11 @@ uvm_km_free(struct vm_map *map, vaddr_t addr, vsize_t size, uvm_flag_t flags)
 #error Must specify MAP and UNMAP together.
 #endif
 
+#if defined(PMAP_ALLOC_POOLPAGE) && \
+    !defined(PMAP_MAP_POOLPAGE) && !defined(PMAP_UNMAP_POOLPAGE)
+#error Must specify ALLOC with MAP and UNMAP
+#endif
+
 int
 uvm_km_kmem_alloc(vmem_t *vm, vmem_size_t size, vm_flag_t flags,
     vmem_addr_t *addr)
