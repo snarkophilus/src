@@ -469,7 +469,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 		panic("%s: cannot allocate page table page", __func__);
 	}
 	pmap_page_attach(pmap, kva, NULL, &pmap->pm_ptp_list, 0);
-	ptp = pmap_ptpage_t *)kva;
+	ptp = (pmap_ptpage_t *)kva;
 #endif
 
 	UVMHIST_LOG(pmaphist, "... ptp %p", (uintptr_t)ptp, 0, 0, 0);
@@ -681,8 +681,6 @@ pmap_segtab_free(pmap_segtab_t *stp)
 	mutex_spin_exit(&pmap_segtab_lock);
 }
 #endif
-
-
 
 #if defined(PMAP_HWPAGEWALKER)
 static void
@@ -1028,7 +1026,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 #endif /* _LP64 */
 	size_t idx = (va >> SEGSHIFT) & segtab_mask;
 #if defined(PMAP_HWPAGEWALKER)
-#if defined(XSEGSHIFT) && XSEGSHIFT != SEGSHIFT)
+#if defined(XSEGSHIFT) && (XSEGSHIFT != SEGSHIFT)
 	*pte_p = &pmap->pm_segtab
 #else /* XSEGSHIFT */
 	*pde_p = &ptb->pde_pde[idx];
@@ -1055,6 +1053,7 @@ pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 	pd_entry_t * const pde_p = pmap_pdetab_reserve(pmap, va);
 	ptp = pmap_pde_to_ptpage(*pde_p);
 #elif defined(PMAP_HWPAGEWALKER)
+	pd_entry_t *pde_p;
 	pmap_ptpage_t ** const ptp_p = pmap_segtab_reserve(pmap, va, &pde_p);
 	ptp = *ptp_p;
 #else
