@@ -177,7 +177,7 @@ extern char __bss_start[], __bss_end__[];
 extern char _end[];
 
 /* Page tables for mapping kernel VM */
-#if 1
+#if defined(ARM_MMU_EXTENDED)
 #define KERNEL_L2PT_VMDATA_NUM	(KERNEL_VM_SIZE / L2_S_SEGSIZE)
 #else
 #define KERNEL_L2PT_VMDATA_NUM	8	/* start with 32MB/64MB of KVM */
