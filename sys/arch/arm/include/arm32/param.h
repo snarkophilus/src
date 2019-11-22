@@ -54,7 +54,7 @@
 #endif
 #define	NBPG		(1 << PGSHIFT)	/* bytes/page */
 #define	PGOFSET		(NBPG - 1)	/* byte offset into page */
-#define	NPTEPG		(NBPG/(sizeof(pt_entry_t)))	// PTEs per Page
+#define	NPTEPG		(NBPG / sizeof(pt_entry_t))	// PTEs per Page
 
 #define SSIZE		1		/* initial stack size/NBPG */
 #define SINCR		1		/* increment of stack/NBPG */

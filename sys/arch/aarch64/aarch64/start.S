@@ -65,6 +65,11 @@ start:
 	adrl	x8, fdt_addr_r
 	str	x0, [x8]
 
+	adrl	x8, pmapboot_pagebase
+	ldr	x9, =ARM_BOOTSTRAP_LxPT
+	sub	x9, x9, x10
+	str	x9, [x8]
+
 	b	aarch64_start		/* aarch64_start() @ aarch64/locore.S */
 
 ENTRY_NP(uartputc)

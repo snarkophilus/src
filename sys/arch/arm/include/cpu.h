@@ -235,6 +235,7 @@ curcpu(void)
 #ifndef curlwp
 #define	curlwp		(curcpu()->ci_curlwp)
 #endif
+#define curpcb		((struct pcb *)lwp_getpcb(curlwp))
 
 #define CPU_INFO_ITERATOR	int
 #if defined(_MODULE) || defined(MULTIPROCESSOR)

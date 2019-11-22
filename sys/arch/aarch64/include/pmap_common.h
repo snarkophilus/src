@@ -34,9 +34,6 @@
 
 #define PMAP_HWPAGEWALKER		1
 
-//XXXNH
-//#define PMAP_NEED_ALLOC_POOLPAGE	1
-
 #define PMAP_TLB_MAX			1
 #if PMAP_TLB_MAX > 1
 #define PMAP_TLB_NEED_SHOOTDOWN		1
@@ -417,7 +414,7 @@ pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
 {
 	KASSERTMSG((pa & ~L3_PAG_OA) == 0, "pa %" PRIxPADDR, pa);
 
-   	pt_entry_t pte = pa
+	pt_entry_t pte = pa
 	    | LX_VALID
 #ifdef MULTIPROCESSOR
 	    | LX_BLKPAG_SH_IS
@@ -428,8 +425,8 @@ pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? LX_BLKPAG_AP_RO : LX_BLKPAG_AP_RW)
 	    | LX_BLKPAG_OS_WIRED;
 
- 	if (prot & VM_PROT_EXECUTE)
- 		pte &= ~LX_BLKPAG_PXN;
+	if (prot & VM_PROT_EXECUTE)
+		pte &= ~LX_BLKPAG_PXN;
 
 	pte &= ~LX_BLKPAG_ATTR_MASK;
 	pte |= pte_memattr(flags);

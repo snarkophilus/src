@@ -196,7 +196,7 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	if (p->p_pid == pfi->pfi_lastpid && va == pfi->pfi_faultaddr) {
 		if (++pfi->pfi_repeats > 4) {
 			tlb_asid_t asid = tlb_get_asid();
-			pt_entry_t *ptep = pfi->pfi_faultpte;
+			pt_entry_t *ptep = pfi->pfi_faultptep;
 			printf("%s: fault #%u (%s/%s) for %#" PRIxVADDR
 			    "(%#"PRIxVADDR") at pc %#"PRIxVADDR" curpid=%u/%u "
 			    "ptep@%p=%#"PRIxPTE")\n", __func__,
@@ -214,7 +214,7 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 		pfi->pfi_lastpid = p->p_pid;
 		pfi->pfi_faultaddr = va;
 		pfi->pfi_repeats = 0;
-		pfi->pfi_faultpte = NULL;
+		pfi->pfi_faultptep = NULL;
 		pfi->pfi_faulttype = eclass;
 	}
 #endif /* PMAP_FAULTINFO */
@@ -233,9 +233,9 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 
 #ifdef PMAP_FAULTINFO
 	if (pfi->pfi_repeats == 0) {
-		pfi->pfi_faultpte = pmap_pte_lookup(map->pmap, va);
+		pfi->pfi_faultptep = pmap_pte_lookup(map->pmap, va);
 	}
-	KASSERT(*(pt_entry_t *)pfi->pfi_faultpte);
+	KASSERT(*(pt_entry_t *)pfi->pfi_faultptep);
 #endif
 
  do_fault:

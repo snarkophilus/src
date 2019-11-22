@@ -414,12 +414,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 	return nskip;
 }
 
-/*
- * This prevents the compiler using an adrp/add pair to determine
- * ARM_BOOTSTRAP_LxPT and (sometimes) getting a PA rather than a VA.
- */
-extern char ARM_BOOTSTRAP_LxPT[];
-static const vaddr_t pmapboot_pagebase = (vaddr_t)ARM_BOOTSTRAP_LxPT;
+paddr_t pmapboot_pagebase __attribute__((__section__(".data")));
 
 pd_entry_t *
 pmapboot_pagealloc(void)
@@ -429,7 +424,7 @@ pmapboot_pagealloc(void)
 	if (kernend_extra < 0)
 		return NULL;
 
-	paddr_t pa = KERN_VTOPHYS(pmapboot_pagebase) + kernend_extra;
+	paddr_t pa = pmapboot_pagebase + kernend_extra;
 	kernend_extra += PAGE_SIZE;
 
 	char *s = (char *)pa;

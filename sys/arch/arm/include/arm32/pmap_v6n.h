@@ -65,8 +65,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_ARM32_PMAP_ARMV6N_H_
-#define	_ARM32_PMAP_ARMV6N_H_
+#ifndef	_ARM32_PMAP_V6N_H_
+#define	_ARM32_PMAP_V6N_H_
 
 #if 0
 // if system has too much ram to do direct map then it all turns to pot
@@ -233,10 +233,7 @@ struct pmap_page {
 
 extern bool arm_has_tlbiasid_p;	/* also in <arm/locore.h> */
 
-
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
-
-
 
 static __inline paddr_t
 pte_to_paddr(pt_entry_t pte)
@@ -251,8 +248,6 @@ pte_valid_p(pt_entry_t pte)
 
 	return l2pte_valid_p(pte);
 }
-
-
 
 static inline int
 pmap_md_pagecolor(struct vm_page *pg)
@@ -277,25 +272,13 @@ pmap_md_setvirtualend(vaddr_t va)
 #endif
 
 
-
 //XXX Move to sys/uvm/pmap/pmap.h
 void pmap_page_remove(struct vm_page *);
-
-#if 0
-static inline void
-pmap_pv_protect(paddr_t pa, vm_prot_t prot)
-{
-
-	/* the only case is remove at the moment */
-	KASSERT(prot == VM_PROT_NONE);
- 	pmap_page_remove(PHYS_TO_VM_PAGE(pa));
-}
-#endif
-
 
 static inline size_t
 pte_index(vaddr_t va)
 {
+
 	return l2pte_index(va);
 }
 
@@ -313,6 +296,7 @@ pte_modified_p(pt_entry_t pte)
 static inline bool
 pte_wired_p(pt_entry_t pte)
 {
+
         return (pte & L2_S_OSBIT0) != 0;
 }
 
@@ -320,18 +304,21 @@ pte_wired_p(pt_entry_t pte)
 static inline pt_entry_t
 pte_wire_entry(pt_entry_t pte)
 {
+
         return pte | L2_S_OSBIT0;
 }
 
 static inline pt_entry_t
 pte_unwire_entry(pt_entry_t pte)
 {
+
         return pte & ~L2_S_OSBIT0;
 }
 
 static inline uint32_t
 pte_value(pt_entry_t pte)
 {
+
 	return pte;
 }
 
@@ -353,12 +340,14 @@ pte_cached_p(pt_entry_t pte)
 static inline bool
 pte_deferred_exec_p(pt_entry_t pte)
 {
+
 	return false;
 }
 
 static inline pt_entry_t
 pte_nv_entry(bool kernel_p)
 {
+
 	/* Not valid entry */
 	return kernel_p ? 0 : 0;
 }
@@ -366,6 +355,7 @@ pte_nv_entry(bool kernel_p)
 static inline pt_entry_t
 pte_prot_downgrade(pt_entry_t pte, vm_prot_t prot)
 {
+
 	return (pte & ~(L2_S_PROT_W | L2_S_PROT_RO))
 	    | (((prot) & (VM_PROT_READ | VM_PROT_WRITE)) == VM_PROT_READ ? L2_S_PROT_RO : L2_S_PROT_W);
 }
@@ -373,6 +363,7 @@ pte_prot_downgrade(pt_entry_t pte, vm_prot_t prot)
 static inline pt_entry_t
 pte_prot_nowrite(pt_entry_t pte)
 {
+
 	return l2pte_set_readonly(pte);
 }
 
@@ -397,6 +388,7 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 static inline pd_entry_t
 pte_invalid_pde(void)
 {
+
 	return 0;
 }
 
@@ -433,6 +425,7 @@ pte_pde_to_paddr(pd_entry_t pde)
 static inline pd_entry_t
 pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 {
+
 #ifdef MULTIPROCESSOR
 #ifdef _LP64
 	return atomic_cas_64(pdep, opde, npde);
@@ -530,6 +523,18 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 
 	return npte;
 }
+
+
+static inline void
+pmap_impl_pageidlezero_done(struct vm_page *pg)
+{
+}
+
+static inline void
+pmap_impl_copypage_done(struct vm_page *pg)
+{
+}
+
 #endif /* __PMAP_PRIVATE */
 
-#endif	/* _ARM32_PMAP_ARMV6N_H_ */
+#endif	/* _ARM32_PMAP_V6N_H_ */

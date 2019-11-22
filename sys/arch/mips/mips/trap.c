@@ -365,7 +365,7 @@ trap(uint32_t status, uint32_t cause, vaddr_t vaddr, vaddr_t pc,
 		if (p->p_pid == pfi->pfi_lastpid && va == pfi->pfi_faultaddr) {
 			if (++pfi->pfi_repeats > 4) {
 				tlb_asid_t asid = tlb_get_asid();
-				pt_entry_t *ptep = pfi->pfi_faultpte;
+				pt_entry_t *ptep = pfi->pfi_faultptep;
 				printf("trap: fault #%u (%s/%s) for %#"
 				    PRIxVADDR" (%#"PRIxVADDR") at pc %#"
 				    PRIxVADDR" curpid=%u/%u ptep@%p=%#"
@@ -384,7 +384,7 @@ trap(uint32_t status, uint32_t cause, vaddr_t vaddr, vaddr_t pc,
 			pfi->pfi_lastpid = p->p_pid;
 			pfi->pfi_faultaddr = va;
 			pfi->pfi_repeats = 0;
-			pfi->pfi_faultpte = NULL;
+			pfi->pfi_faultptep = NULL;
 			pfi->pfi_faulttype = TRAPTYPE(cause);
 		}
 #endif /* PMAP_FAULTINFO */
@@ -417,10 +417,10 @@ trap(uint32_t status, uint32_t cause, vaddr_t vaddr, vaddr_t pc,
 		if (rv == 0) {
 #ifdef PMAP_FAULTINFO
 			if (pfi->pfi_repeats == 0) {
-				pfi->pfi_faultpte =
+				pfi->pfi_faultptep =
 				    pmap_pte_lookup(map->pmap, va);
 			}
-			KASSERT(*(pt_entry_t *)pfi->pfi_faultpte);
+			KASSERT(*(pt_entry_t *)pfi->pfi_faultptep);
 #endif
 			if (type & T_USER) {
 				userret(l);

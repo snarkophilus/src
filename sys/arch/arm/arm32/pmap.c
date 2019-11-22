@@ -474,51 +474,6 @@ extern bool pmap_initialized;
 bool pmap_initialized;
 
 /*
- * Misc. locking data structures
- */
-
-static inline void
-pmap_acquire_pmap_lock(pmap_t pm)
-{
-#if defined(MULTIPROCESSOR) && defined(DDB)
-	if (__predict_false(db_onproc != NULL))
-		return;
-#endif
-
-	mutex_enter(pm->pm_lock);
-}
-
-static inline void
-pmap_release_pmap_lock(pmap_t pm)
-{
-#if defined(MULTIPROCESSOR) && defined(DDB)
-	if (__predict_false(db_onproc != NULL))
-		return;
-#endif
-	mutex_exit(pm->pm_lock);
-}
-
-static inline void
-pmap_acquire_page_lock(struct vm_page_md *md)
-{
-	mutex_enter(&pmap_lock);
-}
-
-static inline void
-pmap_release_page_lock(struct vm_page_md *md)
-{
-	mutex_exit(&pmap_lock);
-}
-
-#ifdef DIAGNOSTIC
-static inline int
-pmap_page_locked_p(struct vm_page_md *md)
-{
-	return mutex_owned(&pmap_lock);
-}
-#endif
-
-/*
  * Metadata for L1 translation tables.
  */
 struct l1_ttable {

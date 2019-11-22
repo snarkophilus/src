@@ -188,7 +188,6 @@
 #include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
 
-
 #define __PMAP_PRIVATE
 
 #include <sys/param.h>
@@ -217,47 +216,15 @@
 
 __KERNEL_RCSID(0, "$NetBSD$");
 
-
 #ifdef VERBOSE_INIT_ARM
 #define VPRINTF(...)	printf(__VA_ARGS__)
 #else
 #define VPRINTF(...)	__nothing
 #endif
 
-
-
 void	pmap_md_init(void);
 
 static void	pmap_md_vca_page_wbinv(struct vm_page *, bool);
-
-
-
-#if comment
-
-// Global
-pmap_bootstrap(void)
-
-// Arch specific
-pmap_md_alloc_ephemeral_address_space(struct cpu_info *ci)
-
-
-// Local
-pmap_md_map_ephemeral_page(struct vm_page *pg, bool locked_p, int prot,
-pmap_md_unmap_ephemeral_page(struct vm_page *pg, bool locked_p, register_t va,
-pmap_md_vca_page_wbinv(struct vm_page *pg, bool locked_p)
-
-
-pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
-pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
-pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *ptep)
-pmap_md_vca_clean(struct vm_page *pg, int op)
-pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty, bool last)
-pmap_md_pool_vtophys(vaddr_t va)
-pmap_md_pool_phystov(paddr_t pa)
-
-#endif
-
-
 
 /*
  * Misc variables
@@ -266,35 +233,10 @@ vaddr_t virtual_avail;
 vaddr_t virtual_end;
 vaddr_t pmap_curmaxkvaddr;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
  * Virtual end of direct-mapped memory
  */
 vaddr_t pmap_directlimit;
-
-
-
-
-
-
-
-
 
 bool
 pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
@@ -332,17 +274,6 @@ done:
 	}
 	return true;
 }
-
-
-
-
-
-
-
-
-
-
-
 
 int
 pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, int user)
@@ -705,24 +636,6 @@ pmap_direct_mapped_phys(paddr_t pa, bool *ok_p, vaddr_t va)
 }
 #endif
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct vm_page *
 pmap_md_alloc_poolpage(int flags)
 {
@@ -898,19 +811,7 @@ pmap_impl_bootstrap(void)
         uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
         uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
 
-
-//      TAILQ_INIT(&pmap->pm_pvp_list);
         TAILQ_INIT(&pm->pm_ptp_list);
-#ifdef _LP64
-#if defined(PMAP_HWPAGEWALKER)
-        TAILQ_INIT(&pm->pm_pdetab_list);
-#endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-        TAILQ_INIT(&pm->pm_segtab_list);
-#endif
-#endif
-
-
 
 	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);
@@ -1039,19 +940,10 @@ pmap_md_tlb_info_attach(struct pmap_tlb_info *ti, struct cpu_info *ci)
 }
 #endif
 
-
-
-
-
-
-
-
-
 void
 pmap_impl_postinit(void)
 {
 }
-
 
 uint32_t
 pmap_kernel_L1_addr(void)
@@ -1059,7 +951,6 @@ pmap_kernel_L1_addr(void)
 
  	return pmap_kernel()->pm_l1_pa;
 }
-
 
 void
 pmap_md_init(void)
@@ -1100,9 +991,9 @@ pmap_md_pdetab_destroy(struct pmap *pm)
 }
 
 
-
-
 #if comment
+
+
 
 // Common?
 pmap_fault_fixup
@@ -1125,6 +1016,7 @@ arm32_mmap_flags(paddr_t pa)
 	 */
 	return (u_int)pa & PMAP_MD_MASK;
 }
+
 
 
 static void
@@ -1358,5 +1250,3 @@ pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty, bool last)
 #endif
 #endif
 }
-
-

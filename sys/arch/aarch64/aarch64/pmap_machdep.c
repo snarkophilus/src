@@ -130,7 +130,7 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 
 	KASSERT(!user || (pm != pmap_kernel()));
 
-	UVMHIST_LOG(maphist, " (pm=%#jx, va=%#jx, ftype=%#jx, user=%jd)",
+	UVMHIST_LOG(maphist, " pm=%#jx, va=%#jx, ftype=%#jx, user=%jd",
 	    (uintptr_t)pm, va, ftype, user);
 	UVMHIST_LOG(maphist, " ti=%#jx pai=%#jx asid=%#jx",
 	    (uintptr_t)cpu_tlb_info(curcpu()),
@@ -147,7 +147,6 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 	}
 
 	pt_entry_t opte = *ptep;
-
 	if (!l3pte_valid(opte)) {
 		UVMHIST_LOG(pmaphist, "invalid pte: %016llx: va=%016lx",
 		    opte, va, 0, 0);
@@ -162,6 +161,8 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, bool user)
 	}
 
 	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
+	UVMHIST_LOG(maphist, " pg=%#jx, opte=%#jx, ptep=%#jx", (uintptr_t)pg, opte,
+	    (uintptr_t)ptep, 0);
 
 	if ((ftype & VM_PROT_WRITE) && (opte & LX_BLKPAG_AP) == LX_BLKPAG_AP_RW) {
 		/*

@@ -45,7 +45,7 @@
 #include <mips/reg.h>
 
 struct pcb_faultinfo {
-	void *pfi_faultpte;
+	void *pfi_faultptep;
 	vaddr_t pfi_faultaddr;
 	u_int pfi_repeats;
 	pid_t pfi_lastpid;

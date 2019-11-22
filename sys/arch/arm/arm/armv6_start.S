@@ -528,12 +528,6 @@ generic_startv6:
 #define CPU_CONTROL_XP_ENABLE_SET	0
 #endif
 
-
-
-
-
-
-
 #ifdef ARM_MMU_EXTENDED
 #define CPU_CONTROL_TRE_ENABLE_CLR	0
 #define CPU_CONTROL_TRE_ENABLE_SET	CPU_CONTROL_TR_ENABLE
@@ -541,11 +535,6 @@ generic_startv6:
 #define CPU_CONTROL_XP_ENABLE_CLR	CPU_CONTROL_TR_ENABLE
 #define CPU_CONTROL_XP_ENABLE_SET	0
 #endif
-
-
-
-
-
 
 // bits to set in the Control Register
 //
@@ -601,7 +590,6 @@ generic_startv6:
 	__SHIFTIN(NMRR_NC, NMRR_ORn(6))		|	\
 	__SHIFTIN(NMRR_NC, NMRR_ORn(7))		|	\
 	0)
-
 
 /*
  * Perform the initialization of the an ARMv7 core required by NetBSD.

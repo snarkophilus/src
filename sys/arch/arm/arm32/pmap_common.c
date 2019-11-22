@@ -266,8 +266,6 @@ static size_t cnptes;
 #define	cpu_cdstp(o)	(cdstp + (o))
 #endif
 
-extern kmutex_t pmap_lock;
-
 vaddr_t memhook;			/* used by mem.c & others */
 kmutex_t memlock __cacheline_aligned;	/* used by mem.c & others */
 extern void *msgbufaddr;
@@ -277,57 +275,6 @@ extern void *msgbufaddr;
 #else
 #define VPRINTF(...)	__nothing
 #endif
-
-#ifndef ARM_MMU_EXTENDED
-/*
- * Misc. locking data structures
- */
-
-static inline void
-pmap_acquire_pmap_lock(pmap_t pm)
-{
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_LOCK(1, NULL);
-#endif
-	} else {
-		mutex_enter(pm->pm_lock);
-	}
-}
-
-static inline void
-pmap_release_pmap_lock(pmap_t pm)
-{
-	if (pm == pmap_kernel()) {
-#ifdef MULTIPROCESSOR
-		KERNEL_UNLOCK_ONE(NULL);
-#endif
-	} else {
-		mutex_exit(pm->pm_lock);
-	}
-}
-
-static inline void
-pmap_acquire_page_lock(struct vm_page_md *md)
-{
-	mutex_enter(&pmap_lock);
-}
-
-static inline void
-pmap_release_page_lock(struct vm_page_md *md)
-{
-	mutex_exit(&pmap_lock);
-}
-
-#ifdef DIAGNOSTIC
-static inline int
-pmap_page_locked_p(struct vm_page_md *md)
-{
-	return mutex_owned(&pmap_lock);
-}
-#endif
-#endif
-
 
 /*
  * Metadata for L1 translation tables.
@@ -681,6 +628,8 @@ pmap_l2dtable_ctor(void *arg, void *v, int flags)
 	return (0);
 }
 
+
+//XXXNH use pmap_page_syncicache for ARM_MMU_EXTENDED
 void
 pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 {
@@ -688,8 +637,6 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 	pt_entry_t *ptep;
 	vaddr_t next_bucket;
 	vsize_t page_size = trunc_page(sva) + PAGE_SIZE - sva;
-
-
 
 #ifndef ARM_MMU_EXTENDED
 	pmap_acquire_pmap_lock(pm);
@@ -807,8 +754,6 @@ pmap_zero_page_generic(paddr_t pa)
 #endif
 	}
 
-
-
 #ifndef ARM_MMU_EXTENDED
 #ifdef PMAP_CACHE_VIPT
 	/*
@@ -875,9 +820,7 @@ bool
 pmap_pageidlezero(paddr_t pa)
 {
 	bool rv = true;
-#if defined(PMAP_CACHE_VIPT) || defined(DEBUG)
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-#endif
 #ifdef PMAP_CACHE_VIPT
 	/* Choose the last page color it had, if any */
 	const vsize_t va_offset = pmap_md_pagecolor(pg);
@@ -942,26 +885,10 @@ pmap_pageidlezero(paddr_t pa)
 		 * purge it unless we finished it
 		 */
 		cpu_dcache_wbinv_range(vdstp, PAGE_SIZE);
+#endif
 
-#if comment
-#ifndef ARM_MMU_EXTENDED
 	pmap_impl_pageidlezero_done(pg);
-#elif defined(PMAP_CACHE_VIPT)
-	/*
-	 * This page is now cache resident so it now has a page color.
-	 * Any contents have been obliterated so clear the EXEC flag.
-	 */
-	if (!pmap_is_page_colored_p(md)) {
-		PMAPCOUNT(vac_color_new);
-		md->pvh_attrs |= PVF_COLORED;
-	}
-	if (PV_IS_EXEC_P(md->pvh_attrs)) {
-		md->pvh_attrs &= ~PVF_EXEC;
-		PMAPCOUNT(exec_discarded_zero);
-	}
-#endif
-#endif
-#endif
+
 	/*
 	 * Unmap the page.
 	 */
@@ -1095,32 +1022,8 @@ pmap_copy_page_generic(paddr_t src, paddr_t dst)
 		cpu_tlb_flushD_SE(vdstp);
 		cpu_cpwait();
 	}
-#if comment
-#ifndef ARM_MMU_EXTENDED
+
 	pmap_impl_copypage_done(dst_pg);
-#ifdef PMAP_CACHE_VIPT
-	/*
-	 * Now that the destination page is in the cache, mark it as colored.
-	 * If this was an exec page, discard it.
-	 */
-	pmap_acquire_page_lock(dst_md);
-	if (arm_pcache.cache_type == CACHE_TYPE_PIPT) {
-		dst_md->pvh_attrs &= ~arm_cache_prefer_mask;
-		dst_md->pvh_attrs |= (dst & arm_cache_prefer_mask);
-	}
-	if (!pmap_is_page_colored_p(dst_md)) {
-		PMAPCOUNT(vac_color_new);
-		dst_md->pvh_attrs |= PVF_COLORED;
-	}
-	dst_md->pvh_attrs |= PVF_DIRTY;
-	if (PV_IS_EXEC_P(dst_md->pvh_attrs)) {
-		dst_md->pvh_attrs &= ~PVF_EXEC;
-		PMAPCOUNT(exec_discarded_copy);
-	}
-	pmap_release_page_lock(dst_md);
-#endif
-#endif
-#endif
 }
 #endif /* (ARM_MMU_GENERIC + ARM_MMU_SA1 + ARM_MMU_V6) != 0 */
 
@@ -1176,16 +1079,6 @@ pmap_copy_page_xscale(paddr_t src, paddr_t dst)
 	PTE_SYNC(cdst_pte);
 }
 #endif /* ARM_MMU_XSCALE == 1 */
-
-
-
-
-
-
-
-
-
-
 
 
 /*
