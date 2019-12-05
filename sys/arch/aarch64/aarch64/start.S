@@ -1,4 +1,4 @@
-/*	$NetBSD: start.S,v 1.2 2018/10/18 09:01:51 skrll Exp $	*/
+/*	$NetBSD: start.S,v 1.3 2019/12/04 11:24:31 jmcneill Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -32,7 +32,12 @@
 
 #include <aarch64/asm.h>
 
-RCSID("$NetBSD: start.S,v 1.2 2018/10/18 09:01:51 skrll Exp $")
+RCSID("$NetBSD: start.S,v 1.3 2019/12/04 11:24:31 jmcneill Exp $")
+
+/*
+ * Padding at start of kernel image to make room for 64-byte header (non-ELF booting)
+ */
+.space	64, 0x0
 
 /*
  * Kernel start routine for aarch64 boards.
