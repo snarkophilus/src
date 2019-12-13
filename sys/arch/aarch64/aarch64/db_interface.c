@@ -304,7 +304,7 @@ pg_dump(struct vm_page *pg, void (*pr)(const char *, ...) __printflike(1, 2))
 	pr(" pg->loan_count = %u\n", pg->loan_count);
 	pr(" pg->wire_count = %u\n", pg->wire_count);
 	pr(" pg->pqflags    = %u\n", pg->pqflags);
-	pr(" pg->phys_addr  = %016lx\n", pg->phys_addr);
+	pr(" pg->phys_addr  = %016lx\n", VM_PAGE_TO_PHYS(pg));
 }
 
 

@@ -1,4 +1,4 @@
-/*        $NetBSD: device-mapper.c,v 1.44 2019/12/04 16:55:30 tkusumi Exp $ */
+/*        $NetBSD: device-mapper.c,v 1.49 2019/12/11 14:03:37 tkusumi Exp $ */
 
 /*
  * Copyright (c) 2010 The NetBSD Foundation, Inc.
@@ -134,7 +134,7 @@ static const struct cmd_function {
 	int  (*fn)(prop_dictionary_t);
 	int  allowed;
 } cmd_fn[] = {
-	{ .cmd = "version", .fn = dm_get_version_ioctl,	  .allowed = 1 },
+	{ .cmd = "version", .fn = NULL,                   .allowed = 1 },
 	{ .cmd = "targets", .fn = dm_list_versions_ioctl, .allowed = 1 },
 	{ .cmd = "create",  .fn = dm_dev_create_ioctl,    .allowed = 0 },
 	{ .cmd = "info",    .fn = dm_dev_status_ioctl,    .allowed = 1 },
@@ -149,7 +149,7 @@ static const struct cmd_function {
 	{ .cmd = "reload",  .fn = dm_table_load_ioctl,    .allowed = 0 },
 	{ .cmd = "status",  .fn = dm_table_status_ioctl,  .allowed = 1 },
 	{ .cmd = "table",   .fn = dm_table_status_ioctl,  .allowed = 1 },
-	{ .cmd = NULL,      .fn = NULL,			  .allowed = 0 }
+	{ .cmd = NULL,      .fn = NULL,                   .allowed = 0 },
 };
 
 #ifdef _MODULE
@@ -355,20 +355,18 @@ dmioctl(dev_t dev, const u_long cmd, void *data, int flag, struct lwp *l)
 	int r;
 	prop_dictionary_t dm_dict_in;
 
-	r = 0;
-
 	aprint_debug("dmioctl called\n");
 	KASSERT(data != NULL);
 
 	if ((r = disk_ioctl_switch(dev, cmd, data)) == ENOTTY) {
-		struct plistref *pref = (struct plistref *) data;
+		struct plistref *pref = (struct plistref *)data;
 
 		/* Check if we were called with NETBSD_DM_IOCTL ioctl
 		   otherwise quit. */
 		if ((r = dm_ioctl_switch(cmd)) != 0)
 			return r;
 
-		if((r = prop_dictionary_copyin_ioctl(pref, cmd, &dm_dict_in))
+		if ((r = prop_dictionary_copyin_ioctl(pref, cmd, &dm_dict_in))
 		    != 0)
 			return r;
 
@@ -413,7 +411,9 @@ dm_cmd_to_fun(prop_dictionary_t dm_dict)
 	if (cmd_fn[i].cmd == NULL)
 		return EINVAL;
 
-	aprint_debug("ioctl %s called\n", cmd_fn[i].cmd);
+	aprint_debug("ioctl %s called %p\n", cmd_fn[i].cmd, cmd_fn[i].fn);
+	if (cmd_fn[i].fn == NULL)
+		return 0;
 	r = cmd_fn[i].fn(dm_dict);
 
 	return r;
@@ -426,21 +426,20 @@ dm_ioctl_switch(u_long cmd)
 
 	switch(cmd) {
 	case NETBSD_DM_IOCTL:
-		aprint_debug("dm NetBSD_DM_IOCTL called\n");
+		aprint_debug("dm NETBSD_DM_IOCTL called\n");
 		break;
 	default:
-		 aprint_debug("dm unknown ioctl called\n");
-		 return ENOTTY;
-		 break; /* NOT REACHED */
+		aprint_debug("dm unknown ioctl called\n");
+		return ENOTTY;
+		break; /* NOT REACHED */
 	}
 
-	 return 0;
+	return 0;
 }
 
- /*
-  * Check for disk specific ioctls.
-  */
-
+/*
+ * Check for disk specific ioctls.
+ */
 static int
 disk_ioctl_switch(dev_t dev, u_long cmd, void *data)
 {
@@ -635,9 +634,9 @@ dmstrategy(struct buf *bp)
 		    PRIu64"\n", buf_start, buf_len);
 		aprint_debug("start-buf_start %010"PRIu64", end %010"
 		    PRIu64"\n", start - buf_start, end);
-		aprint_debug("start %010" PRIu64" , end %010"
+		aprint_debug("start %010" PRIu64", end %010"
                     PRIu64"\n", start, end);
-		aprint_debug("\n----------------------------------------\n");
+		aprint_debug("----------------------------------------\n");
 
 		if (start < end) {
 			/* create nested buffer  */
