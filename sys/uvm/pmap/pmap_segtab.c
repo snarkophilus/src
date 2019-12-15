@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_segtab.c,v 1.11 2019/10/20 07:22:51 skrll Exp $	*/
+/*	$NetBSD: pmap_segtab.c,v 1.12 2019/12/14 14:46:11 ad Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.11 2019/10/20 07:22:51 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.12 2019/12/14 14:46:11 ad Exp $");
 
 /*
  *	Manages physical address maps.
@@ -351,7 +351,7 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 	UVMHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx list %jx",
 	    (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)uobj, (uintptr_t)pglist);
 	mutex_spin_enter(uobj->vmobjlock);
-	TAILQ_INSERT_TAIL(pglist, pg, listq.queue);
+	TAILQ_INSERT_TAIL(pglist, pg, pageq.queue);
 	uobj->uo_npages++;
 	mutex_spin_exit(uobj->vmobjlock);
 
@@ -385,7 +385,7 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 	    pg->uobject, uobj);
 
 	mutex_spin_enter(uobj->vmobjlock);
-	TAILQ_REMOVE(list, pg, listq.queue);
+	TAILQ_REMOVE(list, pg, pageq.queue);
 	uobj->uo_npages--;
 	mutex_spin_exit(uobj->vmobjlock);
 

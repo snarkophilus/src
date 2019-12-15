@@ -836,7 +836,7 @@ init_mmutable:
 	adrl	x1, start			/* pa = start (physical) */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
-	add	x2, x2, #BOOTPAGE_ALLOC_MAX	/* for bootpage_alloc() */
+	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for bootpage_alloc() */
 	mov	x3, #L2_SIZE			/* blocksize */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB | LX_BLKPAG_AP_RW	/* attr */
 	orr	x4, x4, #LX_BLKPAG_UXN
