@@ -43,6 +43,7 @@
 
 // XXXNH some implementations support 16bit asid
 #define PMAP_TLB_NUM_PIDS		65536
+#define PMAP_TLB_BITMAP_LENGTH		PMAP_TLB_NUM_PIDS
 #define cpu_set_tlb_info(ci, ti)        ((void)((ci)->ci_tlb_info = (ti)))
 #if PMAP_TLB_MAX > 1
 #define cpu_tlb_info(ci)		((ci)->ci_tlb_info)
@@ -52,6 +53,7 @@
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
 #define PMAP_PDETABSIZE	(PAGE_SIZE / sizeof(pd_entry_t))
+#define PMAP_SEGTABSIZE	NSEGPG
 
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
