@@ -104,6 +104,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.45 2019/12/18 10:55:50 skrll Exp $");
 
 #include <sys/param.h>
 
+#include <sys/asan.h>
 #include <sys/atomic.h>
 #include <sys/buf.h>
 #include <sys/cpu.h>
@@ -455,10 +456,14 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	if (virtual_end == 0 || virtual_end > VM_MAX_KERNEL_ADDRESS)
 		virtual_end = VM_MAX_KERNEL_ADDRESS;
 
+        kasan_shadow_map((void *)pmap_limits.virtual_end,
+          (size_t)(virtual_end - pmap_limits.virtual_end));
+
 	/*
 	 * Update new end.
 	 */
 	pmap_limits.virtual_end = virtual_end;
+
 	return virtual_end;
 }
 

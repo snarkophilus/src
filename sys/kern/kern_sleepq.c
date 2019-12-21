@@ -42,7 +42,7 @@ __KERNEL_RCSID(0, "$NetBSD: kern_sleepq.c,v 1.56 2019/12/17 18:08:15 ad Exp $");
 #include <sys/cpu.h>
 #include <sys/intr.h>
 #include <sys/pool.h>
-#include <sys/proc.h> 
+#include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/systm.h>
