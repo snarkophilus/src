@@ -86,7 +86,7 @@ mi_startlwp(void *arg)
 		/* Paranoid check */
 		mutex_enter(proc_lock);
 		if ((p->p_slflag & (PSL_TRACED|PSL_TRACELWP_CREATE)) !=
-		    (PSL_TRACED|PSL_TRACELWP_CREATE)) { 
+		    (PSL_TRACED|PSL_TRACELWP_CREATE)) {
 			mutex_exit(proc_lock);
 			return;
 		}
@@ -238,7 +238,7 @@ sys__lwp_suspend(struct lwp *l, const struct sys__lwp_suspend_args *uap,
 
 	/*
 	 * Suspend the LWP.  XXX If it's on a different CPU, we should wait
-	 * for it to be preempted, where it will put itself to sleep. 
+	 * for it to be preempted, where it will put itself to sleep.
 	 *
 	 * Suspension of the current LWP will happen on return to userspace.
 	 */
