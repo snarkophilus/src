@@ -1698,10 +1698,6 @@ _pmap_enter(struct pmap *pm, vaddr_t va, paddr_t pa, vm_prot_t prot,
 	opte = atomic_swap_64(ptep, 0);
 	need_sync_icache = (prot & VM_PROT_EXECUTE);
 
-	if (!user) {
-		kasan_shadow_map((void *)va, PAGE_SIZE);
-	}
-
 	/* for lock ordering for pg and opg */
 	pgs[0] = pg;
 	pgs[1] = NULL;
