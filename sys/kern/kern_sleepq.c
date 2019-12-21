@@ -42,7 +42,7 @@ __KERNEL_RCSID(0, "$NetBSD: kern_sleepq.c,v 1.55 2019/12/16 19:43:36 ad Exp $");
 #include <sys/cpu.h>
 #include <sys/intr.h>
 #include <sys/pool.h>
-#include <sys/proc.h> 
+#include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/sched.h>
 #include <sys/systm.h>
@@ -76,12 +76,17 @@ sleepqlock_t	sleepq_locks[SLEEPTAB_HASH_SIZE] __cacheline_aligned;
 void
 sleeptab_init(sleeptab_t *st)
 {
+	static bool again;
 	int i;
 
 	for (i = 0; i < SLEEPTAB_HASH_SIZE; i++) {
-		mutex_init(&sleepq_locks[i].lock, MUTEX_DEFAULT, IPL_SCHED);
+		if (!again) {
+			mutex_init(&sleepq_locks[i].lock, MUTEX_DEFAULT,
+			    IPL_SCHED);
+		}
 		sleepq_init(&st->st_queue[i]);
 	}
+	again = true;
 }
 
 /*
