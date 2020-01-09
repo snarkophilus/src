@@ -575,6 +575,6 @@ cpu_hatched_p(u_int cpuindex)
 	u_long bit = __BIT(cpuindex % CPUINDEX_DIVISOR);
 
 	membar_consumer();
-	return (arm_cpu_mbox[off] & bit) != 0;
+	return (arm_cpu_hatched[off] & bit) != 0;
 }
 #endif /* MULTIPROCESSOR */

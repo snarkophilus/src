@@ -370,14 +370,6 @@ ENTRY_NP(cpu_mpstart)
 
 	mov	x27, x1			/* x27 = cpuindex */
 
-	adrl	x0, _C_LABEL(arm_cpu_mbox)
-	add	x28, x0, x27, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex] */
-
-	/*
-	 * x27 = cpuindex
-	 * x28 = &arm_cpu_mbox[cpuindex]
-	 */
-
 	/* set stack pointer for boot */
 	mov	x1, #BOOT_AP_STACKSIZE
 	mul	x1, x1, x27
@@ -402,7 +394,6 @@ ENTRY_NP(cpu_mpstart)
 	CPU_DPRINTSREG("MIDR_EL1         = ", midr_el1)
 	CPU_DPRINTSREG("MPIDR_EL1        = ", mpidr_el1)
 
-
 #ifdef LOCORE_EL2
 	CPU_DPRINT("Drop to EL1...\n")
 	bl	drop_to_el1
@@ -411,7 +402,6 @@ ENTRY_NP(cpu_mpstart)
 	lsr	x20, x20, #2
 	CPU_DPRINTREG("CurrentEL        = ", x20)
 #endif /* LOCORE_EL2 */
-
 
 	bl	mmu_disable
 	bl	init_sysregs
@@ -448,23 +438,21 @@ mp_vstart:
 	mrs	x1, mpidr_el1
 	str	x1, [x0, #CI_MPIDR]	/* curcpu()->ci_mpidr = mpidr_el1 */
 
-	// sizeof arm_cpu_hatched[0]) == 64. 1 << 6 is 64.
-
+	/* x28 = &arm_cpu_hatched[cpuindex / (sizeof(unsigned long) * NBBY)] */
 	adrl	x0, _C_LABEL(arm_cpu_hatched)
 	mov	x1, x27, lsr #6
-	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_hatched[cpuindex / sizeof(unsigned long)] */
+	add	x28, x0, x1, lsl #3
 
 	mov	x0, #1
-	bic	x2, x1, #63
+	and	x2, x27, #63
 	lsl	x29, x0, x2		/* x29 = 1 << (cpuindex & 63) */
 
 	/*
 	 * atomic_or_ulong(&arm_cpu_hatched[cpuindex / sizeof(u_long)], 1UL << cpuindex & (64 - 1))
 	 * to tell my activity to primary processor.
 	 */
-
-	adrl	x0, _C_LABEL(arm_cpu_hatched)
-	add	x28, x0, x27, lsl #3	/* x28 = &arm_cpu_hatched[cpuindex / sizeof(u_long)] */
+	CPU_DPRINTREG("x28 hatched      = ", x28)
+	CPU_DPRINTREG("x29 bit          = ", x29)
 
 	mov	x0, x28
 	mov	x1, x29
@@ -474,7 +462,7 @@ mp_vstart:
 
 	adrl	x0, _C_LABEL(arm_cpu_mbox)
 	mov	x1, x27, lsr #6
-	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex / sizeof(u_long)] */
+	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex / (sizeof(u_long) * NBBY)] */
 
 	/* wait for the mailbox start bit to become true */
 1:
