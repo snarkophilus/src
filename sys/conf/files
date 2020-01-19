@@ -1,4 +1,4 @@
-#	$NetBSD: files,v 1.1247 2019/12/19 00:23:57 jakllsch Exp $
+#	$NetBSD: files,v 1.1250 2020/01/19 06:55:24 thorpej Exp $
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
 
 version 	20171118
@@ -89,8 +89,6 @@ defflag	opt_ntp.h		PPS_SYNC PPS_DEBUG NTP
 defflag	opt_ptm.h		NO_DEV_PTM COMPAT_BSDPTY
 
 defparam opt_kmempages.h	NKMEMPAGES NKMEMPAGES_MIN NKMEMPAGES_MAX
-
-defflag	opt_revcache.h		NAMECACHE_ENTER_REVERSE
 
 defflag	opt_exec.h		DEBUG_EXEC
 
@@ -926,11 +924,6 @@ file	dev/ic/clmpcc.c			clmpcc			needs-flag
 device	ug: sysmon_envsys
 file	dev/ic/ug.c			ug			needs-flag
 
-# Essential Communications Corp. HIPPI Interface
-#
-device	esh: hippi, ifnet
-file	dev/ic/rrunner.c		esh			needs-flag
-
 # SMC 90c26, SMC 90C56 (and 90C66 if in compat mode) chip driver
 #
 device	bah: ifnet, arcnet, arp
@@ -1543,6 +1536,12 @@ include "net/files.net"
 # Game adapter (joystick)
 device	joy
 file	dev/ic/joy.c			joy needs-flag
+
+# process monitor for make(1)
+# normally built as module
+defpseudo filemon
+file	dev/filemon/filemon.c		filemon
+file	dev/filemon/filemon_wrapper.c	filemon
 
 #
 # General Purpose Input/Output framework

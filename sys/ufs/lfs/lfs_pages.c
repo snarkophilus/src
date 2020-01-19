@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_pages.c,v 1.18 2019/12/20 20:54:48 ad Exp $	*/
+/*	$NetBSD: lfs_pages.c,v 1.20 2020/01/15 17:55:44 ad Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2002, 2003, 2019 The NetBSD Foundation, Inc.
@@ -60,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: lfs_pages.c,v 1.18 2019/12/20 20:54:48 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lfs_pages.c,v 1.20 2020/01/15 17:55:44 ad Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
@@ -306,8 +306,10 @@ check_dirty(struct lfs *fs, struct vnode *vp,
 			UVM_PAGE_OWN(pg, "lfs_putpages");
 
 			pmap_page_protect(pg, VM_PROT_NONE);
-			tdirty = (pmap_clear_modify(pg) ||
-				  (pg->flags & PG_CLEAN) == 0);
+			tdirty =
+			    uvm_pagegetdirty(pg) != UVM_PAGE_STATUS_CLEAN &&
+			    (uvm_pagegetdirty(pg) == UVM_PAGE_STATUS_DIRTY ||
+			    pmap_clear_modify(pg));
 			dirty += tdirty;
 		}
 		if ((pages_per_block > 0 && nonexistent >= pages_per_block) ||
@@ -329,16 +331,19 @@ check_dirty(struct lfs *fs, struct vnode *vp,
 		for (i = 0; i == 0 || i < pages_per_block; i++) {
 			KASSERT(mutex_owned(vp->v_interlock));
 			pg = pgs[i];
-			KASSERT(!((pg->flags & PG_CLEAN) && (pg->flags & PG_DELWRI)));
+			KASSERT(!(uvm_pagegetdirty(pg) != UVM_PAGE_STATUS_DIRTY
+			    && (pg->flags & PG_DELWRI)));
 			KASSERT(pg->flags & PG_BUSY);
 			if (dirty) {
-				pg->flags &= ~PG_CLEAN;
+				uvm_pagemarkdirty(pg, UVM_PAGE_STATUS_DIRTY);
 				if (flags & PGO_FREE) {
 					/*
 					 * Wire the page so that
 					 * pdaemon doesn't see it again.
 					 */
+					uvm_pagelock(pg);
 					uvm_pagewire(pg);
+					uvm_pageunlock(pg);
 
 					/* Suspended write flag */
 					pg->flags |= PG_DELWRI;
@@ -495,7 +500,9 @@ retry:
 						    "lfsput2", 0);
 				mutex_enter(vp->v_interlock);
 			}
+			uvm_pagelock(pg);
 			uvm_pageactivate(pg);
+			uvm_pageunlock(pg);
 		}
 		ap->a_offlo = blkeof;
 		if (ap->a_offhi > 0 && ap->a_offhi <= ap->a_offlo) {

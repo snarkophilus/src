@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.46 2019/12/08 10:37:19 skrll Exp $	*/
+/*	$NetBSD: locore.S,v 1.52 2020/01/15 08:34:04 mrg Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -38,8 +38,14 @@
 #include <aarch64/hypervisor.h>
 #include "assym.h"
 
-RCSID("$NetBSD: locore.S,v 1.46 2019/12/08 10:37:19 skrll Exp $")
+RCSID("$NetBSD: locore.S,v 1.52 2020/01/15 08:34:04 mrg Exp $")
 
+#ifdef AARCH64_DEVICE_MEM_STRONGLY_ORDERED
+#define	MAIR_DEVICE_MEM		MAIR_DEVICE_nGnRnE
+#else
+#define	MAIR_DEVICE_MEM		MAIR_DEVICE_nGnRE
+#endif
+#define	MAIR_DEVICE_MEM_SO	MAIR_DEVICE_nGnRnE
 
 /*#define DEBUG_LOCORE			/* debug print */
 /*#define DEBUG_LOCORE_PRINT_LOCK	/* avoid mixing AP's output */
@@ -113,7 +119,6 @@ ASENTRY_NP(aarch64_start)
 	DPRINTSREG("ID_AA64MMFR0_EL1 = ", id_aa64mmfr0_el1)
 	DPRINTSREG("ID_AA64MMFR1_EL1 = ", id_aa64mmfr1_el1)
 
-
 #ifdef LOCORE_EL2
 	VPRINT("Drop to EL1...")
 # include <aarch64/aarch64/locore_el2.S>
@@ -147,7 +152,6 @@ aarch64_fatal:
 	mov	sp, x28
 	ret
 
-
 /*
  * vstart is in kernel virtual address
  */
@@ -177,7 +181,8 @@ vstart:
 	/* get cache configuration */
 	mrs	x0, tpidr_el1		/* curcpu */
 	mrs     x1, mpidr_el1
-	bl	aarch64_gettopology
+	mov	x2, #0
+	bl	arm_cpu_topology_set
 	mov	x0, xzr
 	bl	aarch64_getcacheinfo
 
@@ -824,7 +829,6 @@ init_mmutable:
 	adrl	x1, start			/* pa = start (physical) */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
-	add	x2, x2, #PMAPBOOT_PAGEALLOCMAX	/* for bootpage_alloc() */
 	mov	x3, #L2_SIZE			/* blocksize */
 	mov	x4, #LX_BLKPAG_ATTR_NORMAL_WB | LX_BLKPAG_AP_RW	/* attr */
 	orr	x4, x4, #LX_BLKPAG_UXN
@@ -899,7 +903,8 @@ mair_setting:
 	    __SHIFTIN(MAIR_NORMAL_WB, MAIR_ATTR0) |	\
 	    __SHIFTIN(MAIR_NORMAL_NC, MAIR_ATTR1) |	\
 	    __SHIFTIN(MAIR_NORMAL_WT, MAIR_ATTR2) |	\
-	    __SHIFTIN(MAIR_DEVICE_nGnRnE, MAIR_ATTR3))
+	    __SHIFTIN(MAIR_DEVICE_MEM, MAIR_ATTR3) |	\
+	    __SHIFTIN(MAIR_DEVICE_MEM_SO, MAIR_ATTR4))
 
 #define VIRT_BIT	48
 

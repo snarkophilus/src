@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.136 2019/12/20 21:05:33 ad Exp $	*/
+/*	$NetBSD: cpu.c,v 1.141 2020/01/18 14:40:04 skrll Exp $	*/
 
 /*
  * Copyright (c) 1995 Mark Brinicombe.
@@ -46,7 +46,7 @@
 #include "opt_multiprocessor.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.136 2019/12/20 21:05:33 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.141 2020/01/18 14:40:04 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -60,6 +60,7 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.136 2019/12/20 21:05:33 ad Exp $");
 
 #include <arm/locore.h>
 #include <arm/undefined.h>
+#include <arm/cpu_topology.h>
 
 extern const char *cpu_arch;
 
@@ -109,20 +110,6 @@ cpu_attach(device_t dv, cpuid_t id)
 #ifdef MULTIPROCESSOR
 		uint32_t mpidr = armreg_mpidr_read();
 		ci->ci_mpidr = mpidr;
-
-		if (mpidr & MPIDR_MT) {
-			cpu_topology_set(ci,
-			    __SHIFTOUT(mpidr, MPIDR_AFF2),
-			    __SHIFTOUT(mpidr, MPIDR_AFF1),
-			    __SHIFTOUT(mpidr, MPIDR_AFF0),
-			    0);
-		} else {
-			cpu_topology_set(ci,
-			    __SHIFTOUT(mpidr, MPIDR_AFF1),
-			    __SHIFTOUT(mpidr, MPIDR_AFF0),
-			    0,
-			    0);
-		}
 #endif
 	} else {
 #ifdef MULTIPROCESSOR
@@ -151,6 +138,8 @@ cpu_attach(device_t dv, cpuid_t id)
 
 	ci->ci_dev = dv;
 	dv->dv_private = ci;
+
+	arm_cpu_do_topology(ci);
 
 	evcnt_attach_dynamic(&ci->ci_arm700bugcount, EVCNT_TYPE_MISC,
 	    NULL, xname, "arm700swibug");
@@ -679,6 +668,7 @@ identify_arm_cpu(device_t dv, struct cpu_info *ci)
 	const uint32_t arm_cpuid = ci->ci_arm_cpuid;
 	const char * const xname = device_xname(dv);
 	char model[128];
+	const char *m;
 
 	if (arm_cpuid == 0) {
 		aprint_error("Processor failed probe - no CPU ID\n");
@@ -688,7 +678,9 @@ identify_arm_cpu(device_t dv, struct cpu_info *ci)
 	const enum cpu_class cpu_class = identify_arm_model(arm_cpuid,
 	     model, sizeof(model));
 	if (ci->ci_cpuid == 0) {
-		cpu_setmodel("%s", model);
+		m = cpu_getmodel();
+		if (m == NULL || *m == 0)
+			cpu_setmodel("%s", model);
 	}
 
 	if (ci->ci_data.cpu_cc_freq != 0) {
@@ -894,3 +886,12 @@ identify_features(device_t dv)
 	    "pfr: [0]=%#x [1]=%#x\n",
 	    cpu_processor_features[0], cpu_processor_features[1]);
 }
+
+#ifdef _ARM_ARCH_6
+int
+cpu_maxproc_hook(int nmaxproc)
+{
+
+	return pmap_maxproc_set(nmaxproc);
+}
+#endif

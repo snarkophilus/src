@@ -120,6 +120,8 @@
 #endif
 #define	NSEGPG		(1 << SEGLENGTH)
 
+int	pmap_maxproc_set(int);
+
 #if defined(__PMAP_PRIVATE)
 
 #include <uvm/uvm_physseg.h>
@@ -136,6 +138,9 @@ bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
 void	pmap_md_pdetab_activate(pmap_t, struct lwp *);
 void	pmap_md_pdetab_deactivate(pmap_t);
+
+void	pmap_md_alloc_pdp(pmap_t);
+void	pmap_md_free_pdp(pmap_t);
 
 vaddr_t pmap_md_direct_map_paddr(paddr_t);
 

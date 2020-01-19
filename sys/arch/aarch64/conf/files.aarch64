@@ -1,9 +1,10 @@
-#	$NetBSD: files.aarch64,v 1.14 2019/11/20 19:37:51 pgoyette Exp $
+#	$NetBSD: files.aarch64,v 1.17 2020/01/15 08:34:04 mrg Exp $
 
 defflag opt_cpuoptions.h	AARCH64_ALIGNMENT_CHECK
 defflag opt_cpuoptions.h	AARCH64_EL0_STACK_ALIGNMENT_CHECK
 defflag opt_cpuoptions.h	AARCH64_EL1_STACK_ALIGNMENT_CHECK
 defflag opt_cpuoptions.h	AARCH64_HAVE_L2CTLR
+defflag opt_cpuoptions.h	AARCH64_DEVICE_MEM_STRONGLY_ORDERED
 
 defflag	opt_cputypes.h		CPU_ARMV8
 defflag	opt_cputypes.h		CPU_CORTEX: CPU_ARMV8
@@ -40,6 +41,7 @@ defparam opt_console.h		CONADDR
 file	arch/aarch64/aarch64/fpu.c
 
 file	arch/arm/arm/arm_generic_dma.c
+file	arch/arm/arm/arm_cpu_topology.c
 file	arch/arm/arm32/bus_dma.c
 
 device	psci

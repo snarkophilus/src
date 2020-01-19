@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.115 2019/12/01 15:34:46 ad Exp $	*/
+/*	$NetBSD: cpu.h,v 1.117 2020/01/15 13:22:03 ad Exp $	*/
 
 /*
  * Copyright (c) 1990 The Regents of the University of California.
@@ -127,7 +127,7 @@ struct cpu_info {
 	int ci_curldt;		/* current LDT descriptor */
 	int ci_nintrhand;	/* number of H/W interrupt handlers */
 	uint64_t ci_scratch;
-	uintptr_t ci_pmap_data[64 / sizeof(uintptr_t)];
+	uintptr_t ci_pmap_data[128 / sizeof(uintptr_t)];
 	struct kcpuset *ci_tlb_cpuset;
 
 	int ci_kfpu_spl;
@@ -149,9 +149,11 @@ struct cpu_info {
 	struct {
 		uint32_t	ipending;
 		int		ilevel;
+		uint32_t	imasked;
 	} ci_istate __aligned(8);
 #define ci_ipending	ci_istate.ipending
 #define	ci_ilevel	ci_istate.ilevel
+#define	ci_imasked	ci_istate.imasked
 	int		ci_idepth;
 	void *		ci_intrstack;
 	uint32_t	ci_imask[NIPL];

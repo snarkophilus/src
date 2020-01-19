@@ -1,4 +1,4 @@
-/*	$NetBSD: label.c,v 1.17 2019/12/15 11:22:46 martin Exp $	*/
+/*	$NetBSD: label.c,v 1.19 2020/01/15 19:37:41 martin Exp $	*/
 
 /*
  * Copyright 1997 Jonathan Stone
@@ -36,7 +36,7 @@
 
 #include <sys/cdefs.h>
 #if defined(LIBC_SCCS) && !defined(lint)
-__RCSID("$NetBSD: label.c,v 1.17 2019/12/15 11:22:46 martin Exp $");
+__RCSID("$NetBSD: label.c,v 1.19 2020/01/15 19:37:41 martin Exp $");
 #endif
 
 #include <sys/types.h>
@@ -182,7 +182,7 @@ checkoverlap(struct disk_partitions *parts)
  *  2 -> continue installation
  */
 static int
-verify_parts(struct partition_usage_set *pset)
+verify_parts(struct partition_usage_set *pset, bool install)
 {
 	struct part_usage_info *wanted;
 	struct disk_partitions *parts;
@@ -217,9 +217,9 @@ verify_parts(struct partition_usage_set *pset)
 		}
 	}
 
-	if (num_root == 0 ||
+	if ((num_root == 0 && install) ||
 	    (num_root > 1 && inst_start == 0)) {
-		if (num_root == 0)
+		if (num_root == 0 && install)
 			msg_display_subst(MSG_must_be_one_root, 2,
 			    msg_string(parts->pscheme->name),
 			    msg_string(parts->pscheme->short_name));
@@ -425,6 +425,10 @@ renumber_partitions(struct partition_usage_set *pset)
 			continue;
 		for (i = 0; i < pset->parts->num_part; i++) {
 			if (pset->infos[i].cur_start != info.start)
+				continue;
+			if (pset->infos[i].cur_flags != info.flags)
+				continue;
+			if (pset->infos[i].type != info.nat_type->generic_ptype)
 				continue;
 			memcpy(&ninfos[pno], &pset->infos[i],
 			    sizeof(ninfos[pno]));
@@ -1549,7 +1553,6 @@ add_partition_adder(menudesc *m, struct partition_usage_set *pset)
 
 	m->opts = nmenopts;
 	m->numopts++;
-	pset->num++;
 }
 
 static void
@@ -1561,7 +1564,6 @@ remove_partition_adder(menudesc *m, struct partition_usage_set *pset)
 	memmove(m->opts+off, m->opts+off+1,
 	    (m->numopts-off-1)*sizeof(*m->opts));
 	m->numopts--;
-	pset->num--;
 }
 
 /*
@@ -1571,6 +1573,9 @@ remove_partition_adder(menudesc *m, struct partition_usage_set *pset)
 static void
 show_partition_adder(menudesc *m, struct partition_usage_set *pset)
 {
+	if (m->opts == NULL)
+		return;
+
 	bool can_add_partition = pset->parts->pscheme->can_add_partition(
 	    pset->parts);
 	bool part_adder_present =
@@ -1605,7 +1610,8 @@ edit_fspart_abort(menudesc *m, void *arg)
  * Ask the user if they want to edit the partition or give up.
  */
 int
-edit_and_check_label(struct pm_devs *p, struct partition_usage_set *pset)
+edit_and_check_label(struct pm_devs *p, struct partition_usage_set *pset,
+    bool install)
 {
 	menu_ent *op;
 	size_t cnt, i;
@@ -1697,7 +1703,7 @@ edit_and_check_label(struct pm_devs *p, struct partition_usage_set *pset)
 		}
 
 		/* User thinks the label is OK. */
-		i = verify_parts(pset);
+		i = verify_parts(pset, install);
 		if (i == 1)
 			continue;
 		break;
@@ -1977,14 +1983,16 @@ getpartoff(struct disk_partitions *parts, daddr_t defpartstart)
 			i = min;
 			localsizemult = 1;
 		} else {
-			i = parse_disk_pos(isize, &localsizemult, pm->dlcylsize, NULL);
+			i = parse_disk_pos(isize, &localsizemult, 
+			    parts->pscheme->get_cylinder_size(parts), NULL);
 			if (i < 0) {
 				errmsg = msg_string(MSG_invalid_sector_number);
 				continue;
 			}
 		}
 		/* round to cylinder size if localsizemult != 1 */
-		i = NUMSEC(i, localsizemult, pm->dlcylsize);
+		int cylsize = parts->pscheme->get_cylinder_size(parts);
+		i = NUMSEC(i, localsizemult, cylsize);
 		/* Adjust to start of slice if needed */
 		if ((i < min && (min - i) < localsizemult) ||
 		    (i > min && (i - min) < localsizemult)) {
@@ -2008,10 +2016,11 @@ getpartsize(struct disk_partitions *parts, daddr_t partstart, daddr_t dflt)
 	char dsize[24], isize[24], max_size[24], maxpartc, valid_parts[4],
 	    *label_msg, *prompt, *head, *hint, *tail;
 	const char *errmsg = NULL;
-	daddr_t i, partend, localsizemult, max, max_r, dflt_r;
+	daddr_t i, partend, diskend, localsizemult, max, max_r, dflt_r;
 	struct disk_part_info info;
 	part_id partn;
 
+	diskend = parts->disk_start + parts->disk_size;
 	max = parts->pscheme->max_free_space_at(parts, partstart);
 
 	/* We need to keep both the unrounded and rounded (_r) max and dflt */
@@ -2086,7 +2095,7 @@ getpartsize(struct disk_partitions *parts, daddr_t partstart, daddr_t dflt)
 			max_r = max;
 		} else {
 			i = parse_disk_pos(isize, &localsizemult,
-			    pm->dlcylsize, NULL);
+			    parts->pscheme->get_cylinder_size(parts), NULL);
 			if (localsizemult != sizemult)
 				max_r = max;
 		}
@@ -2101,18 +2110,19 @@ getpartsize(struct disk_partitions *parts, daddr_t partstart, daddr_t dflt)
 		 * partend is aligned to a cylinder if localsizemult
 		 * is not 1 sector
 		 */
+		int cylsize = parts->pscheme->get_cylinder_size(parts);
 		partend = NUMSEC((partstart + i*localsizemult) / localsizemult,
-		    localsizemult, pm->dlcylsize);
+		    localsizemult, cylsize);
 		/* Align to end-of-disk or end-of-slice if close enough */
-		if (partend > (pm->dlsize - sizemult)
-		    && partend < (pm->dlsize + sizemult))
-			partend = pm->dlsize;
+		if (partend > (diskend - sizemult)
+		    && partend < (diskend + sizemult))
+			partend = diskend;
 		if (partend > (partstart + max - sizemult)
 		    && partend < (partstart + max + sizemult))
 			partend = partstart + max;
 		/* sanity checks */
-		if (partend > (partstart + pm->dlsize)) {
-			partend = pm->dlsize;
+		if (partend > diskend) {
+			partend = diskend;
 			errmsg = msg_string(MSG_endoutsidedisk);
 			continue;
 		}
@@ -2155,19 +2165,19 @@ parse_disk_pos(
 		if (*cp == 'G' || *cp == 'g') {
 			if (mult_found)
 				return -1;
-			*localsizemult = GIG / pm->sectorsize;
+			*localsizemult = GIG / 512;
 			goto next;
 		}
 		if (*cp == 'M' || *cp == 'm') {
 			if (mult_found)
 				return -1;
-			*localsizemult = MEG / pm->sectorsize;
+			*localsizemult = MEG / 512;
 			goto next;
 		}
 		if (*cp == 'c' || *cp == 'C') {
 			if (mult_found)
 				return -1;
-			*localsizemult = pm->dlcylsize;
+			*localsizemult = cyl_size;
 			goto next;
 		}
 		if (*cp == 's' || *cp == 'S') {

@@ -1,4 +1,4 @@
-/*	$NetBSD: disks.c,v 1.58 2019/12/11 19:23:37 martin Exp $ */
+/*	$NetBSD: disks.c,v 1.60 2020/01/16 16:47:19 martin Exp $ */
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -758,7 +758,7 @@ convert_scheme(struct pm_devs *p, bool is_boot_drive, const char **err_msg)
 		return false;
 
 	new_parts = new_scheme->create_new_for_disk(p->diskdev,
-	    0, p->dlsize, p->dlsize, is_boot_drive);
+	    0, p->dlsize, p->dlsize, is_boot_drive, NULL);
 	if (new_parts == NULL)
 		return false;
 
@@ -914,7 +914,6 @@ find_disks(const char *doingwhat, bool allow_cur_system)
 		pm->found = 1;
 		pm->ptstart = 0;
 		pm->ptsize = 0;
-		pm->bootable = 0;
 		strlcpy(pm->diskdev, disk->dd_name, sizeof pm->diskdev);
 		strlcpy(pm->diskdev_descr, disk->dd_descr, sizeof pm->diskdev_descr);
 		/* Use as a default disk if the user has the sets on a local disk */
@@ -1132,15 +1131,15 @@ make_filesystems(struct install_partition_desc *install)
 			continue;			
 
 		if (parts->pscheme->get_part_device(parts, ptn->cur_part_id,
-		    devdev, sizeof devdev, &partno, parent_device_only, false)
-		    && is_active_rootpart(devdev, partno))
+		    devdev, sizeof devdev, &partno, parent_device_only, false,
+		    false) && is_active_rootpart(devdev, partno))
 			continue;
 
 		parts->pscheme->get_part_device(parts, ptn->cur_part_id,
-		    devdev, sizeof devdev, &partno, plain_name, true);
+		    devdev, sizeof devdev, &partno, plain_name, true, true);
 
 		parts->pscheme->get_part_device(parts, ptn->cur_part_id,
-		    rdev, sizeof rdev, &partno, raw_dev_name, true);
+		    rdev, sizeof rdev, &partno, raw_dev_name, true, true);
 
 		switch (ptn->fs_type) {
 		case FS_APPLEUFS:
@@ -1300,7 +1299,11 @@ make_fstab(struct install_partition_desc *install)
 		if (ptn->size == 0)
 			continue;
 
-		if (ptn->type != PT_swap &&
+		bool is_tmpfs = ptn->type == PT_root &&
+		    ptn->fs_type == FS_TMPFS &&
+		    (ptn->flags & PUIFLG_JUST_MOUNTPOINT);
+
+		if (!is_tmpfs && ptn->type != PT_swap &&
 		    (ptn->instflags & PUIINST_MOUNT) == 0)
 			continue;
 
@@ -1311,7 +1314,7 @@ make_fstab(struct install_partition_desc *install)
 
 		if (ptn->parts->pscheme->get_part_device(ptn->parts,
 			    ptn->cur_part_id, dev_buf, sizeof dev_buf, NULL,
-			    logical_name, true))
+			    logical_name, true, false))
 			dev = dev_buf;
 		else
 			dev = NULL;
@@ -1351,6 +1354,29 @@ make_fstab(struct install_partition_desc *install)
 			scripting_fprintf(f, "%s\t\tnone\tswap\tsw%s\t\t 0 0\n",
 				dev, dump_dev);
 			continue;
+#ifdef HAVE_TMPFS
+		case FS_TMPFS:
+			if (ptn->size < 0)
+				scripting_fprintf(f,
+				    "tmpfs\t\t/tmp\ttmpfs\trw,-m=1777,"
+				    "-s=ram%%%" PRIu64 "\n", -ptn->size);
+			else
+				scripting_fprintf(f,
+				    "tmpfs\t\t/tmp\ttmpfs\trw,-m=1777,"
+				    "-s=%" PRIu64 "M\n", ptn->size);
+			continue;
+#else
+		case FS_MFS:
+			if (swap_dev[0] != 0)
+				scripting_fprintf(f,
+				    "%s\t\t/tmp\tmfs\trw,-s=%"
+				    PRIu64 "\n", swap_dev, ptn->size);
+			else
+				scripting_fprintf(f,
+				    "swap\t\t/tmp\tmfs\trw,-s=%"
+				    PRIu64 "\n", ptn->size);
+			continue;
+#endif
 		case FS_SYSVBFS:
 			fstype = "sysvbfs";
 			make_target_dir("/stand");
@@ -1380,21 +1406,6 @@ make_fstab(struct install_partition_desc *install)
 	}
 
 done_with_disks:
-	if (tmp_ramdisk_size > 0) {
-#ifdef HAVE_TMPFS
-		scripting_fprintf(f, "tmpfs\t\t/tmp\ttmpfs\trw,-m=1777,-s=%"
-		    PRIu64 "\n",
-		    tmp_ramdisk_size * 512);
-#else
-		if (swap_dev[0] != 0)
-			scripting_fprintf(f, "%s\t\t/tmp\tmfs\trw,-s=%"
-			    PRIu64 "\n", swap_dev, tmp_ramdisk_size);
-		else
-			scripting_fprintf(f, "swap\t\t/tmp\tmfs\trw,-s=%"
-			    PRIu64 "\n", tmp_ramdisk_size);
-#endif
-	}
-
 	if (cdrom_dev[0] == 0)
 		get_default_cdrom(cdrom_dev, sizeof(cdrom_dev));
 
@@ -1510,9 +1521,9 @@ process_found_fs(struct data *list, size_t num, const struct lookfor *item,
 		    &parts, &pno) || parts == NULL || pno == NO_PART)
 			return 0;
 		parts->pscheme->get_part_device(parts, pno,
-		    dev, sizeof(dev), NULL, plain_name, true);
+		    dev, sizeof(dev), NULL, plain_name, true, true);
 		parts->pscheme->get_part_device(parts, pno,
-		    rdev, sizeof(rdev), NULL, raw_dev_name, true);
+		    rdev, sizeof(rdev), NULL, raw_dev_name, true, true);
 	} else {
 		/* this fstab entry uses the plain device name */
 		if (is_root) {
@@ -1832,7 +1843,7 @@ mount_disks(struct install_partition_desc *install)
 
 		if (!install->infos[i].parts->pscheme->get_part_device(
 		    install->infos[i].parts, install->infos[i].cur_part_id,
-		    devdev, sizeof devdev, NULL, plain_name, true))
+		    devdev, sizeof devdev, NULL, plain_name, true, true))
 			return -1;
 		error = mount_root(devdev, true, false, install);
 		if (error != 0 && error != EBUSY)
@@ -1899,7 +1910,7 @@ set_swap(struct install_partition_desc *install)
 
 	if (!install->infos[i].parts->pscheme->get_part_device(
 	    install->infos[i].parts, install->infos[i].cur_part_id, dev_buf,
-	    sizeof dev_buf, NULL, plain_name, true))
+	    sizeof dev_buf, NULL, plain_name, true, true))
 		return -1;
 
 	rval = swapctl(SWAP_ON, dev_buf, 0);
@@ -2508,11 +2519,11 @@ clone_partition_data(struct disk_partitions *dest_parts, part_id did,
 
 	if (!src_parts->pscheme->get_part_device(
 	    src_parts, sid, src_dev, sizeof src_dev, NULL,
-	    raw_dev_name, true))
+	    raw_dev_name, true, true))
 		return false;
 	if (!dest_parts->pscheme->get_part_device(
 	    dest_parts, did, target_dev, sizeof target_dev, NULL,
-	    raw_dev_name, true))
+	    raw_dev_name, true, true))
 		return false;
 
 	return run_program(RUN_DISPLAY | RUN_PROGRESS, 

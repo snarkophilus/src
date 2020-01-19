@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_extern.h,v 1.214 2019/12/16 22:47:55 ad Exp $	*/
+/*	$NetBSD: uvm_extern.h,v 1.219 2020/01/15 17:55:45 ad Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -210,6 +210,7 @@ b\32UNMAP\0\
 #define	UVM_PGA_STRAT_NORMAL	0	/* priority (low id to high) walk */
 #define	UVM_PGA_STRAT_ONLY	1	/* only specified free list */
 #define	UVM_PGA_STRAT_FALLBACK	2	/* ONLY falls back on NORMAL */
+#define	UVM_PGA_STRAT_NUMA	3	/* strongly prefer ideal bucket */
 
 /*
  * flags for uvm_pagealloc_strat()
@@ -499,6 +500,12 @@ struct uvmexp_sysctl {
 	int64_t poolpages;
 	int64_t countsyncone;
 	int64_t countsyncall;
+	int64_t anonunknown;
+	int64_t anonclean;
+	int64_t anondirty;
+	int64_t fileunknown;
+	int64_t fileclean;
+	int64_t filedirty;
 };
 
 #ifdef _KERNEL
@@ -638,6 +645,7 @@ int			uvm_coredump_walkmap(struct proc *,
 int			uvm_coredump_count_segs(struct proc *);
 void			uvm_proc_exit(struct proc *);
 void			uvm_lwp_exit(struct lwp *);
+void			uvm_idle(void);
 void			uvm_init_limits(struct proc *);
 bool			uvm_kernacc(void *, size_t, vm_prot_t);
 __dead void		uvm_scheduler(void);
@@ -735,6 +743,8 @@ int			uvm_obj_wirepages(struct uvm_object *, off_t, off_t,
 void			uvm_obj_unwirepages(struct uvm_object *, off_t, off_t);
 
 /* uvm_page.c */
+int			uvm_availmem(void);
+void			uvm_page_numa_load(paddr_t, paddr_t, u_int);
 struct vm_page		*uvm_pagealloc_strat(struct uvm_object *,
 			    voff_t, struct vm_anon *, int, int, int);
 #define	uvm_pagealloc(obj, off, anon, flags) \
@@ -775,10 +785,12 @@ int			uvm_grow(struct proc *, vaddr_t);
 void			uvm_deallocate(struct vm_map *, vaddr_t, vsize_t);
 
 /* uvm_vnode.c */
+struct uvm_page_array;
 void			uvm_vnp_setsize(struct vnode *, voff_t);
 void			uvm_vnp_setwritesize(struct vnode *, voff_t);
 int			uvn_findpages(struct uvm_object *, voff_t,
-			    int *, struct vm_page **, int);
+			    unsigned int *, struct vm_page **,
+			    struct uvm_page_array *, unsigned int);
 bool			uvn_text_p(struct uvm_object *);
 bool			uvn_clean_p(struct uvm_object *);
 bool			uvn_needs_writefault_p(struct uvm_object *);

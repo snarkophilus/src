@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.374 2019/09/25 16:37:54 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.380 2020/01/18 14:40:04 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -222,7 +222,7 @@
 #include <arm/db_machdep.h>
 #endif
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.374 2019/09/25 16:37:54 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.380 2020/01/18 14:40:04 skrll Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG
@@ -469,8 +469,6 @@ int pmap_kmpages;
 /*
  * Flag to indicate if pmap_init() has done its thing
  */
-extern bool pmap_initialized;
-
 bool pmap_initialized;
 
 /*
@@ -544,7 +542,6 @@ static u_int		pmap_modify_pv(struct vm_page_md *, paddr_t, pmap_t, vaddr_t,
 			    u_int, u_int);
 
 static void		pmap_pinit(pmap_t);
-
 
 static int		pmap_pmap_ctor(void *, void *, int);
 
@@ -2996,8 +2993,8 @@ pmap_kremove_pg(struct vm_page *pg, vaddr_t va)
 	KASSERT(PV_IS_KENTRY_P(pv->pv_flags));
 
 	/*
-	 * If we are removing a writeable mapping to a cached exec page,
-	 * if it's the last mapping then clear it execness other sync
+	 * We are removing a writeable mapping to a cached exec page, if
+	 * it's the last mapping then clear its execness otherwise sync
 	 * the page to the icache.
 	 */
 	if ((md->pvh_attrs & (PVF_NC|PVF_EXEC)) == PVF_EXEC
@@ -4293,6 +4290,9 @@ pmap_grow_map(vaddr_t va, paddr_t *pap)
 #else
 		if (uvm_page_physget(&pa) == false)
 			return (1);
+
+		pmap_kenter_pa(va, pa,
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_KMPAGE|PMAP_PTE);
 #endif	/* PMAP_STEAL_MEMORY */
 	} else {
 		struct vm_page *pg;
@@ -4556,10 +4556,6 @@ pmap_init_l1(struct l1_ttable *l1, pd_entry_t *l1pt)
 	TAILQ_INSERT_TAIL(&l1_lru_list, l1, l1_lru);
 }
 
-
-
-
-
 void
 pmap_init(void)
 {
@@ -4762,8 +4758,6 @@ pmap_boot_pagealloc(psize_t amount, psize_t mask, psize_t match,
 	pv_addr_t *rpv)
 {
 	pv_addr_t *pv, **pvp;
-	struct vm_physseg *ps;
-	size_t i;
 
 	KASSERT(amount & PGOFSET);
 	KASSERT((mask & PGOFSET) == 0);
@@ -4776,7 +4770,7 @@ pmap_boot_pagealloc(psize_t amount, psize_t mask, psize_t match,
 		pv_addr_t *newpv;
 		psize_t off;
 		/*
-		 * If this entry is too small to satify the request...
+		 * If this entry is too small to satisfy the request...
 		 */
 		KASSERT(pv->pv_size > 0);
 		if (pv->pv_size < amount)
@@ -4821,7 +4815,7 @@ pmap_boot_pagealloc(psize_t amount, psize_t mask, psize_t match,
 		return;
 	}
 
-	if (vm_nphysseg == 0)
+	if (!uvm_physseg_valid_p(uvm_physseg_get_first()))
 		panic("pmap_boot_pagealloc: couldn't allocate memory");
 
 	for (pvp = &SLIST_FIRST(&pmap_boot_freeq);
@@ -4831,28 +4825,27 @@ pmap_boot_pagealloc(psize_t amount, psize_t mask, psize_t match,
 			break;
 	}
 	KASSERT(mask == 0);
-	for (i = 0; i < vm_nphysseg; i++) {
-		ps = VM_PHYSMEM_PTR(i);
-		if (ps->avail_start == atop(pv->pv_pa + pv->pv_size)
-		    && pv->pv_va + pv->pv_size <= ptoa(ps->avail_end)) {
+
+	for (uvm_physseg_t ups = uvm_physseg_get_first();
+	    uvm_physseg_valid_p(ups);
+	    ups = uvm_physseg_get_next(ups)) {
+
+		paddr_t spn = uvm_physseg_get_start(ups);
+		paddr_t epn = uvm_physseg_get_end(ups);
+		if (spn == atop(pv->pv_pa + pv->pv_size)
+		    && pv->pv_va + pv->pv_size <= ptoa(epn)) {
 			rpv->pv_va = pv->pv_va;
 			rpv->pv_pa = pv->pv_pa;
 			rpv->pv_size = amount;
 			*pvp = NULL;
 			pmap_map_chunk(kernel_l1pt.pv_va,
-			     ptoa(ps->avail_start) + (pv->pv_va - pv->pv_pa),
-			     ptoa(ps->avail_start),
+			     ptoa(spn) + (pv->pv_va - pv->pv_pa),
+			     ptoa(spn),
 			     amount - pv->pv_size,
 			     VM_PROT_READ|VM_PROT_WRITE,
 			     PTE_CACHE);
-			ps->avail_start += atop(amount - pv->pv_size);
-			/*
-			 * If we consumed the entire physseg, remove it.
-			 */
-			if (ps->avail_start == ps->avail_end) {
-				for (--vm_nphysseg; i < vm_nphysseg; i++)
-					VM_PHYSMEM_PTR_SWAP(i, i + 1);
-			}
+
+			uvm_physseg_unplug(spn, atop(amount - pv->pv_size));
 			memset((void *)rpv->pv_va, 0, rpv->pv_size);
 			return;
 		}

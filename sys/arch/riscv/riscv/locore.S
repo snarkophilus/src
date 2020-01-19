@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.9 2019/06/16 07:42:52 maxv Exp $ */
+/* $NetBSD: locore.S,v 1.11 2020/01/08 20:59:19 skrll Exp $ */
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -133,8 +133,6 @@ END(start)
 ENTRY_NP(cpu_switchto)
 	addi	sp, sp, -TF_LEN		// allocate trapframe
 
-	beqz	a0, .Lswitchto_newlwp	// can skip saving oldl state?
-
 	REG_S	ra, TF_RA(sp)		// save return address
 	REG_S	s0, TF_S0(sp)		// save callee saved address
 	REG_S	s1, TF_S1(sp)		// save callee saved address
@@ -152,7 +150,7 @@ ENTRY_NP(cpu_switchto)
 	REG_S	t4, TF_SR(sp)		// save it
 
 	REG_S	sp, L_MD_KTF(a0)	// record trapframe pointer
-.Lswitchto_newlwp:
+
 	csrrci	t0, sstatus, SR_SIE	// # disable interrupts
 
 	mv	tp, a1			// # put the new lwp in thread pointer
@@ -204,7 +202,6 @@ ENTRY_NP(cpu_fast_switchto_cleanup)
 //	INT_L	t1, CI_MTX_COUNT(t0)	// get mutex count
 //	addi	t1, t1, 1		// increment mutex count
 //	INT_S	t1, CI_MTX_COUNT(t0)	// save it
-	PTR_S	zero, L_CTXSWTCH(a0)	// clear l_ctxswitch
         mv	ra, a1			// Restore real RA
 #if IPL_SCHED != IPL_HIGH
 	tail	_C_LABEL(splhigh)	// go back to IPL HIGH

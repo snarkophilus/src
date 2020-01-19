@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_object.c,v 1.18 2019/12/15 21:11:35 ad Exp $	*/
+/*	$NetBSD: uvm_object.c,v 1.20 2020/01/15 17:55:45 ad Exp $	*/
 
 /*
  * Copyright (c) 2006, 2010, 2019 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_object.c,v 1.18 2019/12/15 21:11:35 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_object.c,v 1.20 2020/01/15 17:55:45 ad Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_ddb.h"
@@ -174,14 +174,17 @@ uvm_obj_wirepages(struct uvm_object *uobj, off_t start, off_t end,
 			}
 
 			if (pgs[i]->flags & PG_AOBJ) {
-				pgs[i]->flags &= ~(PG_CLEAN);
+				uvm_pagemarkdirty(pgs[i],
+				    UVM_PAGE_STATUS_DIRTY);
 				uao_dropswap(uobj, i);
 			}
 		}
 
 		/* Wire the pages */
 		for (i = 0; i < npages; i++) {
+			uvm_pagelock(pgs[i]);
 			uvm_pagewire(pgs[i]);
+			uvm_pageunlock(pgs[i]);
 			if (list != NULL)
 				TAILQ_INSERT_TAIL(list, pgs[i], pageq.queue);
 		}
@@ -223,7 +226,9 @@ uvm_obj_unwirepages(struct uvm_object *uobj, off_t start, off_t end)
 		KASSERT(pg != NULL);
 		KASSERT(!(pg->flags & PG_RELEASED));
 
+		uvm_pagelock(pg);
 		uvm_pageunwire(pg);
+		uvm_pageunlock(pg);
 	}
 	mutex_exit(uobj->vmobjlock);
 }

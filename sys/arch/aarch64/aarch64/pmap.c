@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.56 2019/12/19 07:44:56 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.61 2020/01/09 01:38:34 ryo Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.56 2019/12/19 07:44:56 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.61 2020/01/09 01:38:34 ryo Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
@@ -342,8 +342,7 @@ pmap_devmap_bootstrap(vaddr_t l0pt, const struct pmap_devmap *table)
 		    (va < (VM_KERNEL_IO_ADDRESS + VM_KERNEL_IO_SIZE)));
 
 		/* update and check virtual_devmap_addr */
-		if ((virtual_devmap_addr == 0) ||
-		    (virtual_devmap_addr > va)) {
+		if (virtual_devmap_addr == 0 || virtual_devmap_addr > va) {
 			virtual_devmap_addr = va;
 		}
 
@@ -442,7 +441,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 #endif
 
 	/* devmap already uses last of va? */
-	if ((virtual_devmap_addr != 0) && (virtual_devmap_addr < vend))
+	if (virtual_devmap_addr != 0 && virtual_devmap_addr < vend)
 		vend = virtual_devmap_addr;
 
 	virtual_avail = vstart;
@@ -977,9 +976,12 @@ _pmap_pte_adjust_cacheflags(pt_entry_t pte, u_int flags)
 
 	pte &= ~LX_BLKPAG_ATTR_MASK;
 
-	switch (flags & (PMAP_CACHE_MASK|PMAP_DEV)) {
+	switch (flags & (PMAP_CACHE_MASK|PMAP_DEV_MASK)) {
+	case PMAP_DEV_SO ... PMAP_DEV_SO | PMAP_CACHE_MASK:
+		pte |= LX_BLKPAG_ATTR_DEVICE_MEM_SO;	/* Device-nGnRnE */
+		break;
 	case PMAP_DEV ... PMAP_DEV | PMAP_CACHE_MASK:
-		pte |= LX_BLKPAG_ATTR_DEVICE_MEM;	/* nGnRnE */
+		pte |= LX_BLKPAG_ATTR_DEVICE_MEM;	/* Device-nGnRE */
 		break;
 	case PMAP_NOCACHE:
 	case PMAP_NOCACHE_OVR:
@@ -1222,6 +1224,10 @@ pmap_protect(struct pmap *pm, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 
 	KASSERT_PM_ADDR(pm, sva);
 	KASSERT(!IN_KSEG_ADDR(sva));
+
+	/* PROT_EXEC requires implicit PROT_READ */
+	if (prot & VM_PROT_EXECUTE)
+		prot |= VM_PROT_READ;
 
 	if ((prot & VM_PROT_READ) == VM_PROT_NONE) {
 		PMAP_COUNT(protect_remove_fallback);
@@ -2129,6 +2135,10 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 
 	/* ignore except read/write */
 	accessprot &= (VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
+
+	/* PROT_EXEC requires implicit PROT_READ */
+	if (accessprot & VM_PROT_EXECUTE)
+		accessprot |= VM_PROT_READ;
 
 	/* no permission to read/write/execute for this page */
 	if ((pmap_prot & accessprot) != accessprot) {

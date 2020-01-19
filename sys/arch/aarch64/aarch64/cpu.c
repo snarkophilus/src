@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.28 2019/12/21 12:53:54 ad Exp $ */
+/* $NetBSD: cpu.c,v 1.34 2020/01/15 08:34:04 mrg Exp $ */
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.28 2019/12/21 12:53:54 ad Exp $");
+__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.34 2020/01/15 08:34:04 mrg Exp $");
 
 #include "locators.h"
 #include "opt_arm_debug.h"
@@ -48,6 +48,7 @@ __KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.28 2019/12/21 12:53:54 ad Exp $");
 #include <aarch64/cpufunc.h>
 #include <aarch64/machdep.h>
 
+#include <arm/cpu_topology.h>
 #ifdef FDT
 #include <arm/fdt/arm_fdtvar.h>
 #endif
@@ -146,9 +147,9 @@ cpu_attach(device_t dv, cpuid_t id)
 	ci->ci_dev = dv;
 	dv->dv_private = ci;
 
-	aarch64_gettopology(ci, ci->ci_id.ac_mpidr);
-
+	arm_cpu_do_topology(ci);
 	cpu_identify(ci->ci_dev, ci);
+
 #ifdef MULTIPROCESSOR
 	if (unit != 0) {
 		mi_cpu_attach(ci);
@@ -192,6 +193,8 @@ const struct cpuidtab cpuids[] = {
 	{ CPU_ID_CORTEXA76AER1 & CPU_PARTMASK, "Cortex-A76AE", "Cortex", "V8.2-A+" },
 	{ CPU_ID_CORTEXA77R0 & CPU_PARTMASK, "Cortex-A77", "Cortex", "V8.2-A+" },
 	{ CPU_ID_EMAG8180 & CPU_PARTMASK, "Ampere eMAG", "Skylark", "V8-A" },
+	{ CPU_ID_NEOVERSEE1R1 & CPU_PARTMASK, "Neoverse E1", "Neoverse", "V8.2-A+" },
+	{ CPU_ID_NEOVERSEN1R3 & CPU_PARTMASK, "Neoverse N1", "Neoverse", "V8.2-A+" },
 	{ CPU_ID_THUNDERXRX, "Cavium ThunderX", "Cavium", "V8-A" },
 	{ CPU_ID_THUNDERX81XXRX, "Cavium ThunderX CN81XX", "Cavium", "V8-A" },
 	{ CPU_ID_THUNDERX83XXRX, "Cavium ThunderX CN83XX", "Cavium", "V8-A" },
@@ -225,10 +228,14 @@ static void
 cpu_identify(device_t self, struct cpu_info *ci)
 {
 	char model[128];
+	const char *m;
 
 	identify_aarch64_model(ci->ci_id.ac_midr, model, sizeof(model));
-	if (ci->ci_index == 0)
-		cpu_setmodel("%s", model);
+	if (ci->ci_index == 0) { 
+		m = cpu_getmodel();
+		if (m == NULL || *m == 0)
+			cpu_setmodel("%s", model);
+	}
 
 	aprint_naive("\n");
 	aprint_normal(": %s\n", model);
@@ -304,6 +311,8 @@ cpu_identify2(device_t self, struct cpu_info *ci)
 
 	dfr0 = reg_id_aa64dfr0_el1_read();
 
+	aprint_debug_dev(self, "midr=0x%" PRIx32 " mpidr=0x%" PRIx32 "\n",
+	    (uint32_t)ci->ci_id.ac_midr, (uint32_t)ci->ci_id.ac_mpidr);
 	aprint_normal_dev(self, "revID=0x%" PRIx64, id->ac_revidr);
 
 	/* ID_AA64DFR0_EL1 */

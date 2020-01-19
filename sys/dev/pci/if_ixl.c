@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ixl.c,v 1.12 2019/12/20 02:19:27 yamaguchi Exp $	*/
+/*	$NetBSD: if_ixl.c,v 1.26 2020/01/17 09:42:05 yamaguchi Exp $	*/
 
 /*
  * Copyright (c) 2013-2015, Intel Corporation
@@ -77,6 +77,7 @@
 
 #ifdef _KERNEL_OPT
 #include "opt_net_mpsafe.h"
+#include "opt_if_ixl.h"
 #endif
 
 #include <sys/param.h>
@@ -108,6 +109,8 @@
 
 #include <dev/pci/if_ixlreg.h>
 #include <dev/pci/if_ixlvar.h>
+
+#include <prop/proplib.h>
 
 struct ixl_softc; /* defined */
 
@@ -194,6 +197,8 @@ struct ixl_softc; /* defined */
 #define IXL_HMC_PDVALID			1ULL
 
 #define IXL_ATQ_EXEC_TIMEOUT		(10 * hz)
+
+#define IXL_SRRD_SRCTL_ATTEMPTS		100000
 
 struct ixl_aq_regs {
 	bus_size_t		atq_tail;
@@ -485,6 +490,102 @@ struct ixl_product {
 	unsigned int	 product_id;
 };
 
+struct ixl_stats_counters {
+	bool		 isc_has_offset;
+	struct evcnt	 isc_crc_errors;
+	uint64_t	 isc_crc_errors_offset;
+	struct evcnt	 isc_illegal_bytes;
+	uint64_t	 isc_illegal_bytes_offset;
+	struct evcnt	 isc_rx_bytes;
+	uint64_t	 isc_rx_bytes_offset;
+	struct evcnt	 isc_rx_discards;
+	uint64_t	 isc_rx_discards_offset;
+	struct evcnt	 isc_rx_unicast;
+	uint64_t	 isc_rx_unicast_offset;
+	struct evcnt	 isc_rx_multicast;
+	uint64_t	 isc_rx_multicast_offset;
+	struct evcnt	 isc_rx_broadcast;
+	uint64_t	 isc_rx_broadcast_offset;
+	struct evcnt	 isc_rx_size_64;
+	uint64_t	 isc_rx_size_64_offset;
+	struct evcnt	 isc_rx_size_127;
+	uint64_t	 isc_rx_size_127_offset;
+	struct evcnt	 isc_rx_size_255;
+	uint64_t	 isc_rx_size_255_offset;
+	struct evcnt	 isc_rx_size_511;
+	uint64_t	 isc_rx_size_511_offset;
+	struct evcnt	 isc_rx_size_1023;
+	uint64_t	 isc_rx_size_1023_offset;
+	struct evcnt	 isc_rx_size_1522;
+	uint64_t	 isc_rx_size_1522_offset;
+	struct evcnt	 isc_rx_size_big;
+	uint64_t	 isc_rx_size_big_offset;
+	struct evcnt	 isc_rx_undersize;
+	uint64_t	 isc_rx_undersize_offset;
+	struct evcnt	 isc_rx_oversize;
+	uint64_t	 isc_rx_oversize_offset;
+	struct evcnt	 isc_rx_fragments;
+	uint64_t	 isc_rx_fragments_offset;
+	struct evcnt	 isc_rx_jabber;
+	uint64_t	 isc_rx_jabber_offset;
+	struct evcnt	 isc_tx_bytes;
+	uint64_t	 isc_tx_bytes_offset;
+	struct evcnt	 isc_tx_dropped_link_down;
+	uint64_t	 isc_tx_dropped_link_down_offset;
+	struct evcnt	 isc_tx_unicast;
+	uint64_t	 isc_tx_unicast_offset;
+	struct evcnt	 isc_tx_multicast;
+	uint64_t	 isc_tx_multicast_offset;
+	struct evcnt	 isc_tx_broadcast;
+	uint64_t	 isc_tx_broadcast_offset;
+	struct evcnt	 isc_tx_size_64;
+	uint64_t	 isc_tx_size_64_offset;
+	struct evcnt	 isc_tx_size_127;
+	uint64_t	 isc_tx_size_127_offset;
+	struct evcnt	 isc_tx_size_255;
+	uint64_t	 isc_tx_size_255_offset;
+	struct evcnt	 isc_tx_size_511;
+	uint64_t	 isc_tx_size_511_offset;
+	struct evcnt	 isc_tx_size_1023;
+	uint64_t	 isc_tx_size_1023_offset;
+	struct evcnt	 isc_tx_size_1522;
+	uint64_t	 isc_tx_size_1522_offset;
+	struct evcnt	 isc_tx_size_big;
+	uint64_t	 isc_tx_size_big_offset;
+	struct evcnt	 isc_mac_local_faults;
+	uint64_t	 isc_mac_local_faults_offset;
+	struct evcnt	 isc_mac_remote_faults;
+	uint64_t	 isc_mac_remote_faults_offset;
+	struct evcnt	 isc_link_xon_rx;
+	uint64_t	 isc_link_xon_rx_offset;
+	struct evcnt	 isc_link_xon_tx;
+	uint64_t	 isc_link_xon_tx_offset;
+	struct evcnt	 isc_link_xoff_rx;
+	uint64_t	 isc_link_xoff_rx_offset;
+	struct evcnt	 isc_link_xoff_tx;
+	uint64_t	 isc_link_xoff_tx_offset;
+	struct evcnt	 isc_vsi_rx_discards;
+	uint64_t	 isc_vsi_rx_discards_offset;
+	struct evcnt	 isc_vsi_rx_bytes;
+	uint64_t	 isc_vsi_rx_bytes_offset;
+	struct evcnt	 isc_vsi_rx_unicast;
+	uint64_t	 isc_vsi_rx_unicast_offset;
+	struct evcnt	 isc_vsi_rx_multicast;
+	uint64_t	 isc_vsi_rx_multicast_offset;
+	struct evcnt	 isc_vsi_rx_broadcast;
+	uint64_t	 isc_vsi_rx_broadcast_offset;
+	struct evcnt	 isc_vsi_tx_errors;
+	uint64_t	 isc_vsi_tx_errors_offset;
+	struct evcnt	 isc_vsi_tx_bytes;
+	uint64_t	 isc_vsi_tx_bytes_offset;
+	struct evcnt	 isc_vsi_tx_unicast;
+	uint64_t	 isc_vsi_tx_unicast_offset;
+	struct evcnt	 isc_vsi_tx_multicast;
+	uint64_t	 isc_vsi_tx_multicast_offset;
+	struct evcnt	 isc_vsi_tx_broadcast;
+	uint64_t	 isc_vsi_tx_broadcast_offset;
+};
+
 /*
  * Locking notes:
  * + a field in ixl_tx_ring is protected by txr_lock (a spin mutex), and
@@ -507,10 +608,15 @@ struct ixl_softc {
 	struct ethercom		 sc_ec;
 	bool			 sc_attached;
 	bool			 sc_dead;
-	bool			 sc_rxctl_atq;
+	uint32_t		 sc_port;
 	struct sysctllog	*sc_sysctllog;
 	struct workqueue	*sc_workq;
 	struct workqueue	*sc_workq_txrx;
+	int			 sc_stats_intval;
+	callout_t		 sc_stats_callout;
+	struct ixl_work		 sc_stats_task;
+	struct ixl_stats_counters
+				 sc_stats_counters;
 	uint8_t			 sc_enaddr[ETHER_ADDR_LEN];
 	struct ifmedia		 sc_media;
 	uint64_t		 sc_media_status;
@@ -541,6 +647,7 @@ struct ixl_softc {
 	uint16_t		 sc_uplink_seid;	/* le */
 	uint16_t		 sc_downlink_seid;	/* le */
 	uint16_t		 sc_vsi_number;		/* le */
+	uint16_t		 sc_vsi_stat_counter_idx;
 	uint16_t		 sc_seid;
 	unsigned int		 sc_base_queue;
 
@@ -548,9 +655,14 @@ struct ixl_softc {
 	unsigned int		 sc_msix_vector_queue;
 
 	struct ixl_dmamem	 sc_scratch;
+	struct ixl_dmamem	 sc_aqbuf;
 
 	const struct ixl_aq_regs *
 				 sc_aq_regs;
+	uint32_t		 sc_aq_flags;
+#define IXL_SC_AQ_FLAG_RXCTL	__BIT(0)
+#define IXL_SC_AQ_FLAG_NVMLOCK	__BIT(1)
+#define IXL_SC_AQ_FLAG_NVMREAD	__BIT(2)
 
 	kmutex_t		 sc_atq_lock;
 	kcondvar_t		 sc_atq_cv;
@@ -592,18 +704,38 @@ struct ixl_softc {
 #define IXL_TX_INTR_PROCESS_LIMIT	256
 #define IXL_RX_INTR_PROCESS_LIMIT	0U
 
+#define IXL_IFCAP_RXCSUM	(IFCAP_CSUM_IPv4_Rx|	\
+				 IFCAP_CSUM_TCPv4_Rx|	\
+				 IFCAP_CSUM_UDPv4_Rx|	\
+				 IFCAP_CSUM_TCPv6_Rx|	\
+				 IFCAP_CSUM_UDPv6_Rx)
+
 #define delaymsec(_x)	DELAY(1000 * (_x))
 #ifdef IXL_DEBUG
-#define DDPRINTF(sc, fmt, args...)	\
-do {					\
-	if (sc != NULL)				\
-		device_printf(sc->sc_dev, "");	\
-	printf("%s:\t" fmt, __func__, ##args);	\
+#define DDPRINTF(sc, fmt, args...)			\
+do {							\
+	if ((sc) != NULL) {				\
+		device_printf(				\
+		    ((struct ixl_softc *)(sc))->sc_dev,	\
+		    "");				\
+	}						\
+	printf("%s:\t" fmt, __func__, ##args);		\
 } while (0)
 #else
 #define DDPRINTF(sc, fmt, args...)	__nothing
 #endif
-#define IXL_NOMSIX	false
+#ifndef IXL_STATS_INTERVAL_MSEC
+#define IXL_STATS_INTERVAL_MSEC	10000
+#endif
+#ifndef IXL_QUEUE_NUM
+#define IXL_QUEUE_NUM		0
+#endif
+
+static bool		 ixl_param_nomsix = false;
+static int		 ixl_param_stats_interval = IXL_STATS_INTERVAL_MSEC;
+static int		 ixl_param_nqps_limit = IXL_QUEUE_NUM;
+static unsigned int	 ixl_param_tx_ndescs = 1024;
+static unsigned int	 ixl_param_rx_ndescs = 1024;
 
 static enum i40e_mac_type
     ixl_mactype(pci_product_id_t);
@@ -626,6 +758,7 @@ static int	ixl_atq_post_locked(struct ixl_softc *, struct ixl_atq *);
 static void	ixl_atq_done(struct ixl_softc *);
 static int	ixl_atq_exec(struct ixl_softc *, struct ixl_atq *);
 static int	ixl_get_version(struct ixl_softc *);
+static int	ixl_get_nvm_version(struct ixl_softc *);
 static int	ixl_get_hw_capabilities(struct ixl_softc *);
 static int	ixl_pxe_clear(struct ixl_softc *);
 static int	ixl_lldp_shut(struct ixl_softc *);
@@ -653,6 +786,7 @@ static void	ixl_hmc_pack(void *, const void *,
 		    const struct ixl_hmc_pack *, unsigned int);
 static uint32_t	ixl_rd_rx_csr(struct ixl_softc *, uint32_t);
 static void	ixl_wr_rx_csr(struct ixl_softc *, uint32_t, uint32_t);
+static int	ixl_rd16_nvm(struct ixl_softc *, uint16_t, uint16_t *);
 
 static int	ixl_match(device_t, cfdata_t, void *);
 static void	ixl_attach(device_t, device_t, void *);
@@ -681,7 +815,6 @@ static int	ixl_ifflags_cb(struct ethercom *);
 static int	ixl_setup_interrupts(struct ixl_softc *);
 static int	ixl_establish_intx(struct ixl_softc *);
 static int	ixl_establish_msix(struct ixl_softc *);
-static void	ixl_set_affinity_msix(struct ixl_softc *);
 static void	ixl_enable_queue_intr(struct ixl_softc *,
 		    struct ixl_queue_pair *);
 static void	ixl_disable_queue_intr(struct ixl_softc *,
@@ -733,6 +866,8 @@ static int	ixl_setup_interrupts(struct ixl_softc *);;
 static void	ixl_teardown_interrupts(struct ixl_softc *);
 static int	ixl_setup_stats(struct ixl_softc *);
 static void	ixl_teardown_stats(struct ixl_softc *);
+static void	ixl_stats_callout(void *);
+static void	ixl_stats_update(void *);
 static int	ixl_setup_sysctls(struct ixl_softc *);
 static void	ixl_teardown_sysctls(struct ixl_softc *);
 static int	ixl_queue_pairs_alloc(struct ixl_softc *);
@@ -923,7 +1058,7 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	struct ixl_softc *sc;
 	struct pci_attach_args *pa = aux;
 	struct ifnet *ifp;
-	pcireg_t memtype, reg;
+	pcireg_t memtype;
 	uint32_t firstq, port, ari, func;
 	uint64_t phy_types = 0;
 	char xnamebuf[32];
@@ -938,8 +1073,7 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	    pa->pa_dmat64 : pa->pa_dmat;
 	sc->sc_aq_regs = &ixl_pf_aq_regs;
 
-	reg = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
-	sc->sc_mac_type = ixl_mactype(PCI_PRODUCT(reg));
+	sc->sc_mac_type = ixl_mactype(PCI_PRODUCT(pa->pa_id));
 
 	memtype = pci_mapreg_type(pa->pa_pc, pa->pa_tag, IXL_PCIREG);
 	if (pci_mapreg_map(pa, IXL_PCIREG, memtype, 0,
@@ -964,7 +1098,8 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	port = ixl_rd(sc, I40E_PFGEN_PORTNUM);
 	port &= I40E_PFGEN_PORTNUM_PORT_NUM_MASK;
 	port >>= I40E_PFGEN_PORTNUM_PORT_NUM_SHIFT;
-	aprint_normal(": port %u", port);
+	sc->sc_port = port;
+	aprint_normal(": port %u", sc->sc_port);
 
 	ari = ixl_rd(sc, I40E_GLPCI_CAPSUP);
 	ari &= I40E_GLPCI_CAPSUP_ARI_EN_MASK;
@@ -1048,6 +1183,13 @@ ixl_attach(device_t parent, device_t self, void *aux)
 
 	ixl_wr(sc, sc->sc_aq_regs->arq_tail, sc->sc_arq_prod);
 
+	if (ixl_dmamem_alloc(sc, &sc->sc_aqbuf, IXL_AQ_BUFLEN, 0) != 0) {
+		aprint_error_dev(self, ", unable to allocate nvm buffer\n");
+		goto shutdown;
+	}
+
+	ixl_get_nvm_version(sc);
+
 	if (sc->sc_mac_type == I40E_MAC_X722)
 		sc->sc_nqueue_pairs_device = 128;
 	else
@@ -1057,20 +1199,25 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	if (rv != 0) {
 		aprint_error(", GET HW CAPABILITIES %s\n",
 		    rv == ETIMEDOUT ? "timeout" : "error");
-		goto shutdown;
+		goto free_aqbuf;
 	}
 
-	sc->sc_nqueue_pairs = sc->sc_nqueue_pairs_max =
-	    MIN((int)sc->sc_nqueue_pairs_device, ncpu);
-	sc->sc_tx_ring_ndescs = 1024;
-	sc->sc_rx_ring_ndescs = 1024;
+	sc->sc_nqueue_pairs_max = MIN((int)sc->sc_nqueue_pairs_device, ncpu);
+	if (ixl_param_nqps_limit > 0) {
+		sc->sc_nqueue_pairs_max = MIN((int)sc->sc_nqueue_pairs_max,
+		    ixl_param_nqps_limit);
+	}
+
+	sc->sc_nqueue_pairs = sc->sc_nqueue_pairs_max;
+	sc->sc_tx_ring_ndescs = ixl_param_tx_ndescs;
+	sc->sc_rx_ring_ndescs = ixl_param_rx_ndescs;
 
 	KASSERT(IXL_TXRX_PROCESS_UNLIMIT > sc->sc_rx_ring_ndescs);
 	KASSERT(IXL_TXRX_PROCESS_UNLIMIT > sc->sc_tx_ring_ndescs);
 
 	if (ixl_get_mac(sc) != 0) {
 		/* error printed by ixl_get_mac */
-		goto shutdown;
+		goto free_aqbuf;
 	}
 
 	aprint_normal("\n");
@@ -1089,7 +1236,7 @@ ixl_attach(device_t parent, device_t self, void *aux)
 
 	if (ixl_hmc(sc) != 0) {
 		/* error printed by ixl_hmc */
-		goto shutdown;
+		goto free_aqbuf;
 	}
 
 	if (ixl_lldp_shut(sc) != 0) {
@@ -1192,10 +1339,9 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	ifp->if_stop = ixl_stop;
 	IFQ_SET_MAXLEN(&ifp->if_snd, sc->sc_tx_ring_ndescs);
 	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_capabilities |= IXL_IFCAP_RXCSUM;
 #if 0
-	ifp->if_capabilities |= IFCAP_CSUM_IPv4_Rx |
-	    IFCAP_CSUM_TCPv4_Tx | IFCAP_CSUM_TCPv4_Rx |
-	    IFCAP_CSUM_UDPv4_Tx | IFCAP_CSUM_UDPv4_Rx;
+	ifp->if_capabilities |= IFCAP_CSUM_TCPv4_Tx | IFCAP_CSUM_UDPv4_Tx;
 #endif
 	ether_set_vlan_cb(&sc->sc_ec, ixl_vlan_cb);
 	sc->sc_ec.ec_capabilities |= ETHERCAP_VLAN_MTU;
@@ -1253,6 +1399,10 @@ ixl_attach(device_t parent, device_t self, void *aux)
 	sc->sc_tx_intr_process_limit = IXL_TX_INTR_PROCESS_LIMIT;
 	sc->sc_rx_intr_process_limit = IXL_RX_INTR_PROCESS_LIMIT;
 
+	ixl_stats_update(sc);
+	sc->sc_stats_counters.isc_has_offset = true;
+	callout_schedule(&sc->sc_stats_callout, mstohz(sc->sc_stats_intval));
+
 	if (pmf_device_register(self, NULL, NULL) != true)
 		aprint_debug_dev(self, "couldn't establish power handler\n");
 	sc->sc_attached = true;
@@ -1272,6 +1422,8 @@ free_scratch:
 	ixl_dmamem_free(sc, &sc->sc_scratch);
 free_hmc:
 	ixl_hmc_free(sc);
+free_aqbuf:
+	ixl_dmamem_free(sc, &sc->sc_aqbuf);
 shutdown:
 	ixl_wr(sc, sc->sc_aq_regs->atq_head, 0);
 	ixl_wr(sc, sc->sc_aq_regs->arq_head, 0);
@@ -1320,6 +1472,9 @@ ixl_detach(device_t self, int flags)
 
 	ixl_disable_other_intr(sc);
 
+	callout_stop(&sc->sc_stats_callout);
+	ixl_work_wait(sc->sc_workq, &sc->sc_stats_task);
+
 	/* wait for ATQ handler */
 	mutex_enter(&sc->sc_atq_lock);
 	mutex_exit(&sc->sc_atq_lock);
@@ -1343,6 +1498,7 @@ ixl_detach(device_t self, int flags)
 
 	ixl_teardown_interrupts(sc);
 	ixl_teardown_stats(sc);
+	ixl_teardown_sysctls(sc);
 
 	ixl_queue_pairs_free(sc);
 
@@ -1374,6 +1530,7 @@ ixl_detach(device_t self, int flags)
 
 	ixl_dmamem_free(sc, &sc->sc_arq);
 	ixl_dmamem_free(sc, &sc->sc_atq);
+	ixl_dmamem_free(sc, &sc->sc_aqbuf);
 
 	cv_destroy(&sc->sc_atq_cv);
 	mutex_destroy(&sc->sc_atq_lock);
@@ -1647,11 +1804,11 @@ ixl_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 
 			mutex_enter(&txr->txr_lock);
 			ifp->if_opackets += txr->txr_opackets;
-			ifp->if_obytes += txr->txr_opackets;
+			ifp->if_obytes += txr->txr_obytes;
 			ifp->if_omcasts += txr->txr_omcasts;
 			if (cmd == SIOCZIFDATA) {
 				txr->txr_opackets = 0;
-				txr->txr_opackets = 0;
+				txr->txr_obytes = 0;
 				txr->txr_omcasts = 0;
 			}
 			mutex_exit(&txr->txr_lock);
@@ -2835,6 +2992,53 @@ ixl_rxr_free(struct ixl_softc *sc, struct ixl_rx_ring *rxr)
 	kmem_free(rxr, sizeof(*rxr));
 }
 
+static inline void
+ixl_rx_csum(struct mbuf *m, uint64_t qword)
+{
+	int flags_mask;
+
+	if (!ISSET(qword, IXL_RX_DESC_L3L4P)) {
+		/* No L3 or L4 checksum was calculated */
+		return;
+	}
+
+	switch (__SHIFTOUT(qword, IXL_RX_DESC_PTYPE_MASK)) {
+	case IXL_RX_DESC_PTYPE_IPV4FRAG:
+	case IXL_RX_DESC_PTYPE_IPV4:
+	case IXL_RX_DESC_PTYPE_SCTPV4:
+	case IXL_RX_DESC_PTYPE_ICMPV4:
+		flags_mask = M_CSUM_IPv4 | M_CSUM_IPv4_BAD;
+		break;
+	case IXL_RX_DESC_PTYPE_TCPV4:
+		flags_mask = M_CSUM_IPv4 | M_CSUM_IPv4_BAD;
+		flags_mask |= M_CSUM_TCPv4 | M_CSUM_TCP_UDP_BAD;
+		break;
+	case IXL_RX_DESC_PTYPE_UDPV4:
+		flags_mask = M_CSUM_IPv4 | M_CSUM_IPv4_BAD;
+		flags_mask |= M_CSUM_UDPv4 | M_CSUM_TCP_UDP_BAD;
+		break;
+	case IXL_RX_DESC_PTYPE_TCPV6:
+		flags_mask = M_CSUM_TCPv6 | M_CSUM_TCP_UDP_BAD;
+		break;
+	case IXL_RX_DESC_PTYPE_UDPV6:
+		flags_mask = M_CSUM_UDPv6 | M_CSUM_TCP_UDP_BAD;
+		break;
+	default:
+		flags_mask = 0;
+	}
+
+	m->m_pkthdr.csum_flags |= (flags_mask & (M_CSUM_IPv4 |
+	    M_CSUM_TCPv4 | M_CSUM_TCPv6 | M_CSUM_UDPv4 | M_CSUM_UDPv6));
+
+	if (ISSET(qword, IXL_RX_DESC_IPE)) {
+		m->m_pkthdr.csum_flags |= (flags_mask & M_CSUM_IPv4_BAD);
+	}
+
+	if (ISSET(qword, IXL_RX_DESC_L4E)) {
+		m->m_pkthdr.csum_flags |= (flags_mask & M_CSUM_TCP_UDP_BAD);
+	}
+}
+
 static int
 ixl_rxeof(struct ixl_softc *sc, struct ixl_rx_ring *rxr, u_int rxlimit)
 {
@@ -2910,6 +3114,9 @@ ixl_rxeof(struct ixl_softc *sc, struct ixl_rx_ring *rxr, u_int rxlimit)
 				vlan_set_tag(m,
 				    __SHIFTOUT(word0, IXL_RX_DESC_L2TAG1_MASK));
 			}
+
+			if ((ifp->if_capenable & IXL_IFCAP_RXCSUM) != 0)
+				ixl_rx_csum(m, word);
 
 			if (!ISSET(word,
 			    IXL_RX_DESC_RXE | IXL_RX_DESC_OVERSIZE)) {
@@ -3278,6 +3485,8 @@ ixl_link_state_update(struct ixl_softc *sc, const struct ixl_aq_desc *iaq)
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
 	int link_state;
 
+	KASSERT(kpreempt_disabled());
+
 	link_state = ixl_set_link_status(sc, iaq);
 
 	if (ifp->if_link_state != link_state)
@@ -3346,7 +3555,9 @@ ixl_arq(void *xsc)
 
 		switch (iaq->iaq_opcode) {
 		case htole16(IXL_AQ_OP_PHY_LINK_STATUS):
+			kpreempt_disable();
 			ixl_link_state_update(sc, iaq);
+			kpreempt_enable();
 			break;
 		}
 
@@ -3595,12 +3806,50 @@ ixl_get_version(struct ixl_softc *sc)
 	aprint_normal(", FW %hu.%hu.%05u API %hu.%hu", (uint16_t)fwver,
 	    (uint16_t)(fwver >> 16), fwbuild, api_maj_ver, api_min_ver);
 
-	sc->sc_rxctl_atq = true;
 	if (sc->sc_mac_type == I40E_MAC_X722) {
-		if (api_maj_ver == 1 && api_min_ver < 5) {
-			sc->sc_rxctl_atq = false;
-		}
+		SET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_NVMLOCK |
+		    IXL_SC_AQ_FLAG_NVMREAD);
 	}
+
+#define IXL_API_VER(maj, min)	(((uint32_t)(maj) << 16) | (min))
+	if (IXL_API_VER(api_maj_ver, api_min_ver) >= IXL_API_VER(1, 5)) {
+		if (sc->sc_mac_type == I40E_MAC_X722) {
+			SET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_RXCTL);
+		}
+		SET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_NVMLOCK);
+	}
+#undef IXL_API_VER
+
+	return 0;
+}
+
+static int
+ixl_get_nvm_version(struct ixl_softc *sc)
+{
+	uint16_t nvmver, cfg_ptr, eetrack_hi, eetrack_lo, oem_hi, oem_lo;
+	uint32_t eetrack, oem;
+	uint16_t nvm_maj_ver, nvm_min_ver, oem_build;
+	uint8_t oem_ver, oem_patch;
+
+	nvmver = cfg_ptr = eetrack_hi = eetrack_lo = oem_hi = oem_lo = 0;
+	ixl_rd16_nvm(sc, I40E_SR_NVM_DEV_STARTER_VERSION, &nvmver);
+	ixl_rd16_nvm(sc, I40E_SR_NVM_EETRACK_HI, &eetrack_hi);
+	ixl_rd16_nvm(sc, I40E_SR_NVM_EETRACK_LO, &eetrack_lo);
+	ixl_rd16_nvm(sc, I40E_SR_BOOT_CONFIG_PTR, &cfg_ptr);
+	ixl_rd16_nvm(sc, cfg_ptr + I40E_NVM_OEM_VER_OFF, &oem_hi);
+	ixl_rd16_nvm(sc, cfg_ptr + I40E_NVM_OEM_VER_OFF + 1, &oem_lo);
+
+	nvm_maj_ver = (uint16_t)__SHIFTOUT(nvmver, IXL_NVM_VERSION_HI_MASK);
+	nvm_min_ver = (uint16_t)__SHIFTOUT(nvmver, IXL_NVM_VERSION_LO_MASK);
+	eetrack = ((uint32_t)eetrack_hi << 16) | eetrack_lo;
+	oem = ((uint32_t)oem_hi << 16) | oem_lo;
+	oem_ver = __SHIFTOUT(oem, IXL_NVM_OEMVERSION_MASK);
+	oem_build = __SHIFTOUT(oem, IXL_NVM_OEMBUILD_MASK);
+	oem_patch = __SHIFTOUT(oem, IXL_NVM_OEMPATCH_MASK);
+
+	aprint_normal(" nvm %x.%02x etid %08x oem %d.%d.%d",
+	    nvm_maj_ver, nvm_min_ver, eetrack,
+	    oem_ver, oem_build, oem_patch);
 
 	return 0;
 }
@@ -4010,6 +4259,7 @@ ixl_get_vsi(struct ixl_softc *sc)
 	struct ixl_aq_desc iaq;
 	struct ixl_aq_vsi_param *param;
 	struct ixl_aq_vsi_reply *reply;
+	struct ixl_aq_vsi_data *data;
 	int rv;
 
 	/* grumble, vsi info isn't "known" at compile time */
@@ -4049,6 +4299,8 @@ ixl_get_vsi(struct ixl_softc *sc)
 
 	reply = (struct ixl_aq_vsi_reply *)iaq.iaq_param;
 	sc->sc_vsi_number = reply->vsi_number;
+	data = IXL_DMA_KVA(vsi);
+	sc->sc_vsi_stat_counter_idx = le16toh(data->stat_counter_idx);
 
 	return 0;
 }
@@ -5099,11 +5351,15 @@ static int
 ixl_establish_msix(struct ixl_softc *sc)
 {
 	pci_chipset_tag_t pc = sc->sc_pa.pa_pc;
+	kcpuset_t *affinity;
 	unsigned int vector = 0;
 	unsigned int i;
+	int affinity_to, r;
 	char xnamebuf[32];
 	char intrbuf[PCI_INTRSTR_LEN];
 	char const *intrstr;
+
+	kcpuset_create(&affinity, false);
 
 	/* the "other" intr is mapped to vector 0 */
 	vector = 0;
@@ -5119,10 +5375,23 @@ ixl_establish_msix(struct ixl_softc *sc)
 		    "unable to establish interrupt at %s\n", intrstr);
 		goto fail;
 	}
+
+	aprint_normal_dev(sc->sc_dev, "other interrupt at %s", intrstr);
+
+	affinity_to = ncpu > (int)sc->sc_nqueue_pairs_max ? 1 : 0;
+	affinity_to = (affinity_to + sc->sc_nqueue_pairs_max) % ncpu;
+
+	kcpuset_zero(affinity);
+	kcpuset_set(affinity, affinity_to);
+	r = interrupt_distribute(sc->sc_ihs[vector], affinity, NULL);
+	if (r == 0) {
+		aprint_normal(", affinity to %u", affinity_to);
+	}
+	aprint_normal("\n");
 	vector++;
-	aprint_normal_dev(sc->sc_dev, "interrupt at %s\n", intrstr);
 
 	sc->sc_msix_vector_queue = vector;
+	affinity_to = ncpu > (int)sc->sc_nqueue_pairs_max ? 1 : 0;
 
 	for (i = 0; i < sc->sc_nqueue_pairs_max; i++) {
 		intrstr = pci_intr_string(pc, sc->sc_ihp[vector],
@@ -5139,10 +5408,22 @@ ixl_establish_msix(struct ixl_softc *sc)
 			    "unable to establish interrupt at %s\n", intrstr);
 			goto fail;
 		}
-		vector++;
+
 		aprint_normal_dev(sc->sc_dev,
-		    "interrupt at %s\n", intrstr);
+		    "for TXRX%d interrupt at %s",i , intrstr);
+
+		kcpuset_zero(affinity);
+		kcpuset_set(affinity, affinity_to);
+		r = interrupt_distribute(sc->sc_ihs[vector], affinity, NULL);
+		if (r == 0) {
+			aprint_normal(", affinity to %u", affinity_to);
+			affinity_to = (affinity_to + 1) % ncpu;
+		}
+		aprint_normal("\n");
+		vector++;
 	}
+
+	kcpuset_destroy(affinity);
 
 	return 0;
 fail:
@@ -5152,64 +5433,9 @@ fail:
 
 	sc->sc_msix_vector_queue = 0;
 	sc->sc_msix_vector_queue = 0;
+	kcpuset_destroy(affinity);
 
 	return -1;
-}
-
-static void
-ixl_set_affinity_msix(struct ixl_softc *sc)
-{
-	kcpuset_t *affinity;
-	pci_chipset_tag_t pc = sc->sc_pa.pa_pc;
-	int affinity_to, r;
-	unsigned int i, vector;
-	char intrbuf[PCI_INTRSTR_LEN];
-	char const *intrstr;
-
-	affinity_to = 0;
-	kcpuset_create(&affinity, false);
-
-	vector = sc->sc_msix_vector_queue;
-
-	for (i = 0; i < sc->sc_nqueue_pairs_max; i++) {
-		affinity_to = i % ncpu;
-
-		kcpuset_zero(affinity);
-		kcpuset_set(affinity, affinity_to);
-
-		intrstr = pci_intr_string(pc, sc->sc_ihp[vector + i],
-		    intrbuf, sizeof(intrbuf));
-		r = interrupt_distribute(sc->sc_ihs[vector + i],
-		    affinity, NULL);
-		if (r == 0) {
-			aprint_normal_dev(sc->sc_dev,
-			    "for TXRX%u interrupting at %s affinity to %u\n",
-			    i, intrstr, affinity_to);
-		} else {
-			aprint_normal_dev(sc->sc_dev,
-			    "for TXRX%u interrupting at %s\n",
-			    i, intrstr);
-		}
-	}
-
-	vector = 0; /* vector 0 means "other" interrupt */
-	affinity_to = (affinity_to + 1) % ncpu;
-	kcpuset_zero(affinity);
-	kcpuset_set(affinity, affinity_to);
-
-	intrstr = pci_intr_string(pc, sc->sc_ihp[vector],
-	    intrbuf, sizeof(intrbuf));
-	r = interrupt_distribute(sc->sc_ihs[vector], affinity, NULL);
-	if (r == 0) {
-		aprint_normal_dev(sc->sc_dev,
-		    "for other interrupting at %s affinity to %u\n",
-		    intrstr, affinity_to);
-	} else {
-		aprint_normal_dev(sc->sc_dev,
-		    "for other interrupting at %s", intrstr);
-	}
-
-	kcpuset_destroy(affinity);
 }
 
 static void
@@ -5304,7 +5530,7 @@ ixl_setup_interrupts(struct ixl_softc *sc)
 	int counts[PCI_INTR_TYPE_SIZE];
 	int error;
 	unsigned int i;
-	bool retry, nomsix = IXL_NOMSIX;
+	bool retry;
 
 	memset(counts, 0, sizeof(counts));
 	max_type = PCI_INTR_TYPE_MSIX;
@@ -5312,7 +5538,7 @@ ixl_setup_interrupts(struct ixl_softc *sc)
 	counts[PCI_INTR_TYPE_MSIX] = sc->sc_nqueue_pairs_max + 1;
 	counts[PCI_INTR_TYPE_INTX] = 1;
 
-	if (nomsix)
+	if (ixl_param_nomsix)
 		counts[PCI_INTR_TYPE_MSIX] = 0;
 
 	do {
@@ -5340,8 +5566,6 @@ ixl_setup_interrupts(struct ixl_softc *sc)
 			if (error) {
 				counts[PCI_INTR_TYPE_MSIX] = 0;
 				retry = true;
-			} else {
-				ixl_set_affinity_msix(sc);
 			}
 		} else if (intr_type == PCI_INTR_TYPE_INTX) {
 			error = ixl_establish_intx(sc);
@@ -5384,6 +5608,7 @@ ixl_setup_stats(struct ixl_softc *sc)
 	struct ixl_queue_pair *qp;
 	struct ixl_tx_ring *txr;
 	struct ixl_rx_ring *rxr;
+	struct ixl_stats_counters *isc;
 	unsigned int i;
 
 	for (i = 0; i < sc->sc_nqueue_pairs_max; i++) {
@@ -5428,6 +5653,112 @@ ixl_setup_stats(struct ixl_softc *sc)
 	evcnt_attach_dynamic(&sc->sc_event_crit_err, EVCNT_TYPE_MISC,
 	    NULL, device_xname(sc->sc_dev), "Critical error");
 
+	isc = &sc->sc_stats_counters;
+	evcnt_attach_dynamic(&isc->isc_crc_errors, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "CRC errors");
+	evcnt_attach_dynamic(&isc->isc_illegal_bytes, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Illegal bytes");
+	evcnt_attach_dynamic(&isc->isc_mac_local_faults, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Mac local faults");
+	evcnt_attach_dynamic(&isc->isc_mac_remote_faults, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Mac remote faults");
+	evcnt_attach_dynamic(&isc->isc_link_xon_rx, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx xon");
+	evcnt_attach_dynamic(&isc->isc_link_xon_tx, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx xon");
+	evcnt_attach_dynamic(&isc->isc_link_xoff_rx, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx xoff");
+	evcnt_attach_dynamic(&isc->isc_link_xoff_tx, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx xoff");
+	evcnt_attach_dynamic(&isc->isc_rx_fragments, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx fragments");
+	evcnt_attach_dynamic(&isc->isc_rx_jabber, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx jabber");
+
+	evcnt_attach_dynamic(&isc->isc_rx_size_64, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 64");
+	evcnt_attach_dynamic(&isc->isc_rx_size_127, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 127");
+	evcnt_attach_dynamic(&isc->isc_rx_size_255, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 255");
+	evcnt_attach_dynamic(&isc->isc_rx_size_511, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 511");
+	evcnt_attach_dynamic(&isc->isc_rx_size_1023, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 1023");
+	evcnt_attach_dynamic(&isc->isc_rx_size_1522, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx size 1522");
+	evcnt_attach_dynamic(&isc->isc_rx_size_big, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx jumbo packets");
+	evcnt_attach_dynamic(&isc->isc_rx_undersize, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx under size");
+	evcnt_attach_dynamic(&isc->isc_rx_oversize, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx over size");
+
+	evcnt_attach_dynamic(&isc->isc_rx_bytes, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx bytes / port");
+	evcnt_attach_dynamic(&isc->isc_rx_discards, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx discards / port");
+	evcnt_attach_dynamic(&isc->isc_rx_unicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx unicast / port");
+	evcnt_attach_dynamic(&isc->isc_rx_multicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx multicast / port");
+	evcnt_attach_dynamic(&isc->isc_rx_broadcast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx broadcast / port");
+
+	evcnt_attach_dynamic(&isc->isc_vsi_rx_bytes, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx bytes / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_rx_discards, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx discard / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_rx_unicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx unicast / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_rx_multicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx multicast / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_rx_broadcast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Rx broadcast / vsi");
+
+	evcnt_attach_dynamic(&isc->isc_tx_size_64, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 64");
+	evcnt_attach_dynamic(&isc->isc_tx_size_127, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 127");
+	evcnt_attach_dynamic(&isc->isc_tx_size_255, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 255");
+	evcnt_attach_dynamic(&isc->isc_tx_size_511, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 511");
+	evcnt_attach_dynamic(&isc->isc_tx_size_1023, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 1023");
+	evcnt_attach_dynamic(&isc->isc_tx_size_1522, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx size 1522");
+	evcnt_attach_dynamic(&isc->isc_tx_size_big, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx jumbo packets");
+
+	evcnt_attach_dynamic(&isc->isc_tx_bytes, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx bytes / port");
+	evcnt_attach_dynamic(&isc->isc_tx_dropped_link_down, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev),
+	    "Tx dropped due to link down / port");
+	evcnt_attach_dynamic(&isc->isc_tx_unicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx unicast / port");
+	evcnt_attach_dynamic(&isc->isc_tx_multicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx multicast / port");
+	evcnt_attach_dynamic(&isc->isc_tx_broadcast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx broadcast / port");
+
+	evcnt_attach_dynamic(&isc->isc_vsi_tx_bytes, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx bytes / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_tx_errors, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx errors / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_tx_unicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx unicast / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_tx_multicast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx multicast / vsi");
+	evcnt_attach_dynamic(&isc->isc_vsi_tx_broadcast, EVCNT_TYPE_MISC,
+	    NULL, device_xname(sc->sc_dev), "Tx broadcast / vsi");
+
+	sc->sc_stats_intval = ixl_param_stats_interval;
+	callout_init(&sc->sc_stats_callout, CALLOUT_MPSAFE);
+	callout_setfunc(&sc->sc_stats_callout, ixl_stats_callout, sc);
+	ixl_work_set(&sc->sc_stats_task, ixl_stats_update, sc);
+
 	return 0;
 }
 
@@ -5436,6 +5767,7 @@ ixl_teardown_stats(struct ixl_softc *sc)
 {
 	struct ixl_tx_ring *txr;
 	struct ixl_rx_ring *rxr;
+	struct ixl_stats_counters *isc;
 	unsigned int i;
 
 	for (i = 0; i < sc->sc_nqueue_pairs_max; i++) {
@@ -5456,11 +5788,356 @@ ixl_teardown_stats(struct ixl_softc *sc)
 		evcnt_detach(&rxr->rxr_defer);
 	}
 
+	isc = &sc->sc_stats_counters;
+	evcnt_detach(&isc->isc_crc_errors);
+	evcnt_detach(&isc->isc_illegal_bytes);
+	evcnt_detach(&isc->isc_mac_local_faults);
+	evcnt_detach(&isc->isc_mac_remote_faults);
+	evcnt_detach(&isc->isc_link_xon_rx);
+	evcnt_detach(&isc->isc_link_xon_tx);
+	evcnt_detach(&isc->isc_link_xoff_rx);
+	evcnt_detach(&isc->isc_link_xoff_tx);
+	evcnt_detach(&isc->isc_rx_fragments);
+	evcnt_detach(&isc->isc_rx_jabber);
+	evcnt_detach(&isc->isc_rx_bytes);
+	evcnt_detach(&isc->isc_rx_discards);
+	evcnt_detach(&isc->isc_rx_unicast);
+	evcnt_detach(&isc->isc_rx_multicast);
+	evcnt_detach(&isc->isc_rx_broadcast);
+	evcnt_detach(&isc->isc_rx_size_64);
+	evcnt_detach(&isc->isc_rx_size_127);
+	evcnt_detach(&isc->isc_rx_size_255);
+	evcnt_detach(&isc->isc_rx_size_511);
+	evcnt_detach(&isc->isc_rx_size_1023);
+	evcnt_detach(&isc->isc_rx_size_1522);
+	evcnt_detach(&isc->isc_rx_size_big);
+	evcnt_detach(&isc->isc_rx_undersize);
+	evcnt_detach(&isc->isc_rx_oversize);
+	evcnt_detach(&isc->isc_tx_bytes);
+	evcnt_detach(&isc->isc_tx_dropped_link_down);
+	evcnt_detach(&isc->isc_tx_unicast);
+	evcnt_detach(&isc->isc_tx_multicast);
+	evcnt_detach(&isc->isc_tx_broadcast);
+	evcnt_detach(&isc->isc_tx_size_64);
+	evcnt_detach(&isc->isc_tx_size_127);
+	evcnt_detach(&isc->isc_tx_size_255);
+	evcnt_detach(&isc->isc_tx_size_511);
+	evcnt_detach(&isc->isc_tx_size_1023);
+	evcnt_detach(&isc->isc_tx_size_1522);
+	evcnt_detach(&isc->isc_tx_size_big);
+	evcnt_detach(&isc->isc_vsi_rx_discards);
+	evcnt_detach(&isc->isc_vsi_rx_bytes);
+	evcnt_detach(&isc->isc_vsi_rx_unicast);
+	evcnt_detach(&isc->isc_vsi_rx_multicast);
+	evcnt_detach(&isc->isc_vsi_rx_broadcast);
+	evcnt_detach(&isc->isc_vsi_tx_errors);
+	evcnt_detach(&isc->isc_vsi_tx_bytes);
+	evcnt_detach(&isc->isc_vsi_tx_unicast);
+	evcnt_detach(&isc->isc_vsi_tx_multicast);
+	evcnt_detach(&isc->isc_vsi_tx_broadcast);
+
 	evcnt_detach(&sc->sc_event_atq);
 	evcnt_detach(&sc->sc_event_link);
 	evcnt_detach(&sc->sc_event_ecc_err);
 	evcnt_detach(&sc->sc_event_pci_exception);
 	evcnt_detach(&sc->sc_event_crit_err);
+
+	callout_destroy(&sc->sc_stats_callout);
+}
+
+static void
+ixl_stats_callout(void *xsc)
+{
+	struct ixl_softc *sc = xsc;
+
+	ixl_work_add(sc->sc_workq, &sc->sc_stats_task);
+	callout_schedule(&sc->sc_stats_callout, mstohz(sc->sc_stats_intval));
+}
+
+static uint64_t
+ixl_stat_delta(struct ixl_softc *sc, uint32_t reg_hi, uint32_t reg_lo,
+    uint64_t *offset, bool has_offset)
+{
+	uint64_t value, delta;
+	int bitwidth;
+
+	bitwidth = reg_hi == 0 ? 32 : 48;
+
+	value = ixl_rd(sc, reg_lo);
+
+	if (bitwidth > 32) {
+		value |= ((uint64_t)ixl_rd(sc, reg_hi) << 32);
+	}
+
+	if (__predict_true(has_offset)) {
+		delta = value;
+		if (value < *offset)
+			delta += ((uint64_t)1 << bitwidth);
+		delta -= *offset;
+	} else {
+		delta = 0;
+	}
+	atomic_swap_64(offset, value);
+
+	return delta;
+}
+
+static void
+ixl_stats_update(void *xsc)
+{
+	struct ixl_softc *sc = xsc;
+	struct ixl_stats_counters *isc;
+	uint64_t delta;
+
+	isc = &sc->sc_stats_counters;
+
+	/* errors */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_CRCERRS(sc->sc_port),
+	    &isc->isc_crc_errors_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_crc_errors.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_ILLERRC(sc->sc_port),
+	    &isc->isc_illegal_bytes_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_illegal_bytes.ev_count, delta);
+
+	/* rx */
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_GORCH(sc->sc_port), I40E_GLPRT_GORCL(sc->sc_port),
+	    &isc->isc_rx_bytes_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_bytes.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_RDPC(sc->sc_port),
+	    &isc->isc_rx_discards_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_discards.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_UPRCH(sc->sc_port), I40E_GLPRT_UPRCL(sc->sc_port),
+	    &isc->isc_rx_unicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_unicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_MPRCH(sc->sc_port), I40E_GLPRT_MPRCL(sc->sc_port),
+	    &isc->isc_rx_multicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_multicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_BPRCH(sc->sc_port), I40E_GLPRT_BPRCL(sc->sc_port),
+	    &isc->isc_rx_broadcast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_broadcast.ev_count, delta);
+
+	/* Packet size stats rx */
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC64H(sc->sc_port), I40E_GLPRT_PRC64L(sc->sc_port),
+	    &isc->isc_rx_size_64_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_64.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC127H(sc->sc_port), I40E_GLPRT_PRC127L(sc->sc_port),
+	    &isc->isc_rx_size_127_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_127.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC255H(sc->sc_port), I40E_GLPRT_PRC255L(sc->sc_port),
+	    &isc->isc_rx_size_255_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_255.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC511H(sc->sc_port), I40E_GLPRT_PRC511L(sc->sc_port),
+	    &isc->isc_rx_size_511_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_511.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC1023H(sc->sc_port), I40E_GLPRT_PRC1023L(sc->sc_port),
+	    &isc->isc_rx_size_1023_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_1023.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC1522H(sc->sc_port), I40E_GLPRT_PRC1522L(sc->sc_port),
+	    &isc->isc_rx_size_1522_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_1522.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PRC9522H(sc->sc_port), I40E_GLPRT_PRC9522L(sc->sc_port),
+	    &isc->isc_rx_size_big_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_size_big.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_RUC(sc->sc_port),
+	    &isc->isc_rx_undersize_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_undersize.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_ROC(sc->sc_port),
+	    &isc->isc_rx_oversize_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_oversize.ev_count, delta);
+
+	/* tx */
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_GOTCH(sc->sc_port), I40E_GLPRT_GOTCL(sc->sc_port),
+	    &isc->isc_tx_bytes_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_bytes.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_TDOLD(sc->sc_port),
+	    &isc->isc_tx_dropped_link_down_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_dropped_link_down.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_UPTCH(sc->sc_port), I40E_GLPRT_UPTCL(sc->sc_port),
+	    &isc->isc_tx_unicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_unicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_MPTCH(sc->sc_port), I40E_GLPRT_MPTCL(sc->sc_port),
+	    &isc->isc_tx_multicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_multicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_BPTCH(sc->sc_port), I40E_GLPRT_BPTCL(sc->sc_port),
+	    &isc->isc_tx_broadcast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_broadcast.ev_count, delta);
+
+	/* Packet size stats tx */
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC64L(sc->sc_port), I40E_GLPRT_PTC64L(sc->sc_port),
+	    &isc->isc_tx_size_64_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_64.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC127H(sc->sc_port), I40E_GLPRT_PTC127L(sc->sc_port),
+	    &isc->isc_tx_size_127_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_127.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC255H(sc->sc_port), I40E_GLPRT_PTC255L(sc->sc_port),
+	    &isc->isc_tx_size_255_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_255.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC511H(sc->sc_port), I40E_GLPRT_PTC511L(sc->sc_port),
+	    &isc->isc_tx_size_511_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_511.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC1023H(sc->sc_port), I40E_GLPRT_PTC1023L(sc->sc_port),
+	    &isc->isc_tx_size_1023_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_1023.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC1522H(sc->sc_port), I40E_GLPRT_PTC1522L(sc->sc_port),
+	    &isc->isc_tx_size_1522_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_1522.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLPRT_PTC9522H(sc->sc_port), I40E_GLPRT_PTC9522L(sc->sc_port),
+	    &isc->isc_tx_size_big_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_tx_size_big.ev_count, delta);
+
+	/* mac faults */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_MLFC(sc->sc_port),
+	    &isc->isc_mac_local_faults_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_mac_local_faults.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_MRFC(sc->sc_port),
+	    &isc->isc_mac_remote_faults_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_mac_remote_faults.ev_count, delta);
+
+	/* Flow control (LFC) stats */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_LXONRXC(sc->sc_port),
+	    &isc->isc_link_xon_rx_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_link_xon_rx.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_LXONTXC(sc->sc_port),
+	    &isc->isc_link_xon_tx_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_link_xon_tx.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_LXOFFRXC(sc->sc_port),
+	    &isc->isc_link_xoff_rx_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_link_xoff_rx.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_LXOFFTXC(sc->sc_port),
+	    &isc->isc_link_xoff_tx_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_link_xoff_tx.ev_count, delta);
+
+	/* fragments */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_RFC(sc->sc_port),
+	    &isc->isc_rx_fragments_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_fragments.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLPRT_RJC(sc->sc_port),
+	    &isc->isc_rx_jabber_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_rx_jabber.ev_count, delta);
+
+	/* VSI rx counters */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLV_RDPC(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_rx_discards_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_rx_discards.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_GORCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_GORCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_rx_bytes_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_rx_bytes.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_UPRCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_UPRCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_rx_unicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_rx_unicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_MPRCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_MPRCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_rx_multicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_rx_multicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_BPRCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_BPRCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_rx_broadcast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_rx_broadcast.ev_count, delta);
+
+	/* VSI tx counters */
+	delta = ixl_stat_delta(sc,
+	    0, I40E_GLV_TEPC(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_tx_errors_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_tx_errors.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_GOTCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_GOTCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_tx_bytes_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_tx_bytes.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_UPTCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_UPTCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_tx_unicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_tx_unicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_MPTCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_MPTCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_tx_multicast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_tx_multicast.ev_count, delta);
+
+	delta = ixl_stat_delta(sc,
+	    I40E_GLV_BPTCH(sc->sc_vsi_stat_counter_idx),
+	    I40E_GLV_BPTCL(sc->sc_vsi_stat_counter_idx),
+	    &isc->isc_vsi_tx_broadcast_offset, isc->isc_has_offset);
+	atomic_add_64(&isc->isc_vsi_tx_broadcast.ev_count, delta);
 }
 
 static int
@@ -5487,6 +6164,11 @@ ixl_setup_sysctls(struct ixl_softc *sc)
 	    NULL, 0, &sc->sc_txrx_workqueue, 0, CTL_CREATE, CTL_EOL);
 	if (error)
 		goto out;
+
+	error = sysctl_createv(log, 0, &rnode, NULL,
+	    CTLFLAG_READONLY, CTLTYPE_INT, "stats_interval",
+	    SYSCTL_DESCR("Statistics collection interval in milliseconds"),
+	    NULL, 0, &sc->sc_stats_intval, 0, CTL_CREATE, CTL_EOL);
 
 	error = sysctl_createv(log, 0, &rnode, &rxnode,
 	    0, CTLTYPE_NODE, "rx",
@@ -5606,9 +6288,7 @@ ixl_workq_work(struct work *wk, void *context)
 	work = container_of(wk, struct ixl_work, ixw_cookie);
 
 	atomic_swap_uint(&work->ixw_added, 0);
-	kpreempt_disable();
 	work->ixw_func(work->ixw_arg);
-	kpreempt_enable();
 }
 
 static int
@@ -5645,7 +6325,11 @@ ixl_rd_rx_csr(struct ixl_softc *sc, uint32_t reg)
 	uint32_t val;
 	int rv, retry, retry_limit;
 
-	retry_limit = sc->sc_rxctl_atq ? 5 : 0;
+	if (ISSET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_RXCTL)) {
+		retry_limit = 5;
+	} else {
+		retry_limit = 0;
+	}
 
 	for (retry = 0; retry < retry_limit; retry++) {
 		rv = ixl_rx_ctl_read(sc, reg, &val);
@@ -5695,7 +6379,11 @@ ixl_wr_rx_csr(struct ixl_softc *sc, uint32_t reg, uint32_t value)
 {
 	int rv, retry, retry_limit;
 
-	retry_limit = sc->sc_rxctl_atq ? 5 : 0;
+	if (ISSET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_RXCTL)) {
+		retry_limit = 5;
+	} else {
+		retry_limit = 0;
+	}
 
 	for (retry = 0; retry < retry_limit; retry++) {
 		rv = ixl_rx_ctl_write(sc, reg, value);
@@ -5710,10 +6398,265 @@ ixl_wr_rx_csr(struct ixl_softc *sc, uint32_t reg, uint32_t value)
 	ixl_wr(sc, reg, value);
 }
 
+static int
+ixl_nvm_lock(struct ixl_softc *sc, char rw)
+{
+	struct ixl_aq_desc iaq;
+	struct ixl_aq_req_resource_param *param;
+	int rv;
+
+	if (!ISSET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_NVMLOCK))
+		return 0;
+
+	memset(&iaq, 0, sizeof(iaq));
+	iaq.iaq_opcode = htole16(IXL_AQ_OP_REQUEST_RESOURCE);
+
+	param = (struct ixl_aq_req_resource_param *)&iaq.iaq_param;
+	param->resource_id = htole16(IXL_AQ_RESOURCE_ID_NVM);
+	if (rw == 'R') {
+		param->access_type = htole16(IXL_AQ_RESOURCE_ACCES_READ);
+	} else {
+		param->access_type = htole16(IXL_AQ_RESOURCE_ACCES_WRITE);
+	}
+
+	rv = ixl_atq_poll(sc, &iaq, 250);
+
+	if (rv != 0)
+		return ETIMEDOUT;
+
+	switch (le16toh(iaq.iaq_retval)) {
+	case IXL_AQ_RC_OK:
+		break;
+	case IXL_AQ_RC_EACCES:
+		return EACCES;
+	case IXL_AQ_RC_EBUSY:
+		return EBUSY;
+	case IXL_AQ_RC_EPERM:
+		return EPERM;
+	}
+
+	return 0;
+}
+
+static int
+ixl_nvm_unlock(struct ixl_softc *sc)
+{
+	struct ixl_aq_desc iaq;
+	struct ixl_aq_rel_resource_param *param;
+	int rv;
+
+	if (!ISSET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_NVMLOCK))
+		return 0;
+
+	memset(&iaq, 0, sizeof(iaq));
+	iaq.iaq_opcode = htole16(IXL_AQ_OP_RELEASE_RESOURCE);
+
+	param = (struct ixl_aq_rel_resource_param *)&iaq.iaq_param;
+	param->resource_id = htole16(IXL_AQ_RESOURCE_ID_NVM);
+
+	rv = ixl_atq_poll(sc, &iaq, 250);
+
+	if (rv != 0)
+		return ETIMEDOUT;
+
+	switch (le16toh(iaq.iaq_retval)) {
+	case IXL_AQ_RC_OK:
+		break;
+	default:
+		return EIO;
+	}
+	return 0;
+}
+
+static int
+ixl_srdone_poll(struct ixl_softc *sc)
+{
+	int wait_count;
+	uint32_t reg;
+
+	for (wait_count = 0; wait_count < IXL_SRRD_SRCTL_ATTEMPTS;
+	    wait_count++) {
+		reg = ixl_rd(sc, I40E_GLNVM_SRCTL);
+		if (ISSET(reg, I40E_GLNVM_SRCTL_DONE_MASK))
+			break;
+
+		delaymsec(5);
+	}
+
+	if (wait_count == IXL_SRRD_SRCTL_ATTEMPTS)
+		return -1;
+
+	return 0;
+}
+
+static int
+ixl_nvm_read_srctl(struct ixl_softc *sc, uint16_t offset, uint16_t *data)
+{
+	uint32_t reg;
+
+	if (ixl_srdone_poll(sc) != 0)
+		return ETIMEDOUT;
+
+	reg = ((uint32_t)offset << I40E_GLNVM_SRCTL_ADDR_SHIFT) |
+	    __BIT(I40E_GLNVM_SRCTL_START_SHIFT);
+	ixl_wr(sc, I40E_GLNVM_SRCTL, reg);
+
+	if (ixl_srdone_poll(sc) != 0) {
+		aprint_debug("NVM read error: couldn't access "
+		    "Shadow RAM address: 0x%x\n", offset);
+		return ETIMEDOUT;
+	}
+
+	reg = ixl_rd(sc, I40E_GLNVM_SRDATA);
+	*data = (uint16_t)__SHIFTOUT(reg, I40E_GLNVM_SRDATA_RDDATA_MASK);
+
+	return 0;
+}
+
+static int
+ixl_nvm_read_aq(struct ixl_softc *sc, uint16_t offset_word,
+    void *data, size_t len)
+{
+	struct ixl_dmamem *idm;
+	struct ixl_aq_desc iaq;
+	struct ixl_aq_nvm_param *param;
+	uint32_t offset_bytes;
+	int rv;
+
+	idm = &sc->sc_aqbuf;
+	if (len > IXL_DMA_LEN(idm))
+		return ENOMEM;
+
+	memset(IXL_DMA_KVA(idm), 0, IXL_DMA_LEN(idm));
+	memset(&iaq, 0, sizeof(iaq));
+	iaq.iaq_opcode = htole16(IXL_AQ_OP_NVM_READ);
+	iaq.iaq_flags = htole16(IXL_AQ_BUF |
+	    ((len > I40E_AQ_LARGE_BUF) ? IXL_AQ_LB : 0));
+	iaq.iaq_datalen = htole16(len);
+	ixl_aq_dva(&iaq, IXL_DMA_DVA(idm));
+
+	param = (struct ixl_aq_nvm_param *)iaq.iaq_param;
+	param->command_flags = IXL_AQ_NVM_LAST_CMD;
+	param->module_pointer = 0;
+	param->length = htole16(len);
+	offset_bytes = (uint32_t)offset_word * 2;
+	offset_bytes &= 0x00FFFFFF;
+	param->offset = htole32(offset_bytes);
+
+	bus_dmamap_sync(sc->sc_dmat, IXL_DMA_MAP(idm), 0, IXL_DMA_LEN(idm),
+	    BUS_DMASYNC_PREREAD);
+
+	rv = ixl_atq_poll(sc, &iaq, 250);
+
+	bus_dmamap_sync(sc->sc_dmat, IXL_DMA_MAP(idm), 0, IXL_DMA_LEN(idm),
+	    BUS_DMASYNC_POSTREAD);
+
+	if (rv != 0) {
+		return ETIMEDOUT;
+	}
+
+	switch (le16toh(iaq.iaq_retval)) {
+	case IXL_AQ_RC_OK:
+		break;
+	case IXL_AQ_RC_EPERM:
+		return EPERM;
+	case IXL_AQ_RC_EINVAL:
+		return EINVAL;
+	case IXL_AQ_RC_EBUSY:
+		return EBUSY;
+	case IXL_AQ_RC_EIO:
+	default:
+		return EIO;
+	}
+
+	memcpy(data, IXL_DMA_KVA(idm), len);
+
+	return 0;
+}
+
+static int
+ixl_rd16_nvm(struct ixl_softc *sc, uint16_t offset, uint16_t *data)
+{
+	int error;
+	uint16_t buf;
+
+	error = ixl_nvm_lock(sc, 'R');
+	if (error)
+		return error;
+
+	if (ISSET(sc->sc_aq_flags, IXL_SC_AQ_FLAG_NVMREAD)) {
+		error = ixl_nvm_read_aq(sc, offset,
+		    &buf, sizeof(buf));
+		if (error == 0)
+			*data = le16toh(buf);
+	} else {
+		error = ixl_nvm_read_srctl(sc, offset, &buf);
+		if (error == 0)
+			*data = buf;
+	}
+
+	ixl_nvm_unlock(sc);
+
+	return error;
+}
+
 MODULE(MODULE_CLASS_DRIVER, if_ixl, "pci");
 
 #ifdef _MODULE
 #include "ioconf.c"
+#endif
+
+#ifdef _MODULE
+static void
+ixl_parse_modprop(prop_dictionary_t dict)
+{
+	prop_object_t obj;
+	int64_t val;
+	uint64_t uval;
+
+	if (dict == NULL)
+		return;
+
+	obj = prop_dictionary_get(dict, "nomsix");
+	if (obj != NULL && prop_object_type(obj) == PROP_TYPE_BOOL) {
+		ixl_param_nomsix = prop_bool_true((prop_bool_t)obj);
+	}
+
+	obj = prop_dictionary_get(dict, "stats_interval");
+	if (obj != NULL && prop_object_type(obj) == PROP_TYPE_NUMBER) {
+		val = prop_number_integer_value((prop_number_t)obj);
+
+		/* the range has no reason */
+		if (100 < val && val < 180000) {
+			ixl_param_stats_interval = val;
+		}
+	}
+
+	obj = prop_dictionary_get(dict, "nqps_limit");
+	if (obj != NULL && prop_object_type(obj) == PROP_TYPE_NUMBER) {
+		val = prop_number_integer_value((prop_number_t)obj);
+
+		if (val <= INT32_MAX)
+			ixl_param_nqps_limit = val;
+	}
+
+	obj = prop_dictionary_get(dict, "rx_ndescs");
+	if (obj != NULL && prop_object_type(obj) == PROP_TYPE_NUMBER) {
+		uval = prop_number_unsigned_integer_value((prop_number_t)obj);
+
+		if (uval > 8)
+			ixl_param_rx_ndescs = uval;
+	}
+
+	obj = prop_dictionary_get(dict, "tx_ndescs");
+	if (obj != NULL && prop_object_type(obj) == PROP_TYPE_NUMBER) {
+		uval = prop_number_unsigned_integer_value((prop_number_t)obj);
+
+		if (uval > IXL_TX_PKT_DESCS)
+			ixl_param_tx_ndescs = uval;
+	}
+
+}
 #endif
 
 static int
@@ -5724,6 +6667,7 @@ if_ixl_modcmd(modcmd_t cmd, void *opaque)
 #ifdef _MODULE
 	switch (cmd) {
 	case MODULE_CMD_INIT:
+		ixl_parse_modprop((prop_dictionary_t)opaque);
 		error = config_init_component(cfdriver_ioconf_if_ixl,
 		    cfattach_ioconf_if_ixl, cfdata_ioconf_if_ixl);
 		break;

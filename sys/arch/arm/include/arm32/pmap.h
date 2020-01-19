@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.157 2019/12/10 18:02:14 ad Exp $	*/
+/*	$NetBSD: pmap.h,v 1.159 2020/01/18 14:40:04 skrll Exp $	*/
 
 /*
  * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
@@ -283,7 +283,6 @@ uint32_t pmap_kernel_L1_addr(void);
  * The current top of kernel VM
  */
 extern vaddr_t	pmap_curmaxkvaddr;
-
 
 
 

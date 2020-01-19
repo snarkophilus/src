@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_bio.c,v 1.283 2019/12/11 20:50:32 ad Exp $	*/
+/*	$NetBSD: vfs_bio.c,v 1.287 2020/01/17 19:33:14 ad Exp $	*/
 
 /*-
  * Copyright (c) 2007, 2008, 2009, 2019 The NetBSD Foundation, Inc.
@@ -123,7 +123,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vfs_bio.c,v 1.283 2019/12/11 20:50:32 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vfs_bio.c,v 1.287 2020/01/17 19:33:14 ad Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_bufcache.h"
@@ -614,7 +614,7 @@ buf_canrelease(void)
 
 	ninvalid += bufqueues[BQ_AGE].bq_bytes;
 
-	pagedemand = uvmexp.freetarg - uvmexp.free;
+	pagedemand = uvmexp.freetarg - uvm_availmem();
 	if (pagedemand < 0)
 		return ninvalid;
 	return MAX(ninvalid, MIN(2 * MAXBSIZE,
@@ -1666,11 +1666,9 @@ biodone2(buf_t *bp)
 
 		/* Note callout done, then call out. */
 		KASSERT(!cv_has_waiters(&bp->b_done));
-		KERNEL_LOCK(1, NULL);		/* XXXSMP */
 		bp->b_iodone = NULL;
 		mutex_exit(bp->b_objlock);
 		(*callout)(bp);
-		KERNEL_UNLOCK_ONE(NULL);	/* XXXSMP */
 	} else if (ISSET(bp->b_flags, B_ASYNC)) {
 		/* If async, release. */
 		BIOHIST_LOG(biohist, "async", 0, 0, 0, 0);
@@ -2057,7 +2055,7 @@ nestiobuf_iodone(buf_t *bp)
 	if (bp->b_error == 0 &&
 	    (bp->b_bcount < bp->b_bufsize || bp->b_resid > 0)) {
 		/*
-		 * Not all got transfered, raise an error. We have no way to
+		 * Not all got transferred, raise an error. We have no way to
 		 * propagate these conditions to mbp.
 		 */
 		error = EIO;

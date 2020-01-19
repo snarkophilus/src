@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_pager.c,v 1.116 2019/12/14 21:36:00 ad Exp $	*/
+/*	$NetBSD: uvm_pager.c,v 1.120 2020/01/15 17:55:45 ad Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_pager.c,v 1.116 2019/12/14 21:36:00 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_pager.c,v 1.120 2020/01/15 17:55:45 ad Exp $");
 
 #include "opt_uvmhist.h"
 #include "opt_readahead.h"
@@ -176,7 +176,7 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 	struct vm_page *pp;
 	vm_prot_t prot;
 	const bool pdaemon = (curlwp == uvm.pagedaemon_lwp);
-	const u_int first_color = VM_PGCOLOR_BUCKET(*pps);
+	const u_int first_color = VM_PGCOLOR(*pps);
 	UVMHIST_FUNC("uvm_pagermapin"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist,"(pps=0x%#jx, npages=%jd, first_color=%ju)",
@@ -367,6 +367,13 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 		}
 #endif /* defined(VMSWAP) */
 
+		if (write && uobj != NULL) {
+			KASSERT(radix_tree_get_tag(&uobj->uo_pages,
+			    pg->offset >> PAGE_SHIFT, UVM_PAGE_WRITEBACK_TAG));
+			radix_tree_clear_tag(&uobj->uo_pages,
+			    pg->offset >> PAGE_SHIFT, UVM_PAGE_WRITEBACK_TAG);
+		}
+
 		/*
 		 * process errors.  for reads, just mark the page to be freed.
 		 * for writes, if the error was ENOMEM, we assume this was
@@ -386,8 +393,10 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 					pg->flags &= ~PG_PAGEOUT;
 					pageout_done++;
 				}
-				pg->flags &= ~PG_CLEAN;
+				uvm_pagemarkdirty(pg, UVM_PAGE_STATUS_DIRTY);
+				uvm_pagelock(pg);
 				uvm_pageactivate(pg);
+				uvm_pageunlock(pg);
 				slot = 0;
 			} else
 				slot = SWSLOT_BAD;
@@ -411,8 +420,6 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 		/*
 		 * if the page is PG_FAKE, this must have been a read to
 		 * initialize the page.  clear PG_FAKE and activate the page.
-		 * we must also clear the pmap "modified" flag since it may
-		 * still be set from the page's previous identity.
 		 */
 
 		if (pg->flags & PG_FAKE) {
@@ -422,9 +429,10 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 			pg->flags |= PG_READAHEAD;
 			uvm_ra_total.ev_count++;
 #endif /* defined(READAHEAD_STATS) */
-			KASSERT((pg->flags & PG_CLEAN) != 0);
+			KASSERT(uvm_pagegetdirty(pg) == UVM_PAGE_STATUS_CLEAN);
+			uvm_pagelock(pg);
 			uvm_pageenqueue(pg);
-			pmap_clear_modify(pg);
+			uvm_pageunlock(pg);
 		}
 
 		/*
@@ -464,7 +472,6 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 
 		/* these pages are now only in swap. */
 		if (error != ENOMEM) {
-			KASSERT(uvmexp.swpgonly + npages <= uvmexp.swpginuse);
 			atomic_add_int(&uvmexp.swpgonly, npages);
 		}
 		if (error) {

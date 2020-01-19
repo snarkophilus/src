@@ -1,4 +1,4 @@
-/* $NetBSD: gicv3_its.c,v 1.22 2019/12/02 03:06:51 msaitoh Exp $ */
+/* $NetBSD: gicv3_its.c,v 1.24 2020/01/17 13:54:47 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2018 The NetBSD Foundation, Inc.
@@ -32,7 +32,7 @@
 #define _INTR_PRIVATE
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: gicv3_its.c,v 1.22 2019/12/02 03:06:51 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: gicv3_its.c,v 1.24 2020/01/17 13:54:47 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/kmem.h>
@@ -297,7 +297,7 @@ gicv3_its_msi_alloc_lpi(struct gicv3_its *its,
 
         return -1;
 }
-         
+
 static void
 gicv3_its_msi_free_lpi(struct gicv3_its *its, int lpi)
 {
@@ -873,6 +873,7 @@ gicv3_its_init(struct gicv3_softc *sc, bus_space_handle_t bsh,
 	gicv3_its_cpu_init(its, curcpu());
 
 	msi = &its->its_msi;
+	msi->msi_id = its_id;
 	msi->msi_dev = sc->sc_dev;
 	msi->msi_priv = its;
 	msi->msi_alloc = gicv3_its_msi_alloc;

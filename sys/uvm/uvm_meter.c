@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_meter.c,v 1.70 2019/12/16 22:47:55 ad Exp $	*/
+/*	$NetBSD: uvm_meter.c,v 1.74 2020/01/15 17:55:45 ad Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_meter.c,v 1.70 2019/12/16 22:47:55 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_meter.c,v 1.74 2020/01/15 17:55:45 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -107,7 +107,7 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.pagemask = uvmexp.pagemask;
 	u.pageshift = uvmexp.pageshift;
 	u.npages = uvmexp.npages;
-	u.free = uvmexp.free;
+	u.free = uvm_availmem();
 	u.active = active;
 	u.inactive = inactive;
 	u.paging = uvmexp.paging;
@@ -140,7 +140,7 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.forks_sharevm = cpu_count_get(CPU_COUNT_FORKS_SHAREVM);
 	u.pga_zerohit = cpu_count_get(CPU_COUNT_PGA_ZEROHIT);
 	u.pga_zeromiss = cpu_count_get(CPU_COUNT_PGA_ZEROMISS);
-	u.zeroaborts = cpu_count_get(CPU_COUNT_ZEROABORTS);
+	u.zeroaborts = uvmexp.zeroaborts;
 	u.fltnoram = cpu_count_get(CPU_COUNT_FLTNORAM);
 	u.fltnoanon = cpu_count_get(CPU_COUNT_FLTNOANON);
 	u.fltpgwait = cpu_count_get(CPU_COUNT_FLTPGWAIT);
@@ -180,6 +180,12 @@ sysctl_vm_uvmexp2(SYSCTLFN_ARGS)
 	u.poolpages = pool_totalpages();
 	u.countsyncone = cpu_count_get(CPU_COUNT_SYNC_ONE);
 	u.countsyncall = cpu_count_get(CPU_COUNT_SYNC_ALL);
+	u.anonunknown = (int)cpu_count_get(CPU_COUNT_ANONUNKNOWN);
+	u.anonclean = (int)cpu_count_get(CPU_COUNT_ANONCLEAN);
+	u.anondirty = (int)cpu_count_get(CPU_COUNT_ANONDIRTY);
+	u.fileunknown = (int)cpu_count_get(CPU_COUNT_FILEUNKNOWN);
+	u.fileclean = (int)cpu_count_get(CPU_COUNT_FILECLEAN);
+	u.filedirty = (int)cpu_count_get(CPU_COUNT_FILEDIRTY);
 
 	node = *rnode;
 	node.sysctl_data = &u;
@@ -320,6 +326,7 @@ uvm_total(struct vmtotal *totalp)
 	struct vm_map *map;
 	int paging;
 #endif
+	int freepg;
 	int active;
 
 	memset(totalp, 0, sizeof *totalp);
@@ -381,11 +388,12 @@ uvm_total(struct vmtotal *totalp)
 	/*
 	 * Calculate object memory usage statistics.
 	 */
+	freepg = uvm_availmem();
 	uvm_estimatepageable(&active, NULL);
-	totalp->t_free = uvmexp.free;
-	totalp->t_vm = uvmexp.npages - uvmexp.free + uvmexp.swpginuse;
+	totalp->t_free = freepg;
+	totalp->t_vm = uvmexp.npages - freepg + uvmexp.swpginuse;
 	totalp->t_avm = active + uvmexp.swpginuse;	/* XXX */
-	totalp->t_rm = uvmexp.npages - uvmexp.free;
+	totalp->t_rm = uvmexp.npages - freepg;
 	totalp->t_arm = active;
 	totalp->t_vmshr = 0;		/* XXX */
 	totalp->t_avmshr = 0;		/* XXX */
@@ -447,7 +455,7 @@ uvm_update_uvmexp(void)
 
 	cpu_count_sync_all();
 
-	/* uvmexp.free = (int)cpu_count_get(CPU_COUNT_FREE); */
+	uvmexp.free = (int)uvm_availmem();
 	uvmexp.zeropages = (int)cpu_count_get(CPU_COUNT_ZEROPAGES);
 	uvmexp.cpuhit = (int)cpu_count_get(CPU_COUNT_CPUHIT);
 	uvmexp.cpumiss = (int)cpu_count_get(CPU_COUNT_CPUMISS);
@@ -486,5 +494,4 @@ uvm_update_uvmexp(void)
 	uvmexp.execpages = (int)cpu_count_get(CPU_COUNT_EXECPAGES);
 	uvmexp.colorhit = (int)cpu_count_get(CPU_COUNT_COLORHIT);
 	uvmexp.colormiss = (int)cpu_count_get(CPU_COUNT_COLORMISS);
-	uvmexp.zeroaborts = (int)cpu_count_get(CPU_COUNT_ZEROABORTS);
 }
