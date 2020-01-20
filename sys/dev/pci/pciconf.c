@@ -1195,7 +1195,7 @@ mem_region_ok64(struct extent * const ex __used_only_lp64)
 	 */
 	u_long addr64;
 	if (ex->ex_end > (1UL << 32) &&
-	    extent_alloc_subregion(ex, (1UL << 32),
+	    extent_alloc_subregion(ex, MAX(1UL << 32, ex->ex_start),
 				   ex->ex_end,
 				   1 /* size */,
 				   1 /* alignment */,
