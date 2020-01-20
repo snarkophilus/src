@@ -1,4 +1,4 @@
-/*	$NetBSD: mm.h,v 1.11 2020/01/17 20:09:47 ad Exp $	*/
+/*	$NetBSD: mm.h,v 1.12 2020/01/19 15:31:56 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2013 The NetBSD Foundation, Inc.
