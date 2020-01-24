@@ -737,7 +737,6 @@ inet_makenetandmask(const u_int32_t net, struct sockaddr_in * const isin,
 	sin->sin_len = 1 + cp - (char *)sin;
 	sin->sin_family = AF_INET;
 }
-#endif
 
 #ifdef INET6
 /*

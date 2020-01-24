@@ -405,15 +405,6 @@ arp_init_llentry(struct ifnet *ifp, struct llentry *lle)
 	}
 }
 
-#if NTOKEN > 0
-static void
-arp_free_llentry_tokenring(struct llentry *lle)
-{
-
-	kmem_intr_free(lle->la_opaque, sizeof(struct token_rif));
-}
-#endif
-
 /*
  * Parallel to llc_rtrequest.
  */
@@ -1027,12 +1018,6 @@ in_arpinput(struct mbuf *m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ARP_STATINC(ARP_STAT_RCVMCAST);
 
-	memcpy(&isaddr, ar_spa(ah), sizeof(isaddr));
-	memcpy(&itaddr, ar_tpa(ah), sizeof(itaddr));
-
-	if (m->m_flags & (M_BCAST|M_MCAST))
-		ARP_STATINC(ARP_STAT_RCVMCAST);
-
 	/*
 	 * Search for a matching interface address
 	 * or any address on the interface to use
@@ -1110,40 +1095,7 @@ in_arpinput(struct mbuf *m)
 		}
 	}
 
-#if NBRIDGE > 0
-	if (ia == NULL && bridge_ia != NULL) {
-		ia = bridge_ia;
-		m_put_rcvif_psref(rcvif, &psref);
-		rcvif = NULL;
-		/* FIXME */
-		ifp = bridge_ia->ia_ifp;
-	}
-#endif
-	if (ia != NULL)
-		ia4_acquire(ia, &psref_ia);
-	pserialize_read_exit(s);
-
-	if (ah->ar_hln != ifp->if_addrlen) {
-		ARP_STATINC(ARP_STAT_RCVBADLEN);
-		log(LOG_WARNING,
-		    "arp from %s: addr len: new %d, i/f %d (ignored)\n",
-		    IN_PRINT(ipbuf, &isaddr), ah->ar_hln, ifp->if_addrlen);
-		goto out;
-	}
-
-	/* Only do DaD if we have a matching address. */
-	do_dad = (ia != NULL);
-
-	if (ia == NULL) {
-		ia = in_get_ia_on_iface_psref(isaddr, rcvif, &psref_ia);
-		if (ia == NULL) {
-			ia = in_get_ia_from_ifp_psref(ifp, &psref_ia);
-			if (ia == NULL) {
-				ARP_STATINC(ARP_STAT_RCVNOINT);
-				goto out;
-			}
-		}
-	}
+	myaddr = ia->ia_addr.sin_addr;
 
 	/* XXX checks for bridge case? */
 	if (!memcmp(ar_sha(ah), ifp->if_broadcastaddr, ifp->if_addrlen)) {

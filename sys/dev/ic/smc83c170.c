@@ -195,8 +195,6 @@ epic_attach(struct epic_softc *sc)
 		    "unable to create pad buffer DMA map, error = %d\n", error);
 		goto fail_5;
 	}
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_nulldmamap, 0, ETHER_PAD_LEN,
-	    BUS_DMASYNC_PREWRITE);
 
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_nulldmamap,
 	    nullbuf, ETHER_PAD_LEN, NULL, BUS_DMA_NOWAIT)) != 0) {

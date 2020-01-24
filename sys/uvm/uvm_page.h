@@ -239,35 +239,6 @@ struct vm_page {
  *	Dummy marker page, generally used for list traversal.
  */
 
-struct vm_page {
-	union {
-		TAILQ_ENTRY(vm_page) queue;	/* w: wired page queue
-						 * or uvm_pglistalloc output */
-		LIST_ENTRY(vm_page) list;	/* f: global free page queue */
-	} pageq;
-	TAILQ_ENTRY(vm_page)	pdqueue;	/* p: pagedaemon queue */
-	kmutex_t		interlock;	/* s: lock on identity */
-	uint32_t		pqflags;	/* i: pagedaemon flags */
-	uint32_t		flags;		/* o: object flags */
-	paddr_t			phys_addr;	/* o: physical address of pg */
-	uint32_t		loan_count;	/* o,i: num. active loans */
-	uint32_t		wire_count;	/* o,i: wired down map refs */
-	struct vm_anon		*uanon;		/* o,i: anon */
-	struct uvm_object	*uobject;	/* o,i: object */
-	voff_t			offset;		/* o: offset into object */
-
-#ifdef __HAVE_VM_PAGE_MD
-	struct vm_page_md	mdpage;		/* ?: pmap-specific data */
-#endif
-
-#if defined(UVM_PAGE_TRKOWN)
-	/* debugging fields to track page ownership */
-	pid_t			owner;		/* proc that set PG_BUSY */
-	lwpid_t			lowner;		/* lwp that set PG_BUSY */
-	const char		*owner_tag;	/* why it was set busy */
-#endif
-};
-
 /*
  * if you want to renumber PG_CLEAN and PG_DIRTY, check __CTASSERTs in
  * uvm_page_status.c first.

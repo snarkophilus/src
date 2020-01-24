@@ -237,18 +237,6 @@ tracev(const char *fmt, va_list va)
 		trace_flush(tracetfile, 0);
 }
 
-void
-trargs(char **ap)
-{
-	if (debug != 1 || !tracetfile)
-		return;
-	while (*ap) {
-		trstring(*ap++);
-		if (*ap)
-			trace_putc(' ', tracetfile);
-	}
-	trace_putc('\n', tracetfile);
-}
 
 void
 trputs(const char *s)
@@ -305,17 +293,6 @@ trargstr(union node *n)
 	sharg(n, tracetfile);
 }
 
-
-/*
- * Beyond here we just have the implementation of all of that
- */
-
-
-inline static int
-trlinelen(TFILE * fp)
-{
-	return fp->llen;
-}
 
 /*
  * Beyond here we just have the implementation of all of that
