@@ -712,12 +712,13 @@ pmap_l1tt_free(struct pool *pp, void *v)
 	vaddr_t va = (vaddr_t)v;
 
 #if !defined( __HAVE_MM_MD_DIRECT_MAPPED_PHYS)
-	uvm_km_free(kernel_map, va, L1TT_SIZE, 0);
+	uvm_km_free(kernel_map, va, L1TT_SIZE, UVM_KMF_WIRED);
 #else
-	paddr_t pa;
-
-	bool ok = pmap_extract(pmap_kernel(), va, &pa);
-	KASSERT(ok);
+#if defined(KERNEL_BASE_VOFFSET)
+	paddr_t pa = va - KERNEL_BASE_VOFFSET;
+#else
+	paddr_t pa = va - KERNEL_BASE + physical_start;
+#endif
 	const paddr_t epa = pa + L1TT_SIZE;
 
 	for (; pa < epa; pa += PAGE_SIZE) {
