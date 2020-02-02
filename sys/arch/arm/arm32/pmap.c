@@ -4290,9 +4290,6 @@ pmap_grow_map(vaddr_t va, paddr_t *pap)
 #else
 		if (uvm_page_physget(&pa) == false)
 			return (1);
-
-		pmap_kenter_pa(va, pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PMAP_KMPAGE|PMAP_PTE);
 #endif	/* PMAP_STEAL_MEMORY */
 	} else {
 		struct vm_page *pg;
@@ -4306,9 +4303,10 @@ pmap_grow_map(vaddr_t va, paddr_t *pap)
 		 */
 		struct vm_page_md *md __diagused = VM_PAGE_TO_MD(pg);
 		KASSERT(SLIST_EMPTY(&md->pvh_list));
-		pmap_kenter_pa(va, pa,
-		    VM_PROT_READ|VM_PROT_WRITE, PMAP_KMPAGE|PMAP_PTE);
 	}
+
+	pmap_kenter_pa(va, pa,
+	    VM_PROT_READ|VM_PROT_WRITE, PMAP_KMPAGE|PMAP_PTE);
 
 	if (pap)
 		*pap = pa;
