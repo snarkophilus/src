@@ -372,12 +372,12 @@ sysctl_machdep_booted_device(SYSCTLFN_ARGS)
 	struct sysctlnode node;
 
 	if (booted_device == NULL)
-		return (EOPNOTSUPP);
+		return EOPNOTSUPP;
 
 	node = *rnode;
 	node.sysctl_data = __UNCONST(device_xname(booted_device));
 	node.sysctl_size = strlen(device_xname(booted_device)) + 1;
-	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
+	return sysctl_lookup(SYSCTLFN_CALL(&node));
 }
 
 static int
@@ -386,12 +386,12 @@ sysctl_machdep_booted_kernel(SYSCTLFN_ARGS)
 	struct sysctlnode node;
 
 	if (booted_kernel == NULL || booted_kernel[0] == '\0')
-		return (EOPNOTSUPP);
+		return EOPNOTSUPP;
 
 	node = *rnode;
 	node.sysctl_data = booted_kernel;
 	node.sysctl_size = strlen(booted_kernel) + 1;
-	return (sysctl_lookup(SYSCTLFN_CALL(&node)));
+	return sysctl_lookup(SYSCTLFN_CALL(&node));
 }
 
 static int
@@ -415,13 +415,13 @@ sysctl_machdep_powersave(SYSCTLFN_ARGS)
 		node.sysctl_flags &= ~CTLFLAG_READWRITE;
 	error = sysctl_lookup(SYSCTLFN_CALL(&node));
 	if (error || newp == NULL || newval == cpu_do_powersave)
-		return (error);
+		return error;
 
 	if (newval < 0 || newval > 1)
-		return (EINVAL);
+		return EINVAL;
 	cpu_do_powersave = newval;
 
-	return (0);
+	return 0;
 }
 
 SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")

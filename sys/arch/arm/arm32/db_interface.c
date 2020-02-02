@@ -209,7 +209,7 @@ db_validate_address(vaddr_t addr)
 	else
 		pmap = p->p_vmspace->vm_map.pmap;
 
-	return (pmap_extract(pmap, addr, NULL) == false);
+	return pmap_extract(pmap, addr, NULL) == false;
 }
 
 /*

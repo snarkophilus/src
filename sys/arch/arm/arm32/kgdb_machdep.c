@@ -55,18 +55,18 @@ kgdb_acc(vaddr_t va, size_t len)
 
 	do {
 		if (db_validate_address(va))
-			return (0);
+			return 0;
 		va  += PAGE_SIZE;
 	} while (va < last_va);
 
-	return (1);
+	return 1;
 }
 
 /*
  * Translate a trap number into a unix compatible signal value.
  * (gdb only understands unix signal numbers).
  */
-int 
+int
 kgdb_signal(int type)
 {
 
@@ -136,7 +136,7 @@ kgdb_setregs(db_regs_t *regs, kgdb_reg_t *gdb_regs)
 	regs->tf_pc     = gdb_regs[KGDB_REGNUM_R0 + 15];
 
 	regs->tf_spsr = gdb_regs[KGDB_REGNUM_SPSR];
-}	
+}
 
 /*
  * Trap into kgdb to wait for debugger to connect,

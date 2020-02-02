@@ -426,7 +426,7 @@ pmap_alloc_l2_bucket(pmap_t pm, vaddr_t va)
 		 * Need to allocate a new l2_dtable.
 		 */
 		if ((l2 = pmap_alloc_l2_dtable()) == NULL)
-			return (NULL);
+			return NULL;
 
 		/*
 		 * Link it into the parent pmap
@@ -456,7 +456,7 @@ pmap_alloc_l2_bucket(pmap_t pm, vaddr_t va)
 				pm->pm_l2[L2_IDX(l1slot)] = NULL;
 				pmap_free_l2_dtable(l2);
 			}
-			return (NULL);
+			return NULL;
 		}
 
 		l2->l2_occupancy++;
@@ -477,7 +477,7 @@ pmap_alloc_l2_bucket(pmap_t pm, vaddr_t va)
 #endif
 	}
 
-	return (l2b);
+	return l2b;
 }
 
 /*
@@ -614,7 +614,7 @@ pmap_l2ptp_ctor(void *arg, void *v, int flags)
 
 	memset(v, 0, L2_TABLE_SIZE_REAL);
 	PTE_SYNC_RANGE(v, L2_TABLE_SIZE_REAL / sizeof(pt_entry_t));
-	return (0);
+	return 0;
 }
 
 
@@ -625,7 +625,7 @@ pmap_l2dtable_ctor(void *arg, void *v, int flags)
 {
 
 	memset(v, 0, sizeof(struct l2_dtable));
-	return (0);
+	return 0;
 }
 
 
@@ -1413,7 +1413,7 @@ pmap_set_pt_cache_mode(pd_entry_t *kl1, vaddr_t va, size_t nptes)
 		va += PAGE_SIZE;
 	}
 
-	return (rv);
+	return rv;
 #endif
 }
 
@@ -1480,9 +1480,9 @@ kernel_pt_lookup(paddr_t pa)
 
 	SLIST_FOREACH(pv, &kernel_pt_list, pv_list) {
 		if (pv->pv_pa == (pa & ~PGOFSET))
-			return (pv->pv_va | (pa & PGOFSET));
+			return pv->pv_va | (pa & PGOFSET);
 	}
-	return (0);
+	return 0;
 }
 
 /*
@@ -1728,7 +1728,7 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 		resid -= PAGE_SIZE;
 	}
 	VPRINTF("\n");
-	return (size);
+	return size;
 }
 
 /*
@@ -1801,7 +1801,7 @@ pmap_devmap_find_pa(paddr_t pa, psize_t size)
 	int i;
 
 	if (pmap_devmap_table == NULL)
-		return (NULL);
+		return NULL;
 
 	endpa = (uint64_t)pa + (uint64_t)(size - 1);
 
@@ -1809,10 +1809,10 @@ pmap_devmap_find_pa(paddr_t pa, psize_t size)
 		if (pa >= pmap_devmap_table[i].pd_pa &&
 		    endpa <= (uint64_t)pmap_devmap_table[i].pd_pa +
 			     (uint64_t)(pmap_devmap_table[i].pd_size - 1))
-			return (&pmap_devmap_table[i]);
+			return &pmap_devmap_table[i];
 	}
 
-	return (NULL);
+	return NULL;
 }
 
 const struct pmap_devmap *
@@ -1821,16 +1821,16 @@ pmap_devmap_find_va(vaddr_t va, vsize_t size)
 	int i;
 
 	if (pmap_devmap_table == NULL)
-		return (NULL);
+		return NULL;
 
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
 		if (va >= pmap_devmap_table[i].pd_va &&
 		    va + size - 1 <= pmap_devmap_table[i].pd_va +
 				     pmap_devmap_table[i].pd_size - 1)
-			return (&pmap_devmap_table[i]);
+			return &pmap_devmap_table[i];
 	}
 
-	return (NULL);
+	return NULL;
 }
 
 /********************** PTE initialization routines **************************/
