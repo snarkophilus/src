@@ -4275,6 +4275,8 @@ pmap_grow_map(vaddr_t va, paddr_t *pap)
 {
 	paddr_t pa;
 
+	KASSERT((va & PGOFSET) == 0);
+
 	if (uvm.page_init_done == false) {
 #ifdef PMAP_STEAL_MEMORY
 		pv_addr_t pv;
@@ -4361,7 +4363,7 @@ pmap_grow_l2_bucket(pmap_t pm, vaddr_t va)
 			 * The new l2_dtable straddles a page boundary.
 			 * Map in another page to cover it.
 			 */
-			if (pmap_grow_map(nva, NULL))
+			if (pmap_grow_map(nva & ~PGOFSET, NULL))
 				return (NULL);
 		}
 
