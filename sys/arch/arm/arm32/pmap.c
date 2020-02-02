@@ -197,20 +197,22 @@
 #define _INTR_PRIVATE
 #endif
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.383 2020/02/02 07:47:51 skrll Exp $");
+
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/kernel.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-#include <sys/intr.h>
-#include <sys/pool.h>
-#include <sys/kmem.h>
-#include <sys/cdefs.h>
-#include <sys/cpu.h>
-#include <sys/sysctl.h>
-#include <sys/bus.h>
 #include <sys/atomic.h>
+#include <sys/bus.h>
+#include <sys/cpu.h>
+#include <sys/intr.h>
+#include <sys/kernel.h>
 #include <sys/kernhist.h>
+#include <sys/kmem.h>
+#include <sys/pool.h>
+#include <sys/proc.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 
 #include <uvm/uvm.h>
 #include <uvm/pmap/pmap_pvt.h>
@@ -221,8 +223,6 @@
 #ifdef DDB
 #include <arm/db_machdep.h>
 #endif
-
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.382 2020/01/25 16:19:29 skrll Exp $");
 
 //#define PMAP_DEBUG
 #ifdef PMAP_DEBUG
