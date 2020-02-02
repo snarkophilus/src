@@ -502,7 +502,7 @@ struct l1_ttable {
 /*
  * L1 Page Tables are tracked using a Least Recently Used list.
  *  - New L1s are allocated from the HEAD.
- *  - Freed L1s are added to the TAIl.
+ *  - Freed L1s are added to the TAIL.
  *  - Recently accessed L1s (where an 'access' is some change to one of
  *    the userland pmaps which owns this L1) are moved to the TAIL.
  */
