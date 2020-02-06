@@ -181,6 +181,12 @@
 
 /* Include header files */
 
+//XXXNH PMAP_DEV
+
+
+
+
+
 #include "opt_arm_debug.h"
 #include "opt_cpuoptions.h"
 #include "opt_pmap_debug.h"
@@ -619,6 +625,7 @@ static struct pool_allocator pmap_l1tt_allocator = {
 	.pa_pagesz = L1TT_SIZE,
 };
 
+
 int
 pmap_maxproc_set(int nmaxproc)
 {
@@ -743,8 +750,6 @@ pmap_l1tt_ctor(void *arg, void *v, int flags)
 	PTE_SYNC_RANGE(v, L1TT_SIZE / sizeof(pt_entry_t));
 	return 0;
 }
-
-
 
 #ifdef __HAVE_MM_MD_DIRECT_MAPPED_PHYS
 vaddr_t

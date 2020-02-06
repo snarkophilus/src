@@ -320,11 +320,11 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 	pr(" %s", (pte & LX_VALID) ? "VALID" : "**INVALID**");
 
 	if (level == 0 ||
-	   (level == 1 && l1pde_is_table(pte)) ||
-	   (level == 2 && l2pde_is_table(pte))) {
+	    (level == 1 && l1pde_is_table(pte)) ||
+	    (level == 2 && l2pde_is_table(pte))) {
 
 		/* L0/L1/L2 TABLE */
-		if (level == 0 && (pte & LX_TYPE) != LX_TYPE_TBL)
+		if (level == 0 && ((pte & LX_TYPE) != LX_TYPE_TBL))
 			pr(" **ILLEGAL TYPE**"); /* L0 doesn't support block */
 		else
 			pr(" L%d-TABLE", level);
@@ -340,8 +340,7 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 		if (pte & LX_TBL_PXNTABLE)
 			pr(", PXNTABLE");
 
-	} else if (
-	    (level == 1 && l1pde_is_block(pte)) ||
+	} else if ((level == 1 && l1pde_is_block(pte)) ||
 	    (level == 2 && l2pde_is_block(pte)) ||
 	    level == 3) {
 
@@ -362,7 +361,7 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 		pr(", PA=%lx", l3pte_pa(pte));
 
 		pr(", %s", (pte & LX_BLKPAG_UXN) ? "UXN" : "UX ");
-		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" :  "PX ");
+		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" : "PX ");
 
 		if (pte & LX_BLKPAG_CONTIG)
 			pr(", CONTIG");
@@ -402,7 +401,9 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 			pr(", WT");
 			break;
 		case LX_BLKPAG_ATTR_DEVICE_MEM:
-			pr(", DEVICE");
+			pr(", DEV");
+		case LX_BLKPAG_ATTR_DEVICE_MEM_SO:
+			pr(", SO");
 			break;
 		}
 
@@ -420,15 +421,16 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 	pr("\n");
 }
 
+
 void
 pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	struct vm_page *pg;
+	struct pmap_page *pp;
 	bool user;
 	pd_entry_t *l0, *l1, *l2, *l3;
 	pd_entry_t pde;
 	pt_entry_t pte;
-//	struct vm_page_md *md;
 	uint64_t ttbr;
 	paddr_t pa;
 	unsigned int idx;
@@ -494,13 +496,15 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 
 	pa = l3pte_pa(pte);
 	pg = PHYS_TO_VM_PAGE(pa);
-	if (pg == NULL) {
-		pr("No VM_PAGE\n");
+	pp = NULL /*phys_to_pp(pa)*/;
+	if (pp == NULL) {
+		pr("No VM_PAGE nor PMAP_PAGE\n");
 	} else {
-		pg_dump(pg, pr);
-//		md = VM_PAGE_TO_MD(pg);
-		// XXXNH
-		//pv_dump(md, pr);
+		if (pg != NULL)
+			pg_dump(pg, pr);
+		else
+			pr("no VM_PAGE. pv-tracked page?\n");
+//		pv_dump(pp, pr);
 	}
 }
 
@@ -536,11 +540,12 @@ dump_ln_table(bool countmode, pd_entry_t *pdp, int level, int lnindex,
 				    spc, level, i, n, va, pde);
 			n++;
 
-			if ((level != 0 && level != 3 && l1pde_is_block(pde)) ||
-			    (level == 3 && l3pte_is_page(pde))) {
+			if (((level != 0) && (level != 3) &&
+			    l1pde_is_block(pde)) ||
+			    ((level == 3) && l3pte_is_page(pde))) {
 				if (!countmode)
 					pmap_db_pte_print(pde, level, pr);
-			} else if (level != 3 && l1pde_is_table(pde)) {
+			} else if ((level != 3) && l1pde_is_table(pde)) {
 				if (!countmode)
 					pmap_db_pte_print(pde, level, pr);
 				pa = l0pde_pa(pde);
@@ -594,10 +599,10 @@ pmap_db_ttbrdump(bool countmode, vaddr_t va,
 	db_read_bytes((db_addr_t)va, sizeof(_pm), (char *)&_pm);
 
 	pr("pmap=%p\n", pm);
-//	pr(" pm_asid       = %d\n", _pm.pm_asid);
-//	pr(" pm_l0table    = %p\n", _pm.pm_l0table);
-//	pr(" pm_l0table_pa = %lx\n", _pm.pm_l0table_pa);
-//	pr(" pm_activated  = %d\n\n", _pm.pm_activated);
+	//pr(" pm_asid       = %d\n", _pm.pm_asid);
+	//pr(" pm_l0table    = %p\n", _pm.pm_l0table);
+	//pr(" pm_l0table_pa = %lx\n", _pm.pm_l0table_pa);
+	//pr(" pm_activated  = %d\n\n", _pm.pm_activated);
 
 	pmap_db_dump_l0_table(countmode, pmap_l0table(&_pm),
 	    (pm == pmap_kernel()) ? 0xffff000000000000UL : 0, pr);

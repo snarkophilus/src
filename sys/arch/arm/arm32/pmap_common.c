@@ -1501,8 +1501,7 @@ pmap_map_section(vaddr_t l1pt, vaddr_t va, paddr_t pa, int prot, int cache)
 
 	switch (cache) {
 	case PTE_NOCACHE:
-	default:
-		fl = 0;
+		fl = pte_l1_s_nocache_mode;
 		break;
 
 	case PTE_CACHE:
@@ -1511,6 +1510,11 @@ pmap_map_section(vaddr_t l1pt, vaddr_t va, paddr_t pa, int prot, int cache)
 
 	case PTE_PAGETABLE:
 		fl = pte_l1_s_cache_mode_pt;
+		break;
+
+	case PTE_DEV:
+	default:
+		fl = 0;
 		break;
 	}
 
@@ -1537,8 +1541,7 @@ pmap_map_entry(vaddr_t l1pt, vaddr_t va, paddr_t pa, int prot, int cache)
 
 	switch (cache) {
 	case PTE_NOCACHE:
-	default:
-		npte = 0;
+		npte = pte_l2_s_nocache_mode;
 		break;
 
 	case PTE_CACHE:
@@ -1547,6 +1550,10 @@ pmap_map_entry(vaddr_t l1pt, vaddr_t va, paddr_t pa, int prot, int cache)
 
 	case PTE_PAGETABLE:
 		npte = pte_l2_s_cache_mode_pt;
+		break;
+
+	default:
+		npte = 0;
 		break;
 	}
 
@@ -1611,15 +1618,14 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 	if (l1pt == 0)
 		panic("pmap_map_chunk: no L1 table provided");
 
-	VPRINTF("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
-	    "prot=0x%x cache=%d\n", pa, va, size, resid, prot, cache);
+// 	VPRINTF("pmap_map_chunk: pa=0x%lx va=0x%lx size=0x%lx resid=0x%lx "
+// 	    "prot=0x%x cache=%d\n", pa, va, size, resid, prot, cache);
 
 	switch (cache) {
 	case PTE_NOCACHE:
-	default:
-		f1 = 0;
-		f2l = 0;
-		f2s = 0;
+		f1 = pte_l1_s_nocache_mode;
+		f2l = pte_l2_l_nocache_mode;
+		f2s = pte_l2_s_nocache_mode;
 		break;
 
 	case PTE_CACHE:
@@ -1632,6 +1638,13 @@ pmap_map_chunk(vaddr_t l1pt, vaddr_t va, paddr_t pa, vsize_t size,
 		f1 = pte_l1_s_cache_mode_pt;
 		f2l = pte_l2_l_cache_mode_pt;
 		f2s = pte_l2_s_cache_mode_pt;
+		break;
+
+	case PTE_DEV:
+	default:
+		f1 = 0;
+		f2l = 0;
+		f2s = 0;
 		break;
 	}
 
@@ -1843,16 +1856,19 @@ pmap_devmap_find_va(vaddr_t va, vsize_t size)
  * them (though, they shouldn't).
  */
 
+pt_entry_t	pte_l1_s_nocache_mode;
 pt_entry_t	pte_l1_s_cache_mode;
 pt_entry_t	pte_l1_s_wc_mode;
 pt_entry_t	pte_l1_s_cache_mode_pt;
 pt_entry_t	pte_l1_s_cache_mask;
 
+pt_entry_t	pte_l2_l_nocache_mode;
 pt_entry_t	pte_l2_l_cache_mode;
 pt_entry_t	pte_l2_l_wc_mode;
 pt_entry_t	pte_l2_l_cache_mode_pt;
 pt_entry_t	pte_l2_l_cache_mask;
 
+pt_entry_t	pte_l2_s_nocache_mode;
 pt_entry_t	pte_l2_s_cache_mode;
 pt_entry_t	pte_l2_s_wc_mode;
 pt_entry_t	pte_l2_s_cache_mode_pt;
@@ -1921,14 +1937,18 @@ pmap_pte_init_generic(void)
 		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
 	}
 #else
+
+	pte_l1_s_nocache_mode = 0;
 	pte_l1_s_cache_mode = L1_S_B|L1_S_C;
 	pte_l1_s_wc_mode = L1_S_B;
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_generic;
 
+	pte_l2_l_nocache_mode = 0;
 	pte_l2_l_cache_mode = L2_B|L2_C;
 	pte_l2_l_wc_mode = L2_B;
 	pte_l2_l_cache_mask = L2_L_CACHE_MASK_generic;
 
+	pte_l2_s_nocache_mode = 0;
 	pte_l2_s_cache_mode = L2_B|L2_C;
 	pte_l2_s_wc_mode = L2_B;
 	pte_l2_s_cache_mask = L2_S_CACHE_MASK_generic;
@@ -1956,6 +1976,7 @@ pmap_pte_init_generic(void)
 		pte_l2_s_cache_mode_pt = L2_C;		/* write through */
 	}
 #endif
+
 	pte_l1_s_prot_u = L1_S_PROT_U_generic;
 	pte_l1_s_prot_w = L1_S_PROT_W_generic;
 	pte_l1_s_prot_ro = L1_S_PROT_RO_generic;
@@ -2317,7 +2338,7 @@ void
 pmap_pte_init_arm11mpcore(void)
 {
 
-	/* cache mode is controlled by 5 bits (B, C, TEX) */
+	/* cache mode is controlled by 5 bits (B, C, TEX[2:0]) */
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_armv6;
 	pte_l2_l_cache_mask = L2_L_CACHE_MASK_armv6;
 #if defined(ARM11MPCORE_COMPAT_MMU) || defined(ARMV6_EXTENDED_SMALL_PAGE)
@@ -2395,6 +2416,53 @@ pmap_pte_init_arm11mpcore(void)
 }
 #endif	/* CPU_ARM11MPCORE */
 
+#if ARM_MMU_V6 == 1
+void
+pmap_pte_init_armv6(void)
+{
+	/*
+	 * The ARMv6-A MMU is mostly compatible with generic. If the
+	 * AP field is zero, that now means "no access" rather than
+	 * read-only. The prototypes are a little different because of
+	 * the XN bit.
+	 */
+	pmap_pte_init_generic();
+
+	pte_l1_s_nocache_mode = L1_S_XS_TEX(1);
+	pte_l2_l_nocache_mode = L2_XS_L_TEX(1);
+	pte_l2_s_nocache_mode = L2_XS_T_TEX(1);
+
+#ifdef ARM11_COMPAT_MMU
+	/* with AP[0..3] */
+	pte_l1_ss_proto = L1_SS_PROTO_armv6;
+#else
+	pte_l1_s_cache_mask = L1_S_CACHE_MASK_armv6n;
+	pte_l2_l_cache_mask = L2_L_CACHE_MASK_armv6n;
+	pte_l2_s_cache_mask = L2_S_CACHE_MASK_armv6n;
+
+	pte_l1_ss_proto = L1_SS_PROTO_armv6;
+	pte_l1_s_proto = L1_S_PROTO_armv6;
+	pte_l1_c_proto = L1_C_PROTO_armv6;
+	pte_l2_s_proto = L2_S_PROTO_armv6n;
+
+	pte_l1_s_prot_u = L1_S_PROT_U_armv6;
+	pte_l1_s_prot_w = L1_S_PROT_W_armv6;
+	pte_l1_s_prot_ro = L1_S_PROT_RO_armv6;
+	pte_l1_s_prot_mask = L1_S_PROT_MASK_armv6;
+
+	pte_l2_l_prot_u = L2_L_PROT_U_armv6n;
+	pte_l2_l_prot_w = L2_L_PROT_W_armv6n;
+	pte_l2_l_prot_ro = L2_L_PROT_RO_armv6n;
+	pte_l2_l_prot_mask = L2_L_PROT_MASK_armv6n;
+
+	pte_l2_s_prot_u = L2_S_PROT_U_armv6n;
+	pte_l2_s_prot_w = L2_S_PROT_W_armv6n;
+	pte_l2_s_prot_ro = L2_S_PROT_RO_armv6n;
+	pte_l2_s_prot_mask = L2_S_PROT_MASK_armv6n;
+
+#endif
+}
+#endif /* ARM_MMU_V6 */
 
 #if ARM_MMU_V7 == 1
 void
@@ -2409,6 +2477,10 @@ pmap_pte_init_armv7(void)
 	pmap_pte_init_generic();
 
 	pmap_needs_pte_sync = 1;
+
+	pte_l1_s_nocache_mode = L1_S_XS_TEX(1);
+	pte_l2_l_nocache_mode = L2_XS_L_TEX(1);
+	pte_l2_s_nocache_mode = L2_XS_T_TEX(1);
 
 	pte_l1_s_cache_mask = L1_S_CACHE_MASK_armv7;
 	pte_l2_l_cache_mask = L2_L_CACHE_MASK_armv7;

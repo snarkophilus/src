@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.31 2020/01/26 15:52:00 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.33 2020/02/03 13:37:01 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -108,6 +108,7 @@ pd_entry_t *pmap_l0table(struct pmap *);
 
 bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
 
+/* change attribute of kernel segment */
 static inline pt_entry_t
 pmap_kvattr(pt_entry_t *ptep, vm_prot_t prot)
 {
@@ -138,8 +139,6 @@ pmap_kvattr(pt_entry_t *ptep, vm_prot_t prot)
 
 	return opte;
 }
-
-
 
 /* devmap */
 struct pmap_devmap {
@@ -272,6 +271,7 @@ int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
 #define PMAP_STEAL_MEMORY
 
 #define __HAVE_VM_PAGE_MD
+#define __HAVE_PMAP_PV_TRACK	1
 
 struct pmap {
 	kmutex_t pm_lock;
@@ -289,22 +289,27 @@ struct pmap {
 };
 
 struct pv_entry;
-struct vm_page_md {
-	kmutex_t mdpg_pvlock;
-	TAILQ_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
-	TAILQ_HEAD(, pv_entry) mdpg_pvhead;
-
-	pd_entry_t *mdpg_ptep_parent;	/* for page descriptor page only */
+struct pmap_page {
+	kmutex_t pp_pvlock;
+	TAILQ_HEAD(, pv_entry) pp_pvhead;
 
 	/* VM_PROT_READ means referenced, VM_PROT_WRITE means modified */
-	uint32_t mdpg_flags;
+	uint32_t pp_flags;
+#define PMAP_PAGE_FLAGS_PV_TRACKED	0x80000000
 };
 
-/* each mdpg_pvlock will be initialized in pmap_init() */
-#define VM_MDPAGE_INIT(pg)				\
-	do {						\
-		TAILQ_INIT(&(pg)->mdpage.mdpg_pvhead);	\
-		(pg)->mdpage.mdpg_flags = 0;		\
+struct vm_page_md {
+	TAILQ_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
+	pd_entry_t *mdpg_ptep_parent;	/* for page descriptor page only */
+
+	struct pmap_page mdpg_pp;
+};
+
+/* each mdpg_pp.pp_pvlock will be initialized in pmap_init() */
+#define VM_MDPAGE_INIT(pg)					\
+	do {							\
+		TAILQ_INIT(&(pg)->mdpage.mdpg_pp.pp_pvhead);	\
+		(pg)->mdpage.mdpg_pp.pp_flags = 0;		\
 	} while (/*CONSTCOND*/ 0)
 
 
@@ -327,6 +332,11 @@ pt_entry_t *kvtopte(vaddr_t);
 
 void	pmap_procwr(struct proc *, vaddr_t, int);
 void	pmap_icache_sync_range(pmap_t, vaddr_t, vaddr_t);
+
+void	pmap_pv_init(void);
+void	pmap_pv_track(paddr_t, psize_t);
+void	pmap_pv_untrack(paddr_t, psize_t);
+void	pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define	PMAP_MAPSIZE1	L2_SIZE
 

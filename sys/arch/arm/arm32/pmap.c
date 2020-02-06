@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.382 2020/01/25 16:19:29 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.388 2020/02/05 07:37:35 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -198,7 +198,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.383 2020/02/02 07:47:51 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.388 2020/02/05 07:37:35 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -3096,8 +3096,11 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 		if (!(flags & PMAP_NOCACHE))
 			npte |= pte_l2_s_cache_mode_pt;
 	} else {
-		switch (flags & PMAP_CACHE_MASK) {
+		switch (flags & (PMAP_CACHE_MASK | PMAP_DEV_MASK)) {
+		case PMAP_DEV ... PMAP_DEV | PMAP_CACHE_MASK:
+			break;
 		case PMAP_NOCACHE:
+			npte |= pte_l2_s_nocache_mode;
 			break;
 		case PMAP_WRITE_COMBINE:
 			npte |= pte_l2_s_wc_mode;
@@ -4585,8 +4588,6 @@ pmap_init(void)
 
 static vaddr_t last_bootstrap_page = 0;
 static void *free_bootstrap_pages = NULL;
-
-
 
 
 static void *
