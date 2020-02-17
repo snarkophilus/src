@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.33 2020/02/03 13:37:01 ryo Exp $ */
+/* $NetBSD: pmap.h,v 1.34 2020/02/10 19:04:01 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -279,7 +279,7 @@ struct pmap {
 	pd_entry_t *pm_l0table;			/* L0 table: 512G*512 */
 	paddr_t pm_l0table_pa;
 
-	TAILQ_HEAD(, vm_page) pm_vmlist;	/* for L[0123] tables */
+	LIST_HEAD(, vm_page) pm_vmlist;	/* for L[0123] tables */
 
 	struct pmap_statistics pm_stats;
 	unsigned int pm_refcnt;
@@ -289,9 +289,10 @@ struct pmap {
 };
 
 struct pv_entry;
+
 struct pmap_page {
 	kmutex_t pp_pvlock;
-	TAILQ_HEAD(, pv_entry) pp_pvhead;
+	LIST_HEAD(, pv_entry) pp_pvhead;
 
 	/* VM_PROT_READ means referenced, VM_PROT_WRITE means modified */
 	uint32_t pp_flags;
@@ -299,7 +300,7 @@ struct pmap_page {
 };
 
 struct vm_page_md {
-	TAILQ_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
+	LIST_ENTRY(vm_page) mdpg_vmlist;	/* L[0123] table vm_page list */
 	pd_entry_t *mdpg_ptep_parent;	/* for page descriptor page only */
 
 	struct pmap_page mdpg_pp;
@@ -308,7 +309,7 @@ struct vm_page_md {
 /* each mdpg_pp.pp_pvlock will be initialized in pmap_init() */
 #define VM_MDPAGE_INIT(pg)					\
 	do {							\
-		TAILQ_INIT(&(pg)->mdpage.mdpg_pp.pp_pvhead);	\
+		LIST_INIT(&(pg)->mdpage.mdpg_pp.pp_pvhead);	\
 		(pg)->mdpage.mdpg_pp.pp_flags = 0;		\
 	} while (/*CONSTCOND*/ 0)
 
@@ -323,7 +324,6 @@ struct vm_page_md {
 #define POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
 
 pt_entry_t *kvtopte(vaddr_t);
-
 
 #define pmap_update(pmap)		((void)0)
 #define pmap_copy(dp,sp,d,l,s)		((void)0)
