@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.c,v 1.40 2020/02/09 08:14:55 skrll Exp $ */
+/* $NetBSD: cpu.c,v 1.41 2020/02/15 08:16:10 skrll Exp $ */
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.40 2020/02/09 08:14:55 skrll Exp $");
+__KERNEL_RCSID(1, "$NetBSD: cpu.c,v 1.41 2020/02/15 08:16:10 skrll Exp $");
 
 #include "locators.h"
 #include "opt_arm_debug.h"
@@ -68,18 +68,6 @@ static void cpu_setup_id(struct cpu_info *);
 static void cpu_setup_sysctl(device_t, struct cpu_info *);
 
 #ifdef MULTIPROCESSOR
-uint64_t cpu_mpidr[MAXCPUS];
-
-#define	CPUINDEX_DIVISOR	(sizeof(u_long) * NBBY)
-
-volatile u_long arm_cpu_hatched[howmany(MAXCPUS, CPUINDEX_DIVISOR)] __cacheline_aligned = { 0 };
-volatile u_long arm_cpu_mbox[howmany(MAXCPUS, CPUINDEX_DIVISOR)] __cacheline_aligned = { 0 };
-u_int arm_cpu_max = 1;
-
-static kmutex_t cpu_hatch_lock;
-#endif /* MULTIPROCESSOR */
-
-#ifdef MULTIPROCESSOR
 #define NCPUINFO	MAXCPUS
 #else
 #define NCPUINFO	1
@@ -94,10 +82,6 @@ struct cpu_info cpu_info_store[NCPUINFO] = {
 		.ci_cpl = IPL_HIGH,
 		.ci_curlwp = &lwp0
 	}
-};
-
-struct cpu_info *cpu_info[NCPUINFO] __read_mostly = {
-	[0] = &cpu_info_store[0]
 };
 
 void
@@ -500,42 +484,6 @@ cpu_setup_sysctl(device_t dv, struct cpu_info *ci)
 
 #ifdef MULTIPROCESSOR
 void
-cpu_boot_secondary_processors(void)
-{
-	u_int cpuno;
-
-	if ((boothowto & RB_MD1) != 0)
-		return;
-
-	mutex_init(&cpu_hatch_lock, MUTEX_DEFAULT, IPL_NONE);
-
-	VPRINTF("%s: starting secondary processors\n", __func__);
-
-	/* send mbox to have secondary processors do cpu_hatch() */
-	for (size_t n = 0; n < __arraycount(arm_cpu_mbox); n++)
-		atomic_or_ulong(&arm_cpu_mbox[n], arm_cpu_hatched[n]);
-
-	__asm __volatile ("sev; sev; sev");
-
-	/* wait all cpus have done cpu_hatch() */
-	for (cpuno = 1; cpuno < ncpu; cpuno++) {
-		if (!cpu_hatched_p(cpuno))
-			continue;
-
-		const size_t off = cpuno / CPUINDEX_DIVISOR;
-		const u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
-
-		while (membar_consumer(), arm_cpu_mbox[off] & bit) {
-			__asm __volatile ("wfe");
-		}
-		/* Add processor to kcpuset */
-		kcpuset_set(kcpuset_attached, cpuno);
-	}
-
-	VPRINTF("%s: secondary processors hatched\n", __func__);
-}
-
-void
 cpu_hatch(struct cpu_info *ci)
 {
 	KASSERT(curcpu() == ci);
@@ -567,21 +515,6 @@ cpu_hatch(struct cpu_info *ci)
 	 * ci_index are each cpu0=0, cpu1=1, cpu2=undef, cpu3=2.
 	 * therefore we have to use device_unit instead of ci_index for mbox.
 	 */
-	const u_int cpuno = device_unit(ci->ci_dev);
-	const size_t off = cpuno / CPUINDEX_DIVISOR;
-	u_long bit = __BIT(cpuno % CPUINDEX_DIVISOR);
-
-	atomic_and_ulong(&arm_cpu_mbox[off], ~bit);
-	__asm __volatile ("sev; sev; sev");
-}
-
-bool
-cpu_hatched_p(u_int cpuindex)
-{
-	const size_t off = cpuindex / CPUINDEX_DIVISOR;
-	u_long bit = __BIT(cpuindex % CPUINDEX_DIVISOR);
-
-	membar_consumer();
-	return (arm_cpu_hatched[off] & bit) != 0;
+	cpu_clr_mbox(device_unit(ci->ci_dev));
 }
 #endif /* MULTIPROCESSOR */
