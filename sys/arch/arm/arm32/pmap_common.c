@@ -1469,7 +1469,7 @@ pmap_postinit(void)
  * find them as necessary.
  *
  * Note that the data on this list MUST remain valid after initarm() returns,
- * as pmap_bootstrap() uses it to contruct L2 table metadata.
+ * as pmap_bootstrap() uses it to construct L2 table metadata.
  */
 SLIST_HEAD(, pv_addr) kernel_pt_list = SLIST_HEAD_INITIALIZER(kernel_pt_list);
 
