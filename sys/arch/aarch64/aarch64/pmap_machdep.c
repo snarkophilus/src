@@ -394,19 +394,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pm->pm_l0 = (pd_entry_t *)pm->pm_pdetab;
 
 	VPRINTF("locks ");
-	mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
-	uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
-	uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
-
-//	TAILQ_INIT(&pmap->pm_pvp_list);
-	TAILQ_INIT(&pm->pm_ptp_list);
-
-#if defined(PMAP_HWPAGEWALKER)
-	TAILQ_INIT(&pm->pm_pdetab_list);
-#endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-	TAILQ_INIT(&pm->pm_segtab_list);
-#endif
+	pmap_bootstrap_common();
 
 	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);

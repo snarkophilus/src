@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_segtab.c,v 1.13 2019/12/18 11:27:56 skrll Exp $	*/
+/*	$NetBSD: pmap_segtab.c,v 1.14 2020/02/24 12:20:30 rin Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.13 2019/12/18 11:27:56 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.14 2020/02/24 12:20:30 rin Exp $");
 
 /*
  *	Manages physical address maps.
@@ -198,10 +198,10 @@ pmap_check_stp(pmap_segtab_t *stp, const char *caller, const char *why)
 		if (stp->seg_tab[i] != 0) {
 #ifdef DEBUG_NOISY
 			for (size_t j = i; j < PMAP_SEGTABSIZE; j++)
-				printf("%s: pm_segtab.seg_tab[%zu] = 0x%p\n",
+				printf("%s: pm_segtab.seg_tab[%zu] = %p\n",
 				    caller, j, stp->seg_tab[j]);
 #endif
-			panic("%s: pm_segtab.seg_tab[%zu] != 0 (0x%p): %s",
+			panic("%s: pm_segtab.seg_tab[%zu] != 0 (%p): %s",
 			    caller, i, stp->seg_tab[i], why);
 		}
 	}
@@ -351,10 +351,10 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 
 	UVMHIST_LOG(pmaphist, "kva %jx uobj %jx pg %jx list %jx",
 	    (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)uobj, (uintptr_t)pglist);
-	mutex_spin_enter(uobj->vmobjlock);
+	mutex_enter(&pmap->pm_lock);
 	TAILQ_INSERT_TAIL(pglist, pg, pageq.queue);
 	uobj->uo_npages++;
-	mutex_spin_exit(uobj->vmobjlock);
+	mutex_exit(&pmap->pm_lock);
 
 	/*
 	 * Now set each vm_page that maps this page to point to the
@@ -385,10 +385,10 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 	KASSERTMSG(pg->uobject == uobj, "pg->uobject %p vs uobj %p",
 	    pg->uobject, uobj);
 
-	mutex_spin_enter(uobj->vmobjlock);
+	mutex_enter(&pmap->pm_lock);
 	TAILQ_REMOVE(list, pg, pageq.queue);
 	uobj->uo_npages--;
-	mutex_spin_exit(uobj->vmobjlock);
+	mutex_exit(&pmap->pm_lock);
 
 	pg->uobject = NULL;
 	pg->offset = 0;
@@ -515,7 +515,9 @@ pmap_pdetab_alloc(struct pmap *pmap)
 	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 	pmap_pdetab_t *ptb;
+#ifdef KERNHIST
 	bool found_on_freelist = false;
+#endif
 
  again:
 	mutex_spin_enter(&pmap_segtab_lock);
@@ -529,7 +531,9 @@ pmap_pdetab_alloc(struct pmap *pmap)
 
 		PDETAB_ADD(nget, 1);
 		ptb->pde_next = NULL;
+#ifdef KERNHIST
 		found_on_freelist = true;
+#endif
 	}
 	mutex_spin_exit(&pmap_segtab_lock);
 

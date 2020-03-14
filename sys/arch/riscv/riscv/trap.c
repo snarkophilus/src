@@ -453,7 +453,7 @@ cpu_trap(struct trapframe *tf, register_t epc, register_t status,
 void
 cpu_ast(struct trapframe *tf)
 {
-	struct cpu_info * const ci = curcpu();
+//	struct cpu_info * const ci = curcpu();
 
 	atomic_swap_uint(&curlwp->l_md.md_astpending, 0);
 
@@ -478,7 +478,7 @@ fetch_user_data(const void *uaddr, void *valp, size_t size)
 
 	if ((error = cpu_set_onfault(&fb, 1)) != 0)
 		return error;
-	
+
 	switch (size) {
 	case 1:
 		*(uint8_t *)valp = *(volatile const uint8_t *)uaddr;

@@ -435,12 +435,18 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 	paddr_t pa;
 	unsigned int idx;
 
-	if (va & TTBR_SEL_VA) {
+	switch (aarch64_addressspace(va)) {
+	case AARCH64_ADDRSPACE_UPPER:
 		user = false;
 		ttbr = reg_ttbr1_el1_read();
-	} else {
+		break;
+	case AARCH64_ADDRSPACE_LOWER:
 		user = true;
 		ttbr = reg_ttbr0_el1_read();
+		break;
+	default:
+		pr("illegal address space\n");
+		return;
 	}
 	pa = ttbr & TTBR_BADDR;
 	l0 = (pd_entry_t *)AARCH64_PA_TO_KVA(pa);

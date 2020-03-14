@@ -938,13 +938,11 @@ pmap_impl_bootstrap(void)
 	pm->pm_l1 = (pd_entry_t *)kernel_l1pt.pv_va;
 	pm->pm_l1_pa = kernel_l1pt.pv_pa;
 
+	VPRINTF("locks ");
 
-        VPRINTF("locks ");
-        mutex_init(&pm->pm_obj_lock, MUTEX_DEFAULT, IPL_VM);
-        uvm_obj_init(&pm->pm_uobject, NULL, false, 1);
-        uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
+	TAILQ_INIT(&pm->pm_ptp_list);
 
-        TAILQ_INIT(&pm->pm_ptp_list);
+	pmap_bootstrap_common();
 
 	VPRINTF("tlb0 ");
 	pmap_tlb_info_init(&pmap_tlb0_info);

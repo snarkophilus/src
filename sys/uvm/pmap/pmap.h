@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.12 2019/06/01 12:42:28 maxv Exp $	*/
+/*	$NetBSD: pmap.h,v 1.13 2020/03/11 13:30:31 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -74,6 +74,7 @@
 #ifndef	_UVM_PMAP_PMAP_H_
 #define	_UVM_PMAP_PMAP_H_
 
+#include <sys/rwlock.h>
 #include <uvm/uvm_object.h>
 #include <uvm/uvm_stat.h>
 #ifdef UVMHIST
@@ -138,6 +139,7 @@ typedef union pmap_segtab {
 struct pmap;
 typedef bool (*pte_callback_t)(struct pmap *, vaddr_t, vaddr_t,
 	pt_entry_t *, uintptr_t);
+void pmap_bootstrap_common(void);
 pt_entry_t *pmap_pte_lookup(struct pmap *, vaddr_t);
 pt_entry_t *pmap_pte_reserve(struct pmap *, vaddr_t, int);
 void pmap_pte_process(struct pmap *, vaddr_t, vaddr_t, pte_callback_t,
@@ -164,11 +166,13 @@ extern kmutex_t pmap_segtab_lock;
  */
 struct pmap {
 	struct uvm_object	pm_uobject;
-#define pm_lock			pm_uobject.vmobjlock
 #define pm_count		pm_uobject.uo_refs /* pmap reference count */
 #define pm_pvp_list		pm_uobject.memq
 
-	kmutex_t		pm_obj_lock;
+	krwlock_t		pm_obj_lock;
+
+	kmutex_t		pm_lock;
+
 	struct pglist		pm_ptp_list;
 #if defined(PMAP_HWPAGEWALKER)
 	struct pglist		pm_pdetab_list;

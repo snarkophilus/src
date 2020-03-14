@@ -31,7 +31,7 @@
 
 #include "opt_modular.h"
 
-__RCSID("$NetBSD: riscv_machdep.c,v 1.8 2019/12/31 13:07:12 ad Exp $");
+__RCSID("$NetBSD: riscv_machdep.c,v 1.9 2020/03/11 13:30:31 thorpej Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -429,5 +429,4 @@ init_riscv(register_t hartid, paddr_t dtb, paddr_t kernstart, paddr_t kernend)
 
 	/* Finish setting up lwp0 on our end before we call main() */
 	riscv_init_lwp0_uarea();
-
 }

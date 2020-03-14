@@ -56,9 +56,9 @@ ENTRY_NP(start)
 	PTR_LA	gp, _C_LABEL(_gp)
 #endif
 
-        /* Save the phys addr from the start and end of the kernel */
-        la      s3, _C_LABEL(start)
-        la      s4, _C_LABEL(end)
+	/* Save the phys addr from the start and end of the kernel */
+	la	s3, _C_LABEL(start)
+	la	s4, _C_LABEL(end)
 
 #if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
 #error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
@@ -96,8 +96,9 @@ ENTRY_NP(start)
 	csrs	sstatus, t0		// Enable VM
 
 	// We should have a VM so let's start using our real addresses
-	lui	t0, %hi(.Lmmu_on)	// load hi part of absolute address
-	jr	t0, %lo(.Lmmu_on)	// jump to absolute address
+	PTR_LA	t0, vmmu_on
+	INT_L	t0, (t0)
+	jr	t0
 
 .Lmmu_on:
 	// MMU is on!
@@ -118,14 +119,17 @@ ENTRY_NP(start)
 	PTR_S	s2, PM_MD_PTBR(t1)	// PA of kernel PDETAB
 
 	// Now we should ready to start initializing the kernel.
-	mv      a0, s0                  // hartid
-	mv	a1, s1                  // dtb
-        mv      a2, s3                  // kernel start
-	mv	a3, s4                  // kernel end
+	mv	a0, s0			// hartid
+	mv	a1, s1			// dtb
+	mv	a2, s3			// kernel start
+	mv	a3, s4			// kernel end
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
 END(start)
+
+vmmu_on:
+	.quad	.Lmmu_on
 
 //
 // struct lwp *cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
@@ -202,7 +206,7 @@ ENTRY_NP(cpu_fast_switchto_cleanup)
 //	INT_L	t1, CI_MTX_COUNT(t0)	// get mutex count
 //	addi	t1, t1, 1		// increment mutex count
 //	INT_S	t1, CI_MTX_COUNT(t0)	// save it
-        mv	ra, a1			// Restore real RA
+	mv	ra, a1			// Restore real RA
 #if IPL_SCHED != IPL_HIGH
 	tail	_C_LABEL(splhigh)	// go back to IPL HIGH
 #else
@@ -251,7 +255,7 @@ ENTRY_NP(cpu_fast_switchto)
 //#if 0
 	csrw	sstatus, t0		// reenable interrupts
 //#endif
-        mv	a0, s0                  // Pass the pinned lwp
+	mv	a0, s0			// Pass the pinned lwp
 	call	_C_LABEL(softint_dispatch)
 //#if 0
 	csrrci	t0, sstatus, SR_SIE	// disable interrupts
@@ -543,7 +547,7 @@ END(mpentry)
 	/* Used for finding virtual / physical offsets */
 	.globl virt_map
 virt_map:
-	.quad   virt_map
+	.quad	virt_map
 
 	.align PGSHIFT
 	.global _C_LABEL(lwp0uspace)

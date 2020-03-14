@@ -77,6 +77,7 @@ struct trapframe {
 #define tf_t6		tf_reg[_X_T6]
 };
 
+#ifdef _LP64
 // For COMPAT_NETBSD32 coredumps
 struct trapframe32 {
 	struct reg32 tf_regs;
@@ -84,6 +85,7 @@ struct trapframe32 {
 	uint32_t tf_cause;		// 32-bit register
 	uint32_t tf_sr;			// 32-bit register
 };
+#endif
 
 #define FB_A0	0
 #define	FB_RA	1

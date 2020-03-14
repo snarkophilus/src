@@ -261,9 +261,8 @@ union pmap_cache_state {
  * The pmap structure itself
  */
 struct pmap {
-	struct uvm_object	pm_obj;
-	kmutex_t		pm_obj_lock;
-#define	pm_lock pm_obj.vmobjlock
+	kmutex_t		pm_lock;
+	u_int			pm_refs;
 #ifndef ARM_HAS_VBAR
 	pd_entry_t		*pm_pl1vec;
 	pd_entry_t		pm_l1vec;
@@ -310,7 +309,7 @@ pmap_acquire_pmap_lock(pmap_t pm)
 		return;
 #endif
 
-	mutex_enter(pm->pm_lock);
+	mutex_enter(&pm->pm_lock);
 }
 
 static inline void
@@ -320,7 +319,7 @@ pmap_release_pmap_lock(pmap_t pm)
 	if (__predict_false(db_onproc != NULL))
 		return;
 #endif
-	mutex_exit(pm->pm_lock);
+	mutex_exit(&pm->pm_lock);
 }
 
 static inline void

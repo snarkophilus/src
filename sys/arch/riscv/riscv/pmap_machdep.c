@@ -1,4 +1,4 @@
-/* $NetBSD: pmap_machdep.c,v 1.4 2019/06/16 07:42:52 maxv Exp $ */
+/* $NetBSD: pmap_machdep.c,v 1.5 2020/03/11 13:30:31 thorpej Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>
 
-__RCSID("$NetBSD: pmap_machdep.c,v 1.4 2019/06/16 07:42:52 maxv Exp $");
+__RCSID("$NetBSD: pmap_machdep.c,v 1.5 2020/03/11 13:30:31 thorpej Exp $");
 
 #include <sys/param.h>
 
@@ -142,6 +142,12 @@ pmap_md_pdetab_activate(struct pmap *pmap, struct lwp *l)
 }
 
 void
+pmap_md_pdetab_deactivate(struct pmap *pmap)
+{
+	riscvreg_ptbr_write(0);
+}
+
+void
 pmap_md_pdetab_init(struct pmap *pmap)
 {
 	KASSERT(pmap != NULL);
@@ -163,6 +169,8 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	extern __uint64_t virt_map;
 //	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
 	pmap_t pm = pmap_kernel();
+
+	pmap_bootstrap_common();
 
 	kend = (kend + 0x200000 - 1) & -0x200000;
 

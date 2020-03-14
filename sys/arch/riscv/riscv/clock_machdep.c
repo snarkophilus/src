@@ -40,6 +40,6 @@ cpu_initclocks(void)
 }
 
 void
-setstatclockrate(int hz)
+setstatclockrate(int newhz)
 {
 }
