@@ -1,4 +1,4 @@
-/* $NetBSD: pmap_machdep.c,v 1.5 2020/03/11 13:30:31 thorpej Exp $ */
+/* $NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>
 
-__RCSID("$NetBSD: pmap_machdep.c,v 1.5 2020/03/11 13:30:31 thorpej Exp $");
+__RCSID("$NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $");
 
 #include <sys/param.h>
 

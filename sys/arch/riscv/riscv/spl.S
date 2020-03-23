@@ -1,4 +1,4 @@
-/* $NetBSD: spl.S,v 1.2 2015/03/31 01:15:26 matt Exp $ */
+/* $NetBSD: spl.S,v 1.3 2020/03/14 16:12:16 skrll Exp $ */
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -31,7 +31,7 @@
 #include <machine/asm.h>
 #include "assym.h"
 
-__RCSID("$NetBSD: spl.S,v 1.2 2015/03/31 01:15:26 matt Exp $")
+__RCSID("$NetBSD: spl.S,v 1.3 2020/03/14 16:12:16 skrll Exp $")
 
 	.data
 	.globl	_C_LABEL(ipl_sr_map)

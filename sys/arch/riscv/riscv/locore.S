@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.11 2020/01/08 20:59:19 skrll Exp $ */
+/* $NetBSD: locore.S,v 1.12 2020/03/14 16:12:16 skrll Exp $ */
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
  * All rights reserved.

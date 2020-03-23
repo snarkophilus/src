@@ -31,7 +31,7 @@
 
 #include "opt_modular.h"
 
-__RCSID("$NetBSD: riscv_machdep.c,v 1.9 2020/03/11 13:30:31 thorpej Exp $");
+__RCSID("$NetBSD: riscv_machdep.c,v 1.10 2020/03/14 16:12:16 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

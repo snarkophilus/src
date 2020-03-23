@@ -199,7 +199,7 @@ do {									\
  * Functions that we need to export
  */
 void	pmap_procwr(struct proc *, vaddr_t, int);
-void	pmap_remove_all(pmap_t);
+bool	pmap_remove_all(pmap_t);
 bool	pmap_extract(pmap_t, vaddr_t, paddr_t *);
 
 void	pmap_md_clean_page(struct vm_page_md *, bool);

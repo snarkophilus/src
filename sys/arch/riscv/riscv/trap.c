@@ -32,7 +32,7 @@
 #define __PMAP_PRIVATE
 #define __UFETCHSTORE_PRIVATE
 
-__RCSID("$NetBSD: trap.c,v 1.4 2019/11/21 19:24:01 ad Exp $");
+__RCSID("$NetBSD: trap.c,v 1.5 2020/03/14 16:12:16 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -536,7 +536,7 @@ store_user_data(void *uaddr, const void *valp, size_t size)
 
 	if ((error = cpu_set_onfault(&fb, 1)) != 0)
 		return error;
-	
+
 	switch (size) {
 	case 1:
 		*(volatile uint8_t *)uaddr = *(const uint8_t *)valp;

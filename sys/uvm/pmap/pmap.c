@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.47 2020/03/12 23:10:27 thorpej Exp $	*/
+/*	$NetBSD: pmap.c,v 1.48 2020/03/14 14:05:44 ad Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.47 2020/03/12 23:10:27 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.48 2020/03/14 14:05:44 ad Exp $");
 
 /*
  *	Manages physical address maps.
@@ -1585,7 +1585,7 @@ pmap_kremove(vaddr_t va, vsize_t len)
 	UVMHIST_LOG(pmaphist, " <-- done", 0, 0, 0, 0);
 }
 
-void
+bool
 pmap_remove_all(struct pmap *pmap)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
@@ -1620,6 +1620,7 @@ pmap_remove_all(struct pmap *pmap)
 	kpreempt_enable();
 
 	UVMHIST_LOG(pmaphist, " <-- done", 0, 0, 0, 0);
+	return false;
 }
 
 /*
