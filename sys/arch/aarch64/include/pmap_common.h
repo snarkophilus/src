@@ -393,9 +393,13 @@ struct vm_page_md;
 static inline pt_entry_t
 pte_memattr(u_int flags)
 {
-	switch (flags & (PMAP_DEV | PMAP_CACHE_MASK)) {
+
+	switch (flags & (PMAP_DEV_MASK | PMAP_CACHE_MASK)) {
+	case PMAP_DEV_SO ... PMAP_DEV_SO | PMAP_CACHE_MASK:
+		/* Device-nGnRnE */
+		return LX_BLKPAG_ATTR_DEVICE_MEM_SO;
 	case PMAP_DEV ... PMAP_DEV | PMAP_CACHE_MASK:
-		/* nGnRnE */
+		/* Device-nGnRE */
 		return LX_BLKPAG_ATTR_DEVICE_MEM;
 	case PMAP_NOCACHE:
 	case PMAP_NOCACHE_OVR:
