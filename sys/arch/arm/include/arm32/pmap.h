@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.164 2020/03/14 14:05:42 ad Exp $	*/
+/*	$NetBSD: pmap.h,v 1.166 2020/03/29 21:34:33 skrll Exp $	*/
 
 /*
  * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
@@ -1026,13 +1026,13 @@ void pmap_pv_protect(paddr_t, vm_prot_t);
 #include <arm/arm32/pmap_v4.h>
 #endif  /* ARM_MMU_EXTENDED */
 
-#endif /* !_LOCORE */
-
 #ifndef __BSD_PTENTRY_T__
 #define	__BSD_PTENTRY_T__
 typedef uint32_t pt_entry_t;
 #define PRIxPTE		PRIx32
 #endif
+
+#endif /* !_LOCORE */
 
 bool pmap_is_page_ro_p(struct pmap *pmap, vaddr_t, uint32_t);
 
