@@ -377,6 +377,10 @@ ENTRY_NP(cpu_mpstart)
 
 	mov	x27, x1			/* x27 = cpuindex */
 
+	/*
+	 * x27 = cpuindex
+	 */
+
 	/* set stack pointer for boot */
 	mov	x1, #BOOT_AP_STACKSIZE
 	mul	x1, x1, x27
@@ -445,19 +449,25 @@ mp_vstart:
 	mrs	x1, mpidr_el1
 	str	x1, [x0, #CI_MPIDR]	/* curcpu()->ci_mpidr = mpidr_el1 */
 
-	/* x28 = &arm_cpu_hatched[cpuindex / (sizeof(unsigned long) * NBBY)] */
+	/* set topology information */
+	mov	x2, #0
+	bl	arm_cpu_topology_set
+
+	/* x28 = &arm_cpu_hatched[cpuindex / (sizeof(u_long) * NBBY)] */
 	adrl	x0, _C_LABEL(arm_cpu_hatched)
 	// Appease clang - mov	x1, x27, lsr #6
 	orr	x1, xzr, x27, lsr #6
 	add	x28, x0, x1, lsl #3
 
+	/* x29 = __BIT(cpuindex % (sizeof(u_long) * NBBY)) */
 	mov	x0, #1
 	and	x2, x27, #63
-	lsl	x29, x0, x2		/* x29 = 1 << (cpuindex & 63) */
+	lsl	x29, x0, x2
 
 	/*
-	 * atomic_or_ulong(&arm_cpu_hatched[cpuindex / sizeof(u_long)], 1UL << cpuindex & (64 - 1))
-	 * to tell my activity to primary processor.
+	 * atomic_or_ulong(&arm_cpu_hatched[cpuindex / (sizeof(u_long)  * NBBY)],
+	 *   _BIT(cpuindex % ((sizeof(u_long) * NBBY)
+	 * to inform the boot processor.
 	 */
 	CPU_DPRINTREG("x28 hatched      = ", x28)
 	CPU_DPRINTREG("x29 bit          = ", x29)
@@ -468,10 +478,11 @@ mp_vstart:
 	dsb	sy
 	sev
 
+	/* x28 = &arm_cpu_mbox[cpuindex / (sizeof(u_long) * NBBY)] */
 	adrl	x0, _C_LABEL(arm_cpu_mbox)
 	// Appease clang - mov	x1, x27, lsr #6
 	orr	x1, xzr, x27, lsr #6
-	add	x28, x0, x1, lsl #3	/* x28 = &arm_cpu_mbox[cpuindex / (sizeof(u_long) * NBBY)] */
+	add	x28, x0, x1, lsl #3
 
 	/* wait for the mailbox start bit to become true */
 1:
