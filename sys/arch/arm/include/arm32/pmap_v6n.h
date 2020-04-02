@@ -276,10 +276,6 @@ pmap_md_setvirtualend(vaddr_t va)
 }
 #endif
 
-
-//XXX Move to sys/uvm/pmap/pmap.h
-void pmap_page_remove(struct vm_page *);
-
 static inline size_t
 pte_index(vaddr_t va)
 {
