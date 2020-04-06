@@ -307,7 +307,8 @@ trap_pagefault_fixup(struct trapframe *tf, struct pmap *pmap, register_t cause,
 	pmap_tlb_update_addr(pmap, addr, npte, 0);
 
 	if (attr & VM_PAGEMD_EXECPAGE)
-		 pmap_md_page_syncicache(pg, curcpu()->ci_data.cpu_kcpuset);
+		pmap_md_page_syncicache(VM_PAGE_TO_MD(pg),
+		    curcpu()->ci_data.cpu_kcpuset);
 
 	return true;
 }
