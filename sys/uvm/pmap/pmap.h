@@ -259,9 +259,10 @@ bool	pmap_page_clear_attributes(struct vm_page_md *, u_int);
 void	pmap_page_set_attributes(struct vm_page_md *, u_int);
 void	pmap_pvlist_lock_init(size_t);
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
-void	pmap_page_cache(struct vm_page *, bool cached);
+void	pmap_page_cache(struct vm_page_md *md, bool cached);
 #endif
 
+void	pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define	PMAP_WB		0
 #define	PMAP_WBINV	1

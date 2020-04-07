@@ -93,6 +93,7 @@ typedef uint32_t pt_entry_t;
 #define KERNEL_PID			0
 
 #if defined(__PMAP_PRIVATE)
+struct vm_page_md;
 
 #include <mips/locore.h>
 #include <mips/cache.h>
@@ -112,19 +113,19 @@ typedef uint32_t pt_entry_t;
 /*
  * We need the pmap_segtab's to be aligned on MIPS*R2 so we can use the
  * EXT/INS instructions on their addresses.
- */     
+ */
 #if (MIPS32R2 + MIPS64R2 + MIPS64R2_RMIXL) > 0
 #define PMAP_SEGTAB_ALIGN __aligned(sizeof(void *)*NSEGPG) __section(".data1")
-#endif   
+#endif
 
 #include <uvm/uvm_physseg.h>
 
 void	pmap_md_init(void);
 void	pmap_md_icache_sync_all(void);
 void	pmap_md_icache_sync_range_index(vaddr_t, vsize_t);
-void	pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
-bool	pmap_md_vca_add(struct vm_page *, vaddr_t, pt_entry_t *);
-void	pmap_md_vca_clean(struct vm_page *, int);
+void	pmap_md_page_syncicache(struct vm_page_md *, const kcpuset_t *);
+bool	pmap_md_vca_add(struct vm_page_md *, vaddr_t, pt_entry_t *);
+void	pmap_md_vca_clean(struct vm_page_md *, int);
 void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
@@ -146,7 +147,6 @@ pmap_md_nptep(pt_entry_t *ptep)
 {
         return ptep + 1;
 }
-
 
 #endif /* __PMAP_PRIVATE */
 

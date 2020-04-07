@@ -414,6 +414,7 @@ int uvm_direct_process(struct vm_page **, u_int, voff_t, vsize_t,
 
 #ifdef __HAVE_VM_PAGE_MD
 #define	VM_PAGE_TO_MD(pg)	(&(pg)->mdpage)
+#define	VM_MD_TO_PAGE(md)	(container_of((md), struct vm_page, mdpage))
 #endif
 
 /*

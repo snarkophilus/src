@@ -83,8 +83,12 @@ pmap_procwr(struct proc *p, vaddr_t va, size_t len)
 }
 
 void
-pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
+pmap_md_page_syncicache(struct vm_page_md *mdpg, const kcpuset_t *onproc)
 {
+	KASSERT(VM_PAGEMD_VMPAGE_P(mdpg));
+
+	struct vm_page * const pg = VM_MD_TO_PAGE(mdpg);
+
 	/*
 	 * If onproc is empty, we could do a
 	 * pmap_page_protect(pg, VM_PROT_NONE) and remove all
@@ -92,7 +96,7 @@ pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
 	 * the next time page is faulted, it will get icache
 	 * synched.  But this is easier. :)
 	 */
-	paddr_t pa = VM_PAGE_TO_PHYS(pg);
+	const paddr_t pa = VM_PAGE_TO_PHYS(pg);
 	dcache_wb_page(pa);
 	icache_inv_page(pa);
 }
@@ -216,10 +220,11 @@ pmap_bootstrap(vaddr_t startkernel, vaddr_t endkernel,
 	 * an extra page for the segment table and allows the user/kernel
 	 * access to be common.
 	 */
-	pt_entry_t **ptp = &stp->seg_tab[VM_MIN_KERNEL_ADDRESS >> SEGSHIFT];
-	pt_entry_t *ptep = (void *)kv_segtabs;
+
+	pmap_ptpage_t **ptp = &stp->seg_tab[VM_MIN_KERNEL_ADDRESS >> SEGSHIFT];
+	pmap_ptpage_t *ptep = (void *)kv_segtabs;
 	memset(ptep, 0, NBPG * kv_nsegtabs);
-	for (size_t i = 0; i < kv_nsegtabs; i++, ptep += NPTEPG) {
+	for (size_t i = 0; i < kv_nsegtabs; i++, ptep++) {
 		*ptp++ = ptep;
 	}
 

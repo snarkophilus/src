@@ -149,7 +149,7 @@ trap_pte_lookup(struct trapframe *tf, vaddr_t va, register_t psl_mask)
 	pmap_segtab_t * const stp = stps[(tf->tf_srr1 / psl_mask) & 1];
 	if (__predict_false(stp == NULL))
 		return NULL;
-	pt_entry_t * const ptep = stp->seg_tab[va >> SEGSHIFT];
+	pt_entry_t * const ptep = stp->seg_tab[va >> SEGSHIFT]->ptp_ptes;
 	if (__predict_false(ptep == NULL))
 		return NULL;
 	return ptep + ((va & SEGOFSET) >> PAGE_SHIFT);
