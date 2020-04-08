@@ -154,9 +154,7 @@ pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
 
 	return 0;
 }
-#endif
 
-#ifdef __PMAP_PRIVATE
 static inline size_t
 pte_index(vaddr_t va)
 {
