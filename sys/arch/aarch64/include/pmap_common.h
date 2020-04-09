@@ -89,14 +89,15 @@
 #if defined(__PMAP_PRIVATE)
 
 #include <uvm/uvm_physseg.h>
+struct vm_page_md;
 
 void	pmap_md_init(void);
 void	pmap_md_icache_sync_all(void);
 void	pmap_md_icache_sync_range_index(vaddr_t, vsize_t);
-void	pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
-bool	pmap_md_vca_add(struct vm_page *, vaddr_t, pt_entry_t *);
-void	pmap_md_vca_clean(struct vm_page *, int);
-void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
+void	pmap_md_page_syncicache(struct vm_page_md *, const kcpuset_t *);
+bool	pmap_md_vca_add(struct vm_page_md *, vaddr_t, pt_entry_t *);
+void	pmap_md_vca_clean(struct vm_page_md *, int);
+void	pmap_md_vca_remove(struct vm_page_md *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
@@ -142,6 +143,19 @@ pmap_md_nptep(pt_entry_t *ptep)
 
 #endif	/* __PMAP_PRIVATE */
 
+//XXXXNH somewhere else?
+#define __HAVE_PMAP_PV_TRACK
+
+#define PMAP_PAGE_INIT(pp, pa)				\
+do {							\
+	(pp)->pp_md.mdpg_first.pv_next = NULL;		\
+	(pp)->pp_md.mdpg_first.pv_pmap = NULL;		\
+	(pp)->pp_md.mdpg_first.pv_va = 0;		\
+	(pp)->pp_md.mdpg_attrs = 0;			\
+	VM_PAGEMD_PVLIST_LOCK_INIT(&(pp)->pp_md);	\
+	(pp)->pp_pa = (pa);				\
+} while (/* CONSTCOND */ 0)
+
 #define	__HAVE_PMAP_MD
 struct pmap_md {
 	pd_entry_t *		pmd_l0;
@@ -182,10 +196,11 @@ paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
 bool	pmap_md_io_vaddr_p(vaddr_t);
 
 struct pmap_page {
-	struct vm_page_md pp_md;
+	struct vm_page_md	pp_md;
+	paddr_t			pp_pa;
 };
 
-#define PMAP_PAGE_TO_MD(ppage)	((ppage)->pp_md)
+#define PMAP_PAGE_TO_MD(ppage)	(&((ppage)->pp_md))
 
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
 
@@ -387,8 +402,6 @@ pte_pde_set(pd_entry_t *pdep, pd_entry_t npde)
 
 
 #ifdef __PMAP_PRIVATE
-struct vm_page_md;
-
 
 static inline pt_entry_t
 pte_memattr(u_int flags)

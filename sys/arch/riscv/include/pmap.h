@@ -138,7 +138,7 @@ extern vaddr_t pmap_direct_end;
 
 #ifdef __PMAP_PRIVATE
 static inline void
-pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *kc)
+pmap_md_page_syncicache(struct vm_page_md *mdpg, const kcpuset_t *kc)
 {
 	__asm __volatile("fence\trw,rw; fence.i");
 }
@@ -147,19 +147,19 @@ pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *kc)
  * Virtual Cache Alias helper routines.  Not a problem for RISCV CPUs.
  */
 static inline bool
-pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *nptep)
+pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *nptep)
 {
 	return false;
 }
 
 static inline void
-pmap_md_vca_remove(struct vm_page *pg, vaddr_t va)
+pmap_md_vca_remove(struct vm_page_md *mdpg, vaddr_t va)
 {
 
 }
 
 static inline void
-pmap_md_vca_clean(struct vm_page *pg, vaddr_t va, int op)
+pmap_md_vca_clean(struct vm_page_md *mdpg, vaddr_t va, int op)
 {
 }
 

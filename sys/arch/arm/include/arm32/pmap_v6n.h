@@ -123,15 +123,16 @@
 int	pmap_maxproc_set(int);
 
 #if defined(__PMAP_PRIVATE)
+struct vm_page_md;
 
 #include <uvm/uvm_physseg.h>
 
 void	pmap_md_init(void);
 void	pmap_md_icache_sync_all(void);
 void	pmap_md_icache_sync_range_index(vaddr_t, vsize_t);
-void	pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
-bool	pmap_md_vca_add(struct vm_page *, vaddr_t, pt_entry_t *);
-void	pmap_md_vca_clean(struct vm_page *, int);
+void	pmap_md_page_syncicache(struct vm_page_md *, const kcpuset_t *);
+bool	pmap_md_vca_add(struct vm_page_md *, vaddr_t, pt_entry_t *);
+void	pmap_md_vca_clean(struct vm_page_md *, int);
 void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
@@ -225,7 +226,7 @@ struct pmap_page {
 	struct vm_page_md pp_md;
 };
 
-#define PMAP_PAGE_TO_MD(ppage)	((ppage)->pp_md)
+#define PMAP_PAGE_TO_MD(ppage)	(&(ppage)->pp_md)
 
 /*
  * If we have an EXTENDED MMU and the address space is split evenly between
@@ -275,10 +276,6 @@ pmap_md_setvirtualend(vaddr_t va)
 	pmap_limits.virtual_end = va;
 }
 #endif
-
-
-//XXX Move to sys/uvm/pmap/pmap.h
-void pmap_page_remove(struct vm_page *);
 
 static inline size_t
 pte_index(vaddr_t va)

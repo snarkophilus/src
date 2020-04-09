@@ -103,7 +103,7 @@ vaddr_t	pmap_kvptefill(vaddr_t, vaddr_t, pt_entry_t);
 #endif
 #endif
 
-void	pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
+void	pmap_md_page_syncicache(struct vm_page_md *, const kcpuset_t *);
 vaddr_t	pmap_bootstrap(vaddr_t, vaddr_t, phys_ram_seg_t *, size_t);
 bool	pmap_extract(struct pmap *, vaddr_t, paddr_t *);
 
@@ -125,24 +125,48 @@ vtophys(vaddr_t va)
  * Virtual Cache Alias helper routines.  Not a problem for Booke CPUs.
  */
 static __inline bool
-pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *nptep)
+pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *nptep)
 {
 	return false;
 }
 
 static __inline void
-pmap_md_vca_remove(struct vm_page *pg, vaddr_t va, bool dirty)
+pmap_md_vca_remove(struct vm_page_md *mdpg, vaddr_t va, bool dirty)
 {
 
 }
 
 static __inline void
-pmap_md_vca_clean(struct vm_page *pg, vaddr_t va, int op)
+pmap_md_vca_clean(struct vm_page_md *mdpg, vaddr_t va, int op)
 {
 }
-#endif
 
-#ifdef __PMAP_PRIVATE
+static inline bool
+pmap_md_kernel_vaddr_p(vaddr_t va)
+{
+	return false;
+}
+
+static inline paddr_t
+pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
+{
+	/* Not used due to false from pmap_md_kernel_vaddr_p */
+
+	return 0;
+}
+
+static inline size_t
+pte_index(vaddr_t va)
+{
+	return ((va >> PGSHIFT) & (NPTEPG - 1));
+}
+
+static inline pt_entry_t *
+pmap_md_nptep(pt_entry_t *ptep)
+{
+        return ptep + 1;
+}
+
 static __inline size_t
 pmap_md_tlb_asid_max(void)
 {

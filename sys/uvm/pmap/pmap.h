@@ -139,7 +139,12 @@ typedef union pmap_segtab {
 struct pmap;
 typedef bool (*pte_callback_t)(struct pmap *, vaddr_t, vaddr_t,
 	pt_entry_t *, uintptr_t);
+
+/*
+ *	Bootstrap the system enough to run with virtual memory.
+ */
 void pmap_bootstrap_common(void);
+
 pt_entry_t *pmap_pte_lookup(struct pmap *, vaddr_t);
 pt_entry_t *pmap_pte_reserve(struct pmap *, vaddr_t, int);
 void pmap_pte_process(struct pmap *, vaddr_t, vaddr_t, pte_callback_t,
@@ -248,18 +253,16 @@ extern pmap_segtab_t pmap_kern_segtab;
 #define	pmap_wired_count(pmap) 	((pmap)->pm_stats.wired_count)
 #define pmap_resident_count(pmap) ((pmap)->pm_stats.resident_count)
 
-/*
- *	Bootstrap the system enough to run with virtual memory.
- */
 bool	pmap_remove_all(pmap_t);
 void	pmap_set_modified(paddr_t);
 bool	pmap_page_clear_attributes(struct vm_page_md *, u_int);
 void	pmap_page_set_attributes(struct vm_page_md *, u_int);
 void	pmap_pvlist_lock_init(size_t);
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
-void	pmap_page_cache(struct vm_page *, bool cached);
+void	pmap_page_cache(struct vm_page_md *md, bool cached);
 #endif
 
+void	pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define	PMAP_WB		0
 #define	PMAP_WBINV	1

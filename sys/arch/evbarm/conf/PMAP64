@@ -12,7 +12,3 @@ no options 	COMPAT_NETBSD32
 
 options 	UVMHIST
 #options 	UVMHIST_PRINT,KERNHIST_DELAY=0
-
-no radeon*		at pci?
-no radeondrmkmsfb*	at radeonfbbus?
-

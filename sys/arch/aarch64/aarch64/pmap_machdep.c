@@ -241,7 +241,7 @@ pmap_md_map_poolpage(paddr_t pa, size_t len)
 		 */
 		if (AARCH64_CACHE_VIRTUAL_ALIAS
 		    && aarch64_cache_badalias(last_va, va)) {
-			pmap_md_vca_page_wbinv(pg, false);
+			pmap_md_vca_page_wbinv(mdpg, false);
 		}
 #endif
 
@@ -554,25 +554,25 @@ pmap_md_direct_map_paddr(paddr_t pa)
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
 
 static void
-pmap_md_vca_page_wbinv(struct vm_page *pg, bool locked_p)
+pmap_md_vca_page_wbinv(struct vm_page_md *mdpg, bool locked_p)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 #ifdef needtowrite
 	pt_entry_t pte;
 
-	const register_t va = pmap_md_map_ephemeral_page(pg, locked_p,
+	const register_t va = pmap_md_map_ephemeral_page(mdpg, locked_p,
 	    VM_PROT_READ, &pte);
 
 	mips_dcache_wbinv_range(va, PAGE_SIZE);
 
-	pmap_md_unmap_ephemeral_page(pg, locked_p, va, pte);
+	pmap_md_unmap_ephemeral_page(mdpg, locked_p, va, pte);
 #endif
 }
 #endif
 
 
 void
-pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
+pmap_md_page_syncicache(struct vm_page_md *mdpg, const kcpuset_t *onproc)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 #ifdef needtowrite
@@ -593,14 +593,14 @@ pmap_md_page_syncicache(struct vm_page *pg, const kcpuset_t *onproc)
 		if (VM_PAGEMD_CACHED_P(mdpg)) {
 			/* This was probably mapped cached by UBC so flush it */
 			pt_entry_t pte;
-			const register_t tva = pmap_md_map_ephemeral_page(pg, false,
+			const register_t tva = pmap_md_map_ephemeral_page(mdpg, false,
 			    VM_PROT_READ, &pte);
 
 			UVMHIST_LOG(pmaphist, "  va %#"PRIxVADDR, tva, 0, 0, 0);
 			mips_dcache_wbinv_range(tva, PAGE_SIZE);
 			mips_icache_sync_range(tva, PAGE_SIZE);
 
-			pmap_md_unmap_ephemeral_page(pg, false, tva, pte);
+			pmap_md_unmap_ephemeral_page(mdpg, false, tva, pte);
 		}
 	} else {
 		mips_icache_sync_range(MIPS_PHYS_TO_KSEG0(VM_PAGE_TO_PHYS(pg)),
@@ -709,7 +709,7 @@ pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *ptep)
 		 */
 		if (mips_cache_badalias(pv->pv_va, va)) {
 			pmap_page_cache(pg, false);
-			pmap_md_vca_page_wbinv(pg, true);
+			pmap_md_vca_page_wbinv(mdpg, true);
 			*ptep = pte_cached_change(*ptep, false);
 			PMAP_COUNT(page_cache_evictions);
 		}
@@ -726,7 +726,7 @@ pmap_md_vca_add(struct vm_page *pg, vaddr_t va, pt_entry_t *ptep)
 }
 
 void
-pmap_md_vca_clean(struct vm_page *pg, int op)
+pmap_md_vca_clean(struct vm_page_md *mdpg, int op)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 #ifdef needtowrite
@@ -737,7 +737,7 @@ pmap_md_vca_clean(struct vm_page *pg, int op)
 	KASSERT(VM_PAGEMD_PVLIST_LOCKED_P(VM_PAGE_TO_MD(pg)));
 
 	if (op == PMAP_WB || op == PMAP_WBINV) {
-		pmap_md_vca_page_wbinv(pg, true);
+		pmap_md_vca_page_wbinv(mdpg, true);
 	} else if (op == PMAP_INV) {
 		KASSERT(op == PMAP_INV && false);
 		//mips_dcache_inv_range_index(va, PAGE_SIZE);

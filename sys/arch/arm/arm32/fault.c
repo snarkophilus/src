@@ -1,4 +1,4 @@
-/*	$NetBSD: fault.c,v 1.110 2020/02/24 12:38:57 rin Exp $	*/
+/*	$NetBSD: fault.c,v 1.111 2020/03/29 09:10:26 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -81,7 +81,7 @@
 #include "opt_kgdb.h"
 
 #include <sys/types.h>
-__KERNEL_RCSID(0, "$NetBSD: fault.c,v 1.110 2020/02/24 12:38:57 rin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fault.c,v 1.111 2020/03/29 09:10:26 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -476,9 +476,10 @@ data_abort_handler(trapframe_t *tf)
 		if (++pfi->pfi_repeats > 4) {
 			tlb_asid_t asid = tlb_get_asid();
 			pt_entry_t *ptep = pfi->pfi_faultptep;
+
 			printf("%s: fault #%u (%x/%s) for %#" PRIxVADDR
-			    "(%#x) at pc %#"PRIxREGISTER" curpid=%u/%u "
-			    "ptep@%p=%#"PRIxPTE")\n", __func__,
+			    "(%#x) at pc %#" PRIxREGISTER " curpid=%u/%u "
+			    "ptep@%p=%#" PRIxPTE ")\n", __func__,
 			    pfi->pfi_repeats, fsr & FAULT_TYPE_MASK,
 			    data_aborts[fsr & FAULT_TYPE_MASK].desc, va,
 			    far, tf->tf_pc, map->pmap->pm_pai[0].pai_asid,
