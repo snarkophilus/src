@@ -1612,6 +1612,13 @@ pmap_remove_all(struct pmap *pmap)
 	pmap_tlb_miss_lock_exit();
 	pmap->pm_flags |= PMAP_DEFERRED_ACTIVATE;
 
+	const vaddr_t sva = VM_MIN_ADDRESS;
+	const vaddr_t eva = VM_MAX_ADDRESS;
+	const pt_entry_t npte = pte_nv_entry(false);
+
+	pmap_addr_range_check(pmap, sva, eva, __func__);
+	pmap_pte_process(pmap, sva, eva, pmap_pte_remove, npte);
+
 #ifdef PMAP_FAULTINFO
 	curpcb->pcb_faultinfo.pfi_faultaddr = 0;
 	curpcb->pcb_faultinfo.pfi_repeats = 0;
@@ -1620,7 +1627,7 @@ pmap_remove_all(struct pmap *pmap)
 	kpreempt_enable();
 
 	UVMHIST_LOG(pmaphist, " <-- done", 0, 0, 0, 0);
-	return false;
+	return true;
 }
 
 /*
