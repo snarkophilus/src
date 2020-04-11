@@ -192,10 +192,6 @@
 #if defined(_NETBSD_SOURCE)
 #define	F_CLOSEM	10		/* close all fds >= to the one given */
 #define	F_MAXFD		11		/* return the max open fd */
-#define	F_DUPFD_CLOEXEC	12		/* close on exec duplicated fd */
-#define	F_GETNOSIGPIPE	13		/* get SIGPIPE disposition */
-#define	F_SETNOSIGPIPE	14		/* set SIGPIPE disposition */
-#define	F_GETPATH	15		/* get pathname associated with fd */
 #endif
 #if (_POSIX_C_SOURCE - 0) >= 200809L || defined(_NETBSD_SOURCE)
 #define	F_DUPFD_CLOEXEC	12		/* close on exec duplicated fd */

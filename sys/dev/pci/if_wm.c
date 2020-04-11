@@ -1787,82 +1787,6 @@ wm_lookup(const struct pci_attach_args *pa)
 {
 	const struct wm_product *wmp;
 
-	/* Now sync whatever is left. */
-	bus_dmamap_sync(sc->sc_dmat, txq->txq_desc_dmamap,
-	    WM_CDTXOFF(txq, start), txq->txq_descsize * num, ops);
-}
-
-static inline void
-wm_cdrxsync(struct wm_rxqueue *rxq, int start, int ops)
-{
-	struct wm_softc *sc = rxq->rxq_sc;
-
-	bus_dmamap_sync(sc->sc_dmat, rxq->rxq_desc_dmamap,
-	    WM_CDRXOFF(rxq, start), rxq->rxq_descsize, ops);
-}
-
-static inline void
-wm_init_rxdesc(struct wm_rxqueue *rxq, int start)
-{
-	struct wm_softc *sc = rxq->rxq_sc;
-	struct wm_rxsoft *rxs = &rxq->rxq_soft[start];
-	struct mbuf *m = rxs->rxs_mbuf;
-
-	/*
-	 * Note: We scoot the packet forward 2 bytes in the buffer
-	 * so that the payload after the Ethernet header is aligned
-	 * to a 4-byte boundary.
-
-	 * XXX BRAINDAMAGE ALERT!
-	 * The stupid chip uses the same size for every buffer, which
-	 * is set in the Receive Control register.  We are using the 2K
-	 * size option, but what we REALLY want is (2K - 2)!  For this
-	 * reason, we can't "scoot" packets longer than the standard
-	 * Ethernet MTU.  On strict-alignment platforms, if the total
-	 * size exceeds (2K - 2) we set align_tweak to 0 and let
-	 * the upper layer copy the headers.
-	 */
-	m->m_data = m->m_ext.ext_buf + sc->sc_align_tweak;
-
-	if (sc->sc_type == WM_T_82574) {
-		ext_rxdesc_t *rxd = &rxq->rxq_ext_descs[start];
-		rxd->erx_data.erxd_addr =
-		    htole64(rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
-		rxd->erx_data.erxd_dd = 0;
-	} else if ((sc->sc_flags & WM_F_NEWQUEUE) != 0) {
-		nq_rxdesc_t *rxd = &rxq->rxq_nq_descs[start];
-
-		rxd->nqrx_data.nrxd_paddr =
-		    htole64(rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
-		/* Currently, split header is not supported. */
-		rxd->nqrx_data.nrxd_haddr = 0;
-	} else {
-		wiseman_rxdesc_t *rxd = &rxq->rxq_descs[start];
-
-		wm_set_dma_addr(&rxd->wrx_addr,
-		    rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
-		rxd->wrx_len = 0;
-		rxd->wrx_cksum = 0;
-		rxd->wrx_status = 0;
-		rxd->wrx_errors = 0;
-		rxd->wrx_special = 0;
-	}
-	wm_cdrxsync(rxq, start, BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
-
-	CSR_WRITE(sc, rxq->rxq_rdt_reg, start);
-}
-
-/*
- * Device driver interface functions and commonly used functions.
- * match, attach, detach, init, start, stop, ioctl, watchdog and so on.
- */
-
-/* Lookup supported device table */
-static const struct wm_product *
-wm_lookup(const struct pci_attach_args *pa)
-{
-	const struct wm_product *wmp;
-
 	for (wmp = wm_products; wmp->wmp_name != NULL; wmp++) {
 		if (PCI_VENDOR(pa->pa_id) == wmp->wmp_vendor &&
 		    PCI_PRODUCT(pa->pa_id) == wmp->wmp_product)
@@ -13899,19 +13823,6 @@ wm_nvm_version(struct wm_softc *sc)
 		have_uid = false;
 
 	switch (sc->sc_type) {
-	case WM_T_82547:
-	case WM_T_82547_2:
-		sc->sc_pba = sc->sc_ethercom.ec_if.if_mtu > 8192 ?
-		    PBA_22K : PBA_30K;
-		for (i = 0; i < sc->sc_nqueues; i++) {
-			struct wm_txqueue *txq = &sc->sc_queue[i].wmq_txq;
-			txq->txq_fifo_head = 0;
-			txq->txq_fifo_addr = sc->sc_pba << PBA_ADDR_SHIFT;
-			txq->txq_fifo_size =
-			    (PBA_40K - sc->sc_pba) << PBA_BYTE_SHIFT;
-			txq->txq_fifo_stall = 0;
-		}
-		break;
 	case WM_T_82571:
 	case WM_T_82572:
 	case WM_T_82574:
@@ -13921,10 +13832,6 @@ wm_nvm_version(struct wm_softc *sc)
 		have_build = true;
 		break;
 	case WM_T_ICH8:
-		/* Workaround for a bit corruption issue in FIFO memory */
-		sc->sc_pba = PBA_8K;
-		CSR_WRITE(sc, WMREG_PBS, PBA_16K);
-		break;
 	case WM_T_ICH9:
 	case WM_T_ICH10:
 	case WM_T_PCH:
@@ -14006,13 +13913,6 @@ printver:
 			}
 		}
 	}
-	/*
-	 * Only old or non-multiqueue devices have the PBA register
-	 * XXX Need special handling for 82575.
-	 */
-	if (((sc->sc_flags & WM_F_NEWQUEUE) == 0)
-	    || (sc->sc_type == WM_T_82575))
-		CSR_WRITE(sc, WMREG_PBA, sc->sc_pba);
 
 	if (have_uid && (wm_nvm_read(sc, NVM_OFF_IMAGE_UID0, 1, &uid0) == 0))
 		aprint_verbose(", Image Unique ID %08x", (uid1 << 16) | uid0);

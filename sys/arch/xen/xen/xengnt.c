@@ -55,9 +55,6 @@ __KERNEL_RCSID(0, "$NetBSD: xengnt.c,v 1.33 2020/04/10 21:03:20 jdolecek Exp $")
 /* External tools reserve first few grant table entries. */
 #define NR_RESERVED_ENTRIES 8
 
-/* External tools reserve first few grant table entries. */
-#define NR_RESERVED_ENTRIES 8
-
 /* Current number of frames making up the grant table */
 int gnt_nr_grant_frames;
 /* Maximum number of frames that can make up the grant table */
@@ -232,30 +229,6 @@ xengnt_map_status(void)
 
 	return 0;
 }
-
-/*
- * Suspend grant table state
- */
-bool
-xengnt_suspend(void) {
-
-	int i;
-
-	mutex_enter(&grant_lock);
-	KASSERT(gnt_entries[last_gnt_entry] == XENGNT_NO_ENTRY);
-
-	for (i = 0; i < last_gnt_entry; i++) {
-		/* invalidate all grant entries (necessary for resume) */
-		gnt_entries[i] = XENGNT_NO_ENTRY;
-	}
-	
-	/* Remove virtual => machine mapping */
-	pmap_kremove((vaddr_t)grant_table, gnt_nr_grant_frames * PAGE_SIZE);
-	pmap_update(pmap_kernel());
-	mutex_exit(&grant_lock);
-	return true;
-}
-
 
 /*
  * Add another page to the grant table

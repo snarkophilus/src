@@ -4565,21 +4565,6 @@ sys_mkdirat(struct lwp *l, const struct sys_mkdirat_args *uap,
 
 
 int
-sys_mkdirat(struct lwp *l, const struct sys_mkdirat_args *uap,
-    register_t *retval)
-{
-	/* {
-		syscallarg(int) fd;
-		syscallarg(const char *) path;
-		syscallarg(int) mode;
-	} */
-
-	return do_sys_mkdirat(l, SCARG(uap, fd), SCARG(uap, path),
-	    SCARG(uap, mode), UIO_USERSPACE);
-}
-
-
-int
 do_sys_mkdir(const char *path, mode_t mode, enum uio_seg seg)
 {
 	return do_sys_mkdirat(NULL, AT_FDCWD, path, mode, seg);

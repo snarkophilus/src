@@ -747,8 +747,6 @@ namei_follow(struct namei_state *state, int inhibitmagic,
 	size_t linklen;
 	int error;
 
-	KASSERT(VOP_ISLOCKED(searchdir) == LK_EXCLUSIVE);
-	KASSERT(VOP_ISLOCKED(foundobj) == LK_EXCLUSIVE);
 	if (ndp->ni_loopcnt++ >= MAXSYMLINKS) {
 		return ELOOP;
 	}
@@ -1776,17 +1774,6 @@ namei_oneroot(struct namei_state *state,
 	/*
 	 * Done.
 	 */
-	if (searchdir != foundobj) {
-		if (cnp->cn_flags & ISDOTDOT)
-			VOP_UNLOCK(searchdir);
-		error = vn_lock(foundobj, LK_EXCLUSIVE);
-		if (cnp->cn_flags & ISDOTDOT)
-			vn_lock(searchdir, LK_EXCLUSIVE | LK_RETRY);
-		if (error != 0) {
-			vrele(foundobj);
-			goto done;
-		}
-	}
 
 	/*
 	 * If LOCKPARENT is not set, the parent directory isn't returned.
@@ -1869,11 +1856,6 @@ namei(struct nameidata *ndp)
 		KASSERT(ndp->ni_dvp == NULL);
 		KASSERT(ndp->ni_vp == NULL);
 	}
-	/* was it just "/"? */
-	if (cnp->cn_nameptr[0] == '\0') {
-		foundobj = searchdir;
-		searchdir = NULL;
-		cnp->cn_flags |= ISLASTCN;
 
 	return error;
 }
@@ -1980,123 +1962,6 @@ do_lookup_for_nfsd_index(struct namei_state *state)
 		VOP_UNLOCK(startdir);
 		startdir_locked = false;
 	}
-	if (savepath != NULL) {
-		pathbuf_stringcopy_put(ndp->ni_pathbuf, savepath);
-	}
-	return error;
-}
-
-/*
- * External interface.
- */
-int
-namei(struct nameidata *ndp)
-{
-	struct namei_state state;
-	int error;
-
-	namei_init(&state, ndp);
-	error = namei_tryemulroot(&state,
-				  0/*!neverfollow*/, 0/*!inhibitmagic*/,
-				  0/*isnfsd*/);
-	namei_cleanup(&state);
-
-	if (error) {
-		/* make sure no stray refs leak out */
-		KASSERT(ndp->ni_dvp == NULL);
-		KASSERT(ndp->ni_vp == NULL);
-	}
-
-	return error;
-}
-
-////////////////////////////////////////////////////////////
-
-/*
- * External interface used by nfsd. This is basically different from
- * namei only in that it has the ability to pass in the "current
- * directory", and uses an extra flag "neverfollow" for which there's
- * no physical flag defined in namei.h. (There used to be a cut&paste
- * copy of about half of namei in nfsd to allow these minor
- * adjustments to exist.)
- *
- * XXX: the namei interface should be adjusted so nfsd can just use
- * ordinary namei().
- */
-int
-lookup_for_nfsd(struct nameidata *ndp, struct vnode *forcecwd, int neverfollow)
-{
-	struct namei_state state;
-	int error;
-
-	KASSERT(ndp->ni_atdir == NULL);
-	ndp->ni_atdir = forcecwd;
-
-	namei_init(&state, ndp);
-	error = namei_tryemulroot(&state,
-				  neverfollow, 1/*inhibitmagic*/, 1/*isnfsd*/);
-	namei_cleanup(&state);
-
-	if (error) {
-		/* make sure no stray refs leak out */
-		KASSERT(ndp->ni_dvp == NULL);
-		KASSERT(ndp->ni_vp == NULL);
-	}
-
-	return error;
-}
-
-/*
- * A second external interface used by nfsd. This turns out to be a
- * single lookup used by the WebNFS code (ha!) to get "index.html" or
- * equivalent when asked for a directory. It should eventually evolve
- * into some kind of namei_once() call; for the time being it's kind
- * of a mess. XXX.
- *
- * dholland 20110109: I don't think it works, and I don't think it
- * worked before I started hacking and slashing either, and I doubt
- * anyone will ever notice.
- */
-
-/*
- * Internals. This calls lookup_once() after setting up the assorted
- * pieces of state the way they ought to be.
- */
-static int
-do_lookup_for_nfsd_index(struct namei_state *state)
-{
-	int error = 0;
-
-	struct componentname *cnp = state->cnp;
-	struct nameidata *ndp = state->ndp;
-	struct vnode *startdir;
-	struct vnode *foundobj;
-	const char *cp;			/* pointer into pathname argument */
-
-	KASSERT(cnp == &ndp->ni_cnd);
-
-	startdir = state->ndp->ni_atdir;
-
-	cnp->cn_nameptr = ndp->ni_pnbuf;
-	state->docache = 1;
-	state->rdonly = cnp->cn_flags & RDONLY;
-	ndp->ni_dvp = NULL;
-
-	cnp->cn_consume = 0;
-	cnp->cn_namelen = namei_getcomponent(cnp->cn_nameptr);
-	cp = cnp->cn_nameptr + cnp->cn_namelen;
-	KASSERT(cnp->cn_namelen <= KERNEL_NAME_MAX);
-	ndp->ni_pathlen -= cnp->cn_namelen;
-	ndp->ni_next = cp;
-	state->slashes = 0;
-	cnp->cn_flags &= ~REQUIREDIR;
-	cnp->cn_flags |= MAKEENTRY|ISLASTCN;
-
-	if (cnp->cn_namelen == 2 &&
-	    cnp->cn_nameptr[1] == '.' && cnp->cn_nameptr[0] == '.')
-		cnp->cn_flags |= ISDOTDOT;
-	else
-		cnp->cn_flags &= ~ISDOTDOT;
 
 	/*
 	 * If the vnode we found is mounted on, then cross the mount and get

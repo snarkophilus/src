@@ -2912,57 +2912,6 @@ ohci_device_bulk_fini(struct usbd_xfer *xfer)
 	}
 }
 
-Static int
-ohci_device_bulk_init(struct usbd_xfer *xfer)
-{
-	ohci_softc_t *sc = OHCI_XFER2SC(xfer);
-	int len = xfer->ux_bufsize;
-	int endpt = xfer->ux_pipe->up_endpoint->ue_edesc->bEndpointAddress;
-	int isread = UE_GET_DIR(endpt) == UE_DIR_IN;
-	int err;
-
-	OHCIHIST_FUNC(); OHCIHIST_CALLED();
-
-	KASSERT(!(xfer->ux_rqflags & URQ_REQUEST));
-
-	DPRINTFN(4, "xfer=%#jx len=%jd isread=%jd flags=%jd", (uintptr_t)xfer,
-	    len, isread, xfer->ux_flags);
-	DPRINTFN(4, "endpt=%jd", endpt, 0, 0, 0);
-
-	/* Allocate a chain of new TDs (including a new tail). */
-	err = ohci_alloc_std_chain(sc, xfer, len, isread);
-	if (err)
-		return err;
-
-	return 0;
-}
-
-Static void
-ohci_device_bulk_fini(struct usbd_xfer *xfer)
-{
-	ohci_softc_t *sc = OHCI_XFER2SC(xfer);
-	struct ohci_xfer *ox = OHCI_XFER2OXFER(xfer);
-	struct ohci_pipe *opipe = OHCI_PIPE2OPIPE(xfer->ux_pipe);
-
-	OHCIHIST_FUNC(); OHCIHIST_CALLED();
-	DPRINTFN(8, "xfer %#jx nstd %jd", (uintptr_t)xfer, ox->ox_nstd, 0, 0);
-
-	mutex_enter(&sc->sc_lock);
-	for (size_t i = 0; i < ox->ox_nstd; i++) {
-		ohci_soft_td_t *std = ox->ox_stds[i];
-		if (std == NULL)
-			break;
-		if (std != opipe->tail.td)
-			ohci_free_std_locked(sc, std);
-	}
-	mutex_exit(&sc->sc_lock);
-
-	if (ox->ox_nstd) {
-		const size_t sz = sizeof(ohci_soft_td_t *) * ox->ox_nstd;
-		kmem_free(ox->ox_stds, sz);
-	}
-}
-
 Static usbd_status
 ohci_device_bulk_transfer(struct usbd_xfer *xfer)
 {

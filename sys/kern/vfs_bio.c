@@ -1575,8 +1575,6 @@ biowait(buf_t *bp)
 
 	SDT_PROBE1(io, kernel, , wait__start, bp);
 
-	SDT_PROBE1(io, kernel, , wait__start, bp);
-
 	mutex_enter(bp->b_objlock);
 
 	BIOHIST_CALLARGS(biohist, "bp=%#jx, oflags=0x%jx, ret_addr=%#jx",

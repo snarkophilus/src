@@ -1955,7 +1955,6 @@ pmap_vpage_cpu_init(struct cpu_info *ci)
 }
 #endif
 
-#ifndef XENPV
 /*
  * p v _ e n t r y   f u n c t i o n s
  */
@@ -1983,7 +1982,6 @@ pmap_pvp_ctor(void *arg, void *obj, int flags)
 
 	return 0;
 }
-#endif
 
 /*
  * pmap_pvp_dtor: pool_cache destructor for PV pages.
@@ -2037,7 +2035,6 @@ pmap_alloc_pv(struct pmap *pmap)
 	} else {
 		KASSERT(!LIST_EMPTY(&pvp->pvp_pves));
 	}
-	mutex_spin_exit(&pp->pp_lock);
 
 	return pve;
 }
@@ -3193,16 +3190,6 @@ pmap_remove_all(struct pmap *pmap)
 		/* A breathing point. */
 		preempt_point();
 	}
- 
-	for (;;) {
-		/* Fetch a block of PTPs from tree. */
-		mutex_enter(&pmap->pm_lock);
-		n = radix_tree_gang_lookup_node(&pmap->pm_obj[0].uo_pages, 0,
-		    (void **)ptps, __arraycount(ptps), false);
-		if (n == 0) {
-			mutex_exit(&pmap->pm_lock);
-			break;
-		}
 
 	/* Verify that the pmap is now completely empty. */
 	pmap_check_ptps(pmap);
@@ -3326,7 +3313,6 @@ pmap_ldt_xcall(void *arg1, void *arg2)
 	kpreempt_enable();
 }
 
-#if defined(PMAP_FORK)
 /*
  * pmap_ldt_sync: LDT selector for the named pmap is changing.  swap
  * in the new selector on all CPUs.

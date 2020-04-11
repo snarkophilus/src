@@ -313,14 +313,6 @@ ext2fs_lookup(void *v)
 	*vpp = NULL;
 
 	/*
-	 * Produce the auxiliary lookup results into i_crap. Increment
-	 * its serial number so elsewhere we can tell if we're using
-	 * stale results. This should not be done this way. XXX.
-	 */
-	results = &dp->i_crap;
-	dp->i_crapcounter++;
-
-	/*
 	 * Check accessiblity of directory.
 	 */
 	if ((error = VOP_ACCESS(vdp, VEXEC, cred)) != 0)

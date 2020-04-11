@@ -143,21 +143,6 @@ int xennet_debug = 0xff;
 #define DPRINTFN(n,x)
 #endif
 
-#ifdef XENPVHVM
-/* Glue for p2m table stuff. Should be removed eventually */
-#define xpmap_mtop_masked(mpa) (mpa & ~PAGE_MASK)
-#define xpmap_mtop(mpa) (mpa & ~PTE_4KFRAME)
-#define xpmap_ptom_masked(mpa) (mpa & ~PAGE_MASK)
-#define xpmap_ptom(mpa) (mpa & ~PTE_4KFRAME)
-#define xpmap_ptom_map(ppa, mpa)
-#define xpmap_ptom_unmap(ppa)
-#define xpmap_ptom_isvalid 1 /* XXX: valid PA check */
-#define xpmap_pg_nx pmap_pg_nx /* We use the native setting */
-#define xpq_flush_queue() tlbflush()
-#endif /* XENPVHVM */
-
-extern pt_entry_t xpmap_pg_nx;
-
 #define GRANT_INVALID_REF -1 /* entry is free */
 
 #define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
@@ -217,9 +202,6 @@ struct xennet_xenbus_softc {
 static pool_cache_t if_xennetrxbuf_cache;
 static int if_xennetrxbuf_cache_inited=0;
 
-static pool_cache_t if_xennetrxbuf_cache;
-static int if_xennetrxbuf_cache_inited=0;
-
 static int  xennet_xenbus_match(device_t, cfdata_t, void *);
 static void xennet_xenbus_attach(device_t, device_t, void *);
 static int  xennet_xenbus_detach(device_t, int);
@@ -229,7 +211,6 @@ static void xennet_alloc_rx_buffer(struct xennet_xenbus_softc *);
 static void xennet_free_rx_buffer(struct xennet_xenbus_softc *);
 static void xennet_tx_complete(struct xennet_xenbus_softc *);
 static void xennet_rx_mbuf_free(struct mbuf *, void *, size_t, void *);
-static void xennet_rx_free_req(struct xennet_rxreq *);
 static int  xennet_handler(void *);
 static bool xennet_talk_to_backend(struct xennet_xenbus_softc *);
 #ifdef XENNET_DEBUG_DUMP
@@ -289,13 +270,6 @@ xennet_xenbus_attach(device_t parent, device_t self, void *aux)
 	if (if_xennetrxbuf_cache_inited == 0) {
 		if_xennetrxbuf_cache = pool_cache_init(PAGE_SIZE, 0, 0, 0,
 		    "xnfrx", NULL, IPL_NET, NULL, NULL, NULL);
-		if_xennetrxbuf_cache_inited = 1;
-	}
-
-	/* xenbus ensure 2 devices can't be probed at the same time */
-	if (if_xennetrxbuf_cache_inited == 0) {
-		if_xennetrxbuf_cache = pool_cache_init(PAGE_SIZE, 0, 0, 0,
-		    "xnfrx", NULL, IPL_VM, NULL, NULL, NULL);
 		if_xennetrxbuf_cache_inited = 1;
 	}
 
@@ -741,9 +715,6 @@ xennet_alloc_rx_buffer(struct xennet_xenbus_softc *sc)
 			printf("%s: rx no cluster\n", ifp->if_xname);
 			m_freem(m);
 			break;
-		default:
-			panic("%s: unsupported RX feature mode: %ld\n",
-			    __func__, sc->sc_rx_feature);
 		}
 
  		MEXTADD(m, va, PAGE_SIZE,
@@ -882,7 +853,6 @@ xennet_tx_complete(struct xennet_xenbus_softc *sc)
 again:
 	resp_prod = sc->sc_tx_ring.sring->rsp_prod;
 	xen_rmb();
-	mutex_enter(&sc->sc_tx_lock);
 	for (i = sc->sc_tx_ring.rsp_cons; i != resp_prod; i++) {
 		req = &sc->sc_txreqs[RING_GET_RESPONSE(&sc->sc_tx_ring, i)->id];
 		KASSERT(req->txreq_id ==

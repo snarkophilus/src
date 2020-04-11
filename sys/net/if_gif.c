@@ -1085,26 +1085,6 @@ gif_set_tunnel(struct ifnet *ifp, struct sockaddr *src, struct sockaddr *dst)
 		error = 0;
 		goto out;
 	}
-	mutex_exit(&gif_softcs.lock);
-
-	osrc = ovar->gv_psrc;
-	odst = ovar->gv_pdst;
-
-	*nvar = *ovar;
-	nvar->gv_psrc = nsrc;
-	nvar->gv_pdst = ndst;
-	nvar->gv_encap_cookie4 = NULL;
-	nvar->gv_encap_cookie6 = NULL;
-	error = gif_encap_attach(nvar);
-	if (error)
-		goto out;
-	psref_target_init(&nvar->gv_psref, gv_psref_class);
-	gif_update_variant(sc, nvar);
-
-	mutex_exit(&sc->gif_lock);
-
-	(void)gif_encap_detach(ovar);
-	encap_lock_exit();
 
 	mutex_enter(&gif_softcs.lock);
 	LIST_FOREACH(sc2, &gif_softcs.list, gif_list) {

@@ -97,8 +97,6 @@
 
 long dev_bsize = DEV_BSIZE;
 
-long dev_bsize = DEV_BSIZE;
-
 static int
 lfs_fragextend(struct uvnode *, int, int, daddr_t, struct ubuf **);
 

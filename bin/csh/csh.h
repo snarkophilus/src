@@ -553,11 +553,4 @@ extern History *hi;
 #endif
 extern int editing;
 
-#ifdef EDIT
-#include <histedit.h>
-EditLine *el;
-History *hi;
-#endif
-int editing;
-
 #endif /* !_CSH_H_ */

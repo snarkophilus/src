@@ -79,32 +79,6 @@ syncobj_t cv_syncobj = {
 
 static const char deadcv[] = "deadcv";
 
-#define CV_LOCKDEBUG_HANDOFF(l, cv) cv_lockdebug_handoff(l, cv)
-#define CV_LOCKDEBUG_PROCESS(l, cv) cv_lockdebug_process(l, cv)
-
-static inline void
-cv_lockdebug_handoff(lwp_t *l, kcondvar_t *cv)
-{
-
-	if (CV_DEBUG_P(cv))
-		l->l_flag |= LW_CVLOCKDEBUG;
-}
-
-static inline void
-cv_lockdebug_process(lwp_t *l, kcondvar_t *cv)
-{
-
-	if ((l->l_flag & LW_CVLOCKDEBUG) == 0)
-		return;
-
-	l->l_flag &= ~LW_CVLOCKDEBUG;
-	LOCKDEBUG_UNLOCKED(true, cv, CV_RA, 0);
-}
-#else
-#define CV_LOCKDEBUG_HANDOFF(l, cv) __nothing
-#define CV_LOCKDEBUG_PROCESS(l, cv) __nothing
-#endif
-
 /*
  * cv_init:
  *
@@ -196,14 +170,6 @@ cv_wait(kcondvar_t *cv, kmutex_t *mtx)
 	KASSERT(mutex_owned(mtx));
 
 	cv_enter(cv, mtx, l);
-
-	/*
-	 * We can't use cv_exit() here since the cv might be destroyed before
-	 * this thread gets a chance to run.  Instead, hand off the lockdebug
-	 * responsibility to the thread that wakes us up.
-	 */
-
-	CV_LOCKDEBUG_HANDOFF(l, cv);
 	(void)sleepq_block(0, false);
 	mutex_enter(mtx);
 }
@@ -275,160 +241,6 @@ cv_timedwait_sig(kcondvar_t *cv, kmutex_t *mtx, int timo)
 	cv_enter(cv, mtx, l);
 	error = sleepq_block(timo, true);
 	mutex_enter(mtx);
-	return error;
-}
-
-/*
- * Given a number of seconds, sec, and 2^64ths of a second, frac, we
- * want a number of ticks for a timeout:
- *
- *	timo = hz*(sec + frac/2^64)
- *	     = hz*sec + hz*frac/2^64
- *	     = hz*sec + hz*(frachi*2^32 + fraclo)/2^64
- *	     = hz*sec + hz*frachi/2^32 + hz*fraclo/2^64,
- *
- * where frachi is the high 32 bits of frac and fraclo is the
- * low 32 bits.
- *
- * We assume hz < INT_MAX/2 < UINT32_MAX, so
- *
- *	hz*fraclo/2^64 < fraclo*2^32/2^64 <= 1,
- *
- * since fraclo < 2^32.
- *
- * We clamp the result at INT_MAX/2 for a timeout in ticks, since we
- * can't represent timeouts higher than INT_MAX in cv_timedwait, and
- * spurious wakeup is OK.  Moreover, we don't want to wrap around,
- * because we compute end - start in ticks in order to compute the
- * remaining timeout, and that difference cannot wrap around, so we use
- * a timeout less than INT_MAX.  Using INT_MAX/2 provides plenty of
- * margin for paranoia and will exceed most waits in practice by far.
- */
-static unsigned
-bintime2timo(const struct bintime *bt)
-{
-
-	KASSERT(hz < INT_MAX/2);
-	CTASSERT(INT_MAX/2 < UINT32_MAX);
-	if (bt->sec > ((INT_MAX/2)/hz))
-		return INT_MAX/2;
-	if ((hz*(bt->frac >> 32) >> 32) > (INT_MAX/2 - hz*bt->sec))
-		return INT_MAX/2;
-
-	return hz*bt->sec + (hz*(bt->frac >> 32) >> 32);
-}
-
-/*
- * timo is in units of ticks.  We want units of seconds and 2^64ths of
- * a second.  We know hz = 1 sec/tick, and 2^64 = 1 sec/(2^64th of a
- * second), from which we can conclude 2^64 / hz = 1 (2^64th of a
- * second)/tick.  So for the fractional part, we compute
- *
- *	frac = rem * 2^64 / hz
- *	     = ((rem * 2^32) / hz) * 2^32
- *
- * Using truncating integer division instead of real division will
- * leave us with only about 32 bits of precision, which means about
- * 1/4-nanosecond resolution, which is good enough for our purposes.
- */
-static struct bintime
-timo2bintime(unsigned timo)
-{
-
-	return (struct bintime) {
-		.sec = timo / hz,
-		.frac = (((uint64_t)(timo % hz) << 32)/hz << 32),
-	};
-}
-
-/*
- * cv_timedwaitbt:
- *
- *	Wait on a condition variable until awoken or the specified
- *	timeout expires.  Returns zero if awoken normally or
- *	EWOULDBLOCK if the timeout expires.
- *
- *	On entry, bt is a timeout in bintime.  cv_timedwaitbt subtracts
- *	the time slept, so on exit, bt is the time remaining after
- *	sleeping, possibly negative if the complete time has elapsed.
- *	No infinite timeout; use cv_wait_sig instead.
- *
- *	epsilon is a requested maximum error in timeout (excluding
- *	spurious wakeups).  Currently not used, will be used in the
- *	future to choose between low- and high-resolution timers.
- *	Actual wakeup time will be somewhere in [t, t + max(e, r) + s)
- *	where r is the finest resolution of clock available and s is
- *	scheduling delays for scheduler overhead and competing threads.
- *	Time is measured by the interrupt source implementing the
- *	timeout, not by another timecounter.
- */
-int
-cv_timedwaitbt(kcondvar_t *cv, kmutex_t *mtx, struct bintime *bt,
-    const struct bintime *epsilon __diagused)
-{
-	struct bintime slept;
-	unsigned start, end;
-	int error;
-
-	KASSERTMSG(bt->sec >= 0, "negative timeout");
-	KASSERTMSG(epsilon != NULL, "specify maximum requested delay");
-
-	/*
-	 * hardclock_ticks is technically int, but nothing special
-	 * happens instead of overflow, so we assume two's-complement
-	 * wraparound and just treat it as unsigned.
-	 */
-	start = hardclock_ticks;
-	error = cv_timedwait(cv, mtx, bintime2timo(bt));
-	end = hardclock_ticks;
-
-	slept = timo2bintime(end - start);
-	/* bt := bt - slept */
-	bintime_sub(bt, &slept);
-
-	return error;
-}
-
-/*
- * cv_timedwaitbt_sig:
- *
- *	Wait on a condition variable until awoken, the specified
- *	timeout expires, or interrupted by a signal.  Returns zero if
- *	awoken normally, EWOULDBLOCK if the timeout expires, or
- *	EINTR/ERESTART if interrupted by a signal.
- *
- *	On entry, bt is a timeout in bintime.  cv_timedwaitbt_sig
- *	subtracts the time slept, so on exit, bt is the time remaining
- *	after sleeping.  No infinite timeout; use cv_wait instead.
- *
- *	epsilon is a requested maximum error in timeout (excluding
- *	spurious wakeups).  Currently not used, will be used in the
- *	future to choose between low- and high-resolution timers.
- */
-int
-cv_timedwaitbt_sig(kcondvar_t *cv, kmutex_t *mtx, struct bintime *bt,
-    const struct bintime *epsilon __diagused)
-{
-	struct bintime slept;
-	unsigned start, end;
-	int error;
-
-	KASSERTMSG(bt->sec >= 0, "negative timeout");
-	KASSERTMSG(epsilon != NULL, "specify maximum requested delay");
-
-	/*
-	 * hardclock_ticks is technically int, but nothing special
-	 * happens instead of overflow, so we assume two's-complement
-	 * wraparound and just treat it as unsigned.
-	 */
-	start = hardclock_ticks;
-	error = cv_timedwait_sig(cv, mtx, bintime2timo(bt));
-	end = hardclock_ticks;
-
-	slept = timo2bintime(end - start);
-	/* bt := bt - slept */
-	bintime_sub(bt, &slept);
-
 	return error;
 }
 

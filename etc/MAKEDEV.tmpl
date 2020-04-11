@@ -2275,10 +2275,6 @@ makedisk_p8()
 	mkdev ${name}${unit}f	b $blk $(($unit * 8 + 5))	640 $g_operator
 	mkdev ${name}${unit}g	b $blk $(($unit * 8 + 6))	640 $g_operator
 	mkdev ${name}${unit}h	b $blk $(($unit * 8 + 7))	640 $g_operator
-	mkdev ${name}${unit}i	b $blk $(($unit * 8 + $ho + 8)) 640 $g_operator
-	mkdev ${name}${unit}j	b $blk $(($unit * 8 + $ho + 9)) 640 $g_operator
-	mkdev ${name}${unit}k	b $blk $(($unit * 8 + $ho + 10)) 640 $g_operator
-	mkdev ${name}${unit}l	b $blk $(($unit * 8 + $ho + 11)) 640 $g_operator
 	mkdev r${name}${unit}a	c $chr $(($unit * 8 + 0))	640 $g_operator
 	mkdev r${name}${unit}b	c $chr $(($unit * 8 + 1))	640 $g_operator
 	mkdev r${name}${unit}c	c $chr $(($unit * 8 + 2))	640 $g_operator
@@ -2287,10 +2283,6 @@ makedisk_p8()
 	mkdev r${name}${unit}f	c $chr $(($unit * 8 + 5))	640 $g_operator
 	mkdev r${name}${unit}g	c $chr $(($unit * 8 + 6))	640 $g_operator
 	mkdev r${name}${unit}h	c $chr $(($unit * 8 + 7))	640 $g_operator
-	mkdev r${name}${unit}i	c $chr $(($unit * 8 + $ho + 8)) 640 $g_operator
-	mkdev r${name}${unit}j	c $chr $(($unit * 8 + $ho + 9)) 640 $g_operator
-	mkdev r${name}${unit}k	c $chr $(($unit * 8 + $ho + 10)) 640 $g_operator
-	mkdev r${name}${unit}l	c $chr $(($unit * 8 + $ho + 11)) 640 $g_operator
 }
 
 makedisk_p12high()

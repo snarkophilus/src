@@ -103,9 +103,6 @@ time_t write_time;
 static void lfs_shellsort(struct lfs *,
 			  struct ubuf **, union lfs_blocks *, int, int);
 
-static void lfs_shellsort(struct lfs *,
-			  struct ubuf **, union lfs_blocks *, int, int);
-
 /*
  * Logical block number match routines used when traversing the dirty block
  * chain.

@@ -472,33 +472,6 @@ module_start_unload_thread(void)
 {
 	int error;
 
-	module_listener = kauth_listen_scope(KAUTH_SCOPE_SYSTEM,
-	    module_listener_cb, NULL);
-
-	__link_set_foreach(mip, modules) {
-		if ((rv = module_builtin_add(mip, 1, false)) != 0)
-			module_error("builtin %s failed: %d\n",
-			    (*mip)->mi_name, rv);
-	}
-
-	sysctl_module_setup();
-	module_specificdata_domain = specificdata_domain_create();
-
-	module_netbsd = module_newmodule(MODULE_SOURCE_KERNEL);
-	module_netbsd->mod_refcnt = 1;
-	module_netbsd->mod_info = &module_netbsd_modinfo;
-}
-
-/*
- * module_start_unload_thread:
- *
- *	Start the auto unload kthread.
- */
-void
-module_start_unload_thread(void)
-{
-	int error;
-
 	error = kthread_create(PRI_VM, KTHREAD_MPSAFE, NULL, module_thread,
 	    NULL, NULL, "modunload");
 	if (error != 0)

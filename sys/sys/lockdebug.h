@@ -45,8 +45,6 @@
 
 typedef void (*lockop_printer_t)(const char *, ...) __printflike(1, 2);
 
-typedef void (*lockop_printer_t)(const char *, ...) __printflike(1, 2);
-
 typedef	struct lockops {
 	const char	*lo_name;
 	int		lo_type;

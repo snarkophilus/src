@@ -885,22 +885,6 @@ lockdebug_show_all_locks_lwp(void (*pr)(const char *, ...) __printflike(1, 2),
 				(*pr)("\n");
 			}
 		}
-		if (ld->ld_lockops->lo_type == LOCKOPS_CV) {
-			n_cv++;
-			continue;
-		}
-		if (ld->ld_lockops->lo_name[0] == 'M') {
-			if (ld->ld_lockops->lo_type == LOCKOPS_SLEEP)
-				n_adaptive_mutex++;
-			else
-				n_spin_mutex++;
-			continue;
-		}
-		if (ld->ld_lockops->lo_name[0] == 'R') {
-			n_rwlock++;
-			continue;
-		}
-		n_others++;
 	}
 }
 

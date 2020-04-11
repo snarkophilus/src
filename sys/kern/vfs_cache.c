@@ -720,7 +720,6 @@ cache_lookup_linked(struct vnode *dvp, const char *name, size_t namelen,
 	*vn_ret = ncp->nc_vp;
 	return true;
 }
-#endif	/* notyet */
 
 /*
  * Scan cache looking for name of directory entry pointing at vp.
@@ -980,7 +979,6 @@ cache_have_id(struct vnode *vp)
 		return false;
 	}
 }
-#endif	/* notyet */
 
 /*
  * Name cache initialization, from vfs_init() when the system is booting.

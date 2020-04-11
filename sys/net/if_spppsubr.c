@@ -2595,11 +2595,6 @@ sppp_lcp_RCR(struct sppp *sp, struct lcp_header *h, int len)
 				addlog(" [overflow]");
 			continue;
 		}
-		if (rlen + l > blen) {
-			if (debug)
-				addlog(" [overflow]");
-			continue;
-		}
 		/* Add the option to nak'ed list. */
 		memcpy(r, p, l);
 		r += l;
