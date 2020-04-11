@@ -1,4 +1,4 @@
-/*	$NetBSD: ohci.c,v 1.300 2020/03/14 02:35:33 christos Exp $	*/
+/*	$NetBSD: ohci.c,v 1.301 2020/04/05 20:59:38 skrll Exp $	*/
 
 /*
  * Copyright (c) 1998, 2004, 2005, 2012 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ohci.c,v 1.300 2020/03/14 02:35:33 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ohci.c,v 1.301 2020/04/05 20:59:38 skrll Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_usb.h"
@@ -409,7 +409,7 @@ ohci_alloc_sed(ohci_softc_t *sc)
 		mutex_exit(&sc->sc_lock);
 
 		err = usb_allocmem(&sc->sc_bus, OHCI_SED_SIZE * OHCI_SED_CHUNK,
-			  OHCI_ED_ALIGN, &dma);
+		    OHCI_ED_ALIGN, USBMALLOC_COHERENT, &dma);
 		if (err)
 			return 0;
 
@@ -468,7 +468,7 @@ ohci_alloc_std(ohci_softc_t *sc)
 		mutex_exit(&sc->sc_lock);
 
 		err = usb_allocmem(&sc->sc_bus, OHCI_STD_SIZE * OHCI_STD_CHUNK,
-			  OHCI_TD_ALIGN, &dma);
+		    OHCI_TD_ALIGN, USBMALLOC_COHERENT, &dma);
 		if (err)
 			return NULL;
 
@@ -712,7 +712,7 @@ ohci_alloc_sitd(ohci_softc_t *sc)
 		mutex_exit(&sc->sc_lock);
 
 		err = usb_allocmem(&sc->sc_bus, OHCI_SITD_SIZE * OHCI_SITD_CHUNK,
-			  OHCI_ITD_ALIGN, &dma);
+		    OHCI_ITD_ALIGN, USBMALLOC_COHERENT, &dma);
 		if (err)
 			return NULL;
 		mutex_enter(&sc->sc_lock);
@@ -815,7 +815,7 @@ ohci_init(ohci_softc_t *sc)
 	/* XXX determine alignment by R/W */
 	/* Allocate the HCCA area. */
 	err = usb_allocmem(&sc->sc_bus, OHCI_HCCA_SIZE,
-			 OHCI_HCCA_ALIGN, &sc->sc_hccadma);
+	    OHCI_HCCA_ALIGN, USBMALLOC_COHERENT, &sc->sc_hccadma);
 	if (err) {
 		sc->sc_hcca = NULL;
 		return err;
@@ -2081,8 +2081,8 @@ ohci_open(struct usbd_pipe *pipe)
 		case UE_CONTROL:
 			pipe->up_methods = &ohci_device_ctrl_methods;
 			err = usb_allocmem(&sc->sc_bus,
-				  sizeof(usb_device_request_t),
-				  0, &opipe->ctrl.reqdma);
+			    sizeof(usb_device_request_t), 0,
+			    USBMALLOC_COHERENT, &opipe->ctrl.reqdma);
 			if (err)
 				goto bad;
 			mutex_enter(&sc->sc_lock);
@@ -2912,6 +2912,57 @@ ohci_device_bulk_fini(struct usbd_xfer *xfer)
 	}
 }
 
+Static int
+ohci_device_bulk_init(struct usbd_xfer *xfer)
+{
+	ohci_softc_t *sc = OHCI_XFER2SC(xfer);
+	int len = xfer->ux_bufsize;
+	int endpt = xfer->ux_pipe->up_endpoint->ue_edesc->bEndpointAddress;
+	int isread = UE_GET_DIR(endpt) == UE_DIR_IN;
+	int err;
+
+	OHCIHIST_FUNC(); OHCIHIST_CALLED();
+
+	KASSERT(!(xfer->ux_rqflags & URQ_REQUEST));
+
+	DPRINTFN(4, "xfer=%#jx len=%jd isread=%jd flags=%jd", (uintptr_t)xfer,
+	    len, isread, xfer->ux_flags);
+	DPRINTFN(4, "endpt=%jd", endpt, 0, 0, 0);
+
+	/* Allocate a chain of new TDs (including a new tail). */
+	err = ohci_alloc_std_chain(sc, xfer, len, isread);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+Static void
+ohci_device_bulk_fini(struct usbd_xfer *xfer)
+{
+	ohci_softc_t *sc = OHCI_XFER2SC(xfer);
+	struct ohci_xfer *ox = OHCI_XFER2OXFER(xfer);
+	struct ohci_pipe *opipe = OHCI_PIPE2OPIPE(xfer->ux_pipe);
+
+	OHCIHIST_FUNC(); OHCIHIST_CALLED();
+	DPRINTFN(8, "xfer %#jx nstd %jd", (uintptr_t)xfer, ox->ox_nstd, 0, 0);
+
+	mutex_enter(&sc->sc_lock);
+	for (size_t i = 0; i < ox->ox_nstd; i++) {
+		ohci_soft_td_t *std = ox->ox_stds[i];
+		if (std == NULL)
+			break;
+		if (std != opipe->tail.td)
+			ohci_free_std_locked(sc, std);
+	}
+	mutex_exit(&sc->sc_lock);
+
+	if (ox->ox_nstd) {
+		const size_t sz = sizeof(ohci_soft_td_t *) * ox->ox_nstd;
+		kmem_free(ox->ox_stds, sz);
+	}
+}
+
 Static usbd_status
 ohci_device_bulk_transfer(struct usbd_xfer *xfer)
 {
@@ -3460,6 +3511,12 @@ ohci_device_isoc_enter(struct usbd_xfer *xfer)
 	DPRINTFN(1, "used=%jd next=%jd xfer=%#jx nframes=%jd",
 	     isoc->inuse, isoc->next, (uintptr_t)xfer, xfer->ux_nframes);
 
+	int isread =
+	    (UE_GET_DIR(xfer->ux_pipe->up_endpoint->ue_edesc->bEndpointAddress) == UE_DIR_IN);
+
+	usb_syncmem(&xfer->ux_dmabuf, 0, xfer->ux_length,
+	    isread ? BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
+
 	if (isoc->next == -1) {
 		/* Not in use yet, schedule it a few frames ahead. */
 		isoc->next = O32TOH(sc->sc_hcca->hcca_frame_number) + 5;
@@ -3630,6 +3687,14 @@ ohci_device_isoc_done(struct usbd_xfer *xfer)
 {
 	OHCIHIST_FUNC(); OHCIHIST_CALLED();
 	DPRINTFN(1, "xfer=%#jx", (uintptr_t)xfer, 0, 0, 0);
+
+	int isread =
+	    (UE_GET_DIR(xfer->ux_pipe->up_endpoint->ue_edesc->bEndpointAddress) == UE_DIR_IN);
+
+	DPRINTFN(10, "xfer=%#jx, actlen=%jd", (uintptr_t)xfer, xfer->ux_actlen,
+	    0, 0);
+	usb_syncmem(&xfer->ux_dmabuf, 0, xfer->ux_length,
+	    isread ? BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 }
 
 usbd_status

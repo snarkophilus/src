@@ -1,4 +1,4 @@
-/*	$NetBSD: if_wm.c,v 1.670 2020/03/21 16:47:05 thorpej Exp $	*/
+/*	$NetBSD: if_wm.c,v 1.674 2020/04/09 06:55:51 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Wasabi Systems, Inc.
@@ -82,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_wm.c,v 1.670 2020/03/21 16:47:05 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_wm.c,v 1.674 2020/04/09 06:55:51 jdolecek Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_net_mpsafe.h"
@@ -379,6 +379,12 @@ struct wm_txqueue {
 	bool txq_sending;
 	time_t txq_lastsent;
 
+	/* Checksum flags used for previous packet */
+	uint32_t 	txq_last_hw_cmd;
+	uint8_t 	txq_last_hw_fields;
+	uint16_t	txq_last_hw_ipcs;
+	uint16_t	txq_last_hw_tucs;
+
 	uint32_t txq_packets;		/* for AIM */
 	uint32_t txq_bytes;		/* for AIM */
 #ifdef WM_EVENT_COUNTERS
@@ -403,6 +409,7 @@ struct wm_txqueue {
 	WM_Q_EVCNT_DEFINE(txq, toomanyseg)  /* Pkt dropped(toomany DMA segs) */
 	WM_Q_EVCNT_DEFINE(txq, defrag)	    /* m_defrag() */
 	WM_Q_EVCNT_DEFINE(txq, underrun)    /* Tx underrun */
+	WM_Q_EVCNT_DEFINE(txq, skipcontext) /* Tx skip wring cksum context */
 
 	char txq_txseg_evcnt_names[WM_NTXSEGS][sizeof("txqXXtxsegXXX")];
 	struct evcnt txq_ev_txseg[WM_NTXSEGS]; /* Tx packets w/ N segments */
@@ -788,7 +795,7 @@ static int	wm_alloc_txrx_queues(struct wm_softc *);
 static void	wm_free_txrx_queues(struct wm_softc *);
 static int	wm_init_txrx_queues(struct wm_softc *);
 /* Start */
-static int	wm_tx_offload(struct wm_softc *, struct wm_txqueue *,
+static void	wm_tx_offload(struct wm_softc *, struct wm_txqueue *,
     struct wm_txsoft *, uint32_t *, uint8_t *);
 static inline int	wm_select_txqueue(struct ifnet *, struct mbuf *);
 static void	wm_start(struct ifnet *);
@@ -797,7 +804,7 @@ static int	wm_transmit(struct ifnet *, struct mbuf *);
 static void	wm_transmit_locked(struct ifnet *, struct wm_txqueue *);
 static void	wm_send_common_locked(struct ifnet *, struct wm_txqueue *,
 		    bool);
-static int	wm_nq_tx_offload(struct wm_softc *, struct wm_txqueue *,
+static void	wm_nq_tx_offload(struct wm_softc *, struct wm_txqueue *,
     struct wm_txsoft *, uint32_t *, uint32_t *, bool *);
 static void	wm_nq_start(struct ifnet *);
 static void	wm_nq_start_locked(struct ifnet *);
@@ -1703,6 +1710,82 @@ wm_cdtxsync(struct wm_txqueue *txq, int start, int num, int ops)
 		num -= (WM_NTXDESC(txq) - start);
 		start = 0;
 	}
+
+	/* Now sync whatever is left. */
+	bus_dmamap_sync(sc->sc_dmat, txq->txq_desc_dmamap,
+	    WM_CDTXOFF(txq, start), txq->txq_descsize * num, ops);
+}
+
+static inline void
+wm_cdrxsync(struct wm_rxqueue *rxq, int start, int ops)
+{
+	struct wm_softc *sc = rxq->rxq_sc;
+
+	bus_dmamap_sync(sc->sc_dmat, rxq->rxq_desc_dmamap,
+	    WM_CDRXOFF(rxq, start), rxq->rxq_descsize, ops);
+}
+
+static inline void
+wm_init_rxdesc(struct wm_rxqueue *rxq, int start)
+{
+	struct wm_softc *sc = rxq->rxq_sc;
+	struct wm_rxsoft *rxs = &rxq->rxq_soft[start];
+	struct mbuf *m = rxs->rxs_mbuf;
+
+	/*
+	 * Note: We scoot the packet forward 2 bytes in the buffer
+	 * so that the payload after the Ethernet header is aligned
+	 * to a 4-byte boundary.
+
+	 * XXX BRAINDAMAGE ALERT!
+	 * The stupid chip uses the same size for every buffer, which
+	 * is set in the Receive Control register.  We are using the 2K
+	 * size option, but what we REALLY want is (2K - 2)!  For this
+	 * reason, we can't "scoot" packets longer than the standard
+	 * Ethernet MTU.  On strict-alignment platforms, if the total
+	 * size exceeds (2K - 2) we set align_tweak to 0 and let
+	 * the upper layer copy the headers.
+	 */
+	m->m_data = m->m_ext.ext_buf + sc->sc_align_tweak;
+
+	if (sc->sc_type == WM_T_82574) {
+		ext_rxdesc_t *rxd = &rxq->rxq_ext_descs[start];
+		rxd->erx_data.erxd_addr =
+		    htole64(rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
+		rxd->erx_data.erxd_dd = 0;
+	} else if ((sc->sc_flags & WM_F_NEWQUEUE) != 0) {
+		nq_rxdesc_t *rxd = &rxq->rxq_nq_descs[start];
+
+		rxd->nqrx_data.nrxd_paddr =
+		    htole64(rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
+		/* Currently, split header is not supported. */
+		rxd->nqrx_data.nrxd_haddr = 0;
+	} else {
+		wiseman_rxdesc_t *rxd = &rxq->rxq_descs[start];
+
+		wm_set_dma_addr(&rxd->wrx_addr,
+		    rxs->rxs_dmamap->dm_segs[0].ds_addr + sc->sc_align_tweak);
+		rxd->wrx_len = 0;
+		rxd->wrx_cksum = 0;
+		rxd->wrx_status = 0;
+		rxd->wrx_errors = 0;
+		rxd->wrx_special = 0;
+	}
+	wm_cdrxsync(rxq, start, BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+
+	CSR_WRITE(sc, rxq->rxq_rdt_reg, start);
+}
+
+/*
+ * Device driver interface functions and commonly used functions.
+ * match, attach, detach, init, start, stop, ioctl, watchdog and so on.
+ */
+
+/* Lookup supported device table */
+static const struct wm_product *
+wm_lookup(const struct pci_attach_args *pa)
+{
+	const struct wm_product *wmp;
 
 	/* Now sync whatever is left. */
 	bus_dmamap_sync(sc->sc_dmat, txq->txq_desc_dmamap,
@@ -6947,6 +7030,7 @@ wm_alloc_txrx_queues(struct wm_softc *sc)
 		WM_Q_MISC_EVCNT_ATTACH(txq, toomanyseg, txq, i, xname);
 		WM_Q_MISC_EVCNT_ATTACH(txq, defrag, txq, i, xname);
 		WM_Q_MISC_EVCNT_ATTACH(txq, underrun, txq, i, xname);
+		WM_Q_MISC_EVCNT_ATTACH(txq, skipcontext, txq, i, xname);
 #endif /* WM_EVENT_COUNTERS */
 
 		tx_done++;
@@ -7079,6 +7163,7 @@ wm_free_txrx_queues(struct wm_softc *sc)
 		WM_Q_EVCNT_DETACH(txq, toomanyseg, txq, i);
 		WM_Q_EVCNT_DETACH(txq, defrag, txq, i);
 		WM_Q_EVCNT_DETACH(txq, underrun, txq, i);
+		WM_Q_EVCNT_DETACH(txq, skipcontext, txq, i);
 #endif /* WM_EVENT_COUNTERS */
 
 		/* Drain txq_interq */
@@ -7364,7 +7449,7 @@ wm_init_txrx_queues(struct wm_softc *sc)
  *	Set up TCP/IP checksumming parameters for the
  *	specified packet.
  */
-static int
+static void
 wm_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
     struct wm_txsoft *txs, uint32_t *cmdp, uint8_t *fieldsp)
 {
@@ -7394,9 +7479,12 @@ wm_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
 
 	default:
 		/* Don't support this protocol or encapsulation. */
+ 		txq->txq_last_hw_cmd = txq->txq_last_hw_fields = 0;
+ 		txq->txq_last_hw_ipcs = 0;
+ 		txq->txq_last_hw_tucs = 0;
 		*fieldsp = 0;
 		*cmdp = 0;
-		return 0;
+		return;
 	}
 
 	if ((m0->m_pkthdr.csum_flags &
@@ -7533,13 +7621,51 @@ wm_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
 		    WTX_TCPIP_TUCSE(0) /* Rest of packet */;
 	}
 
+	*cmdp = cmd;
+	*fieldsp = fields;
+
 	/*
 	 * We don't have to write context descriptor for every packet
 	 * except for 82574. For 82574, we must write context descriptor
 	 * for every packet when we use two descriptor queues.
-	 * It would be overhead to write context descriptor for every packet,
-	 * however it does not cause problems.
+	 *
+	 * The 82574L can only remember the *last* context used
+	 * regardless of queue that it was use for.  We cannot reuse
+	 * contexts on this hardware platform and must generate a new
+	 * context every time.  82574L hardware spec, section 7.2.6,
+	 * second note.
 	 */
+	if (sc->sc_nqueues < 2) {
+		/*
+	 	 *
+	  	 * Setting up new checksum offload context for every
+		 * frames takes a lot of processing time for hardware.
+		 * This also reduces performance a lot for small sized
+		 * frames so avoid it if driver can use previously
+		 * configured checksum offload context.
+		 * For TSO, in theory we can use the same TSO context only if
+		 * frame is the same type(IP/TCP) and the same MSS. However
+		 * checking whether a frame has the same IP/TCP structure is
+		 * hard thing so just ignore that and always restablish a
+		 * new TSO context.
+	  	 */
+		if ((m0->m_pkthdr.csum_flags & (M_CSUM_TSOv4 | M_CSUM_TSOv6))
+		    == 0) {
+			if (txq->txq_last_hw_cmd == cmd &&
+			    txq->txq_last_hw_fields == fields &&
+			    txq->txq_last_hw_ipcs == (ipcs & 0xffff) &&
+			    txq->txq_last_hw_tucs == (tucs & 0xffff)) {
+				WM_Q_EVCNT_INCR(txq, skipcontext);
+				return;
+			}
+		}
+
+	 	txq->txq_last_hw_cmd = cmd;
+ 		txq->txq_last_hw_fields = fields;
+ 		txq->txq_last_hw_ipcs = (ipcs & 0xffff);
+		txq->txq_last_hw_tucs = (tucs & 0xffff);
+	}
+
 	/* Fill in the context descriptor. */
 	t = (struct livengood_tcpip_ctxdesc *)
 	    &txq->txq_descs[txq->txq_next];
@@ -7551,11 +7677,6 @@ wm_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
 
 	txq->txq_next = WM_NEXTTX(txq, txq->txq_next);
 	txs->txs_ndesc++;
-
-	*cmdp = cmd;
-	*fieldsp = fields;
-
-	return 0;
 }
 
 static inline int
@@ -7832,13 +7953,10 @@ retry:
 		    (M_CSUM_TSOv4 | M_CSUM_TSOv6 |
 		    M_CSUM_IPv4 | M_CSUM_TCPv4 | M_CSUM_UDPv4 |
 		    M_CSUM_TCPv6 | M_CSUM_UDPv6)) {
-			if (wm_tx_offload(sc, txq, txs, &cksumcmd,
-					  &cksumfields) != 0) {
-				/* Error message already displayed. */
-				bus_dmamap_unload(sc->sc_dmat, dmamap);
-				continue;
-			}
+			wm_tx_offload(sc, txq, txs, &cksumcmd, &cksumfields);
 		} else {
+ 			txq->txq_last_hw_cmd = txq->txq_last_hw_fields = 0;
+ 			txq->txq_last_hw_ipcs = txq->txq_last_hw_tucs = 0;
 			cksumcmd = 0;
 			cksumfields = 0;
 		}
@@ -7969,7 +8087,7 @@ retry:
  *	Set up TCP/IP checksumming parameters for the
  *	specified packet, for NEWQUEUE devices
  */
-static int
+static void
 wm_nq_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
     struct wm_txsoft *txs, uint32_t *cmdlenp, uint32_t *fieldsp, bool *do_csum)
 {
@@ -7999,7 +8117,7 @@ wm_nq_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
 	default:
 		/* Don't support this protocol or encapsulation. */
 		*do_csum = false;
-		return 0;
+		return;
 	}
 	*do_csum = true;
 	*cmdlenp = NQTX_DTYP_D | NQTX_CMD_DEXT | NQTX_CMD_IFCS;
@@ -8165,7 +8283,6 @@ wm_nq_tx_offload(struct wm_softc *sc, struct wm_txqueue *txq,
 	DPRINTF(WM_DEBUG_TX, ("\t0x%08x%08x\n", mssidx, cmdc));
 	txq->txq_next = WM_NEXTTX(txq, txq->txq_next);
 	txs->txs_ndesc++;
-	return 0;
 }
 
 /*
@@ -8399,12 +8516,8 @@ retry:
 		    (M_CSUM_TSOv4 | M_CSUM_TSOv6 |
 			M_CSUM_IPv4 | M_CSUM_TCPv4 | M_CSUM_UDPv4 |
 			M_CSUM_TCPv6 | M_CSUM_UDPv6)) {
-			if (wm_nq_tx_offload(sc, txq, txs, &cmdlen, &fields,
-			    &do_csum) != 0) {
-				/* Error message already displayed. */
-				bus_dmamap_unload(sc->sc_dmat, dmamap);
-				continue;
-			}
+			wm_nq_tx_offload(sc, txq, txs, &cmdlen, &fields,
+			    &do_csum);
 		} else {
 			do_csum = false;
 			cmdlen = 0;
@@ -13786,6 +13899,19 @@ wm_nvm_version(struct wm_softc *sc)
 		have_uid = false;
 
 	switch (sc->sc_type) {
+	case WM_T_82547:
+	case WM_T_82547_2:
+		sc->sc_pba = sc->sc_ethercom.ec_if.if_mtu > 8192 ?
+		    PBA_22K : PBA_30K;
+		for (i = 0; i < sc->sc_nqueues; i++) {
+			struct wm_txqueue *txq = &sc->sc_queue[i].wmq_txq;
+			txq->txq_fifo_head = 0;
+			txq->txq_fifo_addr = sc->sc_pba << PBA_ADDR_SHIFT;
+			txq->txq_fifo_size =
+			    (PBA_40K - sc->sc_pba) << PBA_BYTE_SHIFT;
+			txq->txq_fifo_stall = 0;
+		}
+		break;
 	case WM_T_82571:
 	case WM_T_82572:
 	case WM_T_82574:
@@ -13795,6 +13921,10 @@ wm_nvm_version(struct wm_softc *sc)
 		have_build = true;
 		break;
 	case WM_T_ICH8:
+		/* Workaround for a bit corruption issue in FIFO memory */
+		sc->sc_pba = PBA_8K;
+		CSR_WRITE(sc, WMREG_PBS, PBA_16K);
+		break;
 	case WM_T_ICH9:
 	case WM_T_ICH10:
 	case WM_T_PCH:
@@ -13876,6 +14006,13 @@ printver:
 			}
 		}
 	}
+	/*
+	 * Only old or non-multiqueue devices have the PBA register
+	 * XXX Need special handling for 82575.
+	 */
+	if (((sc->sc_flags & WM_F_NEWQUEUE) == 0)
+	    || (sc->sc_type == WM_T_82575))
+		CSR_WRITE(sc, WMREG_PBA, sc->sc_pba);
 
 	if (have_uid && (wm_nvm_read(sc, NVM_OFF_IMAGE_UID0, 1, &uid0) == 0))
 		aprint_verbose(", Image Unique ID %08x", (uid1 << 16) | uid0);

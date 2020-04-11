@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gif.c,v 1.152 2020/02/01 02:57:45 riastradh Exp $	*/
+/*	$NetBSD: if_gif.c,v 1.153 2020/03/30 11:57:50 christos Exp $	*/
 /*	$KAME: if_gif.c,v 1.76 2001/08/20 02:01:02 kjc Exp $	*/
 
 /*
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_gif.c,v 1.152 2020/02/01 02:57:45 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_gif.c,v 1.153 2020/03/30 11:57:50 christos Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
@@ -324,22 +324,20 @@ gifinit(void)
 static int
 gifdetach(void)
 {
-	int error = 0;
 
 	mutex_enter(&gif_softcs.lock);
 	if (!LIST_EMPTY(&gif_softcs.list)) {
 		mutex_exit(&gif_softcs.lock);
-		error = EBUSY;
+		return EBUSY;
 	}
 
-	if (error == 0) {
-		psref_class_destroy(gv_psref_class);
+	psref_class_destroy(gv_psref_class);
 
-		if_clone_detach(&gif_cloner);
-		sysctl_teardown(&gif_sysctl);
-	}
-
-	return error;
+	if_clone_detach(&gif_cloner);
+	sysctl_teardown(&gif_sysctl);
+	mutex_exit(&gif_softcs.lock);
+	mutex_destroy(&gif_softcs.lock);
+	return 0;
 }
 
 static int
@@ -1087,6 +1085,26 @@ gif_set_tunnel(struct ifnet *ifp, struct sockaddr *src, struct sockaddr *dst)
 		error = 0;
 		goto out;
 	}
+	mutex_exit(&gif_softcs.lock);
+
+	osrc = ovar->gv_psrc;
+	odst = ovar->gv_pdst;
+
+	*nvar = *ovar;
+	nvar->gv_psrc = nsrc;
+	nvar->gv_pdst = ndst;
+	nvar->gv_encap_cookie4 = NULL;
+	nvar->gv_encap_cookie6 = NULL;
+	error = gif_encap_attach(nvar);
+	if (error)
+		goto out;
+	psref_target_init(&nvar->gv_psref, gv_psref_class);
+	gif_update_variant(sc, nvar);
+
+	mutex_exit(&sc->gif_lock);
+
+	(void)gif_encap_detach(ovar);
+	encap_lock_exit();
 
 	mutex_enter(&gif_softcs.lock);
 	LIST_FOREACH(sc2, &gif_softcs.list, gif_list) {
