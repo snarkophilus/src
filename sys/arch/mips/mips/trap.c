@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.251 2020/03/10 04:04:45 thorpej Exp $	*/
+/*	$NetBSD: trap.c,v 1.253 2020/04/09 06:49:37 skrll Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.251 2020/03/10 04:04:45 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: trap.c,v 1.253 2020/04/09 06:49:37 skrll Exp $");
 
 #include "opt_cputype.h"	/* which mips CPU levels do we support? */
 #include "opt_ddb.h"

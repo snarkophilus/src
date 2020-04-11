@@ -32,7 +32,7 @@
 #define __PMAP_PRIVATE
 #define __UFETCHSTORE_PRIVATE
 
-__RCSID("$NetBSD: trap.c,v 1.5 2020/03/14 16:12:16 skrll Exp $");
+__RCSID("$NetBSD: trap.c,v 1.6 2020/04/06 20:26:16 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
