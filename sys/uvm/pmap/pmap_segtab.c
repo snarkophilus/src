@@ -335,7 +335,7 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
     struct pglist *pglist, voff_t off)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx kva %jx pg %jx list %jx",
+	UVMHIST_CALLARGS(pmaphist, "pm %jx kva %jx pg %jx list %jx",
 	    (uintptr_t)pmap, (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)pglist);
 
 	struct uvm_object * const uobj = &pmap->pm_uobject;
@@ -369,7 +369,7 @@ static struct vm_page *
 pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx kva %jx list %jx",
+	UVMHIST_CALLARGS(pmaphist, "pm %jx kva %jx list %jx",
 	    (uintptr_t)pmap, (uintptr_t)va, (uintptr_t)list, 0);
 
 	paddr_t pa;
@@ -431,7 +431,7 @@ static pmap_ptpage_t *
 pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx flags %jx pa_p %jx", (uintptr_t)pmap,
+	UVMHIST_CALLARGS(pmaphist, "pm %jx flags %jx pa_p %jx", (uintptr_t)pmap,
 	    (uintptr_t)flags, (uintptr_t)pa_p, 0);
 
 	pmap_ptpage_t *ptp = NULL;
@@ -482,7 +482,8 @@ static void
 pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx va %jx", (uintptr_t)pmap, (uintptr_t)ptp, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "pm %jx va %jx", (uintptr_t)pmap,
+	    (uintptr_t)ptp, 0, 0);
 
 	const vaddr_t kva = (vaddr_t)ptp;
 
@@ -512,7 +513,7 @@ static pmap_pdetab_t *
 pmap_pdetab_alloc(struct pmap *pmap)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 	pmap_pdetab_t *ptb;
 #ifdef KERNHIST
@@ -586,7 +587,7 @@ static pmap_segtab_t *
 pmap_segtab_alloc(struct pmap *pmap)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 	pmap_segtab_t *stp;
 	bool found_on_freelist = false;
@@ -655,7 +656,7 @@ static void
 pmap_pdetab_free(pmap_pdetab_t *ptb)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "ptb %jx", (uintptr_t)ptb, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "ptb %jx", (uintptr_t)ptb, 0, 0, 0);
 	/*
 	 * Insert the pdetab into the pdetab freelist.
 	 */
@@ -674,7 +675,7 @@ static void
 pmap_segtab_free(pmap_segtab_t *stp)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "stp %jx", (uintptr_t)stp, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "stp %jx", (uintptr_t)stp, 0, 0, 0);
 
 	/*
 	 * Insert the segtab into the segtab freelist.
@@ -696,7 +697,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 	pmap_pdetab_t *ptp = *ptp_p;
 
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx ptp %p va %jx vinc %jx",
+	UVMHIST_CALLARGS(pmaphist, "pm %jx ptp %p va %jx vinc %jx",
 	    (uintptr_t)pmap, (uintptr_t)ptp, va, vinc);
 
 	for (size_t i = (va / vinc) & pdetab_mask;
@@ -795,7 +796,7 @@ void
 pmap_segtab_init(pmap_t pmap)
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 	/*
@@ -947,7 +948,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 #endif
 {
 	UVMHIST_FUNC(__func__);
-	KERNHIST_CALLARGS(pmaphist, "pm %jx va %jx", (uintptr_t)pmap, (uintptr_t)va, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "pm %jx va %jx", (uintptr_t)pmap,
+	    (uintptr_t)va, 0, 0);
 
 #if defined(PMAP_HWPAGEWALKER)
 	pmap_pdetab_t *ptb = pmap->pm_pdetab;
@@ -963,7 +965,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 		    &ptb->pde_pde[(va >> segshift) & segtab_mask];
 		pd_entry_t opde = *pde_p;
 
-		UVMHIST_LOG(pmaphist, "ptb %jx segshift %jd pde_p %p opde %jx", ptb, segshift, pde_p, opde);
+		UVMHIST_LOG(pmaphist, "ptb %jx segshift %jd pde_p %p opde %jx",
+		    ptb, segshift, pde_p, opde);
 
 		if (__predict_false(!pte_pde_valid_p(opde))) {
 			ptb = pmap_pdetab_alloc(pmap);
@@ -1050,7 +1053,8 @@ pt_entry_t *
 pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 {
 //	const size_t pte_idx = (va >> PGSHIFT) & (NPTEPG - 1);
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	pmap_ptpage_t *ptp;
 	paddr_t pa = 0;
 
