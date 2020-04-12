@@ -489,7 +489,7 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp)
 #ifdef DEBUG
 	for (size_t j = 0; j < NPTEPG; j++) {
 		if (ptp->ptp_ptes[j]) {
-			UVMHIST_LOG(pmaphist, "pte entry %0x16jx not 0 (%#jx)",
+			UVMHIST_LOG(pmaphist, "pte entry %#jx not 0 (%#jx)",
 			    (uintptr_t)&ptp->ptp_ptes[j], (uintptr_t)ptp->ptp_ptes[j], 0, 0);
 			panic("%s: pte entry %p not 0 (%#" PRIxPTE ")",
 			    __func__, &ptp->ptp_ptes[j],
