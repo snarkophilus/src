@@ -262,8 +262,8 @@ uvm_km_bootstrap(vaddr_t start, vaddr_t end)
 	struct uvm_map_args args;
 	int error;
 
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist, "start=%#jx end=%#jx", start, end, 0,0);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(maphist, "start=%#jx end=%#jx", start, end, 0,0);
 
 	kmeminit_nkmempages();
 	kmemsize = (vsize_t)nkmempages * PAGE_SIZE;
@@ -819,7 +819,7 @@ again:
 
 #ifdef PMAP_GROWKERNEL
 	/*
-	 * These VA allocations happen independently of uvm_map 
+	 * These VA allocations happen independently of uvm_map
 	 * so this allocation must not extend beyond the current limit.
 	 */
 	KASSERTMSG(uvm_maxkaddr >= va + size,

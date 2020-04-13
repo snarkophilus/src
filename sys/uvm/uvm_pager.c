@@ -189,13 +189,12 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 	vm_prot_t prot;
 	const bool pdaemon = (curlwp == uvm.pagedaemon_lwp);
 	const u_int first_color = VM_PGCOLOR(*pps);
-	UVMHIST_FUNC("uvm_pagermapin"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(pps=%#jx, npages=%jd, first_color=%ju)",
+	UVMHIST_FUNC("uvm_pagermapin");
+	UVMHIST_CALLARGS(maphist,"(pps=%#jx, npages=%jd, first_color=%ju)",
 		(uintptr_t)pps, npages, first_color, 0);
 
 #ifdef PMAP_DIRECT
-	/* 
+	/*
 	 * for a single page the direct mapped segment can be used.
 	 */
 
@@ -280,12 +279,11 @@ uvm_pagermapout(vaddr_t kva, int npages)
 {
 	vsize_t size = ptoa(npages);
 	struct vm_map_entry *entries;
-	UVMHIST_FUNC("uvm_pagermapout"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, " (kva=%#jx, npages=%jd)", kva, npages,0,0);
+	UVMHIST_FUNC("uvm_pagermapout");
+	UVMHIST_CALLARGS(maphist, " (kva=%#jx, npages=%jd)", kva, npages,0,0);
 
 #ifdef PMAP_DIRECT
-	/* 
+	/*
 	 * solitary pages are mapped directly.
 	 */
 
@@ -522,8 +520,8 @@ uvm_aio_aiodone(struct buf *bp)
 	struct vm_page *pgs[npages];
 	int i, error;
 	bool write;
-	UVMHIST_FUNC("uvm_aio_aiodone"); UVMHIST_CALLED(ubchist);
-	UVMHIST_LOG(ubchist, "bp %#jx", (uintptr_t)bp, 0,0,0);
+	UVMHIST_FUNC("uvm_aio_aiodone");
+	UVMHIST_CALLARGS(ubchist, "bp %#jx", (uintptr_t)bp, 0,0,0);
 
 	error = bp->b_error;
 	write = (bp->b_flags & B_READ) == 0;

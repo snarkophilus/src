@@ -288,8 +288,8 @@ uao_set_swslot(struct uvm_object *uobj, int pageidx, int slot)
 	struct uvm_aobj *aobj = (struct uvm_aobj *)uobj;
 	struct uao_swhash_elt *elt;
 	int oldslot;
-	UVMHIST_FUNC("uao_set_swslot"); UVMHIST_CALLED(pdhist);
-	UVMHIST_LOG(pdhist, "aobj %#jx pageidx %jd slot %jd",
+	UVMHIST_FUNC("uao_set_swslot");
+	UVMHIST_CALLARGS(pdhist, "aobj %#jx pageidx %jd slot %jd",
 	    (uintptr_t)aobj, pageidx, slot, 0);
 
 	KASSERT(rw_write_held(uobj->vmobjlock) || uobj->uo_refs == 0);
@@ -801,9 +801,8 @@ uao_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
 	struct vm_page *ptmp = NULL;	/* Quell compiler warning */
 	int lcv, gotpages, maxpages, swslot, pageidx;
 	bool done;
-	UVMHIST_FUNC("uao_get"); UVMHIST_CALLED(pdhist);
-
-	UVMHIST_LOG(pdhist, "aobj=%#jx offset=%jd, flags=%jd",
+	UVMHIST_FUNC("uao_get");
+	UVMHIST_CALLARGS(pdhist, "aobj=%#jx offset=%jd, flags=%jd",
 		    (uintptr_t)uobj, offset, flags,0);
 
 	/*

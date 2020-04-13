@@ -176,9 +176,8 @@ uvn_get(struct uvm_object *uobj, voff_t offset,
 	struct vnode *vp = (struct vnode *)uobj;
 	int error;
 
-	UVMHIST_FUNC("uvn_get"); UVMHIST_CALLED(ubchist);
-
-	UVMHIST_LOG(ubchist, "vp %#jx off 0x%jx", (uintptr_t)vp, (int)offset,
+	UVMHIST_FUNC("uvn_get");
+	UVMHIST_CALLARGS(ubchist, "vp %#jx off 0x%jx", (uintptr_t)vp, offset,
 	    0, 0);
 
 	if (vp->v_type == VREG && (access_type & VM_PROT_WRITE) == 0
@@ -283,8 +282,8 @@ uvn_findpage(struct uvm_object *uobj, voff_t offset, struct vm_page **pgp,
 	    ((flags & UFP_BACKWARD) ? UVM_PAGE_ARRAY_FILL_BACKWARD : 0) |
 	    ((flags & UFP_DIRTYONLY) ?
 	    (UVM_PAGE_ARRAY_FILL_DIRTY|UVM_PAGE_ARRAY_FILL_DENSE) : 0);
-	UVMHIST_FUNC("uvn_findpage"); UVMHIST_CALLED(ubchist);
-	UVMHIST_LOG(ubchist, "vp %#jx off 0x%jx", (uintptr_t)uobj, offset,
+	UVMHIST_FUNC("uvn_findpage");
+	UVMHIST_CALLARGS(ubchist, "vp %#jx off 0x%jx", (uintptr_t)uobj, offset,
 	    0, 0);
 
 	/*

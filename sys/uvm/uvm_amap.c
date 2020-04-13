@@ -362,9 +362,8 @@ amap_extend(struct vm_map_entry *entry, vsize_t addsize, int flags)
 	const km_flag_t kmflags =
 	    (flags & AMAP_EXTEND_NOWAIT) ? KM_NOSLEEP : KM_SLEEP;
 
-	UVMHIST_FUNC("amap_extend"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "  (entry=%#jx, addsize=%#jx, flags=%#jx)",
+	UVMHIST_FUNC("amap_extend");
+	UVMHIST_CALLARGS(maphist, "  (entry=%#jx, addsize=%#jx, flags=%#jx)",
 	    (uintptr_t)entry, addsize, flags, 0);
 
 	/*
@@ -724,8 +723,8 @@ amap_wipeout(struct vm_amap *amap)
 {
 	u_int lcv;
 
-	UVMHIST_FUNC("amap_wipeout"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(amap=%#jx)", (uintptr_t)amap, 0,0,0);
+	UVMHIST_FUNC("amap_wipeout");
+	UVMHIST_CALLARGS(maphist,"(amap=%#jx)", (uintptr_t)amap, 0,0,0);
 
 	KASSERT(rw_write_held(amap->am_lock));
 	KASSERT(amap->am_ref == 0);
@@ -796,8 +795,8 @@ amap_copy(struct vm_map *map, struct vm_map_entry *entry, int flags,
 	krwlock_t *oldlock;
 	vsize_t len;
 
-	UVMHIST_FUNC("amap_copy"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist, "  (map=%#j, entry=%#j, flags=%jd)",
+	UVMHIST_FUNC("amap_copy");
+	UVMHIST_CALLARGS(maphist, "  (map=%#j, entry=%#j, flags=%jd)",
 		    (uintptr_t)map, (uintptr_t)entry, flags, 0);
 
 	KASSERT(map != kernel_map);	/* we use nointr pool */
@@ -858,7 +857,7 @@ amap_copy(struct vm_map *map, struct vm_map_entry *entry, int flags,
 	}
 
 	/*
-	 * First check and see if we are the only map entry referencing 
+	 * First check and see if we are the only map entry referencing
 	 * he amap we currently have.  If so, then just take it over instead
 	 * of copying it.  Note that we are reading am_ref without lock held
 	 * as the value value can only be one if we have the only reference
@@ -1387,7 +1386,7 @@ amap_swap_off(int startslot, int endslot)
 		if (am) {
 			amap_unlock(am);
 		}
-		
+
 		mutex_enter(&amap_list_lock);
 		KASSERT(LIST_NEXT(&marker_prev, am_list) == &marker_next ||
 		    LIST_NEXT(LIST_NEXT(&marker_prev, am_list), am_list) ==

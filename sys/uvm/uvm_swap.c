@@ -498,7 +498,7 @@ sys_swapctl(struct lwp *l, const struct sys_swapctl_args *uap, register_t *retva
 		    NULL, sizeof(struct swapent), retval);
 		UVMHIST_LOG(pdhist, "<- done SWAP_STATS", 0, 0, 0, 0);
 		goto out;
-	
+
 	case SWAP_GETDUMPDEV:
 		error = copyout(&dumpdev, SCARG(uap, arg), sizeof(dumpdev));
 		goto out;
@@ -988,8 +988,8 @@ swap_off(struct lwp *l, struct swapdev *sdp)
 	int npages = sdp->swd_npages;
 	int error = 0;
 
-	UVMHIST_FUNC("swap_off"); UVMHIST_CALLED(pdhist);
-	UVMHIST_LOG(pdhist, "  dev=%jx, npages=%jd", sdp->swd_dev,npages, 0, 0);
+	UVMHIST_FUNC("swap_off");
+	UVMHIST_CALLARGS(pdhist, "  dev=%jx, npages=%jd", sdp->swd_dev,npages, 0, 0);
 
 	/* disable the swap area being removed */
 	sdp->swd_flags &= ~SWF_ENABLE;
@@ -1215,9 +1215,9 @@ swstrategy(struct buf *bp)
 static int
 swread(dev_t dev, struct uio *uio, int ioflag)
 {
-	UVMHIST_FUNC("swread"); UVMHIST_CALLED(pdhist);
+	UVMHIST_FUNC("swread");
+	UVMHIST_CALLARGS(pdhist, "  dev=%jx offset=%jx", dev, uio->uio_offset, 0, 0);
 
-	UVMHIST_LOG(pdhist, "  dev=%jx offset=%jx", dev, uio->uio_offset, 0, 0);
 	return (physio(swstrategy, NULL, dev, B_READ, minphys, uio));
 }
 
@@ -1228,9 +1228,9 @@ swread(dev_t dev, struct uio *uio, int ioflag)
 static int
 swwrite(dev_t dev, struct uio *uio, int ioflag)
 {
-	UVMHIST_FUNC("swwrite"); UVMHIST_CALLED(pdhist);
+	UVMHIST_FUNC("swwrite");
+	UVMHIST_CALLARGS(pdhist, "  dev=%jx offset=%jx", dev, uio->uio_offset, 0, 0);
 
-	UVMHIST_LOG(pdhist, "  dev=%jx offset=%jx", dev, uio->uio_offset, 0, 0);
 	return (physio(swstrategy, NULL, dev, B_WRITE, minphys, uio));
 }
 
@@ -1474,9 +1474,8 @@ sw_reg_iodone(struct work *wk, void *dummy)
 	struct swapdev	*sdp = vnx->vx_sdp;
 	int s, resid, error;
 	KASSERT(&vbp->vb_buf.b_work == wk);
-	UVMHIST_FUNC("sw_reg_iodone"); UVMHIST_CALLED(pdhist);
-
-	UVMHIST_LOG(pdhist, "  vbp=%#jx vp=%#jx blkno=%jx addr=%#jx",
+	UVMHIST_FUNC("sw_reg_iodone");
+	UVMHIST_CALLARGS(pdhist, "  vbp=%#jx vp=%#jx blkno=%jx addr=%#jx",
 	    (uintptr_t)vbp, (uintptr_t)vbp->vb_buf.b_vp, vbp->vb_buf.b_blkno,
 	    (uintptr_t)vbp->vb_buf.b_data);
 	UVMHIST_LOG(pdhist, "  cnt=%jx resid=%jx",
@@ -1681,9 +1680,8 @@ void
 uvm_swap_free(int startslot, int nslots)
 {
 	struct swapdev *sdp;
-	UVMHIST_FUNC("uvm_swap_free"); UVMHIST_CALLED(pdhist);
-
-	UVMHIST_LOG(pdhist, "freeing %jd slots starting at %jd", nslots,
+	UVMHIST_FUNC("uvm_swap_free");
+	UVMHIST_CALLARGS(pdhist, "freeing %jd slots starting at %jd", nslots,
 	    startslot, 0, 0);
 
 	/*
@@ -1770,9 +1768,8 @@ uvm_swap_io(struct vm_page **pps, int startslot, int npages, int flags)
 	vaddr_t kva;
 	int	error, mapinflags;
 	bool write, async;
-	UVMHIST_FUNC("uvm_swap_io"); UVMHIST_CALLED(pdhist);
-
-	UVMHIST_LOG(pdhist, "<- called, startslot=%jd, npages=%jd, flags=%jd",
+	UVMHIST_FUNC("uvm_swap_io");
+	UVMHIST_CALLARGS(pdhist, "<- called, startslot=%jd, npages=%jd, flags=%jd",
 	    startslot, npages, flags, 0);
 
 	write = (flags & B_READ) == 0;

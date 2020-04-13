@@ -114,9 +114,8 @@ udv_attach(dev_t device, vm_prot_t accessprot,
 	const struct cdevsw *cdev;
 	dev_type_mmap((*mapfn));
 
-	UVMHIST_FUNC("udv_attach"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(device=%#jx)", device,0,0,0);
+	UVMHIST_FUNC("udv_attach");
+	UVMHIST_CALLARGS(maphist, "(device=%#jx)", device,0,0,0);
 
 	/*
 	 * before we do anything, ensure this device supports mmap

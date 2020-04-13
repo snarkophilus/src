@@ -477,9 +477,8 @@ ubc_alloc(struct uvm_object *uobj, voff_t offset, vsize_t *lenp, int advice,
 	struct ubc_map *umap;
 	voff_t umap_offset;
 	int error;
-	UVMHIST_FUNC("ubc_alloc"); UVMHIST_CALLED(ubchist);
-
-	UVMHIST_LOG(ubchist, "uobj %#jx offset 0x%jx len 0x%jx",
+	UVMHIST_FUNC("ubc_alloc");
+	UVMHIST_CALLARGS(ubchist, "uobj %#jx offset 0x%jx len 0x%jx",
 	    (uintptr_t)uobj, offset, *lenp, 0);
 
 	KASSERT(*lenp > 0);
@@ -633,9 +632,9 @@ ubc_release(void *va, int flags)
 	struct uvm_object *uobj;
 	vaddr_t umapva;
 	bool unmapped;
-	UVMHIST_FUNC("ubc_release"); UVMHIST_CALLED(ubchist);
+	UVMHIST_FUNC("ubc_release");
+	UVMHIST_CALLARGS(ubchist, "va %#jx", (uintptr_t)va, 0, 0, 0);
 
-	UVMHIST_LOG(ubchist, "va %#jx", (uintptr_t)va, 0, 0, 0);
 	umap = &ubc_object.umap[((char *)va - ubc_object.kva) >> ubc_winshift];
 	umapva = UBC_UMAP_ADDR(umap);
 	uobj = umap->uobj;

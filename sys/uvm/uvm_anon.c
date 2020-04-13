@@ -106,8 +106,8 @@ uvm_anfree(struct vm_anon *anon)
 {
 	struct vm_page *pg = anon->an_page, *pg2 __diagused;
 
-	UVMHIST_FUNC("uvm_anon_dispose"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(anon=%#jx)", (uintptr_t)anon, 0,0,0);
+	UVMHIST_FUNC("uvm_anon_dispose");
+	UVMHIST_CALLARGS(maphist,"(anon=%#jx)", (uintptr_t)anon, 0,0,0);
 
 	KASSERT(anon->an_lock == NULL || rw_write_held(anon->an_lock));
 	KASSERT(anon->an_ref == 0);
@@ -235,7 +235,7 @@ uvm_anon_lockloanpg(struct vm_anon *anon)
 				/*
 				 * someone locking the object has a chance to
 				 * lock us right now
-				 * 
+				 *
 				 * XXX Better than yielding but inadequate.
 				 */
 				mutex_exit(&pg->interlock);

@@ -806,9 +806,8 @@ uvm_mapent_alloc(struct vm_map *map, int flags)
 static void
 uvm_mapent_free(struct vm_map_entry *me)
 {
-	UVMHIST_FUNC("uvm_mapent_free"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"<- freeing map entry=%#jx [flags=%jd]",
+	UVMHIST_FUNC("uvm_mapent_free");
+	UVMHIST_CALLARGS(maphist,"<- freeing map entry=%#jx [flags=%jd]",
 		(uintptr_t)me, me->flags, 0, 0);
 	pool_cache_put(&uvm_map_entry_cache, me);
 }
@@ -1130,9 +1129,7 @@ uvm_map_prepare(struct vm_map *map, vaddr_t start, vsize_t size,
 	vm_prot_t maxprot = UVM_MAXPROTECTION(flags);
 
 	UVMHIST_FUNC("uvm_map_prepare");
-	UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(map=%#jx, start=%#jx, size=%ju, flags=%#jx)",
+	UVMHIST_CALLARGS(maphist, "(map=%#jx, start=%#jx, size=%ju, flags=%#jx)",
 	    (uintptr_t)map, start, size, flags);
 	UVMHIST_LOG(maphist, "  uobj/offset %#jx/%jd", (uintptr_t)uobj,
 	    uoffset,0,0);
@@ -1303,9 +1300,7 @@ uvm_map_enter(struct vm_map *map, const struct uvm_map_args *args,
 	int newetype;
 
 	UVMHIST_FUNC("uvm_map_enter");
-	UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(map=%#jx, start=%#jx, size=%ju, flags=%#jx)",
+	UVMHIST_CALLARGS(maphist, "(map=%#jx, start=%#jx, size=%ju, flags=%#jx)",
 	    (uintptr_t)map, start, size, flags);
 	UVMHIST_LOG(maphist, "  uobj/offset %#jx/%jd", (uintptr_t)uobj,
 	    uoffset,0,0);
@@ -1679,9 +1674,7 @@ uvm_map_lookup_entry(struct vm_map *map, vaddr_t address,
 {
 	struct vm_map_entry *cur;
 	UVMHIST_FUNC("uvm_map_lookup_entry");
-	UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(map=%#jx,addr=%#jx,ent=%#jx)",
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,addr=%#jx,ent=%#jx)",
 	    (uintptr_t)map, address, (uintptr_t)entry, 0);
 
 	/*
@@ -1816,10 +1809,9 @@ uvm_map_findspace(struct vm_map *map, vaddr_t hint, vsize_t length,
 	vaddr_t orig_hint __diagused;
 	const int topdown = map->flags & VM_MAP_TOPDOWN;
 	UVMHIST_FUNC("uvm_map_findspace");
-	UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(map=%#jx, hint=%#jx, len=%ju, flags=%#jx)",
+	UVMHIST_CALLARGS(maphist, "(map=%#jx, hint=%#jx, len=%ju, flags=%#jx)",
 	    (uintptr_t)map, hint, length, flags);
+
 	KASSERT((flags & UVM_FLAG_COLORMATCH) != 0 || powerof2(align));
 	KASSERT((flags & UVM_FLAG_COLORMATCH) == 0 || align < uvmexp.ncolors);
 	KASSERT((flags & UVM_FLAG_FIXED) == 0 || align == 0);
@@ -2162,9 +2154,8 @@ uvm_unmap_remove(struct vm_map *map, vaddr_t start, vaddr_t end,
 {
 	struct vm_map_entry *entry, *first_entry, *next;
 	vaddr_t len;
-	UVMHIST_FUNC("uvm_unmap_remove"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(map=%#jx, start=%#jx, end=%#jx)",
+	UVMHIST_FUNC("uvm_unmap_remove");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx, start=%#jx, end=%#jx)",
 	    (uintptr_t)map, start, end, 0);
 	VM_MAP_RANGE_CHECK(map, start, end);
 
@@ -2406,9 +2397,8 @@ uvm_map_reserve(struct vm_map *map, vsize_t size,
     vaddr_t *raddr	/* IN:hint, OUT: reserved VA */,
     uvm_flag_t flags	/* UVM_FLAG_FIXED or UVM_FLAG_COLORMATCH or 0 */)
 {
-	UVMHIST_FUNC("uvm_map_reserve"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(map=%#jx, size=%#jx, offset=%#jx, addr=%#jx)",
+	UVMHIST_FUNC("uvm_map_reserve");
+	UVMHIST_CALLARGS(maphist, "(map=%#jx, size=%#jx, offset=%#jx, addr=%#jx)",
 	    (uintptr_t)map, size, offset, (uintptr_t)raddr);
 
 	size = round_page(size);
@@ -2590,9 +2580,8 @@ uvm_map_extract(struct vm_map *srcmap, vaddr_t start, vsize_t len,
 	vsize_t elen __unused;
 	int nchain, error, copy_ok;
 	vsize_t nsize;
-	UVMHIST_FUNC("uvm_map_extract"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(srcmap=%#jx,start=%#jx, len=%#jx",
+	UVMHIST_FUNC("uvm_map_extract");
+	UVMHIST_CALLARGS(maphist,"(srcmap=%#jx,start=%#jx, len=%#jx",
 	    (uintptr_t)srcmap, start, len, 0);
 	UVMHIST_LOG(maphist," ...,dstmap=%#jx, flags=%#jx)",
 	    (uintptr_t)dstmap, flags, 0, 0);
@@ -2613,7 +2602,7 @@ uvm_map_extract(struct vm_map *srcmap, vaddr_t start, vsize_t len,
 
 	if ((flags & UVM_EXTRACT_RESERVED) == 0) {
 		dstaddr = vm_map_min(dstmap);
-		if (!uvm_map_reserve(dstmap, len, start, 
+		if (!uvm_map_reserve(dstmap, len, start,
 		    atop(start) & uvmexp.colormask, &dstaddr,
 		    UVM_FLAG_COLORMATCH))
 			return (ENOMEM);
@@ -3008,8 +2997,8 @@ uvm_map_protect(struct vm_map *map, vaddr_t start, vaddr_t end,
 {
 	struct vm_map_entry *current, *entry;
 	int error = 0;
-	UVMHIST_FUNC("uvm_map_protect"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_prot=%#jx)",
+	UVMHIST_FUNC("uvm_map_protect");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_prot=%#jx)",
 	    (uintptr_t)map, start, end, new_prot);
 
 	vm_map_lock(map);
@@ -3168,8 +3157,8 @@ uvm_map_inherit(struct vm_map *map, vaddr_t start, vaddr_t end,
     vm_inherit_t new_inheritance)
 {
 	struct vm_map_entry *entry, *temp_entry;
-	UVMHIST_FUNC("uvm_map_inherit"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_inh=%#jx)",
+	UVMHIST_FUNC("uvm_map_inherit");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_inh=%#jx)",
 	    (uintptr_t)map, start, end, new_inheritance);
 
 	switch (new_inheritance) {
@@ -3211,8 +3200,8 @@ int
 uvm_map_advice(struct vm_map *map, vaddr_t start, vaddr_t end, int new_advice)
 {
 	struct vm_map_entry *entry, *temp_entry;
-	UVMHIST_FUNC("uvm_map_advice"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_adv=%#jx)",
+	UVMHIST_FUNC("uvm_map_advice");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_adv=%#jx)",
 	    (uintptr_t)map, start, end, new_advice);
 
 	vm_map_lock(map);
@@ -3260,8 +3249,8 @@ int
 uvm_map_willneed(struct vm_map *map, vaddr_t start, vaddr_t end)
 {
 	struct vm_map_entry *entry;
-	UVMHIST_FUNC("uvm_map_willneed"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx)",
+	UVMHIST_FUNC("uvm_map_willneed");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx)",
 	    (uintptr_t)map, start, end, 0);
 
 	vm_map_lock_read(map);
@@ -3327,8 +3316,8 @@ uvm_map_pageable(struct vm_map *map, vaddr_t start, vaddr_t end,
 #ifdef DIAGNOSTIC
 	u_int timestamp_save;
 #endif
-	UVMHIST_FUNC("uvm_map_pageable"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_pageable=%ju)",
+	UVMHIST_FUNC("uvm_map_pageable");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx,new_pageable=%ju)",
 	    (uintptr_t)map, start, end, new_pageable);
 	KASSERT(map->flags & VM_MAP_PAGEABLE);
 
@@ -3583,8 +3572,8 @@ uvm_map_pageable_all(struct vm_map *map, int flags, vsize_t limit)
 #ifdef DIAGNOSTIC
 	u_int timestamp_save;
 #endif
-	UVMHIST_FUNC("uvm_map_pageable_all"); UVMHIST_CALLED(maphist);
-	UVMHIST_LOG(maphist,"(map=%#jx,flags=%#jx)", (uintptr_t)map, flags,
+	UVMHIST_FUNC("uvm_map_pageable_all");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,flags=%#jx)", (uintptr_t)map, flags,
 	    0, 0);
 
 	KASSERT(map->flags & VM_MAP_PAGEABLE);
@@ -3818,10 +3807,10 @@ uvm_map_clean(struct vm_map *map, vaddr_t start, vaddr_t end, int flags)
 	vsize_t size;
 	voff_t uoff;
 	int error, refs;
-	UVMHIST_FUNC("uvm_map_clean"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(map=%#jx,start=%#jx,end=%#jx,flags=%#jx)",
+	UVMHIST_FUNC("uvm_map_clean");
+	UVMHIST_CALLARGS(maphist,"(map=%#jx,start=%#jx,end=%#jx,flags=%#jx)",
 	    (uintptr_t)map, start, end, flags);
+
 	KASSERT((flags & (PGO_FREE|PGO_DEACTIVATE)) !=
 		(PGO_FREE|PGO_DEACTIVATE));
 
@@ -4037,9 +4026,8 @@ void
 uvmspace_init(struct vmspace *vm, struct pmap *pmap, vaddr_t vmin,
     vaddr_t vmax, bool topdown)
 {
-	UVMHIST_FUNC("uvmspace_init"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(vm=%#jx, pmap=%#jx, vmin=%#jx, vmax=%#jx",
+	UVMHIST_FUNC("uvmspace_init");
+	UVMHIST_CALLARGS(maphist, "(vm=%#jx, pmap=%#jx, vmin=%#jx, vmax=%#jx",
 	    (uintptr_t)vm, (uintptr_t)pmap, vmin, vmax);
 	UVMHIST_LOG(maphist, "   topdown=%ju)", topdown, 0, 0, 0);
 
@@ -4171,7 +4159,7 @@ uvmspace_exec(struct lwp *l, vaddr_t start, vaddr_t end, bool topdown)
 
 		/*
 		 * now unmap the old program.
-		 * 
+		 *
 		 * XXX set VM_MAP_DYING for the duration, so pmap_update()
 		 * is not called until the pmap has been totally cleared out
 		 * after pmap_remove_all(), or it can confuse some pmap
@@ -4244,10 +4232,9 @@ uvmspace_free(struct vmspace *vm)
 	struct vm_map *map = &vm->vm_map;
 	int flags;
 
-	UVMHIST_FUNC("uvmspace_free"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist,"(vm=%#jx) ref=%jd", (uintptr_t)vm, vm->vm_refcnt,
-	    0, 0);
+	UVMHIST_FUNC("uvmspace_free");
+	UVMHIST_CALLARGS(maphist,"(vm=%#jx) ref=%jd", (uintptr_t)vm,
+	    vm->vm_refcnt, 0, 0);
 	if (atomic_dec_uint_nv(&vm->vm_refcnt) > 0)
 		return;
 
@@ -4718,13 +4705,13 @@ void
 uvm_unmap1(struct vm_map *map, vaddr_t start, vaddr_t end, int flags)
 {
 	struct vm_map_entry *dead_entries;
-	UVMHIST_FUNC("uvm_unmap"); UVMHIST_CALLED(maphist);
+	UVMHIST_FUNC("uvm_unmap");
+	UVMHIST_CALLARGS(maphist, "  (map=%#jx, start=%#jx, end=%#jx)",
+	    (uintptr_t)map, start, end, 0);
 
 	KASSERTMSG(start < end,
 	    "%s: map %p: start %#jx < end %#jx", __func__, map,
 	    (uintmax_t)start, (uintmax_t)end);
-	UVMHIST_LOG(maphist, "  (map=%#jx, start=%#jx, end=%#jx)",
-	    (uintptr_t)map, start, end, 0);
 	if (map == kernel_map) {
 		LOCKDEBUG_MEM_CHECK((void *)start, end - start);
 	}

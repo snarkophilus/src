@@ -855,9 +855,8 @@ uvm_fault_internal(struct vm_map *orig_map, vaddr_t vaddr,
 	struct vm_page *pages_store[UVM_MAXRANGE], **pages;
 	int error;
 
-	UVMHIST_FUNC("uvm_fault"); UVMHIST_CALLED(maphist);
-
-	UVMHIST_LOG(maphist, "(map=%#jx, vaddr=%#jx, at=%jd, ff=%jd)",
+	UVMHIST_FUNC("uvm_fault");
+	UVMHIST_CALLARGS(maphist, "(map=%#jx, vaddr=%#jx, at=%jd, ff=%jd)",
 	      (uintptr_t)orig_map, vaddr, access_type, fault_flag);
 
 	/* Don't count anything until user interaction is possible */
