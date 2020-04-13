@@ -838,20 +838,23 @@ pmap_activate(struct lwp *l)
  * Reflects back modify bits to the pager.
  */
 void
-pmap_page_remove(struct vm_page_md * mdpg)
+pmap_page_remove(struct vm_page_md *mdpg)
 {
 	kpreempt_disable();
 	VM_PAGEMD_PVLIST_LOCK(mdpg);
 	pmap_pvlist_check(mdpg);
 
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
-
 	struct vm_page * const pg =
 	    VM_PAGEMD_VMPAGE_P(mdpg) ? VM_MD_TO_PAGE(mdpg) : NULL;
+
+	UVMHIST_FUNC(__func__);
 	if (pg) {
-		UVMHIST_LOG(pmaphist, "pg %#jx (pa %#jx) [page removed]: "
-		    "execpage cleared", (uintptr_t)pg, VM_PAGE_TO_PHYS(pg), 0, 0);
+		UVMHIST_CALLARGS(pmaphist, "mdpg %#jx pg %#jx (pa %#jx): "
+		    "execpage cleared", (uintptr_t)mdpg, (uintptr_t)pg,
+		    VM_PAGE_TO_PHYS(pg), 0);
+	} else {
+		UVMHIST_CALLARGS(pmaphist, "mdpg %#jx", (uintptr_t)mdpg, 0,
+		    0, 0);
 	}
 
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
@@ -1957,17 +1960,14 @@ pmap_enter_pv(pmap_t pmap, vaddr_t va, paddr_t pa, struct vm_page_md *mdpg,
     pt_entry_t *nptep, u_int flags)
 {
 	pv_entry_t pv, npv, apv;
-
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
-
 #ifdef UVMHIST
 	bool first = false;
 	struct vm_page *pg = VM_PAGEMD_VMPAGE_P(mdpg) ? VM_MD_TO_PAGE(mdpg) :
 	    NULL;
 #endif
 
-	UVMHIST_LOG(pmaphist, "(pmap=%#jx va=%#jx pg=%#jx (%#jx)",
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx va=%#jx pg=%#jx (%#jx)",
 	    (uintptr_t)pmap, va, (uintptr_t)pg, pa);
 	UVMHIST_LOG(pmaphist, "nptep=%#jx (%#jx))",
 	    (uintptr_t)nptep, pte_value(*nptep), 0, 0);
