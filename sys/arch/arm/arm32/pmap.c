@@ -2354,7 +2354,7 @@ pmap_page_remove(struct vm_page_md *md, paddr_t pa)
 		pmap_acquire_page_lock(md);
 #ifdef MULTIPROCESSOR
 		/*
-		 * Restart of the beginning of the list.
+		 * Restart at the beginning of the list.
 		 */
 		pvp = &SLIST_FIRST(&md->pvh_list);
 #endif
