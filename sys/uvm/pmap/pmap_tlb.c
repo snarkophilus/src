@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_tlb.c,v 1.31 2020/04/09 08:55:45 skrll Exp $	*/
+/*	$NetBSD: pmap_tlb.c,v 1.33 2020/04/14 05:43:57 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2010 The NetBSD Foundation, Inc.
@@ -31,7 +31,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_tlb.c,v 1.31 2020/04/09 08:55:45 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_tlb.c,v 1.33 2020/04/14 05:43:57 skrll Exp $");
 
 /*
  * Manages address spaces in a TLB.
@@ -215,7 +215,7 @@ static void
 pmap_tlb_pai_check(struct pmap_tlb_info *ti, bool locked_p)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "(ti=%#jx)", ti, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "(ti=%#jx)", (uintptr_t)ti, 0, 0, 0);
 
 #ifdef DIAGNOSTIC
 	struct pmap_asid_info *pai;
@@ -649,7 +649,7 @@ pmap_tlb_shootdown_bystanders(pmap_t pm)
 	 */
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(maphist, "(pm=%#jx)", (uintptr_t)pm, 0, 0, 0);
+	UVMHIST_CALLARGS(maphist, "pm %#jx", (uintptr_t)pm, 0, 0, 0);
 
 	kcpuset_t *pm_active;
 	kcpuset_clone(&pm_active, pm->pm_active);
@@ -973,7 +973,7 @@ void
 pmap_tlb_asid_deactivate(pmap_t pm)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(maphist, "(pm=%#jx)", (uintptr_t)pm, 0, 0, 0);
+	UVMHIST_CALLARGS(maphist, "pm %#jx", (uintptr_t)pm, 0, 0, 0);
 
 	KASSERT(kpreempt_disabled());
 #if defined(MULTIPROCESSOR)
@@ -1004,7 +1004,7 @@ pmap_tlb_asid_deactivate(pmap_t pm)
 #if defined(DEBUG)
 	pmap_tlb_asid_check();
 #endif
-	UVMHIST_LOG(maphist, " <-- done (pm=%#jx)", pm, 0, 0, 0);
+	UVMHIST_LOG(maphist, " <-- done (pm=%#jx)", (uintptr_t)pm, 0, 0, 0);
 }
 
 void

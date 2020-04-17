@@ -632,7 +632,7 @@ pmap_maxproc_set(int nmaxproc)
 	static const char pmap_l1ttpool_warnmsg[] =
 	    "WARNING: l1ttpool limit reached; increase kern.maxproc";
 
-//	pool_cache_setlowat(&pmap_l1tt_cache, nmaxproc);
+	pool_cache_prime(&pmap_l1tt_cache, nmaxproc);
 
 	/*
 	 * Set the hard limit on the pmap_l1tt_cache to the number

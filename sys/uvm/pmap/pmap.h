@@ -77,15 +77,17 @@
 #include <sys/rwlock.h>
 #include <uvm/uvm_object.h>
 #include <uvm/uvm_stat.h>
-#if 0
+
+#if 1
 #ifdef UVMHIST
 UVMHIST_DECL(pmapexechist);
 UVMHIST_DECL(pmaphist);
 #endif
-#endif
+#else
 UVMHIST_DECL(maphist);
 #define pmaphist maphist
 #define pmapexechist maphist
+#endif
 
 #if !defined(KASAN)
 

@@ -58,6 +58,9 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #define VPRINTF(...)	__nothing
 #endif
 
+/* Set to LX_BLKPAG_GP if supported. */
+uint64_t pmap_attr_gp = 0;
+
 //static void	pmap_md_vca_page_wbinv(struct vm_page *, bool);
 
 /*

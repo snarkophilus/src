@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.48 2020/03/14 14:05:44 ad Exp $	*/
+/*	$NetBSD: pmap.c,v 1.49 2020/04/12 15:36:18 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.48 2020/03/14 14:05:44 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.49 2020/04/12 15:36:18 skrll Exp $");
 
 /*
  *	Manages physical address maps.
@@ -748,7 +748,7 @@ void
 pmap_destroy(pmap_t pmap)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx)", pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx)", (uintptr_t)pmap, 0, 0, 0);
 
 	if (atomic_dec_uint_nv(&pmap->pm_count) > 0) {
 		PMAP_COUNT(dereference);
@@ -1059,9 +1059,9 @@ pmap_pte_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
 	const bool is_kernel_pmap_p = (pmap == pmap_kernel());
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx kernel=%u va=%#jx..%#jx)",
+	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx kernel=%jx va=%#jx..%#jx)",
 	    (uintptr_t)pmap, (is_kernel_pmap_p ? 1 : 0), sva, eva);
-	UVMHIST_LOG(pmaphist, "ptep=%#jx, flags(npte)=%#jx",
+	UVMHIST_LOG(pmaphist, "ptep=%#jx, flags(npte)=%#jx)",
 	    (uintptr_t)ptep, flags, 0, 0);
 
 	KASSERT(kpreempt_disabled());
