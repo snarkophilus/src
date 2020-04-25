@@ -638,6 +638,10 @@ pmap_icache_sync_range(pmap_t pm, vaddr_t sva, vaddr_t eva)
 	vaddr_t next_bucket;
 	vsize_t page_size = trunc_page(sva) + PAGE_SIZE - sva;
 
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(maphist, "pm %#jx va %#jx...#%jx",
+	    (uintptr_t)pm, sva, eva, 0);
+
 #ifndef ARM_MMU_EXTENDED
 	pmap_acquire_pmap_lock(pm);
 #endif

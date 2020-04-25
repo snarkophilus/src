@@ -1292,13 +1292,14 @@ pmap_protect(pmap_t pmap, vaddr_t sva, vaddr_t eva, vm_prot_t prot)
 void
 pmap_page_cache(struct vm_page_md *mdpg, bool cached)
 {
+#ifdef UVMHIST
 	const bool vmpage_p = VM_PAGEMD_VMPAGE_P(mdpg);
 	struct vm_page * const pg = vmpage_p ? VM_MD_TO_PAGE(mdpg) : NULL;
-	const paddr_t pa = pg ? VM_PAGE_TO_PHYS(pg) : 0;
+#endif
 
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmaphist, "(mdpg=%#jx (pa %#jx) cached=%jd vmpage %jd)",
-	    (uintptr_t)mdpg, pa, cached, vmpage_p);
+	    (uintptr_t)mdpg, pg ? VM_PAGE_TO_PHYS(pg) : 0, cached, vmpage_p);
 
 	KASSERT(kpreempt_disabled());
 	KASSERT(VM_PAGEMD_PVLIST_LOCKED_P(mdpg));

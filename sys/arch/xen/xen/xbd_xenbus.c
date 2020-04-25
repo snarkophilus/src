@@ -1,4 +1,4 @@
-/*      $NetBSD: xbd_xenbus.c,v 1.116 2020/04/16 16:38:43 jdolecek Exp $      */
+/*      $NetBSD: xbd_xenbus.c,v 1.122 2020/04/21 13:31:08 jdolecek Exp $      */
 
 /*
  * Copyright (c) 2006 Manuel Bouyer.
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.116 2020/04/16 16:38:43 jdolecek Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xbd_xenbus.c,v 1.122 2020/04/21 13:31:08 jdolecek Exp $");
 
 #include "opt_xen.h"
 
@@ -186,12 +186,6 @@ struct xbd_xenbus_softc {
 	struct evcnt sc_cnt_indirect;
 };
 
-#if 0
-/* too big to be on stack */
-static multicall_entry_t rq_mcl[XBD_RING_SIZE+1];
-static paddr_t rq_pages[XBD_RING_SIZE];
-#endif
-
 static int  xbd_xenbus_match(device_t, cfdata_t, void *);
 static void xbd_xenbus_attach(device_t, device_t, void *);
 static int  xbd_xenbus_detach(device_t, int);
@@ -256,7 +250,7 @@ const struct cdevsw xbd_cdevsw = {
 
 extern struct cfdriver xbd_cd;
 
-static struct dkdriver xbddkdriver = {
+static const struct dkdriver xbddkdriver = {
         .d_strategy = xbdstrategy,
 	.d_minphys = xbdminphys,
 	.d_open = xbdopen,
@@ -287,12 +281,6 @@ xbd_xenbus_attach(device_t parent, device_t self, void *aux)
 	struct xenbusdev_attach_args *xa = aux;
 	blkif_sring_t *ring;
 	RING_IDX i;
-#ifdef XBD_DEBUG
-	char **dir, *val;
-	int dir_n = 0;
-	char id_str[20];
-	int err;
-#endif
 
 	config_pending_incr(self);
 	aprint_normal(": Xen Virtual Block Device Interface\n");
@@ -714,6 +702,18 @@ xbd_connect(struct xbd_xenbus_softc *sc)
 {
 	int err;
 	unsigned long long sectors;
+	u_long val;
+
+	/*
+	 * Must read feature-persistent later, e.g. Linux Dom0 writes
+	 * this together with the device info.
+	 */
+	err = xenbus_read_ul(NULL, sc->sc_xbusd->xbusd_otherend,
+	    "feature-persistent", &val, 10);
+	if (err)
+		val = 0;
+	if (val > 0)
+		sc->sc_features |= BLKIF_FEATURE_PERSISTENT;
 
 	err = xenbus_read_ul(NULL,
 	    sc->sc_xbusd->xbusd_path, "virtual-device", &sc->sc_handle, 10);
@@ -766,17 +766,10 @@ xbd_features(struct xbd_xenbus_softc *sc)
 		sc->sc_features |= BLKIF_FEATURE_BARRIER;
 
 	err = xenbus_read_ul(NULL, sc->sc_xbusd->xbusd_otherend,
-	    "feature-persistent", &val, 10);
-	if (err)
-		val = 0;
-	if (val > 0)
-		sc->sc_features |= BLKIF_FEATURE_PERSISTENT;
-
-	err = xenbus_read_ul(NULL, sc->sc_xbusd->xbusd_otherend,
 	    "feature-max-indirect-segments", &val, 10);
 	if (err)
 		val = 0;
-	if (val > (MAXPHYS >> PAGE_SHIFT)) {
+	if (val >= (MAXPHYS >> PAGE_SHIFT) + 1) {
 		/* We can use indirect segments, the limit is big enough */
 		sc->sc_features |= BLKIF_FEATURE_INDIRECT;
 	}
@@ -857,6 +850,7 @@ again:
 		if (bp->b_error == 0)
 			bp->b_resid = 0;
 
+		KASSERT(xbdreq->req_dmamap->dm_nsegs > 0);
 		for (seg = 0; seg < xbdreq->req_dmamap->dm_nsegs; seg++) {
 			/*
 			 * We are not allowing persistent mappings, so
@@ -939,7 +933,7 @@ xbdopen(dev_t dev, int flags, int fmt, struct lwp *l)
 	if ((flags & FWRITE) && (sc->sc_info & VDISK_READONLY))
 		return EROFS;
 
-	DPRINTF(("xbdopen(0x%04x, %d)\n", dev, flags));
+	DPRINTF(("xbdopen(%" PRIx64 ", %d)\n", dev, flags));
 	return dk_open(&sc->sc_dksc, dev, flags, fmt, l);
 }
 
@@ -950,7 +944,7 @@ xbdclose(dev_t dev, int flags, int fmt, struct lwp *l)
 
 	sc = device_lookup_private(&xbd_cd, DISKUNIT(dev));
 
-	DPRINTF(("xbdclose(%d, %d)\n", dev, flags));
+	DPRINTF(("xbdclose(%" PRIx64 ", %d)\n", dev, flags));
 	return dk_close(&sc->sc_dksc, dev, flags, fmt, l);
 }
 
@@ -985,7 +979,7 @@ xbdsize(dev_t dev)
 {
 	struct	xbd_xenbus_softc *sc;
 
-	DPRINTF(("xbdsize(%d)\n", dev));
+	DPRINTF(("xbdsize(%" PRIx64 ")\n", dev));
 
 	sc = device_lookup_private(&xbd_cd, DISKUNIT(dev));
 	if (sc == NULL || sc->sc_shutdown != BLKIF_SHUTDOWN_RUN)
@@ -1030,7 +1024,7 @@ xbdioctl(dev_t dev, u_long cmd, void *data, int flag, struct lwp *l)
 	blkif_request_t *req;
 	int notify;
 
-	DPRINTF(("xbdioctl(%d, %08lx, %p, %d, %p)\n",
+	DPRINTF(("xbdioctl(%" PRIx64 ", %08lx, %p, %d, %p)\n",
 	    dev, cmd, data, flag, l));
 	dksc = &sc->sc_dksc;
 
@@ -1052,6 +1046,7 @@ xbdioctl(dev_t dev, u_long cmd, void *data, int flag, struct lwp *l)
 		mutex_enter(&sc->sc_lock);
 		while ((xbdreq = SLIST_FIRST(&sc->sc_xbdreq_head)) == NULL)
 			cv_wait(&sc->sc_req_cv, &sc->sc_lock);
+		KASSERT(!RING_FULL(&sc->sc_ring));
 
 		SLIST_REMOVE_HEAD(&sc->sc_xbdreq_head, req_next);
 		req = RING_GET_REQUEST(&sc->sc_ring,
@@ -1099,7 +1094,7 @@ xbddump(dev_t dev, daddr_t blkno, void *va, size_t size)
 	if (sc == NULL)
 		return (ENXIO);
 
-	DPRINTF(("xbddump(%d, %" PRId64 ", %p, %lu)\n", dev, blkno, va,
+	DPRINTF(("xbddump(%" PRIx64 ", %" PRId64 ", %p, %lu)\n", dev, blkno, va,
 	    (unsigned long)size));
 	return dk_dump(&sc->sc_dksc, dev, blkno, va, size, 0);
 }
@@ -1146,6 +1141,7 @@ xbd_diskstart(device_t self, struct buf *bp)
 		error = EAGAIN;
 		goto out;
 	}
+	KASSERT(!RING_FULL(&sc->sc_ring));
 
 	if ((sc->sc_features & BLKIF_FEATURE_INDIRECT) == 0
 	    && bp->b_bcount > XBD_MAX_CHUNK) {
@@ -1177,6 +1173,8 @@ xbd_diskstart(device_t self, struct buf *bp)
 		error = EINVAL;
 		goto out;
 	}
+	KASSERTMSG(xbdreq->req_dmamap->dm_nsegs > 0,
+	    "dm_nsegs == 0 with bcount %d", bp->b_bcount);
 
 	for (int seg = 0; seg < xbdreq->req_dmamap->dm_nsegs; seg++) {
 		KASSERT(seg < __arraycount(xbdreq->req_gntref));
@@ -1219,6 +1217,7 @@ xbd_diskstart(device_t self, struct buf *bp)
 	    bp, 0, xbdreq->req_dmamap, xbdreq->req_gntref);
 
 	if (bp->b_bcount > XBD_MAX_CHUNK) {
+		KASSERT(!RING_FULL(&sc->sc_ring));
 		struct xbd_req *xbdreq2 = SLIST_FIRST(&sc->sc_xbdreq_head);
 		KASSERT(xbdreq2 != NULL); /* Checked earlier */
 		SLIST_REMOVE_HEAD(&sc->sc_xbdreq_head, req_next);
@@ -1265,7 +1264,7 @@ xbd_diskstart_submit(struct xbd_xenbus_softc *sc,
 		bus_dma_segment_t *ds = &dmamap->dm_segs[dmaseg];
 
 		ma = ds->ds_addr;
-		nbytes = imin(ds->ds_len, size);
+		nbytes = ds->ds_len;
 
 		if (start > 0) {
 			if (start >= nbytes) {
@@ -1292,6 +1291,7 @@ xbd_diskstart_submit(struct xbd_xenbus_softc *sc,
 
 		reqseg->gref = gntref[dmaseg];
 	}
+	KASSERT(segidx > 0);
 	req->nr_segments = segidx;
 	sc->sc_ring.req_prod_pvt++;
 }

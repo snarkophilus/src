@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.166 2020/03/29 21:34:33 skrll Exp $	*/
+/*	$NetBSD: pmap.h,v 1.167 2020/04/18 11:00:38 skrll Exp $	*/
 
 /*
  * Copyright (c) 2002, 2003 Wasabi Systems, Inc.
@@ -204,7 +204,6 @@ extern pv_addr_t kernel_l1pt;
 /*
  * Commonly referenced structures
  */
-extern int		pmap_debug_level; /* Only exists if PMAP_DEBUG */
 extern int		arm_poolpage_vmfreelist;
 
 
@@ -238,7 +237,6 @@ bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
 
 void	pmap_icache_sync_range(pmap_t, vaddr_t, vaddr_t);
 
-void	pmap_debug(int);
 void	pmap_postinit(void);
 
 void	vector_page_setprot(int);

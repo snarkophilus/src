@@ -267,12 +267,11 @@ pmap_md_unmap_ephemeral_page(struct vm_page_md *mdpg, bool locked_p,
 {
 	KASSERT(VM_PAGEMD_VMPAGE_P(mdpg));
 
-	struct vm_page * const pg = VM_MD_TO_PAGE(mdpg);
 	pv_entry_t pv = &mdpg->mdpg_first;
 
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 	UVMHIST_LOG(pmaphist, "(pg=%#jx, va=%#lx, pte=%#"PRIxPTE")",
-	    (uintptr_t)pg, va, pte_value(old_pte), 0);
+	    (uintptr_t)VM_MD_TO_PAGE(mdpg), va, pte_value(old_pte), 0);
 
 	KASSERT(!locked_p || VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
 

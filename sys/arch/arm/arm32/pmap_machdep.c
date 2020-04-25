@@ -1000,7 +1000,12 @@ pmap_impl_bootstrap_pools(void)
 void
 pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
+	UVMHIST_FUNC(__func__);
+	struct cpu_info * const ci = curcpu();
+	struct pmap_asid_info * const pai = PMAP_PAI(pm, cpu_tlb_info(ci));
+
+	UVMHIST_CALLARGS(maphist, "pm %#jx (pm->pm_l1_pa %08jx asid %ju)",
+	    (uintptr_t)pm, pm->pm_l1_pa, pai->pai_asid, 0);
 
 	/*
 	 * Assume that TTBR1 has only global mappings and TTBR0 only
@@ -1015,9 +1020,6 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 
 	pmap_tlb_asid_acquire(pm, l);
 
-	struct cpu_info * const ci = curcpu();
-	struct pmap_asid_info * const pai = PMAP_PAI(pm, cpu_tlb_info(ci));
-
 	cpu_setttb(pm->pm_l1_pa, pai->pai_asid);
 	/*
 	 * Now we can reenable tablewalks since the CONTEXTIDR and TTRB0
@@ -1030,9 +1032,6 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 	}
 	cpu_cpwait();
 
-	UVMHIST_LOG(maphist, " pm %#jx pm->pm_l1_pa %08jx asid %ju... done",
-	    (uintptr_t)pm, pm->pm_l1_pa, pai->pai_asid, 0);
-
 	KASSERTMSG(ci->ci_pmap_asid_cur == pai->pai_asid, "%u vs %u",
 	    ci->ci_pmap_asid_cur, pai->pai_asid);
 	ci->ci_pmap_cur = pm;
@@ -1041,7 +1040,9 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 void
 pmap_md_pdetab_deactivate(pmap_t pm)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
+
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(maphist, "pm %#jx", (uintptr_t)pm, 0, 0, 0);
 
 	kpreempt_disable();
 	struct cpu_info * const ci = curcpu();
