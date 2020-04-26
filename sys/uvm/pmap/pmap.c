@@ -1460,8 +1460,6 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 
 	/*
 	 * Now validate mapping with desired protection/wiring.
-	 * Assume uniform modified and referenced status for all
-	 * MIPS pages in a MACH page.
 	 */
 	if (wired) {
 		pmap->pm_stats.wired_count++;
