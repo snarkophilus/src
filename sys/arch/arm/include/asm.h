@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.31 2020/04/13 05:40:25 maxv Exp $	*/
+/*	$NetBSD: asm.h,v 1.33 2020/04/21 11:35:02 joerg Exp $	*/
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -221,7 +221,9 @@
 #define	PIC_SYM(x,y)	x
 #endif	/* __PIC__ */
 
-#define RCSID(x)	.pushsection ".ident"; .asciz x; .popsection
+#define RCSID(x)	.pushsection ".ident","MS",%progbits,1;		\
+			.asciz x;					\
+			.popsection
 
 #define	WEAK_ALIAS(alias,sym)						\
 	.weak alias;							\
