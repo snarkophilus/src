@@ -180,8 +180,8 @@ pmap_md_map_ephemeral_page(struct vm_page_md *mdpg, bool locked_p, int prot,
 	pv_entry_t pv = &mdpg->mdpg_first;
 	register_t va = 0;
 
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(pg=%#jx, prot=%d, ptep=%#jx)",
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "(pg=%#jx, prot=%d, ptep=%#jx)",
 	    (uintptr_t)pg, prot, (uintptr_t)old_pte_p, 0);
 
 	KASSERT(!locked_p || VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
@@ -269,8 +269,8 @@ pmap_md_unmap_ephemeral_page(struct vm_page_md *mdpg, bool locked_p,
 
 	pv_entry_t pv = &mdpg->mdpg_first;
 
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(pg=%#jx, va=%#lx, pte=%#"PRIxPTE")",
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "(pg=%#jx, va=%#lx, pte=%#"PRIxPTE")",
 	    (uintptr_t)VM_MD_TO_PAGE(mdpg), va, pte_value(old_pte), 0);
 
 	KASSERT(!locked_p || VM_PAGEMD_PVLIST_LOCKED_P(mdpg));
@@ -310,7 +310,8 @@ pmap_md_unmap_ephemeral_page(struct vm_page_md *mdpg, bool locked_p,
 static void
 pmap_md_vca_page_wbinv(struct vm_page_md *mdpg, bool locked_p)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	pt_entry_t pte;
 
 	const register_t va = pmap_md_map_ephemeral_page(mdpg, locked_p,
@@ -614,8 +615,8 @@ pmap_zero_page(paddr_t dst_pa)
 {
 	pt_entry_t dst_pte;
 
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(pa=%#"PRIxPADDR")", dst_pa, 0, 0, 0);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "(pa=%#"PRIxPADDR")", dst_pa, 0, 0, 0);
 	PMAP_COUNT(zeroed_pages);
 
 	struct vm_page * const dst_pg = PHYS_TO_VM_PAGE(dst_pa);
@@ -641,8 +642,8 @@ pmap_copy_page(paddr_t src_pa, paddr_t dst_pa)
 {
 	pt_entry_t src_pte, dst_pte;
 
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
-	UVMHIST_LOG(pmaphist, "(src_pa=%#lx, dst_pa=%#lx)", src_pa, dst_pa, 0, 0);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "(src_pa=%#lx, dst_pa=%#lx)", src_pa, dst_pa, 0, 0);
 	PMAP_COUNT(copied_pages);
 
 	struct vm_page * const src_pg = PHYS_TO_VM_PAGE(src_pa);
@@ -670,7 +671,8 @@ pmap_copy_page(paddr_t src_pa, paddr_t dst_pa)
 void
 pmap_md_page_syncicache(struct vm_page_md *mdpg, const kcpuset_t *onproc)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	struct mips_options * const opts = &mips_options;
 	if (opts->mips_cpu_flags & CPU_MIPS_I_D_CACHE_COHERENT)
 		return;
@@ -820,14 +822,16 @@ pmap_md_io_vaddr_p(vaddr_t va)
 void
 pmap_md_icache_sync_range_index(vaddr_t va, vsize_t len)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	mips_icache_sync_range_index(va, len);
 }
 
 void
 pmap_md_icache_sync_all(void)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	mips_icache_sync_all();
 }
 
@@ -922,7 +926,8 @@ tlb_walk(void *ctx, tlb_walkfunc_t func)
 bool
 pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *ptep)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	if (!MIPS_HAS_R4K_MMU || !MIPS_CACHE_VIRTUAL_ALIAS)
 		return false;
 
@@ -1004,7 +1009,8 @@ pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *ptep)
 void
 pmap_md_vca_clean(struct vm_page_md *mdpg, int op)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLED(pmaphist);
 	if (!MIPS_HAS_R4K_MMU || !MIPS_CACHE_VIRTUAL_ALIAS)
 		return;
 
