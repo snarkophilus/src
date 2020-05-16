@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.301 2020/04/12 22:06:17 christos Exp $
+	$NetBSD: syscalls.master,v 1.304 2020/04/26 19:15:55 thorpej Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -352,9 +352,13 @@
 164	COMPAT_09 MODULAR compat	\
 		{ int|sys||uname(struct outsname *name); } ouname
 165	STD		{ int|sys||sysarch(int op, void *parms); }
-166	UNIMPL
-167	UNIMPL
-168	UNIMPL
+166	STD		{ int|sys||__futex(int *uaddr, int op, int val, \
+			    const struct timespec *timeout, \
+			    int *uaddr2, int val2, int val3); }
+167	STD		{ int|sys||__futex_set_robust_list(void *head, \
+			    size_t len); }
+168	STD		{ int|sys||__futex_get_robust_list(lwpid_t lwpid, \
+			    void **headp, size_t *lenp); }
 ; XXX more generally, never on machines where sizeof(void *) != sizeof(int)
 #if !defined(_LP64)
 169	COMPAT_10 MODULAR compat_sysv_10	\
@@ -661,8 +665,8 @@
 				char *name, size_t len); }
 325	STD		{ int|sys||_lwp_ctl(int features, \
 				struct lwpctl **address); }
-326	STD		{ lwptid_t|sys||_lwp_gettid(void); }
-; Syscalls 327-339 reserved for LWP syscalls.
+; Syscalls 326-339 reserved for LWP syscalls.
+326	UNIMPL
 327	UNIMPL
 328	UNIMPL
 329	UNIMPL
