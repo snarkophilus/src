@@ -797,7 +797,7 @@ amap_copy(struct vm_map *map, struct vm_map_entry *entry, int flags,
 
 	UVMHIST_FUNC("amap_copy");
 	UVMHIST_CALLARGS(maphist, "  (map=%#j, entry=%#j, flags=%jd)",
-		    (uintptr_t)map, (uintptr_t)entry, flags, 0);
+	    (uintptr_t)map, (uintptr_t)entry, flags, -2);
 
 	KASSERT(map != kernel_map);	/* we use nointr pool */
 
