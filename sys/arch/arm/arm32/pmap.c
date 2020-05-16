@@ -536,10 +536,12 @@ vaddr_t pmap_curmaxkvaddr;
 paddr_t avail_start;
 paddr_t avail_end;
 
+#if 0
 pv_addrqh_t pmap_boot_freeq = SLIST_HEAD_INITIALIZER(&pmap_boot_freeq);
 pv_addr_t kernelpages;
 pv_addr_t kernel_l1pt;
 pv_addr_t systempage;
+#endif
 
 #ifdef PMAP_CACHE_VIPT
 #define PMAP_VALIDATE_MD_PAGE(md)	\

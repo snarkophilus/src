@@ -1,4 +1,4 @@
-/*	$NetBSD: atavar.h,v 1.105 2020/04/13 10:49:34 jdolecek Exp $	*/
+/*	$NetBSD: atavar.h,v 1.107 2020/05/02 19:09:56 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1998, 2001 Manuel Bouyer.

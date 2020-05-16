@@ -1,5 +1,4 @@
 
-
 /*
  * The l2_dtable tracks L2_BUCKET_SIZE worth of L1 slots.
  *
@@ -49,6 +48,10 @@ extern vaddr_t pmap_kernel_l2ptp_kva;
 extern paddr_t pmap_kernel_l2ptp_phys;
 
 
+//pv_addrqh_t pmap_boot_freeq = SLIST_HEAD_INITIALIZER(&pmap_boot_freeq);
+//pv_addr_t kernelpages;
+extern pv_addr_t kernel_l1pt;
+extern pv_addr_t systempage;
 
 
 

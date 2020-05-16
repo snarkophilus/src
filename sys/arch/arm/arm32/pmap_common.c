@@ -343,7 +343,6 @@ pv_addr_t kernelpages;
 pv_addr_t kernel_l1pt;
 pv_addr_t systempage;
 
-
 static inline uint8_t
 pmap_domain(pmap_t pm)
 {
