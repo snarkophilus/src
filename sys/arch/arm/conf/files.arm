@@ -223,7 +223,7 @@ file	arch/arm/arm32/cpuswitch.S		arm32
 file	arch/arm/arm32/exception.S		arm32
 file	arch/arm/arm32/fault.c			arm32
 file	arch/arm/arm32/kobj_machdep.c		arm32 & modular
-file	arch/arm/arm32/pmap_common.c		arm32
+file	arch/arm/arm32/pmap_subr.c		arm32
 file	arch/arm/arm32/setcpsr.S		arm32
 file	arch/arm/arm32/setstack.S		arm32
 file	arch/arm/arm32/stubs.c			arm32

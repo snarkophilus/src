@@ -290,7 +290,7 @@ extern vaddr_t	pmap_curmaxkvaddr;
 #if 0
 
 
-/* XXXNH maybe these can live in pmap_common only - xscale stuff can go there */
+/* XXXNH maybe these can live in pmap_subr only - xscale stuff can go there */
 
 /*
  * pmap copy/zero page

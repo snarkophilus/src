@@ -189,7 +189,6 @@
 
 #include "opt_arm_debug.h"
 #include "opt_cpuoptions.h"
-#include "opt_pmap_debug.h"
 #include "opt_ddb.h"
 #include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
@@ -215,7 +214,7 @@
 #include <uvm/pmap/pmap_pvt.h>
 
 #include <arm/cpufunc.h>
-#include <arm/arm32/pmap_common.h>
+#include <arm/arm32/pmap_subr.h>
 #include <arm/arm32/machdep.h>
 
 #include <arm/locore.h>

@@ -188,7 +188,6 @@
 
 #include "opt_arm_debug.h"
 #include "opt_cpuoptions.h"
-#include "opt_pmap_debug.h"
 #include "opt_ddb.h"
 #include "opt_lockdebug.h"
 #include "opt_multiprocessor.h"
@@ -222,7 +221,7 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <uvm/pmap/pmap_pvt.h>
 
 #include <arm/locore.h>
-#include <arm/arm32/pmap_common.h>
+#include <arm/arm32/pmap_subr.h>
 
 #ifdef PMAP_NEED_ALLOC_POOLPAGE
 int			arm_poolpage_vmfreelist = VM_FREELIST_DEFAULT;

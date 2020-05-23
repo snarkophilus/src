@@ -213,7 +213,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.412 2020/04/21 06:45:16 skrll Exp $");
 #include <uvm/pmap/pmap_pvt.h>
 
 #include <arm/locore.h>
-#include <arm/arm32/pmap_common.h>
+#include <arm/arm32/pmap_subr.h>
 
 #ifdef DDB
 #include <arm/db_machdep.h>
