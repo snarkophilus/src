@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_lwp.c,v 1.80 2020/05/05 22:12:06 ad Exp $	*/
+/*	$NetBSD: sys_lwp.c,v 1.82 2020/05/23 23:42:43 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2006, 2007, 2008, 2019, 2020 The NetBSD Foundation, Inc.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_lwp.c,v 1.80 2020/05/05 22:12:06 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_lwp.c,v 1.82 2020/05/23 23:42:43 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,6 +49,7 @@ __KERNEL_RCSID(0, "$NetBSD: sys_lwp.c,v 1.80 2020/05/05 22:12:06 ad Exp $");
 #include <sys/sleepq.h>
 #include <sys/lwpctl.h>
 #include <sys/cpu.h>
+#include <sys/pserialize.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -76,10 +77,10 @@ mi_startlwp(void *arg)
 	if ((p->p_slflag & (PSL_TRACED|PSL_TRACELWP_CREATE)) ==
 	    (PSL_TRACED|PSL_TRACELWP_CREATE)) {
 		/* Paranoid check */
-		mutex_enter(proc_lock);
+		mutex_enter(&proc_lock);
 		if ((p->p_slflag & (PSL_TRACED|PSL_TRACELWP_CREATE)) !=
 		    (PSL_TRACED|PSL_TRACELWP_CREATE)) {
-			mutex_exit(proc_lock);
+			mutex_exit(&proc_lock);
 			return;
 		}
 
@@ -379,14 +380,14 @@ sys__lwp_kill(struct lwp *l, const struct sys__lwp_kill_args *uap,
 	ksi.ksi_uid = kauth_cred_geteuid(l->l_cred);
 	ksi.ksi_lid = SCARG(uap, target);
 
-	mutex_enter(proc_lock);
+	mutex_enter(&proc_lock);
 	mutex_enter(p->p_lock);
 	if ((t = lwp_find(p, ksi.ksi_lid)) == NULL)
 		error = ESRCH;
 	else if (signo != 0)
 		kpsignal2(p, &ksi);
 	mutex_exit(p->p_lock);
-	mutex_exit(proc_lock);
+	mutex_exit(&proc_lock);
 
 	return error;
 }
@@ -458,25 +459,26 @@ int
 lwp_unpark(const lwpid_t *tp, const u_int ntargets)
 {
 	u_int target;
-	int error;
+	int error, s;
 	proc_t *p;
 	lwp_t *t;
 
 	p = curproc;
 	error = 0;
 
-	mutex_enter(p->p_lock);
+	s = pserialize_read_enter();
 	for (target = 0; target < ntargets; target++) {
-		t = proc_find_lwp(p, tp[target]);
+		t = proc_find_lwp_unlocked(p, tp[target]);
 		if (__predict_false(t == NULL)) {
 			error = ESRCH;
 			continue;
 		}
 
-		lwp_lock(t);
+		KASSERT(lwp_locked(t, NULL));
+
 		if (__predict_true(t->l_syncobj == &lwp_park_syncobj)) {
 			/*
-			 * As expected it's parked, so wake it up. 
+			 * As expected it's parked, so wake it up.
 			 * lwp_unsleep() will release the LWP lock.
 			 */
 			lwp_unsleep(t, true);
@@ -487,7 +489,7 @@ lwp_unpark(const lwpid_t *tp, const u_int ntargets)
 			/*
 			 * It hasn't parked yet because the wakeup side won
 			 * the race, or something else has happened to make
-			 * the thread not park.  Why doesn't really matter. 
+			 * the thread not park.  Why doesn't really matter.
 			 * Set the operation pending, so that the next call
 			 * to _lwp_park() in the LWP returns early.  If it
 			 * turns out to be a spurious wakeup, no harm done.
@@ -496,7 +498,7 @@ lwp_unpark(const lwpid_t *tp, const u_int ntargets)
 			lwp_unlock(t);
 		}
 	}
-	mutex_exit(p->p_lock);
+	pserialize_read_exit(s);
 
 	return error;
 }
@@ -510,7 +512,7 @@ lwp_park(clockid_t clock_id, int flags, struct timespec *ts)
 	bool timeremain = !(flags & TIMER_ABSTIME) && ts;
 
 	if (ts != NULL) {
-		if ((error = ts2timo(clock_id, flags, ts, &timo, 
+		if ((error = ts2timo(clock_id, flags, ts, &timo,
 		    timeremain ? &start : NULL)) != 0)
 			return error;
 		KASSERT(timo != 0);
