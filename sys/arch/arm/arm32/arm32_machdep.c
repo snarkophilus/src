@@ -1,4 +1,4 @@
-/*	$NetBSD: arm32_machdep.c,v 1.133 2020/04/18 11:00:37 skrll Exp $	*/
+/*	$NetBSD: arm32_machdep.c,v 1.134 2020/06/20 15:45:22 skrll Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.133 2020/04/18 11:00:37 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: arm32_machdep.c,v 1.134 2020/06/20 15:45:22 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_arm_start.h"

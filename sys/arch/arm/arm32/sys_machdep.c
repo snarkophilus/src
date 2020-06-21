@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_machdep.c,v 1.23 2017/03/16 16:13:20 chs Exp $	*/
+/*	$NetBSD: sys_machdep.c,v 1.26 2020/06/20 15:45:22 skrll Exp $	*/
 
 /*
  * Copyright (c) 1995-1997 Mark Brinicombe.
@@ -41,17 +41,17 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sys_machdep.c,v 1.23 2017/03/16 16:13:20 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sys_machdep.c,v 1.26 2020/06/20 15:45:22 skrll Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-#include <sys/mbuf.h>
-#include <sys/mount.h>
+
 #include <sys/cpu.h>
-#include <uvm/uvm_extern.h>
-#include <sys/sysctl.h>
+#include <sys/proc.h>
 #include <sys/syscallargs.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/sysarch.h>
 #include <machine/pcb.h>
@@ -77,7 +77,7 @@ arm32_sync_icache(struct lwp *l, const void *args, register_t *retval)
 	    ua.addr, ua.addr + ua.len);
 
 	*retval = 0;
-	return(0);
+	return 0;
 }
 
 static int
@@ -88,7 +88,7 @@ arm32_drain_writebuf(struct lwp *l, const void *args, register_t *retval)
 	cpu_drain_writebuf();
 
 	*retval = 0;
-	return(0);
+	return 0;
 }
 
 static int
