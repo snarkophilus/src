@@ -61,6 +61,7 @@ __KERNEL_RCSID(0, "$NetBSD: db_machdep.c,v 1.32 2020/07/02 11:10:48 jmcneill Exp
 #ifdef _KERNEL
 static long nil;
 
+void db_reset_cmd(db_expr_t, bool, db_expr_t, const char *);
 void db_md_cpuinfo_cmd(db_expr_t, bool, db_expr_t, const char *);
 
 int db_access_und_sp(const struct db_variable *, db_expr_t *, int);
