@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.h,v 1.22 2020/03/10 01:17:33 christos Exp $ */
+/* $NetBSD: cpu.h,v 1.25 2020/07/01 08:01:07 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -69,6 +69,7 @@ struct clockframe {
 
 struct aarch64_cpufuncs {
 	void (*cf_set_ttbr0)(uint64_t);
+	void (*cf_icache_sync_range)(vaddr_t, vsize_t);
 };
 
 struct cpu_info {
@@ -97,12 +98,14 @@ struct cpu_info {
         struct pmap *   ci_pmap_cur;
         tlb_asid_t      ci_pmap_asid_cur;
 #endif
+	int ci_kfpu_spl;
 
 	/* event counters */
 	struct evcnt ci_vfp_use;
 	struct evcnt ci_vfp_reuse;
 	struct evcnt ci_vfp_save;
 	struct evcnt ci_vfp_release;
+	struct evcnt ci_uct_trap;
 
 	/* FDT or similar supplied "cpu capacity" */
 	uint32_t ci_capacity_dmips_mhz;
