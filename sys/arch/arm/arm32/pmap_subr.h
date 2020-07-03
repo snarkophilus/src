@@ -28,11 +28,11 @@ struct l2_dtable {
  * Given an L1 table index, calculate the corresponding l2_dtable index
  * and bucket index within the l2_dtable.
  */
-#define L2_BUCKET_XSHIFT	(L2_BUCKET_XLOG2 - L1_S_SHIFT)
-#define L2_BUCKET_XFRAME	(~(vaddr_t)0 << L2_BUCKET_XLOG2)
-#define L2_BUCKET_IDX(l1slot)	((l1slot) >> L2_BUCKET_XSHIFT)
-#define L2_IDX(l1slot)		(L2_BUCKET_IDX(l1slot) >> L2_BUCKET_LOG2)
-#define L2_BUCKET(l1slot)	(L2_BUCKET_IDX(l1slot) & (L2_BUCKET_SIZE - 1))
+#define	L2_BUCKET_XSHIFT	(L2_BUCKET_XLOG2 - L1_S_SHIFT)
+#define	L2_BUCKET_XFRAME	(~(vaddr_t)0 << L2_BUCKET_XLOG2)
+#define	L2_BUCKET_IDX(l1slot)	((l1slot) >> L2_BUCKET_XSHIFT)
+#define	L2_IDX(l1slot)		(L2_BUCKET_IDX(l1slot) >> L2_BUCKET_LOG2)
+#define	L2_BUCKET(l1slot)	(L2_BUCKET_IDX(l1slot) & (L2_BUCKET_SIZE - 1))
 
 __CTASSERT(0x100000000ULL == ((uint64_t)L2_SIZE * L2_BUCKET_SIZE * L1_S_SIZE));
 __CTASSERT(L2_BUCKET_XFRAME == ~(L2_BUCKET_XSIZE-1));
@@ -60,11 +60,11 @@ extern pv_addr_t systempage;
 /*
  * L2 allocation.
  */
-#define pmap_alloc_l2_dtable()          \
+#define	pmap_alloc_l2_dtable()          \
             pool_cache_get(&pmap_l2dtable_cache, PR_NOWAIT)
-#define pmap_free_l2_dtable(l2)         \
+#define	pmap_free_l2_dtable(l2)         \
             pool_cache_put(&pmap_l2dtable_cache, (l2))
-#define pmap_alloc_l2_ptp(pap)          \
+#define	pmap_alloc_l2_ptp(pap)          \
             ((pt_entry_t *)pool_cache_get_paddr(&pmap_l2ptp_cache,\
             PR_NOWAIT, (pap)))
 

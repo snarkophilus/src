@@ -472,7 +472,7 @@ l2pte_reset(pt_entry_t *ptep)
 
 /* L1 and L2 page table macros */
 #define	pmap_pde_v(pde)		l1pte_valid(*(pde))
-#define pmap_pde_section(pde)	l1pte_section_p(*(pde))
+#define	pmap_pde_section(pde)	l1pte_section_p(*(pde))
 #define	pmap_pde_supersection(pde)	l1pte_supersection_p(*(pde))
 #define	pmap_pde_page(pde)	l1pte_page_p(*(pde))
 #define	pmap_pde_fpage(pde)	l1pte_fpage_p(*(pde))
@@ -1027,7 +1027,7 @@ void pmap_pv_protect(paddr_t, vm_prot_t);
 #ifndef __BSD_PTENTRY_T__
 #define	__BSD_PTENTRY_T__
 typedef uint32_t pt_entry_t;
-#define PRIxPTE		PRIx32
+#define	PRIxPTE		PRIx32
 #endif
 
 #endif /* !_LOCORE */

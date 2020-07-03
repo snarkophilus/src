@@ -76,23 +76,23 @@
 #endif
 #endif
 
-#define PMAP_HWPAGEWALKER		1
-#define PMAP_NEED_ALLOC_POOLPAGE	1
-#define PMAP_TLB_MAX			1
+#define	PMAP_HWPAGEWALKER		1
+#define	PMAP_NEED_ALLOC_POOLPAGE	1
+#define	PMAP_TLB_MAX			1
 #if PMAP_TLB_MAX > 1
-#define PMAP_TLB_NEED_SHOOTDOWN		1
+#define	PMAP_TLB_NEED_SHOOTDOWN		1
 #endif
-#define PMAP_TLB_FLUSH_ASID_ON_RESET	(arm_has_tlbiasid_p)
-#define PMAP_TLB_NUM_PIDS		256
-#define cpu_set_tlb_info(ci, ti)        ((void)((ci)->ci_tlb_info = (ti)))
+#define	PMAP_TLB_FLUSH_ASID_ON_RESET	(arm_has_tlbiasid_p)
+#define	PMAP_TLB_NUM_PIDS		256
+#define	cpu_set_tlb_info(ci, ti)        ((void)((ci)->ci_tlb_info = (ti)))
 #if PMAP_TLB_MAX > 1
-#define cpu_tlb_info(ci)		((ci)->ci_tlb_info)
+#define	cpu_tlb_info(ci)		((ci)->ci_tlb_info)
 #else
-#define cpu_tlb_info(ci)		(&pmap_tlb0_info)
+#define	cpu_tlb_info(ci)		(&pmap_tlb0_info)
 #endif
-#define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
+#define	pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
-#define PMAP_PDETABSIZE	(L1_TABLE_SIZE / sizeof(pd_entry_t))
+#define	PMAP_PDETABSIZE	(L1_TABLE_SIZE / sizeof(pd_entry_t))
 #ifdef _LP64
 #define	PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
 #define	PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
@@ -146,11 +146,11 @@ void	pmap_md_free_pdp(pmap_t);
 vaddr_t pmap_md_direct_map_paddr(paddr_t);
 
 #ifdef PMAP_CACHE_VIPT
-#define PMAP_VIRTUAL_CACHE_ALIASES
+#define	PMAP_VIRTUAL_CACHE_ALIASES
 #endif
 
 #ifdef MULTIPROCESSOR
-#define PMAP_NO_PV_UNCACHED
+#define	PMAP_NO_PV_UNCACHED
 #endif
 
 static inline bool
@@ -188,9 +188,9 @@ struct pmap_md {
 	struct l2_dtable *	pmd_l2[L2_SIZE];
 };
 
-#define pm_l1		pm_md.pmd_l1
-#define pm_l1_pa	pm_md.pmd_l1_pa
-#define pm_l2		pm_md.pmd_l2
+#define	pm_l1		pm_md.pmd_l1
+#define	pm_l1_pa	pm_md.pmd_l1_pa
+#define	pm_l2		pm_md.pmd_l2
 
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
@@ -226,7 +226,7 @@ struct pmap_page {
 	struct vm_page_md pp_md;
 };
 
-#define PMAP_PAGE_TO_MD(ppage)	(&(ppage)->pp_md)
+#define	PMAP_PAGE_TO_MD(ppage)	(&(ppage)->pp_md)
 
 /*
  * If we have an EXTENDED MMU and the address space is split evenly between

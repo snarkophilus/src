@@ -99,7 +99,7 @@ struct vm_page_md {
 #define	k_mappings	pp.k_u.i_mappings
 };
 
-#define PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
+#define	PMAP_PAGE_TO_MD(ppage) container_of((ppage), struct vm_page_md, pp)
 
 /*
  * Set the default color of each page.
@@ -205,7 +205,7 @@ bool	pmap_extract(pmap_t, vaddr_t, paddr_t *);
 void	pmap_md_clean_page(struct vm_page_md *, bool);
 
 #define	PMAP_NEED_PROCWR
-#define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
+#define	PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 #define	PMAP_ENABLE_PMAP_KMPAGE	/* enable the PMAP_KMPAGE flag */
 
 #if (ARM_MMU_V6 + ARM_MMU_V7) > 0
