@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.14 2020/03/15 11:36:24 rin Exp $	*/
+/*	$NetBSD: pmap.h,v 1.15 2020/07/08 12:12:16 skrll Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -148,7 +148,8 @@ typedef bool (*pte_callback_t)(struct pmap *, vaddr_t, vaddr_t,
 	pt_entry_t *, uintptr_t);
 
 /*
- *	Bootstrap the system enough to run with virtual memory.
+ * Common part of the bootstraping the system enough to run with
+ * virtual memory.
  */
 void pmap_bootstrap_common(void);
 
