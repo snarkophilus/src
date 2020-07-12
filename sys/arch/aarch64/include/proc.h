@@ -43,6 +43,7 @@ struct mdlwp {
 	struct trapframe *md_utf;
 	uint64_t md_cpacr;
 	uint32_t md_flags;
+	volatile uint32_t md_astpending;
 
 	uint64_t md_ia_kern[2]; /* APIAKey{Lo,Hi}_EL1 used in the kernel */
 	uint64_t md_ia_user[2]; /* APIAKey{Lo,Hi}_EL1 used in user-process */

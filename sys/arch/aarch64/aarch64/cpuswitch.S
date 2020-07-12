@@ -1,7 +1,7 @@
 /* $NetBSD: cpuswitch.S,v 1.21 2020/05/23 18:08:59 ryo Exp $ */
 
 /*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -116,8 +116,10 @@ ENTRY_NP(cpu_switchto)
 1:
 #endif
 
-	mrs	x3, tpidr_el1
+	msr	tpidr_el1, x1		/* switch curlwp to new lwp */
+	ldr	x3, [x1, #L_CPU]
 	str	x1, [x3, #CI_CURLWP]	/* switch curlwp to new lwp */
+	dmb	st			/* see comments in kern_mutex.c */
 	ENABLE_INTERRUPT
 
 	/*
@@ -161,15 +163,17 @@ ENTRY_NP(cpu_switchto_softint)
 	stp	x27, x28, [sp, #TF_X27]
 	stp	x29, x2, [sp, #TF_X29]	/* tf->lr = softint_cleanup; */
 
-	mrs	x3, tpidr_el1		/* x3 := curcpu() */
+	mrs	x19, tpidr_el1		/* x19 := curcpu()->ci_curlwp */
 	DISABLE_INTERRUPT
-	ldr	x19, [x3, #CI_CURLWP]	/* x19 := curcpu()->ci_curlwp */
+	ldr	x3, [x19, #L_CPU]	/* x3 := curlwp->l_cpu */
 	mov	x4, sp
 	mrs	x5, cpacr_el1
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	str	x4, [x6, #PCB_TF]
 	str	x5, [x19, #L_MD_CPACR]
+	msr	tpidr_el1, x0		/* curlwp = softlwp; */
 	str	x0, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
+					/* no need for memory barrier here */
 
 #ifdef ARMV83_PAC
 	/* Switch the PAC key. */
@@ -200,9 +204,11 @@ ENTRY_NP(cpu_switchto_softint)
 	mov	x0, x19			/* x0 := pinned_lwp */
 	bl	_C_LABEL(softint_dispatch)
 
-	mrs	x3, tpidr_el1
 	DISABLE_INTERRUPT
+	msr	tpidr_el1, x19		/* curlwp = pinned_lwp */
+	ldr	x3, [x19, #L_CPU]	/* x3 = curlwp->l_cpu */
 	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
+	dmb	st			/* see comments in kern_mutex.c */
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	ldr	x4, [x6, #PCB_TF]	/* x4 := pinned_lwp->l_addr->pcb_tf */
 #ifdef DDB
@@ -245,7 +251,8 @@ END(cpu_switchto_softint)
 ENTRY_NP(softint_cleanup)
 	mov	lr, x20			/* restore original lr */
 
-	mrs	x3, tpidr_el1		/* curcpu() */
+	mrs	x3, tpidr_el1		/* curlwp */
+	ldr	x3, [x3, #L_CPU]	/* curcpu */
 	ldr	w2, [x3, #CI_MTX_COUNT]	/* ->ci_mtx_count */
 	add	w2, w2, #1
 	str	w2, [x3, #CI_MTX_COUNT]
@@ -361,15 +368,13 @@ ENTRY_NP(el0_trap)
 #endif
 ENTRY_NP(el0_trap_exit)
 1:
-	/* while (curcpu()->ci_astpending & __BIT(0)) { */
+	/* while (curlwp->l_md.md_astpending != 0) { */
 	mrs	x8, tpidr_el1
-	ldr	w9, [x8, #CI_ASTPENDING]
-	tbz	w9, #0, 9f
+	ldr	w9, [x8, #L_MD_ASTPENDING]
+	cbz	w9, 9f
 
-	/*  atomic_and_uint(&curcpu()->ci_astpending, ~__BIT(0)); */
-	mov	w1, #~__BIT(0)
-	add	x0, x8, #CI_ASTPENDING
-	bl	_C_LABEL(atomic_and_uint);
+	/* curlwp->l_md.md_astpending = 0; */
+	str	xzr, [x8, #L_MD_ASTPENDING]
 
 	/*  trap_doast(tf); */
 	ENABLE_INTERRUPT
@@ -381,8 +386,7 @@ ENTRY_NP(el0_trap_exit)
 9:
 	DISABLE_INTERRUPT		/* make sure I|F marked */
 
-	mrs	x8, tpidr_el1
-	ldr	x9, [x8, #CI_CURLWP]
+	mrs	x9, tpidr_el1
 	ldr	x23, [x9, #L_MD_CPACR]
 	msr	cpacr_el1, x23		/* FP unit EL0 handover */
 	isb				/* necessary? */
@@ -444,8 +448,7 @@ END(cpu_Debugger)
  * int cpu_set_onfault(struct faultbuf *fb)
  */
 ENTRY_NP(cpu_set_onfault)
-	mrs	x3, tpidr_el1
-	ldr	x2, [x3, #CI_CURLWP]	/* curlwp = curcpu()->ci_curlwp */
+	mrs	x2, tpidr_el1		/* curlwp */
 	str	x0, [x2, #L_MD_ONFAULT] /* l_md.md_onfault = fb */
 
 	stp	x19, x20, [x0, #(FB_X19 * 8)]

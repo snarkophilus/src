@@ -59,8 +59,7 @@ RCSID("$NetBSD: copyinout.S,v 1.10 2020/06/30 16:20:00 maxv Exp $");
 
 	.macro exit_cpu_onfault
 	/* curlwp->l_md.md_onfault = NULL */
-	mrs	x0, tpidr_el1			/* curcpu */
-	ldr	x0, [x0, #CI_CURLWP]		/* x0 = curlwp */
+	mrs	x0, tpidr_el1			/* x0 = curlwp */
 	str	xzr, [x0, #L_MD_ONFAULT]	/* lwp->l_md_onfault = NULL */
 9:
 	add	sp, sp, #FB_T_SIZE		/* pop stack */

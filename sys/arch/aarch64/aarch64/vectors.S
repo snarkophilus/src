@@ -81,8 +81,7 @@ ENTRY_NBTI(\func)
 
 	.if \el == 0
 	/* curlwp->l_private = tpidr{,ro}_el0 */
-	mrs	x1, tpidr_el1		/* curcpu() */
-	ldr	x1, [x1, #CI_CURLWP]	/* x1 = curcpu()->ci_curlwp */
+	mrs	x1, tpidr_el1		/* x1 = curlwp */
 	mrs	x0, tpidr\tpidr\()_el0
 	str	x0, [x1, #L_PRIVATE]	/* curlwp->l_private = tpidr{,ro}_el0 */
 
