@@ -1,4 +1,4 @@
-/*	$NetBSD: asan.h,v 1.7 2020/06/23 17:21:55 maxv Exp $	*/
+w/*	$NetBSD: asan.h,v 1.7 2020/06/23 17:21:55 maxv Exp $	*/
 
 /*
  * Copyright (c) 2018 The NetBSD Foundation, Inc.
@@ -139,7 +139,6 @@ kasan_md_shadow_map_page(vaddr_t va)
 		atomic_swap_64(&l3[idx], pa | L3_PAGE | LX_BLKPAG_UXN |
 		    LX_BLKPAG_PXN | LX_BLKPAG_AF | LX_BLKPAG_SH_IS |
 		    LX_BLKPAG_AP_RW);
-		aarch64_tlbi_by_va(va);
 	}
 }
 
