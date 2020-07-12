@@ -1,3 +1,5 @@
 /* $NetBSD: mutex.h,v 1.1 2014/08/10 05:47:38 matt Exp $ */
 
 #include <arm/mutex.h>
+
+#define __HAVE_MUTEX_STUBS		1
