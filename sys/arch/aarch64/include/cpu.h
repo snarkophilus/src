@@ -154,6 +154,7 @@ static __inline struct cpu_info *lwp_getcpu(struct lwp *);
 #define	setsoftast(ci)		(cpu_signotify((ci)->ci_onproc))
 #undef curlwp
 #define	curlwp			(aarch64_curlwp())
+#define	curpcb			((struct pcb *)lwp_getpcb(curlwp))
 
 void	cpu_signotify(struct lwp *l);
 void	cpu_need_proftick(struct lwp *l);
