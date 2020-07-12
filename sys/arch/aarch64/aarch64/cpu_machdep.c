@@ -261,7 +261,7 @@ cpu_need_resched(struct cpu_info *ci, struct lwp *l, int flags)
 		intr_ipi_send(ci->ci_kcpuset, IPI_AST);
 #endif
 	} else {
-		setsoftast(ci);	/* force call to ast() */
+		l->l_md.md_astpending = 1;
 	}
 }
 
@@ -272,7 +272,22 @@ cpu_need_proftick(struct lwp *l)
 	KASSERT(l->l_cpu == curcpu());
 
 	l->l_pflag |= LP_OWEUPC;
-	setsoftast(l->l_cpu);
+	l->l_md.md_astpending = 1;
+}
+
+void
+cpu_signotify(struct lwp *l)
+{
+
+	KASSERT(kpreempt_disabled());
+
+	if (l->l_cpu != curcpu()) {
+#ifdef MULTIPROCESSOR
+		intr_ipi_send(l->l_cpu->ci_kcpuset, IPI_AST);
+#endif
+	} else {
+		l->l_md.md_astpending = 1;
+	}
 }
 
 #ifdef __HAVE_PREEMPTION

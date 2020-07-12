@@ -51,8 +51,7 @@ RCSID("$NetBSD: fusu.S,v 1.6 2019/04/06 03:06:24 thorpej Exp $");
 
 	.macro exit_cpu_onfault
 	/* curlwp->l_md.md_onfault = NULL */
-	mrs	x1, tpidr_el1			/* curcpu */
-	ldr	x1, [x1, #CI_CURLWP]		/* x1 = curlwp */
+	mrs	x1, tpidr_el1			/* x1 = curlwp */
 	str	xzr, [x1, #L_MD_ONFAULT]	/* lwp->l_md_onfault = NULL */
 9:
 	add	sp, sp, #FB_T_SIZE		/* pop stack */

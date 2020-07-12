@@ -35,9 +35,9 @@ ENTRY_NP(_atomic_swap_8)
 	mov	x4, x0
 1:	ldxrb	w0, [x4]
 	stxrb	w3, w1, [x4]
-	cbnz	w3, 1b
-	dmb	st
+	cbnz	w3, 2f
 	ret
+2:	b	1b
 END(_atomic_swap_8)
 
 ATOMIC_OP_ALIAS(atomic_swap_8,_atomic_swap_8)

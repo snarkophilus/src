@@ -74,7 +74,8 @@ ENTRY(cpu_idle)
 	adr	x0, 1f
 	str	x0, [sp, #TF_PC]		/* CLKF_PC refer to tf_pc */
 
-	mrs	x1, tpidr_el1			/* get curcpu() */
+	mrs	x1, tpidr_el1			/* get curlwp */
+	ldr	x1, [x1, #L_CPU]		/* get curcpu */
 	ldr	w28, [x1, #CI_INTR_DEPTH]	/* w28 = ci->ci_intr_depth */
 	add	w2, w28, #1			/* w2 = intr_depth + 1 */
 
@@ -86,7 +87,8 @@ ENTRY(cpu_idle)
 	str	w2, [x1, #CI_INTR_DEPTH]	/* ci->ci_intr_depth++ */
 	bl	ARM_IRQ_HANDLER			/* irqhandler(trapframe) */
 1:
-	mrs	x1, tpidr_el1			/* get curcpu() */
+	mrs	x1, tpidr_el1			/* get curlwp */
+	ldr	x1, [x1, #L_CPU]		/* get curcpu */
 	str	w28, [x1, #CI_INTR_DEPTH]	/* ci->ci_intr_depth = old */
 
 #if defined(__HAVE_FAST_SOFTINTS) && !defined(__HAVE_PIC_FAST_SOFTINTS)

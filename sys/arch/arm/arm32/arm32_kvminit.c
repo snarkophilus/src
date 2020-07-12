@@ -195,6 +195,16 @@ pv_addr_t kasan_l2pt[KERNEL_L2PT_KASAN_NUM];
 #define KERNEL_L2PT_KASAN_NUM	0
 #endif
 
+#ifdef KASAN
+vaddr_t kasan_kernelstart;
+vaddr_t kasan_kernelsize;
+
+#define	KERNEL_L2PT_KASAN_NUM	howmany(VM_KERNEL_KASAN_SIZE, L2_S_SEGSIZE)
+pv_addr_t kasan_l2pt[KERNEL_L2PT_KASAN_NUM];
+#else
+#define KERNEL_L2PT_KASAN_NUM	0
+#endif
+
 u_long kern_vtopdiff __attribute__((__section__(".data")));
 
 void
