@@ -35,9 +35,9 @@ ENTRY_NP(_atomic_inc_64)
 1:	ldxr	x2, [x0]		/* load old value (return value) */
 	add	x2, x2, #1		/* calculate new value */
 	stxr	w3, x2, [x0]		/* try to store */
-	cbnz	w3, 1b			/*   succeed? no, try again? */
-	dmb	st
+	cbnz	w3, 2f			/*   succeed? no, try again? */
 	ret				/* return new value */
+2:	b	1b
 END(_atomic_inc_64)
 
 ATOMIC_OP_ALIAS(atomic_inc_64,_atomic_inc_64)
@@ -51,9 +51,9 @@ ENTRY_NP(_atomic_inc_64_nv)
 1:	ldxr	x0, [x4]		/* load old value */
 	add	x0, x0, #1		/* calculate new value (return value) */
 	stxr	w3, x0, [x4]		/* try to store */
-	cbnz	w3, 1b			/*   succeed? no, try again? */
-	dmb	st
+	cbnz	w3, 2f			/*   succeed? no, try again? */
 	ret				/* return new value */
+2:	b	1b
 END(_atomic_inc_64_nv)
 
 ATOMIC_OP_ALIAS(atomic_inc_64_nv,_atomic_inc_64_nv)

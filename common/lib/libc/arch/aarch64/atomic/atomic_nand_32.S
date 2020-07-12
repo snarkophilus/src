@@ -37,9 +37,9 @@ ENTRY_NP(_atomic_nand_32)
 	mvn	w3, w0			/* complement source */
 	and	w3, w3, w1		/* calculate new value */
 	stxr	w2, w3, [x4]		/* try to store */
-	cbnz	w2, 1b			/*   succeed? no, try again */
-	dmb	st
+	cbnz	w2, 2f			/*   succeed? no, try again */
 	ret				/* return old value */
+2:	b	1b
 END(_atomic_nand_32)
 
 ATOMIC_OP_ALIAS(atomic_nand_32,_atomic_nand_32)
@@ -53,9 +53,9 @@ ENTRY_NP(_atomic_nand_32_nv)
 	mvn	w0, w0			/* complement source */
 	and	w0, w0, w1		/* calculate new value (return value) */
 	stxr	w2, w0, [x4]		/* try to store */
-	cbnz	w2, 1b			/*   succeed? no, try again? */
-	dmb	st
+	cbnz	w2, 2f			/*   succeed? no, try again? */
 	ret				/* return new value */
+2:	b	1b
 END(_atomic_nand_32_nv)
 
 ATOMIC_OP_ALIAS(atomic_nand_32_nv,_atomic_nand_32_nv)
