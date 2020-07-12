@@ -326,7 +326,6 @@ pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
 	attr = _pmap_pte_adjust_cacheflags(attr, flags);
 	pmapboot_enter_range(va, pa, resid, attr,
 	    PMAPBOOT_ENTER_NOOVERWRITE, bootpage_alloc, printf);
-	aarch64_tlbi_all();
 
 	return resid;
 }
@@ -741,7 +740,6 @@ pmap_growkernel(vaddr_t maxkvaddr)
 			    __func__, error);
 		}
 	}
-	aarch64_tlbi_by_asid(pm->pm_asid);
 	kasan_shadow_map((void *)pmap_maxkvaddr,
 	    (size_t)(va - pmap_maxkvaddr));
 	pmap_maxkvaddr = va;
