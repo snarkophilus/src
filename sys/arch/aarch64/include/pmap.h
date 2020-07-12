@@ -111,7 +111,7 @@ struct vm_page_md {
 
 #define PMAP_PAGE_INIT(pp)						\
 	do {								\
-		mutex_init(&(pp)->pp_pvlock, MUTEX_NODEBUG, IPL_VM);	\
+		mutex_init(&(pp)->pp_pvlock, MUTEX_NODEBUG, IPL_NONE);	\
 		(pp)->pp_pv.pv_next = NULL;				\
 		(pp)->pp_pv.pv_pmap = NULL;				\
 		(pp)->pp_pv.pv_va = 0;					\
