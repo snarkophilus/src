@@ -1085,7 +1085,6 @@ pmap_pte_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva, pt_entry_t *ptep,
 		pmap_tlb_miss_lock_enter();
 		pte_set(ptep, npte);
 		if (__predict_true(!(pmap->pm_flags & PMAP_DEFERRED_ACTIVATE))) {
-
 			/*
 			 * Flush the TLB for the given address.
 			 */
