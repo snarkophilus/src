@@ -1,15 +1,16 @@
-#	$NetBSD: OCTEON,v 1.2 2020/07/16 11:49:37 jmcneill Exp $
+#	$NetBSD: OCTEON,v 1.7 2020/07/17 14:57:54 jmcneill Exp $
 
 include 	"arch/mips/conf/std.octeon"
 include 	"arch/evbmips/conf/files.octeon"
 
 #options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"ERLITE-$Revision: 1.2 $"
+#ident 		"OCTEON-$Revision: 1.7 $"
 
 maxusers	32
 
 options 	FDT
+options 	FDT_DEFAULT_STDOUT_PATH="\"uart0:115200n8\""
 
 # Options for necessary to use MD
 #options 	MEMORY_DISK_HOOKS
@@ -53,6 +54,10 @@ include         "conf/compat_netbsd50.config"
 
 #options 	EXEC_ECOFF	# exec ECOFF binaries
 #options 	COMPAT_ULTRIX	# binary compatibility with Ultrix
+
+# Wedge support
+options 	DKWEDGE_AUTODISCOVER	# Automatically add dk(4) instances
+options 	DKWEDGE_METHOD_GPT	# Supports GPT partitions as wedges
 
 # File systems
 file-system	FFS		# Berkeley Fast Filesystem
@@ -123,14 +128,15 @@ bootbus0	at mainbus?
 simplebus*	at fdt? pass 0
 
 octintc*	at fdt? pass 1
+octcib*		at fdt? pass 2
 
 com*		at iobus?
 com*		at fdt?
 
 octsmi*		at iobus?		# MDIO controller
-octsmi*		at fdt? pass 2
+octsmi*		at fdt? pass 3
 octpip*		at iobus?		# PIP packet processing controller
-octpip*		at fdt? pass 3
+octpip*		at fdt? pass 4
 
 octgmx*		at octpip?
 cnmac*		at octgmx?
@@ -138,8 +144,10 @@ cnmac*		at octgmx?
 octrnm*		at iobus?		# Random Number Memory (and generator)
 
 dwctwo*		at iobus?
+xhci*		at fdt?
 
 usb*		at dwctwo?
+usb*		at xhci?
 
 uhub*		at usb?
 
