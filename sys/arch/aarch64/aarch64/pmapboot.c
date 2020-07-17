@@ -1,4 +1,4 @@
-/*	$NetBSD: pmapboot.c,v 1.7 2020/04/13 05:40:25 maxv Exp $	*/
+/*	$NetBSD: pmapboot.c,v 1.8 2020/07/16 11:36:35 skrll Exp $	*/
 
 /*
  * Copyright (c) 2018 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmapboot.c,v 1.7 2020/04/13 05:40:25 maxv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmapboot.c,v 1.8 2020/07/16 11:36:35 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
@@ -225,9 +225,9 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 	    "blocksize=0x%lx, attr=0x%016lx\n",
 	    va, pa, size, blocksize, attr);
 
-	va_end = (va + size - 1) & ~(blocksize - 1);
 	pa &= ~(blocksize - 1);
 	va &= ~(blocksize - 1);
+	va_end = (va + size + blocksize- 1) & ~(blocksize - 1);
 #ifdef OPTIMIZE_TLB_CONTIG
 	va_start = va;
 #endif
@@ -249,7 +249,7 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		return -1;
 	}
 
-	while (va <= va_end) {
+	while (va < va_end) {
 #ifdef OPTIMIZE_TLB_CONTIG
 		ll = NULL;
 		llidx = -1;
@@ -382,7 +382,6 @@ pmapboot_enter(vaddr_t va, paddr_t pa, psize_t size, psize_t blocksize,
 		VPRINTF("TTBR%d[%d][%d][%d][%d]\t= %lx:", ttbr,
 		    idx0, idx1, idx2, idx3, pte);
 		VPRINT_PTE(pte, 3);
-
  nextblk:
 #ifdef OPTIMIZE_TLB_CONTIG
 		/*

@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.16 2020/06/20 02:27:55 simonb Exp $	*/
+/*	$NetBSD: machdep.c,v 1.18 2020/07/16 11:49:37 jmcneill Exp $	*/
 
 /*
  * Copyright 2001, 2002 Wasabi Systems, Inc.
@@ -114,7 +114,7 @@
 #include "opt_multiprocessor.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.16 2020/06/20 02:27:55 simonb Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.18 2020/07/16 11:49:37 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -152,6 +152,8 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.16 2020/06/20 02:27:55 simonb Exp $");
 #include <mips/cavium/dev/octeon_gpioreg.h>
 
 #include <evbmips/cavium/octeon_uboot.h>
+
+#include <dev/fdt/fdtvar.h>
 
 static void	mach_init_vector(void);
 static void	mach_init_bus_space(void);
@@ -192,9 +194,12 @@ void
 mach_init(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 {
 	uint64_t btinfo_paddr;
+	void *fdt_data;
 
 	/* clear the BSS segment */
 	memset(edata, 0, end - edata);
+
+	cpu_reset_address = octeon_soft_reset;
 
 	KASSERT(MIPS_XKPHYS_P(arg3));
 	btinfo_paddr = mips3_ld(arg3 + OCTEON_BTINFO_PADDR_OFFSET);
@@ -216,6 +221,13 @@ mach_init(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 
 	cpu_setmodel("Cavium Octeon %s",
 	    octeon_cpu_model(mips_options.mips_cpu_id));
+
+	if (octeon_btinfo.obt_minor_version >= 3 &&
+	    octeon_btinfo.obt_fdt_addr != 0) {
+		fdt_data = (void *)MIPS_PHYS_TO_XKPHYS(CCA_CACHEABLE,
+		    octeon_btinfo.obt_fdt_addr);
+		fdtbus_init(fdt_data);
+	}
 
 	mach_init_vector();
 

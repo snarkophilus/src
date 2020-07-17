@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.40 2020/06/14 21:47:15 ad Exp $ */
+/* $NetBSD: pmap.h,v 1.41 2020/07/16 11:36:35 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -250,13 +250,14 @@ aarch64_mmap_flags(paddr_t mdpgno)
 void pmap_bootstrap(vaddr_t, vaddr_t);
 bool pmap_fault_fixup(struct pmap *, vaddr_t, vm_prot_t, bool user);
 
-
 pd_entry_t *pmapboot_pagealloc(void);
-int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t,
-    pt_entry_t, void (*pr)(const char *, ...) __printflike(1, 2));
-int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
+int pmapboot_enter(vaddr_t, paddr_t, psize_t, psize_t, pt_entry_t,
+    void (*pr)(const char *, ...) __printflike(1, 2));
 int pmapboot_enter_range(vaddr_t, paddr_t, psize_t, pt_entry_t,
     void (*)(const char *, ...) __printflike(1, 2));
+int pmapboot_protect(vaddr_t, vaddr_t, vm_prot_t);
+void pmap_db_pte_print(pt_entry_t, int,
+    void (*pr)(const char *, ...) __printflike(1, 2));
 /*
  * XXXNH Maybe drop BOOT
  */

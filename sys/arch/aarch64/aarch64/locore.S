@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.S,v 1.64 2020/05/28 04:51:44 ryo Exp $	*/
+/*	$NetBSD: locore.S,v 1.67 2020/07/16 11:36:35 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -38,7 +38,7 @@
 #include <aarch64/hypervisor.h>
 #include "assym.h"
 
-RCSID("$NetBSD: locore.S,v 1.64 2020/05/28 04:51:44 ryo Exp $")
+RCSID("$NetBSD: locore.S,v 1.67 2020/07/16 11:36:35 skrll Exp $")
 
 #ifdef AARCH64_DEVICE_MEM_STRONGLY_ORDERED
 #define	MAIR_DEVICE_MEM		MAIR_DEVICE_nGnRnE
@@ -57,6 +57,9 @@ RCSID("$NetBSD: locore.S,v 1.64 2020/05/28 04:51:44 ryo Exp $")
 #define PMAPBOOT_PAGEALLOCMAX	(1024 * 1024)	/* reserved size from _end[] */
 
 #if (defined(VERBOSE_INIT_ARM) || defined(DEBUG_LOCORE)) && defined(EARLYCONS)
+#if !defined(CONSADDR)
+#error CONSADDR required with EARLYCONS
+#endif
 #define VERBOSE_LOCORE
 #endif
 
@@ -368,7 +371,7 @@ printcpu:
 
 ENTRY_NP(cpu_mpstart)
 	mrs	x3, mpidr_el1
-	ldr	x0, =(MPIDR_AFF0|MPIDR_AFF1|MPIDR_AFF2|MPIDR_AFF3)
+	ldr	x0, =(MPIDR_AFF0 | MPIDR_AFF1 | MPIDR_AFF2 | MPIDR_AFF3)
 	and	x3, x3, x0
 
 	/*
@@ -808,7 +811,7 @@ init_mmutable:
 	 */
 
 #ifdef CONSADDR
-	VPRINT("Creating VA=PA tables for CONSADDR\n")
+	VPRINT("Creating identity mapping for CONSADDR\n")
 	ldr	x0, =CONSADDR			/* va = CONADDR (physical) */
 	mov	x1, x0				/* pa = va */
 	mov	x2, #L2_SIZE			/* size */
@@ -818,23 +821,12 @@ init_mmutable:
 	mov	x5, x26				/* pr func */
 	bl	pmapboot_enter
 	cbnz	x0, init_mmutable_error
-#elif defined(EARLYCONS)
-	/* CONSADDR is unknown, but need to map UART */
-	VPRINT("Creating VA=PA tables (0x00000000-0xffffffff)\n")
-	mov	x0, xzr				/* va */
-	mov	x1, xzr				/* pa */
-	mov	x2, #(1024*1024*1024*4)		/* size */
-	mov	x3, #L1_SIZE			/* blocksize */
-	mov	x4, #LX_BLKPAG_ATTR_DEVICE_MEM | LX_BLKPAG_AP_RW
-	orr	x4, x4, #LX_BLKPAG_UXN | LX_BLKPAG_PXN	/* attr */
-	mov	x5, x26				/* pr func */
-	bl	pmapboot_enter
-	cbnz	x0, init_mmutable_error
 #endif
 
 	/* identity mapping for kernel image */
-	VPRINT("Creating VA=PA tables for kernel image\n")
+	VPRINT("Creating identity mapping for kernel image\n")
 	adrl	x0, start			/* va = start (physical) */
+
 	mov	x1, x0				/* pa = va */
 	adrl	x2, _end
 	sub	x2, x2, x1			/* size = _end - start */
@@ -846,10 +838,10 @@ init_mmutable:
 	cbnz	x0, init_mmutable_error
 
 #ifdef FDT
+	VPRINT("Creating identity mapping for FDT\n")
 	adrl	x8, _C_LABEL(fdt_addr_r)
 	ldr	x8, [x8]
 
-	VPRINT("Creating VA=PA tables for FDT\n")
 	mov	x0, x8				/* va */
 	mov	x1, x8				/* pa */
 	mov	x2, #L2_SIZE			/* size */

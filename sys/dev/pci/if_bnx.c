@@ -1,4 +1,4 @@
-/*	$NetBSD: if_bnx.c,v 1.95 2020/05/18 05:47:54 msaitoh Exp $	*/
+/*	$NetBSD: if_bnx.c,v 1.99 2020/07/14 15:37:40 jdolecek Exp $	*/
 /*	$OpenBSD: if_bnx.c,v 1.101 2013/03/28 17:21:44 brad Exp $	*/
 
 /*-
@@ -35,7 +35,7 @@
 #if 0
 __FBSDID("$FreeBSD: src/sys/dev/bce/if_bce.c,v 1.3 2006/04/13 14:12:26 ru Exp $");
 #endif
-__KERNEL_RCSID(0, "$NetBSD: if_bnx.c,v 1.95 2020/05/18 05:47:54 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_bnx.c,v 1.99 2020/07/14 15:37:40 jdolecek Exp $");
 
 /*
  * The following controllers are supported by this driver:
@@ -577,7 +577,6 @@ bnx_attach(device_t parent, device_t self, void *aux)
 	prop_dictionary_t	dict;
 	struct pci_attach_args	*pa = aux;
 	pci_chipset_tag_t	pc = pa->pa_pc;
-	pci_intr_handle_t	ih;
 	const char		*intrstr = NULL;
 	uint32_t		command;
 	struct ifnet		*ifp;
@@ -626,11 +625,11 @@ bnx_attach(device_t parent, device_t self, void *aux)
 		return;
 	}
 
-	if (pci_intr_map(pa, &ih)) {
+	if (pci_intr_alloc(pa, &sc->bnx_ih, NULL, 0)) {
 		aprint_error_dev(sc->bnx_dev, "couldn't map interrupt\n");
 		goto bnx_attach_fail;
 	}
-	intrstr = pci_intr_string(pc, ih, intrbuf, sizeof(intrbuf));
+	intrstr = pci_intr_string(pc, sc->bnx_ih[0], intrbuf, sizeof(intrbuf));
 
 	/*
 	 * Configure byte swap and enable indirect register access.
@@ -915,8 +914,8 @@ bnx_attach(device_t parent, device_t self, void *aux)
 	callout_setfunc(&sc->bnx_timeout, bnx_tick, sc);
 
 	/* Hookup IRQ last. */
-	sc->bnx_intrhand = pci_intr_establish_xname(pc, ih, IPL_NET, bnx_intr,
-	    sc, device_xname(self));
+	sc->bnx_intrhand = pci_intr_establish_xname(pc, sc->bnx_ih[0], IPL_NET,
+	    bnx_intr, sc, device_xname(self));
 	if (sc->bnx_intrhand == NULL) {
 		aprint_error_dev(self, "couldn't establish interrupt");
 		if (intrstr != NULL)
@@ -2376,7 +2375,14 @@ bnx_dma_free(struct bnx_softc *sc)
 	}
 
 	/* Destroy the TX dmamaps. */
-	/* This isn't necessary since we dont allocate them up front */
+	struct bnx_pkt *pkt;
+	while ((pkt = TAILQ_FIRST(&sc->tx_free_pkts)) != NULL) {
+		TAILQ_REMOVE(&sc->tx_free_pkts, pkt, pkt_entry);
+		sc->tx_pkt_count--;
+
+		bus_dmamap_destroy(sc->bnx_dmatag, pkt->pkt_dmamap);
+		pool_put(bnx_tx_pool, pkt);
+	}
 
 	/* Free, unmap and destroy all RX buffer descriptor chain pages. */
 	for (i = 0; i < RX_PAGES; i++ ) {
@@ -2712,6 +2718,9 @@ bnx_release_resources(struct bnx_softc *sc)
 
 	if (sc->bnx_intrhand != NULL)
 		pci_intr_disestablish(pa->pa_pc, sc->bnx_intrhand);
+
+	if (sc->bnx_ih != NULL)
+		pci_intr_release(pa->pa_pc, sc->bnx_ih, 1);
 
 	if (sc->bnx_size)
 		bus_space_unmap(sc->bnx_btag, sc->bnx_bhandle, sc->bnx_size);
@@ -4161,9 +4170,6 @@ bnx_init_tx_chain(struct bnx_softc *sc)
 
 	DBPRINT(sc, BNX_VERBOSE_RESET, "Entering %s()\n", __func__);
 
-	/* Force an allocation of some dmamaps for tx up front */
-	bnx_alloc_pkts(NULL, sc);
-
 	/* Set the initial TX producer/consumer indices. */
 	sc->tx_prod = 0;
 	sc->tx_cons = 0;
@@ -4243,21 +4249,7 @@ bnx_free_tx_chain(struct bnx_softc *sc)
 		mutex_enter(&sc->tx_pkt_mtx);
 		TAILQ_INSERT_TAIL(&sc->tx_free_pkts, pkt, pkt_entry);
 	}
-
-	/* Destroy all the dmamaps we allocated for TX */
-	while ((pkt = TAILQ_FIRST(&sc->tx_free_pkts)) != NULL) {
-		TAILQ_REMOVE(&sc->tx_free_pkts, pkt, pkt_entry);
-		sc->tx_pkt_count--;
-		mutex_exit(&sc->tx_pkt_mtx);
-
-		bus_dmamap_destroy(sc->bnx_dmatag, pkt->pkt_dmamap);
-		pool_put(bnx_tx_pool, pkt);
-
-		mutex_enter(&sc->tx_pkt_mtx);
-	}
 	mutex_exit(&sc->tx_pkt_mtx);
-
-
 
 	/* Clear each TX chain page. */
 	for (i = 0; i < TX_PAGES; i++) {
@@ -5126,7 +5118,6 @@ bnx_tx_encap(struct bnx_softc *sc, struct mbuf *m)
 #endif
 	uint32_t		addr, prod_bseq;
 	int			i, error;
-	static struct work	bnx_wk; /* Dummy work. Statically allocated. */
 	bool			remap = true;
 
 	mutex_enter(&sc->tx_pkt_mtx);
@@ -5139,7 +5130,7 @@ bnx_tx_encap(struct bnx_softc *sc, struct mbuf *m)
 
 		if (sc->tx_pkt_count <= TOTAL_TX_BD &&
 		    !ISSET(sc->bnx_flags, BNX_ALLOC_PKTS_FLAG)) {
-			workqueue_enqueue(sc->bnx_wq, &bnx_wk, NULL);
+			workqueue_enqueue(sc->bnx_wq, &sc->bnx_wk, NULL);
 			SET(sc->bnx_flags, BNX_ALLOC_PKTS_FLAG);
 		}
 

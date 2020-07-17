@@ -1,4 +1,4 @@
-w/*	$NetBSD: asan.h,v 1.7 2020/06/23 17:21:55 maxv Exp $	*/
+/*	$NetBSD: asan.h,v 1.8 2020/07/16 11:36:35 skrll Exp $	*/
 
 /*
  * Copyright (c) 2018 The NetBSD Foundation, Inc.
