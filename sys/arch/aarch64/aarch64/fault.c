@@ -239,7 +239,8 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	if (pfi->pfi_repeats == 0) {
 		pfi->pfi_faultptep = pmap_pte_lookup(map->pmap, va);
 	}
-	KASSERT(*(pt_entry_t *)pfi->pfi_faultptep);
+	KASSERTMSG(*(pt_entry_t *)pfi->pfi_faultptep, "pfi_faultptep %p pte %" PRIxPTE,
+	    pfi->pfi_faultptep, *(pt_entry_t *)pfi->pfi_faultptep);
 #endif
 
  do_fault:
