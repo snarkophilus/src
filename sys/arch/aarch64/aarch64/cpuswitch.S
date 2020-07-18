@@ -199,9 +199,7 @@ ENTRY_NP(cpu_switchto_softint)
 
 	DISABLE_INTERRUPT
 	/* onto new stack */
-	str	x0, [x20, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
 	sub	sp, x4, #TF_SIZE	/* new sp := softlwp->l_md_utf - 1 */
-
 
 	// Why when interrupts are disabled?
 	mov	x5, #CPACR_FPEN_NONE
@@ -212,7 +210,6 @@ ENTRY_NP(cpu_switchto_softint)
 	mov	x0, x19			/* x0 := pinned_lwp */
 	bl	_C_LABEL(softint_dispatch)
 
-	DISABLE_INTERRUPT
 	msr	tpidr_el1, x19		/* curlwp = pinned_lwp */
 	ldr	x3, [x19, #L_CPU]	/* x3 = curlwp->l_cpu */
 	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
@@ -225,7 +222,6 @@ ENTRY_NP(cpu_switchto_softint)
 	ldr	x5, [x19, #L_MD_CPACR]	/* x5 := pinned_lwp->l_md_cpacr */
 
 	DISABLE_INTERRUPT
-	str	x19, [x20, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
 	mov	sp, x4			/* restore pinned_lwp sp */
 	msr	cpacr_el1, x5		/* restore pinned_lwp cpacr */
 
@@ -266,7 +262,7 @@ ENTRY_NP(softint_cleanup)
 	ldr	x3, [x3, #L_CPU]	/* curcpu */
 	ldr	w2, [x3, #CI_MTX_COUNT]	/* ->ci_mtx_count */
 	add	w2, w2, #1
-	str	w2, [x20, #CI_MTX_COUNT]
+	str	w2, [x3, #CI_MTX_COUNT]
 
 	msr	daif, x19		/* restore interrupt mask */
 	ldp	x19, x20, [sp], #16	/* restore */
