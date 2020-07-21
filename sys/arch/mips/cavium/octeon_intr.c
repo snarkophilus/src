@@ -1,4 +1,4 @@
-/*	$NetBSD: octeon_intr.c,v 1.15 2020/07/16 21:33:50 jmcneill Exp $	*/
+/*	$NetBSD: octeon_intr.c,v 1.20 2020/07/20 14:05:51 jmcneill Exp $	*/
 /*
  * Copyright 2001, 2002 Wasabi Systems, Inc.
  * All rights reserved.
@@ -44,7 +44,7 @@
 #define __INTR_PRIVATE
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: octeon_intr.c,v 1.15 2020/07/16 21:33:50 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: octeon_intr.c,v 1.20 2020/07/20 14:05:51 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/cpu.h>
@@ -158,17 +158,11 @@ struct octeon_intrhand {
 static int octeon_send_ipi(struct cpu_info *, int);
 static int octeon_ipi_intr(void *);
 
-struct octeon_intrhand ipi_intrhands[2] = {
+struct octeon_intrhand ipi_intrhands[1] = {
 	[0] = {
 		.ih_func = octeon_ipi_intr,
 		.ih_arg = (void *)(uintptr_t)__BITS(15,0),
 		.ih_irq = CIU_INT_MBOX_15_0,
-		.ih_ipl = IPL_SCHED,
-	},
-	[1] = {
-		.ih_func = octeon_ipi_intr,
-		.ih_arg = (void *)(uintptr_t)__BITS(31,16),
-		.ih_irq = CIU_INT_MBOX_31_16,
 		.ih_ipl = IPL_HIGH,
 	},
 };
@@ -177,180 +171,102 @@ struct octeon_intrhand ipi_intrhands[2] = {
 struct octeon_intrhand *octciu_intrs[NIRQS] = {
 #ifdef MULTIPROCESSOR
 	[CIU_INT_MBOX_15_0] = &ipi_intrhands[0],
-	[CIU_INT_MBOX_31_16] = &ipi_intrhands[1],
 #endif
 };
 
 kmutex_t octeon_intr_lock;
 
+#if defined(MULTIPROCESSOR)
+#define	OCTEON_NCPU	MAXCPUS
+#else
+#define	OCTEON_NCPU	1
+#endif
+
+struct cpu_softc octeon_cpu_softc[OCTEON_NCPU];
+
+static void
+octeon_intr_setup(void)
+{
+	struct cpu_softc *cpu;
+	int cpunum;
+
 #define X(a)	MIPS_PHYS_TO_XKPHYS(OCTEON_CCA_NONE, (a))
 
-struct cpu_softc octeon_cpu0_softc = {
-	.cpu_ci = &cpu_info_store,
-	.cpu_int0_sum0 = X(CIU_INT0_SUM0),
-	.cpu_int1_sum0 = X(CIU_INT1_SUM0),
-	.cpu_int2_sum0 = X(CIU_INT4_SUM0),
+	for (cpunum = 0; cpunum < OCTEON_NCPU; cpunum++) {
+		cpu = &octeon_cpu_softc[cpunum];
 
-	.cpu_int_sum1 = X(CIU_INT_SUM1),
+		cpu->cpu_ip2_sum0 = X(CIU_IP2_SUM0(cpunum));
+		cpu->cpu_ip3_sum0 = X(CIU_IP3_SUM0(cpunum));
+		cpu->cpu_ip4_sum0 = X(CIU_IP4_SUM0(cpunum));
 
-	.cpu_int0_en0 = X(CIU_INT0_EN0),
-	.cpu_int1_en0 = X(CIU_INT1_EN0),
-	.cpu_int2_en0 = X(CIU_INT4_EN00),
+		cpu->cpu_int_sum1 = X(CIU_INT_SUM1);
 
-	.cpu_int0_en1 = X(CIU_INT0_EN1),
-	.cpu_int1_en1 = X(CIU_INT1_EN1),
-	.cpu_int2_en1 = X(CIU_INT4_EN01),
+		cpu->cpu_ip2_en[0] = X(CIU_IP2_EN0(cpunum));
+		cpu->cpu_ip3_en[0] = X(CIU_IP3_EN0(cpunum));
+		cpu->cpu_ip4_en[0] = X(CIU_IP4_EN0(cpunum));
 
-	.cpu_int32_en = X(CIU_INT32_EN0),
+		cpu->cpu_ip2_en[1] = X(CIU_IP2_EN1(cpunum));
+		cpu->cpu_ip3_en[1] = X(CIU_IP3_EN1(cpunum));
+		cpu->cpu_ip4_en[1] = X(CIU_IP4_EN1(cpunum));
 
-	.cpu_wdog = X(CIU_WDOG0),
-	.cpu_pp_poke = X(CIU_PP_POKE0),
-
-#ifdef MULTIPROCESSOR
-	.cpu_mbox_set = X(CIU_MBOX_SET0),
-	.cpu_mbox_clr = X(CIU_MBOX_CLR0),
-#endif
-};
+		cpu->cpu_wdog = X(CIU_WDOG(cpunum));
+		cpu->cpu_pp_poke = X(CIU_PP_POKE(cpunum));
 
 #ifdef MULTIPROCESSOR
-/* XXX limit of two CPUs ... */
-struct cpu_softc octeon_cpu1_softc = {
-	.cpu_int0_sum0 = X(CIU_INT2_SUM0),
-	.cpu_int1_sum0 = X(CIU_INT3_SUM0),
-	.cpu_int2_sum0 = X(CIU_INT4_SUM1),
-
-	.cpu_int_sum1 = X(CIU_INT_SUM1),
-
-	.cpu_int0_en0 = X(CIU_INT2_EN0),
-	.cpu_int1_en0 = X(CIU_INT3_EN0),
-	.cpu_int2_en0 = X(CIU_INT4_EN10),
-
-	.cpu_int0_en1 = X(CIU_INT2_EN1),
-	.cpu_int1_en1 = X(CIU_INT3_EN1),
-	.cpu_int2_en1 = X(CIU_INT4_EN11),
-
-	.cpu_int32_en = X(CIU_INT32_EN1),
-
-	.cpu_wdog = X(CIU_WDOG(1)),
-	.cpu_pp_poke = X(CIU_PP_POKE1),
-
-	.cpu_mbox_set = X(CIU_MBOX_SET1),
-	.cpu_mbox_clr = X(CIU_MBOX_CLR1),
-};
+		cpu->cpu_mbox_set = X(CIU_MBOX_SET(cpunum));
+		cpu->cpu_mbox_clr = X(CIU_MBOX_CLR(cpunum));
 #endif
-
-#ifdef DEBUG
-static void
-octeon_mbox_test(void)
-{
-	const uint64_t mbox_clr0 = X(CIU_MBOX_CLR0);
-	const uint64_t mbox_clr1 = X(CIU_MBOX_CLR1);
-	const uint64_t mbox_set0 = X(CIU_MBOX_SET0);
-	const uint64_t mbox_set1 = X(CIU_MBOX_SET1);
-	const uint64_t int_sum0 = X(CIU_INT0_SUM0);
-	const uint64_t int_sum1 = X(CIU_INT2_SUM0);
-	const uint64_t sum_mbox_lo = __BIT(CIU_INT_MBOX_15_0);
-	const uint64_t sum_mbox_hi = __BIT(CIU_INT_MBOX_31_16);
-
-	mips3_sd(mbox_clr0, ~0ULL);
-	mips3_sd(mbox_clr1, ~0ULL);
-
-	uint32_t mbox0 = mips3_ld(mbox_set0);
-	uint32_t mbox1 = mips3_ld(mbox_set1);
-
-	KDASSERTMSG(mbox0 == 0, "mbox0 %#x mbox1 %#x", mbox0, mbox1);
-	KDASSERTMSG(mbox1 == 0, "mbox0 %#x mbox1 %#x", mbox0, mbox1);
-
-	mips3_sd(mbox_set0, __BIT(0));
-
-	mbox0 = mips3_ld(mbox_set0);
-	mbox1 = mips3_ld(mbox_set1);
-
-	KDASSERTMSG(mbox0 == 1, "mbox0 %#x mbox1 %#x", mbox0, mbox1);
-	KDASSERTMSG(mbox1 == 0, "mbox0 %#x mbox1 %#x", mbox0, mbox1);
-
-	uint64_t sum0 = mips3_ld(int_sum0);
-	uint64_t sum1 = mips3_ld(int_sum1);
-
-	KDASSERTMSG((sum0 & sum_mbox_lo) != 0, "sum0 %#"PRIx64, sum0);
-	KDASSERTMSG((sum0 & sum_mbox_hi) == 0, "sum0 %#"PRIx64, sum0);
-
-	KDASSERTMSG((sum1 & sum_mbox_lo) == 0, "sum1 %#"PRIx64, sum1);
-	KDASSERTMSG((sum1 & sum_mbox_hi) == 0, "sum1 %#"PRIx64, sum1);
-
-	mips3_sd(mbox_clr0, mbox0);
-	mbox0 = mips3_ld(mbox_set0);
-	KDASSERTMSG(mbox0 == 0, "mbox0 %#x", mbox0);
-
-	mips3_sd(mbox_set0, __BIT(16));
-
-	mbox0 = mips3_ld(mbox_set0);
-	mbox1 = mips3_ld(mbox_set1);
-
-	KDASSERTMSG(mbox0 == __BIT(16), "mbox0 %#x", mbox0);
-	KDASSERTMSG(mbox1 == 0, "mbox1 %#x", mbox1);
-
-	sum0 = mips3_ld(int_sum0);
-	sum1 = mips3_ld(int_sum1);
-
-	KDASSERTMSG((sum0 & sum_mbox_lo) == 0, "sum0 %#"PRIx64, sum0);
-	KDASSERTMSG((sum0 & sum_mbox_hi) != 0, "sum0 %#"PRIx64, sum0);
-
-	KDASSERTMSG((sum1 & sum_mbox_lo) == 0, "sum1 %#"PRIx64, sum1);
-	KDASSERTMSG((sum1 & sum_mbox_hi) == 0, "sum1 %#"PRIx64, sum1);
-}
-#endif
+	}
 
 #undef X
+
+}
 
 void
 octeon_intr_init(struct cpu_info *ci)
 {
-#ifdef DIAGNOSTIC
 	const int cpunum = cpu_index(ci);
-#endif
+	struct cpu_softc *cpu = &octeon_cpu_softc[cpunum];
 	const char * const xname = cpu_name(ci);
-	struct cpu_softc *cpu = ci->ci_softc;
+	int bank;
 
+	cpu->cpu_ci = ci;
+	ci->ci_softc = cpu;
+
+	KASSERT(cpunum == ci->ci_cpuid);
 
 	if (ci->ci_cpuid == 0) {
-		KASSERT(ci->ci_softc == &octeon_cpu0_softc);
 		ipl_sr_map = octeon_ipl_sr_map;
 		mutex_init(&octeon_intr_lock, MUTEX_DEFAULT, IPL_HIGH);
 #ifdef MULTIPROCESSOR
 		mips_locoresw.lsw_send_ipi = octeon_send_ipi;
 #endif
-#ifdef DEBUG
-		octeon_mbox_test();
-#endif
-	} else {
-		KASSERT(cpunum == 1);
-#ifdef MULTIPROCESSOR
-		KASSERT(ci->ci_softc == &octeon_cpu1_softc);
-#endif
+
+		octeon_intr_setup();
 	}
 
 #ifdef MULTIPROCESSOR
 	// Enable the IPIs
-	cpu->cpu_int1_enable0 |= __BIT(CIU_INT_MBOX_15_0);
-	cpu->cpu_int2_enable0 |= __BIT(CIU_INT_MBOX_31_16);
+	cpu->cpu_ip4_enable[0] |= __BIT(CIU_INT_MBOX_15_0);
 #endif
 
-	if (ci->ci_dev)
-		aprint_verbose_dev(ci->ci_dev,
-		    "enabling intr masks %#"PRIx64"/%#"PRIx64"/%#"PRIx64"\n",
-		    cpu->cpu_int0_enable0, cpu->cpu_int1_enable0,
-		    cpu->cpu_int2_enable0);
+	if (ci->ci_dev) {
+		for (bank = 0; bank < NBANKS; bank++) {
+			aprint_verbose_dev(ci->ci_dev,
+			    "enabling intr masks %u "
+			    " %#"PRIx64"/%#"PRIx64"/%#"PRIx64"\n",
+			    bank,
+			    cpu->cpu_ip2_enable[bank],
+			    cpu->cpu_ip3_enable[bank],
+			    cpu->cpu_ip4_enable[bank]);
+		}
+	}
 
-	mips3_sd(cpu->cpu_int0_en0, cpu->cpu_int0_enable0);
-	mips3_sd(cpu->cpu_int1_en0, cpu->cpu_int1_enable0);
-	mips3_sd(cpu->cpu_int2_en0, cpu->cpu_int2_enable0);
-
-	mips3_sd(cpu->cpu_int32_en, 0);
-
-	mips3_sd(cpu->cpu_int0_en1, cpu->cpu_int0_enable1);
-	mips3_sd(cpu->cpu_int1_en1, cpu->cpu_int1_enable1);
-	mips3_sd(cpu->cpu_int2_en1, cpu->cpu_int2_enable1);
+	for (bank = 0; bank < NBANKS; bank++) {
+		mips3_sd(cpu->cpu_ip2_en[bank], cpu->cpu_ip2_enable[bank]);
+		mips3_sd(cpu->cpu_ip3_en[bank], cpu->cpu_ip3_enable[bank]);
+		mips3_sd(cpu->cpu_ip4_en[bank], cpu->cpu_ip4_enable[bank]);
+	}
 
 #ifdef MULTIPROCESSOR
 	mips3_sd(cpu->cpu_mbox_clr, __BITS(31,0));
@@ -388,6 +304,8 @@ void *
 octeon_intr_establish(int irq, int ipl, int (*func)(void *), void *arg)
 {
 	struct octeon_intrhand *ih;
+	struct cpu_softc *cpu;
+	int cpunum;
 
 	if (irq >= NIRQS)
 		panic("octeon_intr_establish: bogus IRQ %d", irq);
@@ -419,57 +337,32 @@ octeon_intr_establish(int irq, int ipl, int (*func)(void *), void *arg)
 	 */
 	const int bank = irq / 64;
 	const uint64_t irq_mask = __BIT(irq % 64);
-	struct cpu_softc * const cpu0 = &octeon_cpu0_softc;
-#if MULTIPROCESSOR
-	struct cpu_softc * const cpu1 = &octeon_cpu1_softc;
-#endif
 
 	switch (ipl) {
 	case IPL_VM:
-		if (bank == 0) {
-			cpu0->cpu_int0_enable0 |= irq_mask;
-			mips3_sd(cpu0->cpu_int0_en0, cpu0->cpu_int0_enable0);
-		} else {
-			cpu0->cpu_int0_enable1 |= irq_mask;
-			mips3_sd(cpu0->cpu_int0_en1, cpu0->cpu_int0_enable1);
-		}
+		cpu = &octeon_cpu_softc[0];
+		cpu->cpu_ip2_enable[bank] |= irq_mask;
+		mips3_sd(cpu->cpu_ip2_en[bank], cpu->cpu_ip2_enable[bank]);
 		break;
 
 	case IPL_SCHED:
-		if (bank == 0) {
-			cpu0->cpu_int1_enable0 |= irq_mask;
-			mips3_sd(cpu0->cpu_int1_en0, cpu0->cpu_int1_enable0);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int1_enable0 = cpu0->cpu_int1_enable0;
-			mips3_sd(cpu1->cpu_int1_en0, cpu1->cpu_int1_enable0);
-#endif
-		} else {
-			cpu0->cpu_int1_enable1 |= irq_mask;
-			mips3_sd(cpu0->cpu_int1_en1, cpu0->cpu_int1_enable1);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int1_enable1 = cpu0->cpu_int1_enable1;
-			mips3_sd(cpu1->cpu_int1_en1, cpu1->cpu_int1_enable1);
-#endif
+		for (cpunum = 0; cpunum < OCTEON_NCPU; cpunum++) {
+			cpu = &octeon_cpu_softc[cpunum];
+			if (cpu->cpu_ci == NULL)
+				break;
+			cpu->cpu_ip3_enable[bank] |= irq_mask;
+			mips3_sd(cpu->cpu_ip3_en[bank], cpu->cpu_ip3_enable[bank]);
 		}
-
 		break;
 
 	case IPL_DDB:
 	case IPL_HIGH:
-		if (bank == 0) {
-			cpu0->cpu_int2_enable0 |= irq_mask;
-			mips3_sd(cpu0->cpu_int2_en0, cpu0->cpu_int2_enable0);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int2_enable0 = cpu0->cpu_int2_enable0;
-			mips3_sd(cpu1->cpu_int2_en0, cpu1->cpu_int2_enable0);
-#endif
-		} else {
-			cpu0->cpu_int2_enable1 |= irq_mask;
-			mips3_sd(cpu0->cpu_int2_en1, cpu0->cpu_int2_enable1);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int2_enable1 = cpu0->cpu_int2_enable1;
-			mips3_sd(cpu1->cpu_int2_en1, cpu1->cpu_int2_enable1);
-#endif
+		for (cpunum = 0; cpunum < OCTEON_NCPU; cpunum++) {
+			cpu = &octeon_cpu_softc[cpunum];
+			if (cpu->cpu_ci == NULL)
+				break;
+			cpu->cpu_ip4_enable[bank] |= irq_mask;
+			mips3_sd(cpu->cpu_ip4_en[bank], cpu->cpu_ip4_enable[bank]);
 		}
 		break;
 	}
@@ -483,8 +376,10 @@ void
 octeon_intr_disestablish(void *cookie)
 {
 	struct octeon_intrhand * const ih = cookie;
+	struct cpu_softc *cpu;
 	const int irq = ih->ih_irq & (NIRQS-1);
 	const int ipl = ih->ih_ipl;
+	int cpunum;
 
 	mutex_enter(&octeon_intr_lock);
 
@@ -493,56 +388,32 @@ octeon_intr_disestablish(void *cookie)
 	 */
 	const int bank = irq / 64;
 	const uint64_t irq_mask = ~__BIT(irq % 64);
-	struct cpu_softc * const cpu0 = &octeon_cpu0_softc;
-#if MULTIPROCESSOR
-	struct cpu_softc * const cpu1 = &octeon_cpu1_softc;
-#endif
 
 	switch (ipl) {
 	case IPL_VM:
-		if (bank == 0) {
-			cpu0->cpu_int0_enable0 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int0_en0, cpu0->cpu_int0_enable0);
-		} else {
-			cpu0->cpu_int0_enable1 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int0_en1, cpu0->cpu_int0_enable1);
-		}
+		cpu = &octeon_cpu_softc[0];
+		cpu->cpu_ip2_enable[bank] &= ~irq_mask;
+		mips3_sd(cpu->cpu_ip2_en[bank], cpu->cpu_ip2_enable[bank]);
 		break;
 
 	case IPL_SCHED:
-		if (bank == 0) {
-			cpu0->cpu_int1_enable0 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int1_en0, cpu0->cpu_int1_enable0);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int1_enable0 = cpu0->cpu_int1_enable0;
-			mips3_sd(cpu1->cpu_int1_en0, cpu1->cpu_int1_enable0);
-#endif
-		} else {
-			cpu0->cpu_int1_enable1 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int1_en1, cpu0->cpu_int1_enable1);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int1_enable1 = cpu0->cpu_int1_enable1;
-			mips3_sd(cpu1->cpu_int1_en1, cpu1->cpu_int1_enable1);
-#endif
+		for (cpunum = 0; cpunum < OCTEON_NCPU; cpunum++) {
+			cpu = &octeon_cpu_softc[cpunum];
+			if (cpu->cpu_ci == NULL)
+				break;
+			cpu->cpu_ip3_enable[bank] &= ~irq_mask;
+			mips3_sd(cpu->cpu_ip3_en[bank], cpu->cpu_ip3_enable[bank]);
 		}
 		break;
 
 	case IPL_DDB:
 	case IPL_HIGH:
-		if (bank == 0) {
-			cpu0->cpu_int2_enable0 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int2_en0, cpu0->cpu_int2_enable0);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int2_enable0 = cpu0->cpu_int2_enable0;
-			mips3_sd(cpu1->cpu_int2_en0, cpu1->cpu_int2_enable0);
-#endif
-		} else {
-			cpu0->cpu_int2_enable1 &= ~irq_mask;
-			mips3_sd(cpu0->cpu_int2_en1, cpu0->cpu_int2_enable1);
-#ifdef MULTIPROCESSOR
-			cpu1->cpu_int2_enable1 = cpu0->cpu_int2_enable1;
-			mips3_sd(cpu1->cpu_int2_en1, cpu1->cpu_int2_enable1);
-#endif
+		for (cpunum = 0; cpunum < OCTEON_NCPU; cpunum++) {
+			cpu = &octeon_cpu_softc[cpunum];
+			if (cpu->cpu_ci == NULL)
+				break;
+			cpu->cpu_ip4_enable[bank] &= ~irq_mask;
+			mips3_sd(cpu->cpu_ip4_en[bank], cpu->cpu_ip4_enable[bank]);
 		}
 		break;
 	}
@@ -572,17 +443,17 @@ octeon_iointr(int ipl, vaddr_t pc, uint32_t ipending)
 	const uint64_t sum1 = mips3_ld(cpu->cpu_int_sum1);
 
 	if (ipending & MIPS_INT_MASK_2) {
-		hwpend[0] = mips3_ld(cpu->cpu_int2_sum0)
-		    & cpu->cpu_int2_enable0;
-		hwpend[1] = sum1 & cpu->cpu_int2_enable1;
+		hwpend[0] = mips3_ld(cpu->cpu_ip4_sum0)
+		    & cpu->cpu_ip4_enable[0];
+		hwpend[1] = sum1 & cpu->cpu_ip4_enable[1];
 	} else if (ipending & MIPS_INT_MASK_1) {
-		hwpend[0] = mips3_ld(cpu->cpu_int1_sum0)
-		    & cpu->cpu_int1_enable0;
-		hwpend[1] = sum1 & cpu->cpu_int1_enable1;
+		hwpend[0] = mips3_ld(cpu->cpu_ip3_sum0)
+		    & cpu->cpu_ip3_enable[0];
+		hwpend[1] = sum1 & cpu->cpu_ip3_enable[1];
 	} else if (ipending & MIPS_INT_MASK_0) {
-		hwpend[0] = mips3_ld(cpu->cpu_int0_sum0)
-		    & cpu->cpu_int0_enable0;
-		hwpend[1] = sum1 & cpu->cpu_int0_enable1;
+		hwpend[0] = mips3_ld(cpu->cpu_ip2_sum0)
+		    & cpu->cpu_ip2_enable[0];
+		hwpend[1] = sum1 & cpu->cpu_ip2_enable[1];
 	} else {
 		panic("octeon_iointr: unexpected ipending %#x", ipending);
 	}
@@ -623,7 +494,7 @@ octeon_ipi_intr(void *arg)
 	struct cpu_softc * const cpu = ci->ci_softc;
 	uint32_t ipi_mask = (uintptr_t) arg;
 
-	KASSERTMSG((ipi_mask & __BITS(31,16)) == 0 || ci->ci_cpl >= IPL_SCHED,
+	KASSERTMSG(ci->ci_cpl == IPL_HIGH,
 	    "ipi_mask %#"PRIx32" cpl %d", ipi_mask, ci->ci_cpl);
 
 	ipi_mask &= mips3_ld(cpu->cpu_mbox_set);
@@ -631,9 +502,6 @@ octeon_ipi_intr(void *arg)
 		return 0;
 
 	mips3_sd(cpu->cpu_mbox_clr, ipi_mask);
-
-	ipi_mask |= (ipi_mask >> 16);
-	ipi_mask &= __BITS(15,0);
 
 	KASSERT(ipi_mask < __BIT(NIPIS));
 
@@ -681,14 +549,12 @@ octeon_send_ipi(struct cpu_info *ci, int req)
 		return -1;
 
 	struct cpu_softc * const cpu = ci->ci_softc;
-	uint64_t ipi_mask = __BIT(req);
+	const uint32_t ipi_mask = __BIT(req);
 
 	atomic_or_64(&ci->ci_request_ipis, ipi_mask);
-	if (req == IPI_SUSPEND || req == IPI_WDOG) {
-		ipi_mask <<= 16;
-	}
 
 	mips3_sd(cpu->cpu_mbox_set, ipi_mask);
+
 	return 0;
 }
 #endif	/* MULTIPROCESSOR */
