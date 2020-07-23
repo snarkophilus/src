@@ -17,11 +17,14 @@ C:
 S:empty
 C:empty
 @:
+mod-S:
 :a b b c:
 :a b b c:
 : b c:
 :a c:
 :x__ 3 x__ 3:
+12345
+mod-C:
 :a b b c:
 :a b b c:
 : b c:
@@ -83,4 +86,7 @@ mod-assign-nested: else2e2
 mod-assign-nested: then3t3
 mod-assign-nested: else4e4
 mod-tu-space: A   B
+mod-Q: new
+
+line
 exit status 0
