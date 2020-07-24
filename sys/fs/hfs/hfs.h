@@ -43,7 +43,7 @@
 #ifdef HFS_DEBUG
 	#if defined(_KERNEL)
 		#include "opt_ddb.h"
-	#endif /* defined(_KERNEL_)
+	#endif /* defined(_KERNEL_) */
 #endif /* HFS_DEBUG */
 
 #include <fs/hfs/libhfs.h>
