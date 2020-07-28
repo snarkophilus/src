@@ -1,4 +1,4 @@
-/*	$NetBSD: pic.c,v 1.56 2020/02/01 12:55:35 riastradh Exp $	*/
+/*	$NetBSD: pic.c,v 1.57 2020/07/27 16:26:51 skrll Exp $	*/
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -33,7 +33,7 @@
 #include "opt_multiprocessor.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.56 2020/02/01 12:55:35 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pic.c,v 1.57 2020/07/27 16:26:51 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/atomic.h>
@@ -174,7 +174,9 @@ pic_ipi_ddb(void *arg)
 int
 pic_ipi_kpreempt(void *arg)
 {
-	atomic_or_uint(&curcpu()->ci_astpending, __BIT(1));
+	struct lwp *l = curlwp;
+
+	l->l_md.md_astpending |= __BIT(1);
 	return 1;
 }
 #endif /* __HAVE_PREEMPTION */
@@ -568,7 +570,8 @@ pic_do_pending_ints(register_t psw, int newipl, void *frame)
 	pic_pending_put(pend);
 #endif /* __HAVE_PIC_PENDING_INTRS */
 #ifdef __HAVE_PREEMPTION
-	if (newipl == IPL_NONE && (ci->ci_astpending & __BIT(1))) {
+	struct lwp *l = curlwp;
+	if (newipl == IPL_NONE && (l->l_md.md_astpending & __BIT(1))) {
 		pic_set_priority(ci, IPL_SCHED);
 		kpreempt(0);
 	}
@@ -692,7 +695,7 @@ pic_add(struct pic_softc *pic, int irqbase)
 	KASSERT((pic->pic_cpus != NULL) == (pic->pic_ops->pic_ipi_send != NULL));
 #endif
 	pic_list[slot] = pic;
-	
+
 	return irqbase;
 }
 

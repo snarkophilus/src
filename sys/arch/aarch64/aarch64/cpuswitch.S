@@ -1,4 +1,4 @@
-/* $NetBSD: cpuswitch.S,v 1.21 2020/05/23 18:08:59 ryo Exp $ */
+/* $NetBSD: cpuswitch.S,v 1.22 2020/07/23 13:12:54 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
 #include "opt_ddb.h"
 #include "opt_kasan.h"
 
-RCSID("$NetBSD: cpuswitch.S,v 1.21 2020/05/23 18:08:59 ryo Exp $")
+RCSID("$NetBSD: cpuswitch.S,v 1.22 2020/07/23 13:12:54 skrll Exp $")
 
 	ARMV8_DEFINE_OPTIONS
 
@@ -83,7 +83,6 @@ ENTRY_NP(cpu_switchto)
 #endif
 	ldr	x5, [x1, #L_MD_CPACR]	/* get cpacr_el1 */
 
-	mrs	x3, tpidr_el1
 	DISABLE_INTERRUPT
 	mov	sp, x4			/* restore stack pointer */
 	msr	cpacr_el1, x5		/* restore cpacr_el1 */
@@ -165,28 +164,12 @@ ENTRY_NP(cpu_switchto_softint)
 	stp	x29, x2, [sp, #TF_X29]	/* tf->lr = softint_cleanup; */
 
 	mrs	x19, tpidr_el1		/* x19 := curcpu()->ci_curlwp */
-	DISABLE_INTERRUPT
-	ldr	x3, [x19, #L_CPU]	/* x3 := curlwp->l_cpu */
 	mov	x4, sp
 
 	mrs	x5, cpacr_el1
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	str	x4, [x6, #PCB_TF]
 	str	x5, [x19, #L_MD_CPACR]
-	msr	tpidr_el1, x0		/* curlwp = softlwp; */
-	str	x0, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
-					/* no need for memory barrier here */
-
-#ifdef ARMV83_PAC
-	/* Switch the PAC key. */
-	adrl	x4, _C_LABEL(aarch64_pac_enabled)
-	ldr	w4, [x4]
-	cbz	w4, 1f
-	ldp	x5, x6, [x0, #L_MD_IA_KERN]
-	msr	APIAKeyLo_EL1, x5
-	msr	APIAKeyHi_EL1, x6
-1:
-#endif
 
 #ifdef KASAN
 	/* clear the new stack */
@@ -198,22 +181,33 @@ ENTRY_NP(cpu_switchto_softint)
 	ldr	x4, [x0, #L_MD_UTF]
 
 	DISABLE_INTERRUPT
+	ldr	x20, [x19, #L_CPU]	/* x20 := curlwp->l_cpu */
+
 	/* onto new stack */
 	sub	sp, x4, #TF_SIZE	/* new sp := softlwp->l_md_utf - 1 */
+	msr	tpidr_el1, x0		/* curlwp = softlwp; */
+	str	x0, [x20, #CI_CURLWP]	/* curcpu()->ci_curlwp = softlwp; */
+					/* no need for memory barrier here */
 
-	// Why when interrupts are disabled?
 	mov	x5, #CPACR_FPEN_NONE
 	msr	cpacr_el1, x5		/* cpacr_el1 = CPACR_FPEN_NONE */
+
+#ifdef ARMV83_PAC
+	/* Switch the PAC key. */
+	adrl	x4, _C_LABEL(aarch64_pac_enabled)
+	ldr	w4, [x4]
+	cbz	w4, 1f
+	ldp	x5, x6, [x0, #L_MD_IA_KERN]
+	msr	APIAKeyLo_EL1, x5
+	msr	APIAKeyHi_EL1, x6
+1:
+#endif
 	ENABLE_INTERRUPT
 
 	/* softint_dispatch(pinned_lwp, ipl) */
 	mov	x0, x19			/* x0 := pinned_lwp */
 	bl	_C_LABEL(softint_dispatch)
 
-	msr	tpidr_el1, x19		/* curlwp = pinned_lwp */
-	ldr	x3, [x19, #L_CPU]	/* x3 = curlwp->l_cpu */
-	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
-	dmb	st			/* see comments in kern_mutex.c */
 	ldr	x6, [x19, #L_PCB]	/* x6 = lwp_getpcb(curlwp) */
 	ldr	x4, [x6, #PCB_TF]	/* x4 := pinned_lwp->l_addr->pcb_tf */
 #ifdef DDB
@@ -222,6 +216,11 @@ ENTRY_NP(cpu_switchto_softint)
 	ldr	x5, [x19, #L_MD_CPACR]	/* x5 := pinned_lwp->l_md_cpacr */
 
 	DISABLE_INTERRUPT
+	msr	tpidr_el1, x19		/* curlwp = pinned_lwp */
+	ldr	x3, [x19, #L_CPU]	/* x3 = curlwp->l_cpu */
+	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
+	dmb	st			/* see comments in kern_mutex.c */
+
 	mov	sp, x4			/* restore pinned_lwp sp */
 	msr	cpacr_el1, x5		/* restore pinned_lwp cpacr */
 
@@ -258,8 +257,8 @@ END(cpu_switchto_softint)
 ENTRY_NP(softint_cleanup)
 	mov	lr, x20			/* restore original lr */
 
-	mrs	x3, tpidr_el1		/* curlwp */
-	ldr	x3, [x3, #L_CPU]	/* curcpu */
+	mrs	x20, tpidr_el1		/* curlwp */
+	ldr	x3, [x20, #L_CPU]	/* curcpu */
 	ldr	w2, [x3, #CI_MTX_COUNT]	/* ->ci_mtx_count */
 	add	w2, w2, #1
 	str	w2, [x3, #CI_MTX_COUNT]
@@ -392,7 +391,6 @@ ENTRY_NP(el0_trap_exit)
 	b	1b
 	/* } */
 9:
-	DISABLE_INTERRUPT		/* make sure I|F marked */
 
 	mrs	x9, tpidr_el1
 	ldr	x23, [x9, #L_MD_CPACR]
@@ -435,7 +433,6 @@ ENTRY_NP(el0_trap_exit)
 	orr	x0, x0, #MDSCR_SS
 	msr	mdscr_el1, x0
 1:
-
 	unwind_x0_x2
 
 	/* leave sp at l_md.md_utf, return back to EL0 user process */
