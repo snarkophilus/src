@@ -861,21 +861,23 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 {
 	if (l == curlwp) {
 		KASSERT(pm == l->l_proc->p_vmspace->vm_map.pmap);
+		struct cpu_info * const ci = l->l_cpu;
+
 #if defined(PMAP_HWPAGEWALKER)
 		pmap_md_pdetab_activate(pm, l);
 #endif
 		if (pm == pmap_kernel()) {
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-			l->l_cpu->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
+			ci->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
 #ifdef _LP64
-			l->l_cpu->ci_pmap_user_seg0tab = PMAP_INVALID_SEGTAB_ADDRESS;
+			ci->ci_pmap_user_seg0tab = PMAP_INVALID_SEGTAB_ADDRESS;
 #endif
 #endif
 		} else {
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
-			l->l_cpu->ci_pmap_user_segtab = pm->pm_segtab;
+			ci->ci_pmap_user_segtab = pm->pm_segtab;
 #ifdef _LP64
-			l->l_cpu->ci_pmap_user_seg0tab = pm->pm_segtab->seg_seg[0];
+			ci->ci_pmap_user_seg0tab = pm->pm_segtab->seg_seg[0];
 #endif
 #endif
 		}
