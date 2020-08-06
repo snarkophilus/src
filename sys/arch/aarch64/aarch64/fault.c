@@ -1,4 +1,4 @@
-/*	$NetBSD: fault.c,v 1.14 2020/07/08 03:45:13 ryo Exp $	*/
+/*	$NetBSD: fault.c,v 1.16 2020/08/03 05:56:50 ryo Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fault.c,v 1.14 2020/07/08 03:45:13 ryo Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fault.c,v 1.16 2020/08/03 05:56:50 ryo Exp $");
 
 #include "opt_compat_netbsd32.h"
 #include "opt_ddb.h"
@@ -136,6 +136,7 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	vm_prot_t ftype;
 	int error = 0, len;
 	const bool user = IS_SPSR_USER(tf->tf_spsr) ? true : false;
+	bool is_pan_trap = false;
 
 	const char *faultstr;
 	static char panicinfo[256];
@@ -188,6 +189,16 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 		UVMHIST_LOG(pmaphist, "pagefault %016lx %016lx in %s %s",
 		    tf->tf_far, va, user ? "user" : "kernel",
 		    (rw == 0) ? "read" : "write");
+	}
+
+	if (__predict_false(!user && (map != kernel_map) &&
+	    (tf->tf_spsr & SPSR_PAN))) {
+		/*
+		 * We were in kernel mode, faulted on a user address,
+		 * and had PAN enabled. This is a fatal fault.
+		 */
+		is_pan_trap = true;
+		goto handle_fault;
 	}
 
 	/* reference/modified emulation */
@@ -245,12 +256,21 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 
  do_fault:
 	/* faultbail path? */
-	fb = cpu_disable_onfault();
-	if (fb != NULL) {
+	fb = l->l_md.md_onfault;
+	if (fb != NULL && fb->fb_idepth == curcpu()->ci_intr_depth) {
+		cpu_unset_onfault();
+#ifdef DEBUG_DUMP_ON_FAULTBAIL
+		printf("fault in failtbail[%p]: "
+		    "fb_sp=%016lx, fb_lr=%016lx, fb_idepth=%u, fb_old=%p\n",
+		    fb, fb->fb_reg[FB_SP], fb->fb_reg[FB_LR],
+		    fb->fb_idepth, fb->fb_old);
+		dump_trapframe(tf, printf);
+#endif
 		cpu_jump_onfault(tf, fb, EFAULT);
 		return;
 	}
 
+ handle_fault:
 	fsc = __SHIFTOUT(esr, ESR_ISS_DATAABORT_DFSC); /* also IFSC */
 	if (user) {
 		if (!fatalabort) {
@@ -358,6 +378,10 @@ data_abort_handler(struct trapframe *tf, uint32_t eclass)
 	if (__SHIFTOUT(esr, ESR_ISS_DATAABORT_S1PTW) != 0)
 		len += snprintf(panicinfo + len, sizeof(panicinfo) - len,
 		    ", State 2 Fault");
+
+	if (is_pan_trap)
+		len += snprintf(panicinfo + len, sizeof(panicinfo) - len,
+		    ", PAN Set");
 
 	len += snprintf(panicinfo + len, sizeof(panicinfo) - len,
 	    ": pc %016"PRIxREGISTER, tf->tf_pc);
