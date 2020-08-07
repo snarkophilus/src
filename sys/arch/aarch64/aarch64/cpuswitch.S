@@ -453,8 +453,7 @@ END(cpu_Debugger)
  * int cpu_set_onfault(struct faultbuf *fb)
  */
 ENTRY_NP(cpu_set_onfault)
-	mrs	x3, tpidr_el1
-	ldr	x2, [x3, #CI_CURLWP]	/* curlwp = curcpu()->ci_curlwp */
+	mrs	x2, tpidr_el1		/* x2 = curlwp */
 	str	x0, [x2, #L_MD_ONFAULT] /* l_md.md_onfault = fb */
 
 	stp	x19, x20, [x0, #FB_REG_X19]
