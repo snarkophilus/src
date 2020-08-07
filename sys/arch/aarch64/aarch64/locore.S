@@ -175,7 +175,7 @@ vstart:
 	msr	tpidr_el0, xzr
 	msr	tpidrro_el0, xzr
 
-	/* set curcpu() */
+	/* set curlwp() */
 	adrl	x0, lwp0		/* curlwp is lwp0 */
 	msr	tpidr_el1, x0
 	DPRINTREG("curlwp           = ", x0);
