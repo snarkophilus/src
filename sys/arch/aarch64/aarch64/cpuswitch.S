@@ -218,7 +218,7 @@ ENTRY_NP(cpu_switchto_softint)
 	DISABLE_INTERRUPT
 	msr	tpidr_el1, x19		/* curlwp = pinned_lwp */
 	ldr	x3, [x19, #L_CPU]	/* x3 = curlwp->l_cpu */
-	str	x19, [x3, #CI_CURLWP]	/* curcpu()->ci_curlwp := x19 */
+	str	x19, [x3, #CI_CURLWP]	/* curlwp->l_cpu->ci_curlwp := x19 */
 	dmb	st			/* see comments in kern_mutex.c */
 
 	mov	sp, x4			/* restore pinned_lwp sp */
