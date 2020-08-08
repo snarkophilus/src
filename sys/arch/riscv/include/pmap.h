@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.4 2020/03/11 13:30:31 thorpej Exp $ */
+/* $NetBSD: pmap.h,v 1.5 2020/08/07 07:19:45 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
@@ -124,8 +124,8 @@ void    pmap_md_init(void);
 bool    pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 //void    pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
 
-void	pmap_md_pdetab_activate(struct pmap *, struct lwp *);
-void	pmap_md_pdetab_deactivate(struct pmap *);
+void	pmap_md_xtab_activate(struct pmap *, struct lwp *);
+void	pmap_md_xtab_deactivate(struct pmap *);
 void	pmap_md_pdetab_init(struct pmap *);
 bool    pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 
@@ -188,6 +188,7 @@ pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
 
         return 0;
 }
+
 #endif /* __PMAP_PRIVATE */
 #endif /* _KERNEL */
 

@@ -466,7 +466,7 @@ pmap_md_init(void)
 }
 
 void
-pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
+pmap_md_xtab_activate(pmap_t pm, struct lwp *l)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 
@@ -507,7 +507,7 @@ pmap_md_pdetab_activate(pmap_t pm, struct lwp *l)
 }
 
 void
-pmap_md_pdetab_deactivate(pmap_t pm)
+pmap_md_xtab_deactivate(pmap_t pm)
 {
 	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
 

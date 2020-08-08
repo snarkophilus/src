@@ -137,8 +137,8 @@ void	pmap_md_vca_remove(struct vm_page *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
-void	pmap_md_pdetab_activate(pmap_t, struct lwp *);
-void	pmap_md_pdetab_deactivate(pmap_t);
+void	pmap_md_xtab_activate(pmap_t, struct lwp *);
+void	pmap_md_xtab_deactivate(pmap_t);
 
 void	pmap_md_alloc_pdp(pmap_t);
 void	pmap_md_free_pdp(pmap_t);

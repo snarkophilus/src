@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_segtab.c,v 1.14 2020/02/24 12:20:30 rin Exp $	*/
+/*	$NetBSD: pmap_segtab.c,v 1.15 2020/08/07 07:19:45 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.14 2020/02/24 12:20:30 rin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_segtab.c,v 1.15 2020/08/07 07:19:45 skrll Exp $");
 
 /*
  *	Manages physical address maps.
@@ -861,9 +861,7 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 {
 	if (l == curlwp) {
 		KASSERT(pm == l->l_proc->p_vmspace->vm_map.pmap);
-#if defined(PMAP_HWPAGEWALKER)
-		pmap_md_pdetab_activate(pm, l);
-#endif
+		pmap_md_xtab_activate(pm, l);
 		if (pm == pmap_kernel()) {
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 			l->l_cpu->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
@@ -885,9 +883,7 @@ pmap_segtab_activate(struct pmap *pm, struct lwp *l)
 void
 pmap_segtab_deactivate(pmap_t pm)
 {
-#if defined(PMAP_HWPAGEWALKER)
-	pmap_md_pdetab_deactivate(pm);
-#endif
+	pmap_md_xtab_deactivate(pm);
 
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
 	curcpu()->ci_pmap_user_segtab = PMAP_INVALID_SEGTAB_ADDRESS;
