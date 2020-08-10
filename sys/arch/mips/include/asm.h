@@ -54,10 +54,6 @@
 #ifndef _MIPS_ASM_H
 #define	_MIPS_ASM_H
 
-#include "opt_cputype.h"
-#include "opt_lockdebug.h"
-#include "opt_multiprocessor.h"
-
 #include <sys/cdefs.h>		/* for API selection */
 #include <mips/regdef.h>
 
