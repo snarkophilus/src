@@ -1,11 +1,11 @@
-# $Id: export.mk,v 1.3 2020/07/27 19:53:37 rillig Exp $
+# $Id: export.mk,v 1.5 2020/08/08 13:00:07 rillig Exp $
 
 UT_TEST=export
 UT_FOO=foo${BAR}
 UT_FU=fubar
 UT_ZOO=hoopie
 UT_NO=all
-# belive it or not, we expect this one to come out with $UT_FU unexpanded.
+# believe it or not, we expect this one to come out with $UT_FU unexpanded.
 UT_DOLLAR= This is $$UT_FU
 
 .export UT_FU UT_FOO
@@ -37,7 +37,7 @@ BAR=bar is ${UT_FU}
 
 .MAKE.EXPORTED+= UT_ZOO UT_TEST
 
-FILTER_CMD?=	grep -v -E '^(MAKEFLAGS|PATH|PWD)='
+FILTER_CMD?=	egrep -v '^(MAKEFLAGS|PATH|PWD|SHLVL|_)='
 
 all:
 	@env | ${FILTER_CMD} | sort

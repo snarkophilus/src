@@ -1,4 +1,4 @@
-/*	$NetBSD: asm.h,v 1.57 2020/07/26 08:08:41 simonb Exp $	*/
+/*	$NetBSD: asm.h,v 1.59 2020/08/09 08:13:09 skrll Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -511,6 +511,18 @@ _C_LABEL(x):
 #define	NOP_L		nop
 #else
 #define	NOP_L		/* nothing */
+#endif
+
+/* compiler define */
+#if defined(__OCTEON__)
+				/* early cnMIPS have erratum which means 2 */
+#define	LLSCSYNC	sync 4; sync 4
+#define	SYNC		sync 4		/* sync 4 == syncw - sync all writes */
+#define	BDSYNC		sync 4		/* sync 4 == syncw - sync all writes */
+#else
+#define	LLSCSYNC	sync
+#define	SYNC		sync
+#define	BDSYNC		sync
 #endif
 
 /* CPU dependent hook for cp0 load delays */

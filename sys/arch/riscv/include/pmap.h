@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.4 2020/03/11 13:30:31 thorpej Exp $ */
+/* $NetBSD: pmap.h,v 1.5 2020/08/07 07:19:45 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
@@ -113,21 +113,21 @@ struct pmap_md {
 };
 
 struct vm_page *
-        pmap_md_alloc_poolpage(int flags);
-vaddr_t pmap_md_map_poolpage(paddr_t, vsize_t);
-void    pmap_md_unmap_poolpage(vaddr_t, vsize_t);
-bool    pmap_md_direct_mapped_vaddr_p(vaddr_t);
-bool    pmap_md_io_vaddr_p(vaddr_t);
-paddr_t pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
-vaddr_t pmap_md_direct_map_paddr(paddr_t);
-void    pmap_md_init(void);
-bool    pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
+	pmap_md_alloc_poolpage(int flags);
+vaddr_t	pmap_md_map_poolpage(paddr_t, vsize_t);
+void	pmap_md_unmap_poolpage(vaddr_t, vsize_t);
+bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
+bool	pmap_md_io_vaddr_p(vaddr_t);
+paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
+vaddr_t	pmap_md_direct_map_paddr(paddr_t);
+void	pmap_md_init(void);
+bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 //void    pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
 
-void	pmap_md_pdetab_activate(struct pmap *, struct lwp *);
-void	pmap_md_pdetab_deactivate(struct pmap *);
+void	pmap_md_xtab_activate(struct pmap *, struct lwp *);
+void	pmap_md_xtab_deactivate(struct pmap *);
 void	pmap_md_pdetab_init(struct pmap *);
-bool    pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
+bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 
 void	pmap_bootstrap(paddr_t pstart, paddr_t pend, paddr_t kstart, paddr_t kend);
 
@@ -172,22 +172,23 @@ pmap_md_tlb_asid_max(void)
 static inline pt_entry_t *
 pmap_md_nptep(pt_entry_t *ptep)
 {
-        return ptep + 1;
+	return ptep + 1;
 }
 
 static inline bool
 pmap_md_kernel_vaddr_p(vaddr_t va)
 {
-        return false;
+	return false;
 }
 
 static inline paddr_t
 pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
 {
-        /* Not used due to false from pmap_md_kernel_vaddr_p */
+	/* Not used due to false from pmap_md_kernel_vaddr_p */
 
-        return 0;
+	return 0;
 }
+
 #endif /* __PMAP_PRIVATE */
 #endif /* _KERNEL */
 

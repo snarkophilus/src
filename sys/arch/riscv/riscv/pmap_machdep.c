@@ -136,13 +136,13 @@ pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
 }
 
 void
-pmap_md_pdetab_activate(struct pmap *pmap, struct lwp *l)
+pmap_md_xtab_activate(struct pmap *pmap, struct lwp *l)
 {
 	riscvreg_ptbr_write(pmap->pm_md.md_ptbr);
 }
 
 void
-pmap_md_pdetab_deactivate(struct pmap *pmap)
+pmap_md_xtab_deactivate(struct pmap *pmap)
 {
 	riscvreg_ptbr_write(0);
 }

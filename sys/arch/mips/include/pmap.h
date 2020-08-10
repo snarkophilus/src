@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.72 2020/07/26 08:08:41 simonb Exp $	*/
+/*	$NetBSD: pmap.h,v 1.73 2020/08/07 07:19:45 skrll Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -146,6 +146,20 @@ static inline pt_entry_t *
 pmap_md_nptep(pt_entry_t *ptep)
 {
         return ptep + 1;
+}
+
+static inline void
+pmap_md_xtab_activate(struct pmap *pm, struct lwp *l)
+{
+
+	/* nothing */
+}
+
+static inline void
+pmap_md_xtab_deactivate(struct pmap *pm)
+{
+
+	/* nothing */
 }
 
 #endif /* __PMAP_PRIVATE */

@@ -1,0 +1,8 @@
+
+I'll need to look at it again and write down my thoughts, will do so this
+week after work some evening.  One thing I do remember seeing was a function
+doing swap on PTEs for MIPS didn't seem to be atomic, I have concerns about
+concurrent fault with multithreaded processes on that one.  The stats
+(wired_count etc) aren't updated atomically.  I'm concerned about ordering
+of PV entry ops with regard to PTE insertions but it's probably not an issue
+for us just yet given the way the locking works in UVM.

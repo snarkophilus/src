@@ -1,4 +1,4 @@
-/*	$NetBSD: for.c,v 1.55 2020/07/19 12:26:17 rillig Exp $	*/
+/*	$NetBSD: for.c,v 1.63 2020/08/09 19:51:02 rillig Exp $	*/
 
 /*
  * Copyright (c) 1992, The Regents of the University of California.
@@ -30,14 +30,14 @@
  */
 
 #ifndef MAKE_NATIVE
-static char rcsid[] = "$NetBSD: for.c,v 1.55 2020/07/19 12:26:17 rillig Exp $";
+static char rcsid[] = "$NetBSD: for.c,v 1.63 2020/08/09 19:51:02 rillig Exp $";
 #else
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
 static char sccsid[] = "@(#)for.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: for.c,v 1.55 2020/07/19 12:26:17 rillig Exp $");
+__RCSID("$NetBSD: for.c,v 1.63 2020/08/09 19:51:02 rillig Exp $");
 #endif
 #endif /* not lint */
 #endif
@@ -83,33 +83,32 @@ __RCSID("$NetBSD: for.c,v 1.55 2020/07/19 12:26:17 rillig Exp $");
  * For_Run.
  */
 
-static int  	  forLevel = 0;  	/* Nesting level	*/
+static int forLevel = 0;	/* Nesting level */
 
 /*
  * State of a for loop.
  */
-typedef struct _For {
-    Buffer	  buf;			/* Body of loop		*/
-    strlist_t     vars;			/* Iteration variables	*/
-    strlist_t     items;		/* Substitution items */
-    char          *parse_buf;
-    int           short_var;
-    int           sub_next;
+typedef struct {
+    Buffer buf;			/* Body of loop */
+    strlist_t vars;		/* Iteration variables */
+    strlist_t items;		/* Substitution items */
+    char *parse_buf;
+    int short_var;
+    int sub_next;
 } For;
 
-static For        *accumFor;            /* Loop being accumulated */
+static For *accumFor;		/* Loop being accumulated */
 
-
 
 static char *
 make_str(const char *ptr, int len)
 {
-	char *new_ptr;
+    char *new_ptr;
 
-	new_ptr = bmake_malloc(len + 1);
-	memcpy(new_ptr, ptr, len);
-	new_ptr[len] = 0;
-	return new_ptr;
+    new_ptr = bmake_malloc(len + 1);
+    memcpy(new_ptr, ptr, len);
+    new_ptr[len] = 0;
+    return new_ptr;
 }
 
 static void
@@ -155,7 +154,7 @@ For_Eval(char *line)
     int n, nwords;
 
     /* Skip the '.' and any following whitespace */
-    for (ptr++; *ptr && isspace((unsigned char) *ptr); ptr++)
+    for (ptr++; *ptr && isspace((unsigned char)*ptr); ptr++)
 	continue;
 
     /*
@@ -163,8 +162,8 @@ For_Eval(char *line)
      * a for.
      */
     if (ptr[0] != 'f' || ptr[1] != 'o' || ptr[2] != 'r' ||
-	    !isspace((unsigned char) ptr[3])) {
-	if (ptr[0] == 'e' && strncmp(ptr+1, "ndfor", 5) == 0) {
+	!isspace((unsigned char)ptr[3])) {
+	if (ptr[0] == 'e' && strncmp(ptr + 1, "ndfor", 5) == 0) {
 	    Parse_Error(PARSE_FATAL, "for-less endfor");
 	    return -1;
 	}
@@ -181,7 +180,7 @@ For_Eval(char *line)
 
     /* Grab the variables. Terminate on "in". */
     for (;; ptr += len) {
-	while (*ptr && isspace((unsigned char) *ptr))
+	while (*ptr && isspace((unsigned char)*ptr))
 	    ptr++;
 	if (*ptr == '\0') {
 	    Parse_Error(PARSE_FATAL, "missing `in' in for");
@@ -205,7 +204,7 @@ For_Eval(char *line)
 	return -1;
     }
 
-    while (*ptr && isspace((unsigned char) *ptr))
+    while (*ptr && isspace((unsigned char)*ptr))
 	ptr++;
 
     /*
@@ -216,7 +215,7 @@ For_Eval(char *line)
      * We can't do the escapes here - because we don't know whether
      * we are substuting into ${...} or $(...).
      */
-    sub = Var_Subst(NULL, ptr, VAR_GLOBAL, VARE_WANTRES);
+    sub = Var_Subst(ptr, VAR_GLOBAL, VARE_WANTRES);
 
     /*
      * Split into words allowing for quoted strings.
@@ -232,7 +231,7 @@ For_Eval(char *line)
 		continue;
 	    escapes = 0;
 	    while ((ch = *ptr++)) {
-		switch(ch) {
+		switch (ch) {
 		case ':':
 		case '$':
 		case '\\':
@@ -288,49 +287,35 @@ For_Accum(char *line)
 
     if (*ptr == '.') {
 
-	for (ptr++; *ptr && isspace((unsigned char) *ptr); ptr++)
+	for (ptr++; *ptr && isspace((unsigned char)*ptr); ptr++)
 	    continue;
 
 	if (strncmp(ptr, "endfor", 6) == 0 &&
-		(isspace((unsigned char) ptr[6]) || !ptr[6])) {
+	    (isspace((unsigned char)ptr[6]) || !ptr[6])) {
 	    if (DEBUG(FOR))
 		(void)fprintf(debug_file, "For: end for %d\n", forLevel);
 	    if (--forLevel <= 0)
 		return 0;
 	} else if (strncmp(ptr, "for", 3) == 0 &&
-		 isspace((unsigned char) ptr[3])) {
+		   isspace((unsigned char)ptr[3])) {
 	    forLevel++;
 	    if (DEBUG(FOR))
 		(void)fprintf(debug_file, "For: new loop %d\n", forLevel);
 	}
     }
 
-    Buf_AddBytes(&accumFor->buf, strlen(line), line);
+    Buf_AddStr(&accumFor->buf, line);
     Buf_AddByte(&accumFor->buf, '\n');
     return 1;
 }
 
-
-/*-
- *-----------------------------------------------------------------------
- * For_Run --
- *	Run the for loop, imitating the actions of an include file
- *
- * Results:
- *	None.
- *
- * Side Effects:
- *	None.
- *
- *-----------------------------------------------------------------------
- */
 
-static int
+static size_t
 for_var_len(const char *var)
 {
     char ch, var_start, var_end;
     int depth;
-    int len;
+    size_t len;
 
     var_start = *var;
     if (var_start == 0)
@@ -360,24 +345,24 @@ for_var_len(const char *var)
 static void
 for_substitute(Buffer *cmds, strlist_t *items, unsigned int item_no, char ech)
 {
-    const char *item = strlist_str(items, item_no);
-    int len;
     char ch;
+
+    const char *item = strlist_str(items, item_no);
 
     /* If there were no escapes, or the only escape is the other variable
      * terminator, then just substitute the full string */
     if (!(strlist_info(items, item_no) &
-	    (ech == ')' ? ~FOR_SUB_ESCAPE_BRACE : ~FOR_SUB_ESCAPE_PAREN))) {
-	Buf_AddBytes(cmds, strlen(item), item);
+	  (ech == ')' ? ~FOR_SUB_ESCAPE_BRACE : ~FOR_SUB_ESCAPE_PAREN))) {
+	Buf_AddStr(cmds, item);
 	return;
     }
 
     /* Escape ':', '$', '\\' and 'ech' - removed by :U processing */
     while ((ch = *item++) != 0) {
 	if (ch == '$') {
-	    len = for_var_len(item);
+	    size_t len = for_var_len(item);
 	    if (len != 0) {
-		Buf_AddBytes(cmds, len + 1, item - 1);
+		Buf_AddBytes(cmds, item - 1, len + 1);
 		item += len;
 		continue;
 	    }
@@ -392,13 +377,14 @@ static char *
 For_Iterate(void *v_arg, size_t *ret_len)
 {
     For *arg = v_arg;
-    int i, len;
+    int i;
     char *var;
     char *cp;
     char *cmd_cp;
     char *body_end;
     char ch;
     Buffer cmds;
+    size_t cmd_len;
 
     if (arg->sub_next + strlist_num(&arg->vars) > strlist_num(&arg->items)) {
 	/* No more iterations */
@@ -421,9 +407,9 @@ For_Iterate(void *v_arg, size_t *ret_len)
      * to contrive a makefile where an unwanted substitution happens.
      */
 
-    cmd_cp = Buf_GetAll(&arg->buf, &len);
-    body_end = cmd_cp + len;
-    Buf_Init(&cmds, len + 256);
+    cmd_cp = Buf_GetAll(&arg->buf, &cmd_len);
+    body_end = cmd_cp + cmd_len;
+    Buf_Init(&cmds, cmd_len + 256);
     for (cp = cmd_cp; (cp = strchr(cp, '$')) != NULL;) {
 	char ech;
 	ch = *++cp;
@@ -431,15 +417,15 @@ For_Iterate(void *v_arg, size_t *ret_len)
 	    cp++;
 	    /* Check variable name against the .for loop variables */
 	    STRLIST_FOREACH(var, &arg->vars, i) {
-		len = strlist_info(&arg->vars, i);
-		if (memcmp(cp, var, len) != 0)
+		size_t vlen = strlist_info(&arg->vars, i);
+		if (memcmp(cp, var, vlen) != 0)
 		    continue;
-		if (cp[len] != ':' && cp[len] != ech && cp[len] != '\\')
+		if (cp[vlen] != ':' && cp[vlen] != ech && cp[vlen] != '\\')
 		    continue;
 		/* Found a variable match. Replace with :U<value> */
-		Buf_AddBytes(&cmds, cp - cmd_cp, cmd_cp);
-		Buf_AddBytes(&cmds, 2, ":U");
-		cp += len;
+		Buf_AddBytesBetween(&cmds, cmd_cp, cp);
+		Buf_AddStr(&cmds, ":U");
+		cp += vlen;
 		cmd_cp = cp;
 		for_substitute(&cmds, &arg->items, arg->sub_next + i, ech);
 		break;
@@ -457,15 +443,15 @@ For_Iterate(void *v_arg, size_t *ret_len)
 	    if (var[0] != ch || var[1] != 0)
 		continue;
 	    /* Found a variable match. Replace with ${:U<value>} */
-	    Buf_AddBytes(&cmds, cp - cmd_cp, cmd_cp);
-	    Buf_AddBytes(&cmds, 3, "{:U");
+	    Buf_AddBytesBetween(&cmds, cmd_cp, cp);
+	    Buf_AddStr(&cmds, "{:U");
 	    cmd_cp = ++cp;
 	    for_substitute(&cmds, &arg->items, arg->sub_next + i, /*{*/ '}');
-	    Buf_AddBytes(&cmds, 1, "}");
+	    Buf_AddByte(&cmds, '}');
 	    break;
 	}
     }
-    Buf_AddBytes(&cmds, body_end - cmd_cp, cmd_cp);
+    Buf_AddBytesBetween(&cmds, cmd_cp, body_end);
 
     cp = Buf_Destroy(&cmds, FALSE);
     if (DEBUG(FOR))
@@ -478,6 +464,7 @@ For_Iterate(void *v_arg, size_t *ret_len)
     return cp;
 }
 
+/* Run the for loop, imitating the actions of an include file. */
 void
 For_Run(int lineno)
 {
@@ -487,9 +474,9 @@ For_Run(int lineno)
     accumFor = NULL;
 
     if (strlist_num(&arg->items) == 0) {
-        /* Nothing to expand - possibly due to an earlier syntax error. */
-        For_Free(arg);
-        return;
+	/* Nothing to expand - possibly due to an earlier syntax error. */
+	For_Free(arg);
+	return;
     }
 
     Parse_SetInput(NULL, lineno, -1, For_Iterate, arg);

@@ -1,4 +1,4 @@
-/*	$NetBSD: nonints.h,v 1.86 2020/07/26 20:21:31 rillig Exp $	*/
+/*	$NetBSD: nonints.h,v 1.91 2020/08/09 13:05:04 rillig Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -91,8 +91,8 @@ int Compat_Make(void *, void *);
 
 /* cond.c */
 struct If;
-int Cond_EvalExpression(const struct If *, char *, Boolean *, int, Boolean);
-int Cond_Eval(char *);
+CondEvalResult Cond_EvalExpression(const struct If *, char *, Boolean *, int, Boolean);
+CondEvalResult Cond_Eval(char *);
 void Cond_restore_depth(unsigned int);
 unsigned int Cond_save_depth(void);
 
@@ -190,9 +190,9 @@ void Var_Delete(const char *, GNode *);
 void Var_Set(const char *, const char *, GNode *);
 void Var_Append(const char *, const char *, GNode *);
 Boolean Var_Exists(const char *, GNode *);
-char *Var_Value(const char *, GNode *, char **);
+const char *Var_Value(const char *, GNode *, char **);
 const char *Var_Parse(const char *, GNode *, VarEvalFlags, int *, void **);
-char *Var_Subst(const char *, const char *, GNode *, VarEvalFlags);
+char *Var_Subst(const char *, GNode *, VarEvalFlags);
 char *Var_GetTail(const char *);
 char *Var_GetHead(const char *);
 void Var_Init(void);
@@ -200,8 +200,8 @@ void Var_End(void);
 void Var_Stats(void);
 void Var_Dump(GNode *);
 void Var_ExportVars(void);
-void Var_Export(char *, int);
-void Var_UnExport(char *);
+void Var_Export(const char *, Boolean);
+void Var_UnExport(const char *);
 
 /* util.c */
 void (*bmake_signal(int, void (*)(int)))(int);

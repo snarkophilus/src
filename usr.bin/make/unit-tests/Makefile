@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.71 2020/07/28 00:48:00 sjg Exp $
+# $NetBSD: Makefile,v 1.91 2020/08/09 16:32:28 rillig Exp $
 #
 # Unit tests for make(1)
 #
@@ -24,18 +24,24 @@
 # and it should be added to the TESTS list.
 #
 # Any added files must also be added to src/distrib/sets/lists/tests/mi.
-# Makefiles that are not added to TESTS must be ignored in
-# src/tests/usr.bin/make/t_make.sh (example: include-sub).
+# To do that, just run "make sync-mi" in this directory.
+#
+# A few *.mk files are helper files for other tests (such as include-sub.mk)
+# and are thus not added to TESTS.  Such files must be ignored in
+# src/tests/usr.bin/make/t_make.sh.
 #
 
 # Each test is in a sub-makefile.
 # Keep the list sorted.
-TESTS+=		archive
+TESTS+=		# archive	# broken on FreeBSD
+TESTS+=		cmdline
 TESTS+=		comment
 TESTS+=		cond-late
 TESTS+=		cond-short
 TESTS+=		cond1
 TESTS+=		cond2
+TESTS+=		counter
+TESTS+=		dir
 TESTS+=		directives
 TESTS+=		dollar
 TESTS+=		doterror
@@ -46,11 +52,14 @@ TESTS+=		# escape	# broken by reverting POSIX changes
 TESTS+=		export
 TESTS+=		export-all
 TESTS+=		export-env
+TESTS+=		export-variants
 TESTS+=		forloop
 TESTS+=		forsubst
 TESTS+=		hash
-TESTS+=		# impsrc	# broken by reverting POSIX changes
+TESTS+=		impsrc
 TESTS+=		include-main
+TESTS+=		lint
+TESTS+=		make-exported
 TESTS+=		misc
 TESTS+=		moderrs
 TESTS+=		modmatch
@@ -59,16 +68,18 @@ TESTS+=		modorder
 TESTS+=		modts
 TESTS+=		modword
 TESTS+=		order
-TESTS+=		# phony-end	# broken by reverting POSIX changes
+TESTS+=		phony-end
 TESTS+=		posix
 TESTS+=		# posix1	# broken by reverting POSIX changes
 TESTS+=		qequals
-TESTS+=		# suffixes	# broken by reverting POSIX changes
+TESTS+=		recursive
+TESTS+=		# suffixes	# runs into an endless loop (try -dA)
 TESTS+=		sunshcmd
 TESTS+=		sysv
 TESTS+=		ternary
 TESTS+=		unexport
 TESTS+=		unexport-env
+TESTS+=		use-inference
 TESTS+=		varcmd
 TESTS+=		vardebug
 TESTS+=		varfind
@@ -79,26 +90,41 @@ TESTS+=		varquote
 TESTS+=		varshell
 
 # Override environment variables for some of the tests.
+ENV.counter=		-i
 ENV.envfirst=		FROM_ENV=value-from-env
 ENV.export=		-i PATH=${PATH:Q}
+ENV.export-variants=	-i PATH=${PATH:Q}
+ENV.lint=		-i
+ENV.make-exported=	-i PATH=${PATH:Q}
+ENV.recursive=		-i
 ENV.varmisc=		FROM_ENV=env
 ENV.varmisc+=		FROM_ENV_BEFORE=env
 ENV.varmisc+=		FROM_ENV_AFTER=env
 
 # Override make flags for some of the tests; default is -k.
+FLAGS.counter=		-r -dv
 FLAGS.doterror=		# none
 FLAGS.envfirst=		-e
 FLAGS.export=		-r
+FLAGS.lint=		-dL -k
 FLAGS.order=		-j1
+FLAGS.recursive=	-dL -r
 FLAGS.vardebug=		-k -dv FROM_CMDLINE=
 
 # Some tests need extra post-processing.
-SED_CMDS.modmisc+=	-e 's,\(substitution error:\).*,\1 (details omitted),'
+SED_CMDS.moderrs+=	-e 's,\(Regex compilation error:\).*,\1 (details omitted),'
+SED_CMDS.modmisc+=	-e 's,\(Regex compilation error:\).*,\1 (details omitted),'
+SED_CMDS.varmod-edge+=	-e 's, line [0-9]*:, line omitted:,'
 SED_CMDS.varshell+=	-e 's,^[a-z]*sh: ,,'
 SED_CMDS.varshell+=	-e '/command/s,No such.*,not found,'
 
 # Some tests need an additional round of postprocessing.
+POSTPROC.counter=	${TOOL_SED} -n -e '/:RELEVANT = yes/,/:RELEVANT = no/p'
 POSTPROC.vardebug=	${TOOL_SED} -n -e '/:RELEVANT = yes/,/:RELEVANT = no/p'
+
+export-all.rawout: export.mk
+unexport.rawout: export.mk
+unexport-env.rawout: export.mk
 
 # End of the configuration section.
 
@@ -136,7 +162,7 @@ LANG=		C
 	@echo testing ${.IMPSRC}
 	@set -eu; \
 	cd ${.OBJDIR}; \
-	env ${ENV.${.TARGET:R}} ${TEST_MAKE} \
+	env ${ENV.${.TARGET:R}} ${TEST_MAKE} -C ${.CURDIR} \
 	  ${FLAGS.${.TARGET:R}:U-k} -f ${.IMPSRC} \
 	  > ${.TARGET}.tmp 2>&1 \
 	&& status=$$? || status=$$?; \
@@ -158,7 +184,7 @@ _SED_CMDS+=	-e 's,${UNIT_TESTS:S,.,\\.,g}/,,g'
 	@echo postprocess ${.TARGET}
 	@${TOOL_SED} ${_SED_CMDS} ${SED_CMDS.${.TARGET:R}} \
 	  < ${.IMPSRC} > ${.TARGET}.tmp1
-	@${POSTPROC.${.TARGET:R}:U${TOOL_SED}} < ${.TARGET}.tmp1 > ${.TARGET}.tmp2
+	@${POSTPROC.${.TARGET:R}:Ucat} < ${.TARGET}.tmp1 > ${.TARGET}.tmp2
 	@rm ${.TARGET}.tmp1
 	@echo "exit status `cat ${.TARGET:R}.status`" >> ${.TARGET}.tmp2
 	@mv ${.TARGET}.tmp2 ${.TARGET}
@@ -182,6 +208,28 @@ accept:
 	  || { echo "Replacing $${test}.exp" ; \
 	       cp $${test}.out ${UNIT_TESTS}/$${test}.exp ; } \
 	done
+
+SYNC_MI_AWK= \
+	BEGIN {								\
+	  testsdir = "usr.bin/make/unit-tests";				\
+	  linestart = "./usr/tests/" testsdir;				\
+	  fmt = linestart "/%s\ttests-usr.bin-tests\tcompattestfile,atf\\n"; \
+	  cmd = "cd " testsdir " && ls *.exp *.mk | xargs printf '" fmt "'" \
+	}								\
+	function startswith(s, prefix) {				\
+	  return substr(s, 1, length(prefix)) == prefix;		\
+	}								\
+	startswith($$1, linestart) && $$1 ~ /\.(exp|mk)$$/ { next }	\
+	{ print $$0 }							\
+	$$1 == linestart "/Makefile" { system(cmd) }
+
+sync-mi:
+	@set -eu;							\
+	cd "${MAKEFILE:tA:H}/../../..";					\
+	mi="distrib/sets/lists/tests/mi";				\
+	awk ${SYNC_MI_AWK:Q} < "$$mi" > "$$mi.$@";			\
+	mv -f "$$mi.$@" "$$mi";						\
+	cvs diff "$$mi" || true
 
 .if exists(${TEST_MAKE})
 ${TESTS:=.rawout}: ${TEST_MAKE}
