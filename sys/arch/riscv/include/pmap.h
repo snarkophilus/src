@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.5 2020/08/07 07:19:45 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.6 2020/08/10 06:53:11 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
