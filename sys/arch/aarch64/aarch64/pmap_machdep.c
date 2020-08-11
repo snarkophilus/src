@@ -91,14 +91,11 @@ bool
 pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 {
 	paddr_t pa;
-
-	// XXXNH copy of ryopmap behaviour.
-	*coherentp = false;
+	bool coherency = false;
 
 	if (pm == pmap_kernel()) {
 		if (pmap_md_direct_mapped_vaddr_p(va)) {
 			pa = pmap_md_direct_mapped_vaddr_to_paddr(va);
-//			*coherentp = true;
 			goto done;
 		}
 		if (pmap_md_io_vaddr_p(va))
@@ -111,16 +108,30 @@ pmap_extract_coherency(pmap_t pm, vaddr_t va, paddr_t *pap, bool *coherentp)
 
 	kpreempt_disable();
 	const pt_entry_t * const ptep = pmap_pte_lookup(pm, va);
-	if (ptep == NULL || !pte_valid_p(*ptep)) {
+	pt_entry_t pte;
+
+	if (ptep == NULL || !pte_valid_p(pte = *ptep)) {
 		kpreempt_enable();
 		return false;
 	}
-
-	pa = pte_to_paddr(*ptep) | (va & PGOFSET);
 	kpreempt_enable();
-done:
+
+	pa = pte_to_paddr(pte) | (va & PGOFSET);
+
+	switch (pte & LX_BLKPAG_ATTR_MASK) {
+	case LX_BLKPAG_ATTR_NORMAL_NC:
+	case LX_BLKPAG_ATTR_DEVICE_MEM:
+	case LX_BLKPAG_ATTR_DEVICE_MEM_SO:
+		coherency = true;
+		break;
+	}
+
+ done:
 	if (pap != NULL) {
 		*pap = pa;
+	}
+	if (coherentp != NULL) {
+		*coherentp = coherency;
 	}
 	return true;
 }
