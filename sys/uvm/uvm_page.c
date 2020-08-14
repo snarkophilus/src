@@ -240,17 +240,15 @@ uvm_pageinsert_tree(struct uvm_object *uobj, struct vm_page *pg)
 	const uint64_t idx = pg->offset >> PAGE_SHIFT;
 	int error;
 
-	KASSERT(rw_write_held(uobj->vmobjlock));
-
 	error = radix_tree_insert_node(&uobj->uo_pages, idx, pg);
 	if (error != 0) {
 		return error;
 	}
 	if ((pg->flags & PG_CLEAN) == 0) {
-		uvm_obj_page_set_dirty(pg);
+		radix_tree_set_tag(&uobj->uo_pages, idx, UVM_PAGE_DIRTY_TAG);
 	}
 	KASSERT(((pg->flags & PG_CLEAN) == 0) ==
-		uvm_obj_page_dirty_p(pg));
+	    radix_tree_get_tag(&uobj->uo_pages, idx, UVM_PAGE_DIRTY_TAG));
 	return 0;
 }
 
@@ -298,8 +296,6 @@ static inline void
 uvm_pageremove_tree(struct uvm_object *uobj, struct vm_page *pg)
 {
 	struct vm_page *opg __unused;
-
-	KASSERT(rw_write_held(uobj->vmobjlock));
 
 	opg = radix_tree_remove_node(&uobj->uo_pages, pg->offset >> PAGE_SHIFT);
 	KASSERT(pg == opg);
@@ -1367,9 +1363,11 @@ uvm_pagereplace(struct vm_page *oldpg, struct vm_page *newpg)
 	KASSERT(pg == oldpg);
 	if (((oldpg->flags ^ newpg->flags) & PG_CLEAN) != 0) {
 		if ((newpg->flags & PG_CLEAN) != 0) {
-			uvm_obj_page_clear_dirty(newpg);
+			radix_tree_clear_tag(&uobj->uo_pages, idx,
+			    UVM_PAGE_DIRTY_TAG);
 		} else {
-			uvm_obj_page_set_dirty(newpg);
+			radix_tree_set_tag(&uobj->uo_pages, idx,
+			    UVM_PAGE_DIRTY_TAG);
 		}
 	}
 	/*
@@ -1790,13 +1788,8 @@ struct vm_page *
 uvm_pagelookup(struct uvm_object *obj, voff_t off)
 {
 	struct vm_page *pg;
-	bool ddb = false;
-#ifdef DDB
-	extern int db_active;
-	ddb = db_active != 0;
-#endif
 
-	KASSERT(ddb || rw_lock_held(obj->vmobjlock));
+	/* No - used from DDB. KASSERT(rw_lock_held(obj->vmobjlock)); */
 
 	pg = radix_tree_lookup_node(&obj->uo_pages, off >> PAGE_SHIFT);
 

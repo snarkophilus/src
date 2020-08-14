@@ -60,11 +60,12 @@ unsigned int
 uvm_pagegetdirty(struct vm_page *pg)
 {
 	struct uvm_object * const uobj __diagused = pg->uobject;
+	const uint64_t idx __diagused = pg->offset >> PAGE_SHIFT;
 
 	KASSERT((~pg->flags & (PG_CLEAN|PG_DIRTY)) != 0);
 	KASSERT(uvm_page_owner_locked_p(pg, false));
 	KASSERT(uobj == NULL || ((pg->flags & PG_CLEAN) == 0) ==
-		uvm_obj_page_dirty_p(pg));
+	    !!radix_tree_get_tag(&uobj->uo_pages, idx, UVM_PAGE_DIRTY_TAG));
 	return pg->flags & (PG_CLEAN|PG_DIRTY);
 }
 
@@ -84,6 +85,7 @@ void
 uvm_pagemarkdirty(struct vm_page *pg, unsigned int newstatus)
 {
 	struct uvm_object * const uobj = pg->uobject;
+	const uint64_t idx = pg->offset >> PAGE_SHIFT;
 	const unsigned int oldstatus = uvm_pagegetdirty(pg);
 	enum cpu_count base;
 
@@ -91,7 +93,7 @@ uvm_pagemarkdirty(struct vm_page *pg, unsigned int newstatus)
 	KASSERT((newstatus & ~(PG_CLEAN|PG_DIRTY)) == 0);
 	KASSERT(uvm_page_owner_locked_p(pg, true));
 	KASSERT(uobj == NULL || ((pg->flags & PG_CLEAN) == 0) ==
-		uvm_obj_page_dirty_p(pg));
+	    !!radix_tree_get_tag(&uobj->uo_pages, idx, UVM_PAGE_DIRTY_TAG));
 
 	if (oldstatus == newstatus) {
 		return;
@@ -104,17 +106,20 @@ uvm_pagemarkdirty(struct vm_page *pg, unsigned int newstatus)
 
 	if (uobj != NULL) {
 		if (newstatus == UVM_PAGE_STATUS_CLEAN) {
-			uvm_obj_page_clear_dirty(pg);
+			radix_tree_clear_tag(&uobj->uo_pages, idx,
+			    UVM_PAGE_DIRTY_TAG);
 		} else if (oldstatus == UVM_PAGE_STATUS_CLEAN) {
 			/*
 			 * on first dirty page, mark the object dirty.
 			 * for vnodes this inserts to the syncer worklist.
 			 */
-			if (uvm_obj_clean_p(uobj) &&
+			if (radix_tree_empty_tagged_tree_p(&uobj->uo_pages,
+		            UVM_PAGE_DIRTY_TAG) &&
 		            uobj->pgops->pgo_markdirty != NULL) {
 				(*uobj->pgops->pgo_markdirty)(uobj);
 			}
-			uvm_obj_page_set_dirty(pg);
+			radix_tree_set_tag(&uobj->uo_pages, idx,
+			    UVM_PAGE_DIRTY_TAG);
 		}
 	}
 	if (newstatus == UVM_PAGE_STATUS_UNKNOWN) {
@@ -126,7 +131,7 @@ uvm_pagemarkdirty(struct vm_page *pg, unsigned int newstatus)
 	pg->flags &= ~(PG_CLEAN|PG_DIRTY);
 	pg->flags |= newstatus;
 	KASSERT(uobj == NULL || ((pg->flags & PG_CLEAN) == 0) ==
-		uvm_obj_page_dirty_p(pg));
+	    !!radix_tree_get_tag(&uobj->uo_pages, idx, UVM_PAGE_DIRTY_TAG));
 	if ((pg->flags & PG_STAT) != 0) {
 		if ((pg->flags & PG_SWAPBACKED) != 0) {
 			base = CPU_COUNT_ANONUNKNOWN;

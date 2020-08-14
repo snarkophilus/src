@@ -776,14 +776,6 @@ void			uvm_obj_destroy(struct uvm_object *, bool);
 int			uvm_obj_wirepages(struct uvm_object *, off_t, off_t,
 			    struct pglist *);
 void			uvm_obj_unwirepages(struct uvm_object *, off_t, off_t);
-bool			uvm_obj_clean_p(struct uvm_object *);
-bool			uvm_obj_nowriteback_p(struct uvm_object *);
-bool			uvm_obj_page_dirty_p(struct vm_page *);
-void			uvm_obj_page_set_dirty(struct vm_page *);
-void			uvm_obj_page_clear_dirty(struct vm_page *);
-bool			uvm_obj_page_writeback_p(struct vm_page *);
-void			uvm_obj_page_set_writeback(struct vm_page *);
-void			uvm_obj_page_clear_writeback(struct vm_page *);
 
 /* uvm_page.c */
 int			uvm_availmem(bool);
@@ -834,6 +826,7 @@ int			uvn_findpages(struct uvm_object *, voff_t,
 			    unsigned int *, struct vm_page **,
 			    struct uvm_page_array *, unsigned int);
 bool			uvn_text_p(struct uvm_object *);
+bool			uvn_clean_p(struct uvm_object *);
 bool			uvn_needs_writefault_p(struct uvm_object *);
 
 /* kern_malloc.c */
