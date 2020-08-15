@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_page_status.c,v 1.5 2020/05/15 22:25:18 ad Exp $	*/
+/*	$NetBSD: uvm_page_status.c,v 1.6 2020/08/14 09:06:15 chs Exp $	*/
 
 /*-
  * Copyright (c)2011 YAMAMOTO Takashi,
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_page_status.c,v 1.5 2020/05/15 22:25:18 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_page_status.c,v 1.6 2020/08/14 09:06:15 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

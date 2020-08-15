@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_object.h,v 1.38 2020/03/14 20:45:23 ad Exp $	*/
+/*	$NetBSD: uvm_object.h,v 1.39 2020/08/14 09:06:15 chs Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.

@@ -1,4 +1,4 @@
-/*	$NetBSD: genfs_io.c,v 1.99 2020/08/10 11:09:15 rin Exp $	*/
+/*	$NetBSD: genfs_io.c,v 1.100 2020/08/14 09:06:14 chs Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: genfs_io.c,v 1.99 2020/08/10 11:09:15 rin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: genfs_io.c,v 1.100 2020/08/14 09:06:14 chs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

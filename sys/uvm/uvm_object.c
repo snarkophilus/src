@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_object.c,v 1.23 2020/05/25 21:15:10 ad Exp $	*/
+/*	$NetBSD: uvm_object.c,v 1.24 2020/08/14 09:06:15 chs Exp $	*/
 
 /*
  * Copyright (c) 2006, 2010, 2019 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_object.c,v 1.23 2020/05/25 21:15:10 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_object.c,v 1.24 2020/08/14 09:06:15 chs Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_ddb.h"
