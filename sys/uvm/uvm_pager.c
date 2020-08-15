@@ -391,10 +391,8 @@ uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, bool write, int error)
 #endif /* defined(VMSWAP) */
 
 		if (write && uobj != NULL) {
-			KASSERT(radix_tree_get_tag(&uobj->uo_pages,
-			    pg->offset >> PAGE_SHIFT, UVM_PAGE_WRITEBACK_TAG));
-			radix_tree_clear_tag(&uobj->uo_pages,
-			    pg->offset >> PAGE_SHIFT, UVM_PAGE_WRITEBACK_TAG);
+			KASSERT(uvm_obj_page_writeback_p(pg));
+			uvm_obj_page_clear_writeback(pg);
 		}
 
 		/*
