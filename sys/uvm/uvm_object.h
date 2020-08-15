@@ -104,7 +104,7 @@ extern const struct uvm_pagerops aobj_pager;
 	(UVM_OBJ_IS_VNODE(uobj) && uvn_text_p(uobj))
 
 #define	UVM_OBJ_IS_CLEAN(uobj)						\
-	(UVM_OBJ_IS_VNODE(uobj) && uvn_clean_p(uobj))
+	(UVM_OBJ_IS_VNODE(uobj) && uvm_obj_clean_p(uobj))
 
 /*
  * UVM_OBJ_NEEDS_WRITEFAULT: true if the uobj needs to detect modification.
@@ -114,7 +114,7 @@ extern const struct uvm_pagerops aobj_pager;
  */
 
 #define	UVM_OBJ_NEEDS_WRITEFAULT(uobj)					\
-	(UVM_OBJ_IS_VNODE(uobj) && uvn_clean_p(uobj))
+	(UVM_OBJ_IS_VNODE(uobj) && uvm_obj_clean_p(uobj))
 
 #define	UVM_OBJ_IS_AOBJ(uobj)						\
 	((uobj)->pgops == &aobj_pager)
