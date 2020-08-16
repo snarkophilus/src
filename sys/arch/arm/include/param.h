@@ -186,4 +186,7 @@
 #endif
 #endif /* _KERNEL */
 
+#define COHERENCY_UNIT		32
+#define CACHE_LINE_SIZE		32
+
 #endif /* _ARM_PARAM_H_ */
