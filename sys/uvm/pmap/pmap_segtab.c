@@ -495,13 +495,19 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 }
 
 static void
-pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp)
+pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp, const char *caller)
 {
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmapsegtabhist, "pm %jx va %jx", (uintptr_t)pmap,
 	    (uintptr_t)ptp, 0, 0);
 
 	const vaddr_t kva = (vaddr_t)ptp;
+	/*
+	 * All pte arrays should be page aligned.
+	 */
+	if ((kva & PAGE_MASK) != 0) {
+		panic("%s: pte entry at %p not page aligned", caller, ptp);
+	}
 
 #ifdef DEBUG
 	for (size_t j = 0; j < NPTEPG; j++) {
@@ -616,7 +622,6 @@ pmap_segtab_alloc(struct pmap *pmap)
 	pmap_segtab_t *stp;
 	bool found_on_freelist = false;
 
-	UVMHIST_FUNC(__func__);
  again:
 	mutex_spin_enter(&pmap_segtab_lock);
 	if (__predict_true((stp = pmap_segtab_info.segalloc.free_segtab) != NULL)) {
@@ -624,7 +629,8 @@ pmap_segtab_alloc(struct pmap *pmap)
 		SEGTAB_ADD(nget, 1);
 		stp->seg_next = NULL;
 		found_on_freelist = true;
-		UVMHIST_LOG(pmapsegtabhist, "freelist stp=%#jx", stp, 0, 0, 0);
+		UVMHIST_LOG(pmapsegtabhist, "freelist stp=%#jx",
+		    (uintptr_t)stp, 0, 0, 0);
 	}
 	mutex_spin_exit(&pmap_segtab_lock);
 
@@ -643,7 +649,8 @@ pmap_segtab_alloc(struct pmap *pmap)
 		const paddr_t stp_pa = VM_PAGE_TO_PHYS(stp_pg);
 
 		stp = (pmap_segtab_t *)PMAP_MAP_POOLPAGE(stp_pa);
-+		UVMHIST_LOG(pmapsegtabhist, "new stp=%#jx", stp, 0, 0, 0);
+		UVMHIST_LOG(pmapsegtabhist, "new stp=%#jx", (uintptr_t)stp, 0,
+		    0, 0);
 #if 0
 CTASSERT(NBPG / sizeof(*stp) == 1);
 		const size_t n = NBPG / sizeof(*stp);
@@ -758,7 +765,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 		if (ptb == NULL)
 			continue;
 
-		pmap_ptpage_free(pmap, ptb);
+		pmap_ptpage_free(pmap, ptb, __func__);
 		ptp->pde_pde[i] = pte_invalid_pde();
 		UVMHIST_LOG(pmapsegtabhist, " zeroing tab[%jd]", i, 0, 0, 0);
 	}
@@ -813,7 +820,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		if (callback != NULL) {
 			(*callback)(pmap, va, va + vinc, stb->ptp_ptes, flags);
 		}
-		pmap_ptpage_free(pmap, stb);
+		pmap_ptpage_free(pmap, stb, __func__);
 		stp->seg_tab[i] = NULL;
 		UVMHIST_LOG(pmaphist, " zeroing tab[%jd]", i, 0, 0, 0);
 	}
@@ -1121,7 +1128,7 @@ pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 		pd_entry_t opde = *pde_p;
 		opde = pte_pde_cas(pde_p, opde, npde);
 		if (__predict_false(pte_pde_valid_p(opde))) {
-			pmap_ptpage_free(pmap, ptp);
+			pmap_ptpage_free(pmap, ptp, __func__);
 			ptp = pmap_pde_to_ptpage(opde);
 		}
 #else
@@ -1132,7 +1139,7 @@ pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 		 * free the page we just allocated.
 		 */
 		if (__predict_false(optp != NULL)) {
-			pmap_ptpage_free(pmap, ptp);
+			pmap_ptpage_free(pmap, ptp, __func__);
 			ptp = optp;
 #if defined(PMAP_HWPAGEWALKER)
 		} else {
