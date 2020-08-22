@@ -183,5 +183,4 @@ typedef __uint32_t tlb_asid_t;
 #endif
 #endif /* _KERNEL */
 
-
 #endif	/* _MIPS_TYPES_H_ */
