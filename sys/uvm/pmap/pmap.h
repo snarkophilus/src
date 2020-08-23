@@ -82,7 +82,7 @@
 #ifdef UVMHIST
 UVMHIST_DECL(pmapexechist);
 UVMHIST_DECL(pmaphist);
-UVMHIST_DECL(pmapsegtabhist);
+UVMHIST_DECL(pmapxtabhist);
 #endif
 #else
 UVMHIST_DECL(maphist);
