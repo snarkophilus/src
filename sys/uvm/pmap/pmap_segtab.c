@@ -210,7 +210,7 @@ pmap_check_stp(pmap_segtab_t *stp, const char *caller, const char *why)
 #define DEBUG_NOISY
 #ifdef DEBUG_NOISY
 			UVMHIST_FUNC(__func__);
-			UVMHIST_CALLARGS(pmapsegtabhist, "stp=%#jx",
+			UVMHIST_CALLARGS(pmapxtabhist, "stp=%#jx",
 			    (uintptr_t)stp, 0, 0, 0);
 			for (size_t j = i; j < PMAP_SEGTABSIZE; j++)
 				if (stp->seg_tab[j] != NULL)
@@ -498,7 +498,7 @@ static void
 pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp, const char *caller)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmapsegtabhist, "pm %jx va %jx", (uintptr_t)pmap,
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %jx va %jx", (uintptr_t)pmap,
 	    (uintptr_t)ptp, 0, 0);
 
 	const vaddr_t kva = (vaddr_t)ptp;
@@ -512,13 +512,13 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp, const char *caller)
 #ifdef DEBUG
 	for (size_t j = 0; j < NPTEPG; j++) {
 		if (ptp->ptp_ptes[j] != 0) {
-			UVMHIST_LOG(pmapsegtabhist,
+			UVMHIST_LOG(pmapxtabhist,
 			    "pte entry %#jx not 0 (%#jx)",
 			    (uintptr_t)&ptp->ptp_ptes[j],
 			    (uintptr_t)ptp->ptp_ptes[j], 0, 0);
 			for (size_t i = j + 1; j < NPTEPG; i++)
 				if (ptp->ptp_ptes[i] != 0)
-					UVMHIST_LOG(pmapsegtabhist,
+					UVMHIST_LOG(pmapxtabhist,
 					    "pte[%zu] = %#"PRIxPTE,
 					    i, ptp->ptp_ptes[i], 0, 0);
 
@@ -543,7 +543,7 @@ static pmap_pdetab_t *
 pmap_pdetab_alloc(struct pmap *pmap)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 	pmap_pdetab_t *ptb;
 #ifdef KERNHIST
@@ -557,8 +557,8 @@ pmap_pdetab_alloc(struct pmap *pmap)
 	if (__predict_true((ptb = pmap_segtab_info.pdealloc.free_pdetab) != NULL)) {
 		pmap_segtab_info.pdealloc.free_pdetab = ptb->pde_next;
 
-		UVMHIST_LOG(pmaphist, "ptb %jx free_pdetab %jx", (uintptr_t)ptb,
-		    (uintptr_t)pmap_segtab_info.pdealloc.free_pdetab, 0, 0);
+		UVMHIST_LOG(pmapxtabhist, "freelist ptb=%#jx",
+		    (uintptr_t)ptb, 0, 0, 0);
 
 		PDETAB_ADD(nget, 1);
 		ptb->pde_next = NULL;
@@ -583,6 +583,8 @@ pmap_pdetab_alloc(struct pmap *pmap)
 		PDETAB_ADD(npage, 1);
 		const paddr_t ptb_pa = VM_PAGE_TO_PHYS(ptb_pg);
 		ptb = (pmap_pdetab_t *)PMAP_MAP_POOLPAGE(ptb_pa);
+		UVMHIST_LOG(pmapxtabhist, "new ptb=%#jx", (uintptr_t)ptb, 0,
+		    0, 0);
 
 		if (pte_invalid_pde() != 0) {
 			for (size_t i = 0; i < NPDEPG; i++) {
@@ -617,7 +619,7 @@ static pmap_segtab_t *
 pmap_segtab_alloc(struct pmap *pmap)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmapsegtabhist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %jx", (uintptr_t)pmap, 0, 0, 0);
 
 	pmap_segtab_t *stp;
 	bool found_on_freelist = false;
@@ -629,7 +631,7 @@ pmap_segtab_alloc(struct pmap *pmap)
 		SEGTAB_ADD(nget, 1);
 		stp->seg_next = NULL;
 		found_on_freelist = true;
-		UVMHIST_LOG(pmapsegtabhist, "freelist stp=%#jx",
+		UVMHIST_LOG(pmapxtabhist, "freelist stp=%#jx",
 		    (uintptr_t)stp, 0, 0, 0);
 	}
 	mutex_spin_exit(&pmap_segtab_lock);
@@ -649,7 +651,7 @@ pmap_segtab_alloc(struct pmap *pmap)
 		const paddr_t stp_pa = VM_PAGE_TO_PHYS(stp_pg);
 
 		stp = (pmap_segtab_t *)PMAP_MAP_POOLPAGE(stp_pa);
-		UVMHIST_LOG(pmapsegtabhist, "new stp=%#jx", (uintptr_t)stp, 0,
+		UVMHIST_LOG(pmapxtabhist, "new stp=%#jx", (uintptr_t)stp, 0,
 		    0, 0);
 #if 0
 CTASSERT(NBPG / sizeof(*stp) == 1);
@@ -734,9 +736,9 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 	pmap_pdetab_t *ptp = *ptp_p;
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "pm %#jx ptp %#jx free %jd",
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %#jx ptpp %#jx free %jd",
 	    (uintptr_t)pmap, (uintptr_t)ptp, free_ptp, 0);
-	UVMHIST_LOG(pmaphist, " va=%jx vinc=%jx",
+	UVMHIST_LOG(pmapxtabhist, " va=%jx vinc=%jx",
 	    (uintptr_t)va, (uintptr_t)vinc, 0, 0);
 
 	for (size_t i = (va / vinc) & pdetab_mask;
@@ -767,7 +769,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 
 		pmap_ptpage_free(pmap, ptb, __func__);
 		ptp->pde_pde[i] = pte_invalid_pde();
-		UVMHIST_LOG(pmapsegtabhist, " zeroing tab[%jd]", i, 0, 0, 0);
+		UVMHIST_LOG(pmapxtabhist, " zeroing tab[%jd]", i, 0, 0, 0);
 	}
 
 	if (free_ptp) {
@@ -787,9 +789,9 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 	pmap_segtab_t *stp = *stp_p;
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmapsegtabhist, "pm=%#jx stpp=%#jx free=%jd",
+	UVMHIST_CALLARGS(pmapxtabhist, "pm=%#jx stpp=%#jx free=%jd",
 	    (uintptr_t)pmap, (uintptr_t)stp, free_stp, 0);
-	UVMHIST_LOG(pmapsegtabhist, " callback=%jx flags=%jx va=%jx vinc=%jx",
+	UVMHIST_LOG(pmapxtabhist, " callback=%jx flags=%jx va=%jx vinc=%jx",
 	    (uintptr_t)callback, flags, (uintptr_t)va, (uintptr_t)vinc);
 
 	for (size_t i = (va / vinc) & (PMAP_SEGTABSIZE - 1);
@@ -798,7 +800,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 #ifdef _LP64
 		if (vinc > NBSEG) {
 			if (stp->seg_seg[i] != NULL) {
-				UVMHIST_LOG(pmapsegtabhist,
+				UVMHIST_LOG(pmapxtabhist,
 				    " recursing %jd", i, 0, 0, 0);
 				pmap_segtab_release(pmap, &stp->seg_seg[i],
 				    true, callback, flags, va, vinc / NSEGPG);
