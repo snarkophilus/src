@@ -749,7 +749,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 			if (pte_pde_valid_p(ptp->pde_pde[i])) {
 				pmap_pdetab_t *nptp =
 				    pmap_pde_to_pdetab(ptp->pde_pde[i]);
-				UVMHIST_LOG(pmaphist, " recursing", 0, 0, 0, 0);
+				UVMHIST_LOG(pmapxtabhist, " recursing", 0, 0, 0, 0);
 				pmap_pdetab_release(pmap, &nptp, true,
 				    va, vinc / NPDEPG);
 				ptp->pde_pde[i] = pte_invalid_pde();
@@ -824,7 +824,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		}
 		pmap_ptpage_free(pmap, stb, __func__);
 		stp->seg_tab[i] = NULL;
-		UVMHIST_LOG(pmaphist, " zeroing tab[%jd]", i, 0, 0, 0);
+		UVMHIST_LOG(pmapxtabhist, " zeroing tab[%jd]", i, 0, 0, 0);
 	}
 
 	if (free_stp) {
