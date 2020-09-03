@@ -516,7 +516,7 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp, const char *caller)
 			    "pte entry %#jx not 0 (%#jx)",
 			    (uintptr_t)&ptp->ptp_ptes[j],
 			    (uintptr_t)ptp->ptp_ptes[j], 0, 0);
-			for (size_t i = j + 1; j < NPTEPG; i++)
+			for (size_t i = j + 1; i < NPTEPG; i++)
 				if (ptp->ptp_ptes[i] != 0)
 					UVMHIST_LOG(pmapxtabhist,
 					    "pte[%zu] = %#"PRIxPTE,
