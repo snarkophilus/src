@@ -753,9 +753,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 				pmap_pdetab_release(pmap, &nptp, true,
 				    va, vinc / NPDEPG);
 				ptp->pde_pde[i] = pte_invalid_pde();
-				KASSERTMSG(ptp->pde_pde[i] == pte_invalid_pde(),
-				    "ptp->pde_pde[%zu] = %lx", i,
-				    ptp->pde_pde[i]);
+				KASSERTMSG(nptp == NULL);
 			}
 			continue;
 		}
