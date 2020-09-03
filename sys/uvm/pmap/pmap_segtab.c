@@ -736,8 +736,8 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 	pmap_pdetab_t *ptp = *ptp_p;
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmapxtabhist, "pm %#jx ptpp %#jx free %jd",
-	    (uintptr_t)pmap, (uintptr_t)ptp, free_ptp, 0);
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %#jx ptp_p %#jx ptp %#jx free %jd",
+	    (uintptr_t)pmap, (uintptr_t)ptp_p, (uintptr_t)ptp, free_ptp);
 	UVMHIST_LOG(pmapxtabhist, " va=%jx vinc=%jx",
 	    (uintptr_t)va, (uintptr_t)vinc, 0, 0);
 
