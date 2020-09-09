@@ -4,7 +4,7 @@ include "arch/evbarm/conf/GENERIC64"
 
 options 	PMAP_COMMON
 options 	PMAP_FAULTINFO
-options 	UVMHIST
+options 	UVM_PAGE_TRKOWN
 
 options 	VERBOSE_INIT_ARM # verbose bootstrapping messages
 #options 	EARLYCONS=virt, CONSADDR=0x09000000
