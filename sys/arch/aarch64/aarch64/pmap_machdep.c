@@ -380,7 +380,9 @@ struct vm_page *pmap_md_alloc_poolpage(int);
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
-	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "vstart=%#jx vend=%#jx", (uintptr_t)vstart,
+	    (uintptr_t)vend, 0, 0);
 
 	pmap_t pm = pmap_kernel();
 
@@ -455,8 +457,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
 
 
-        pmap_limits.virtual_start = virtual_avail;
-        pmap_limits.virtual_end = virtual_end;
+	pmap_limits.virtual_start = virtual_avail;
+	pmap_limits.virtual_end = virtual_end;
 
 	pool_init(&pmap_pmap_pool, PMAP_SIZE, 0, 0, 0, "pmappl",
 	    &pool_allocator_nointr, IPL_NONE);
@@ -915,7 +917,7 @@ pmap_devmap_find_va(vaddr_t va, vsize_t size)
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
 		if ((va >= pmap_devmap_table[i].pd_va) &&
 		    (endva <= pmap_devmap_table[i].pd_va +
-		              pmap_devmap_table[i].pd_size)) {
+			      pmap_devmap_table[i].pd_size)) {
 			return &pmap_devmap_table[i];
 		}
 	}
@@ -935,7 +937,7 @@ pmap_devmap_find_pa(paddr_t pa, psize_t size)
 	for (i = 0; pmap_devmap_table[i].pd_size != 0; i++) {
 		if (pa >= pmap_devmap_table[i].pd_pa &&
 		    (endpa <= pmap_devmap_table[i].pd_pa +
-		              pmap_devmap_table[i].pd_size))
+			      pmap_devmap_table[i].pd_size))
 			return (&pmap_devmap_table[i]);
 	}
 	return NULL;
