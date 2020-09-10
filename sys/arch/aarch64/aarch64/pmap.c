@@ -447,7 +447,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	PMAP_HIST_INIT();	/* init once */
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
+	UVMHIST_CALLARGS(pmaphist, "vstart=%#jx vend=%#jx", (uintptr_t)vstart,
+	    (uintptr_t)vend, 0, 0);
 
 	uvmexp.ncolors = aarch64_cache_vindexsize / PAGE_SIZE;
 
