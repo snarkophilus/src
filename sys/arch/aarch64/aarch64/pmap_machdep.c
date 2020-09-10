@@ -380,9 +380,7 @@ struct vm_page *pmap_md_alloc_poolpage(int);
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "vstart=%#jx vend=%#jx", (uintptr_t)vstart,
-	    (uintptr_t)vend, 0, 0);
+	VPRINTF("bootstrap(%" PRIxVADDR ", %" PRIxVADDR ")", vstart, vend);
 
 	pmap_t pm = pmap_kernel();
 
@@ -426,7 +424,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	kcpuset_set(pm->pm_active, cpu_number());
 #endif
 
-	VPRINTF("specials ");
+	VPRINTF("specials(none) ");
 
 	/*
 	 * does VIPT exist for aarch64?
@@ -447,6 +445,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 #endif
 
 
+	VPRINTF("limits ");
+
 	/*
 	 * Initialize `FYI' variables.	Note we're relying on
 	 * the fact that BSEARCH sorts the vm_physmem[] array
@@ -455,7 +455,6 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	 */
 	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
 	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
-
 
 	pmap_limits.virtual_start = virtual_avail;
 	pmap_limits.virtual_end = virtual_end;
@@ -466,6 +465,8 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	    &pmap_pv_page_allocator, IPL_NONE);
 
 	pmap_pvlist_lock_init(/*arm_dcache_align*/ 128);
+
+	VPRINTF("done\n");
 }
 
 
@@ -473,6 +474,7 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 void
 pmap_md_init(void)
 {
+
 
 	//XXXNH implement this.
 //	pmap_md_alloc_ephemeral_address_space(curcpu());
