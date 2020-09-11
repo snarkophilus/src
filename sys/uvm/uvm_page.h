@@ -471,10 +471,6 @@ uvm_page_set_bucket(struct vm_page *pg, unsigned b)
 	pg->phys_addr |= __SHIFTIN(b, UVM_PHYSADDR_BUCKET);
 }
 
-#ifdef DEBUG
-void uvm_pagezerocheck(struct vm_page *);
-#endif /* DEBUG */
-
 #endif /* _KERNEL */
 
 #endif /* _UVM_UVM_PAGE_H_ */
