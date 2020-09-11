@@ -293,7 +293,10 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 		}
 	}
 
-	/* Boot strap pmap telling it where the managed kernel virtual memory is */
+	/*
+	 * Bootstrap pmap telling it where the managed kernel virtual memory
+	 * is.
+	 */
 	VPRINTF("pmap ");
 	pmap_bootstrap(kvm_base, kvm_base + kvm_size);
 
