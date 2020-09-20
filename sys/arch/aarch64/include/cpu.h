@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.h,v 1.26 2020/08/12 13:19:35 skrll Exp $ */
+/* $NetBSD: cpu.h,v 1.27 2020/09/14 10:06:35 ryo Exp $ */
 
 /*-
  * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
@@ -46,8 +46,8 @@
 #if defined(_KERNEL) || defined(_KMEMUSER)
 #include <sys/evcnt.h>
 
-#include <aarch64/frame.h>
 #include <aarch64/armreg.h>
+#include <aarch64/frame.h>
 
 struct clockframe {
 	struct trapframe cf_tf;
@@ -155,6 +155,21 @@ static __inline struct cpu_info *lwp_getcpu(struct lwp *);
 #undef curlwp
 #define	curlwp			(aarch64_curlwp())
 #define	curpcb			((struct pcb *)lwp_getpcb(curlwp))
+
+static __inline int
+cpu_maxproc(void)
+{
+#if defined(PMAP_COMMON)
+	return 0;
+#else
+	/*
+	 * XXX: due to the current implementation of pmap depends on 16bit
+	 * ASID
+	 */
+	return 1U << 16;
+
+#endif
+}
 
 void	cpu_signotify(struct lwp *l);
 void	cpu_need_proftick(struct lwp *l);

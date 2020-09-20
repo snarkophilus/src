@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.42 2020/08/12 13:36:36 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.43 2020/09/19 13:33:08 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -156,8 +156,6 @@ const struct pmap_devmap *pmap_devmap_find_pa(paddr_t, psize_t);
 const struct pmap_devmap *pmap_devmap_find_va(vaddr_t, vsize_t);
 vaddr_t pmap_devmap_phystov(paddr_t);
 paddr_t pmap_devmap_vtophys(paddr_t);
-
-paddr_t pmap_alloc_pdp(struct pmap *, struct vm_page **, int, bool);
 
 #define L1_TRUNC_BLOCK(x)	((x) & L1_FRAME)
 #define L1_ROUND_BLOCK(x)	L1_TRUNC_BLOCK((x) + L1_SIZE - 1)
@@ -330,8 +328,8 @@ struct vm_page_md {
 #define LX_BLKPAG_OS_RWMASK		(LX_BLKPAG_OS_WRITE|LX_BLKPAG_OS_READ)
 
 
-#define VTOPHYS_FAILED		((paddr_t)-1L)	/* POOL_PADDR_INVALID */
-#define POOL_VTOPHYS(va)	vtophys((vaddr_t) (va))
+#define VTOPHYS_FAILED			((paddr_t)-1L)	/* POOL_PADDR_INVALID */
+#define POOL_VTOPHYS(va)		vtophys((vaddr_t) (va))
 
 pt_entry_t *kvtopte(vaddr_t);
 
