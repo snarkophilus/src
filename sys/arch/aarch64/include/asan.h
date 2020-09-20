@@ -201,12 +201,12 @@ kasan_md_early_init(void *stack)
 static void
 kasan_md_init(void)
 {
-	vaddr_t eva, dummy;
 
 	CTASSERT((__MD_SHADOW_SIZE / L0_SIZE) == 64);
 
 	/* The VAs we've created until now. */
-	pmap_virtual_space(&eva, &dummy);
+	vaddr_t eva = pmap_growkernel(VM_KERNEL_VM_BASE);
+
 	kasan_shadow_map((void *)VM_MIN_KERNEL_ADDRESS,
 	    eva - VM_MIN_KERNEL_ADDRESS);
 }
