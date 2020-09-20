@@ -618,6 +618,10 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 void
 pmap_bootstrap_common(void)
 {
+	UVMHIST_INIT_STATIC(pmapexechist, pmapexechistbuf);
+	UVMHIST_INIT_STATIC(pmaphist, pmaphistbuf);
+	UVMHIST_INIT_STATIC(pmapxtabhist, pmapxtabhistbuf);
+
 	static const struct uvm_pagerops pmap_pager = {
 		/* nothing */
 	};
@@ -650,10 +654,6 @@ pmap_bootstrap_common(void)
 void
 pmap_init(void)
 {
-	UVMHIST_INIT_STATIC(pmapexechist, pmapexechistbuf);
-	UVMHIST_INIT_STATIC(pmaphist, pmaphistbuf);
-	UVMHIST_INIT_STATIC(pmapxtabhist, pmapxtabhistbuf);
-
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLED(pmaphist);
 
