@@ -483,6 +483,10 @@ pmap_virtual_space(vaddr_t *vstartp, vaddr_t *vendp)
 vaddr_t
 pmap_growkernel(vaddr_t maxkvaddr)
 {
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmaphist, "maxkvaddr=%#jx (%#jx)",
+	    (uintptr_t)maxkvaddr, pmap_limits.virtual_end, 0, 0);
+
 	vaddr_t virtual_end = pmap_limits.virtual_end;
 	maxkvaddr = pmap_round_seg(maxkvaddr) - 1;
 
@@ -506,6 +510,8 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	 * Update new end.
 	 */
 	pmap_limits.virtual_end = virtual_end;
+
+	UVMHIST_LOG(pmaphist, " <-- done", 0, 0, 0, 0);
 
 	return virtual_end;
 }
