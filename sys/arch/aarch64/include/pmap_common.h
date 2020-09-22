@@ -181,13 +181,7 @@ vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
 paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
 struct vm_page *pmap_md_alloc_poolpage(int);
 
-/*
- * Other hooks for the pool allocator.
- */
-paddr_t	pmap_md_pool_vtophys(vaddr_t);
-vaddr_t	pmap_md_pool_phystov(paddr_t);
-#define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
-#define	POOL_PHYSTOV(pa)	pmap_md_pool_phystov((paddr_t)pa)
+#define POOL_VTOPHYS(va)	vtophys((vaddr_t)(va))
 
 bool	pmap_md_kernel_vaddr_p(vaddr_t);
 paddr_t	pmap_md_kernel_vaddr_to_paddr(vaddr_t);

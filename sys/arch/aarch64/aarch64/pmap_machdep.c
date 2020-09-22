@@ -236,7 +236,7 @@ pmap_md_map_poolpage(paddr_t pa, size_t len)
 {
 
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
-	vaddr_t va = pmap_md_pool_phystov(pa);
+	vaddr_t va = pmap_md_direct_map_paddr(pa);
 	KASSERT(cold || pg != NULL);
 	if (pg != NULL) {
 		struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
@@ -346,6 +346,12 @@ pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t va)
 	return AARCH64_KVA_TO_PA(va);
 }
 
+vaddr_t
+pmap_md_direct_map_paddr(paddr_t pa)
+{
+
+	return AARCH64_PA_TO_KVA(pa);
+}
 
 bool
 pmap_md_io_vaddr_p(vaddr_t va)
@@ -357,25 +363,6 @@ pmap_md_io_vaddr_p(vaddr_t va)
 	return false;
 }
 
-
-paddr_t
-pmap_md_pool_vtophys(vaddr_t va)
-{
-
-	KASSERT(AARCH64_KVA_P(va));
-	//XXXNH Check actual RAM size
-
-	return AARCH64_KVA_TO_PA(va);
-}
-
-vaddr_t
-pmap_md_pool_phystov(paddr_t pa)
-{
-
-	return AARCH64_PA_TO_KVA(pa);
-}
-
-struct vm_page *pmap_md_alloc_poolpage(int);
 
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
@@ -475,7 +462,6 @@ void
 pmap_md_init(void)
 {
 
-
 	//XXXNH implement this.
 //	pmap_md_alloc_ephemeral_address_space(curcpu());
 }
@@ -560,13 +546,6 @@ pmap_md_pdetab_destroy(struct pmap *pm)
 {
 
 	KASSERT(pm != NULL);
-}
-
-vaddr_t
-pmap_md_direct_map_paddr(paddr_t pa)
-{
-
-	return AARCH64_PA_TO_KVA(pa);
 }
 
 #ifdef PMAP_VIRTUAL_CACHE_ALIASES
