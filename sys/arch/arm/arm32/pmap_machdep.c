@@ -919,12 +919,6 @@ pmap_md_pool_phystov(paddr_t pa)
         return (pa - physical_start) + KERNEL_DIRECTMAP_BASE;
 }
 
-
-
-struct vm_page *pmap_md_alloc_poolpage(int);
-
-
-
 void
 pmap_impl_bootstrap(void)
 {
