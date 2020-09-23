@@ -131,14 +131,14 @@
 
 /*
  * kernel virtual space layout:
- *   0xffff_0000_0000_0000  -   64T KSEG(direct mapping)
- *   0xffff_4000_0000_0000  -   32T (KASAN SHADOW MAP)
- *   0xffff_6000_0000_0000  -   32T (not used)
- *   0xffff_8000_0000_0000  -    1G EFI_RUNTIME
- *   0xffff_8000_4000_0000  -   64T (not used)
- *   0xffff_c000_0000_0000  -   64T KERNEL VM Space (including kernel text/data/bss)
- *   0xffff_ffff_f000_0000  -  254M KERNEL_IO for pmap_devmap
- *   0xffff_ffff_ffe0_0000  -    2M RESERVED
+ *   0xffff_0000_0000_0000  -   64T  KSEG(direct mapping)
+ *   0xffff_4000_0000_0000  -   32T  (KASAN SHADOW MAP)
+ *   0xffff_6000_0000_0000  -   32T  (not used)
+ *   0xffff_8000_0000_0000  -    1G  EFI_RUNTIME
+ *   0xffff_8000_4000_0000  -   64T  (not used)
+ *   0xffff_c000_0000_0000  -   64T  KERNEL VM Space (including text/data/bss)
+ *   0xffff_ffff_f000_0000  -  254M  KERNEL_IO for pmap_devmap
+ *   0xffff_ffff_ffe0_0000  -    2M  RESERVED
  */
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t) 0xffffc00000000000L)
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t) 0xffffffffffe00000L)
