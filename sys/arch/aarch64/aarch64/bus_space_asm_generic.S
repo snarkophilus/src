@@ -225,7 +225,7 @@ ENTRY_NP(\funcname\()_bs_rm_4_swap)
 	ldr	w8, [x0, #BS_STRIDE]
 	lsl	x8, x2, x8	/* offset <<= tag->bs_stride */
 1:
-	ldrh	w9, [x1, x8]
+	ldr	w9, [x1, x8]
 	subs	x4, x4, #1	/* count-- */
 	rev	w9, w9
 	str	w9, [x3], #4
@@ -248,7 +248,7 @@ ENTRY_NP(\funcname\()_bs_rm_8_swap)
 	ldr	w8, [x0, #BS_STRIDE]
 	lsl	x8, x2, x8	/* offset <<= tag->bs_stride */
 1:
-	ldrh	w9, [x1, x8]
+	ldr	x9, [x1, x8]
 	subs	x4, x4, #1	/* count-- */
 	rev	x9, x9
 	str	x9, [x3], #8
