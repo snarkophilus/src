@@ -226,15 +226,6 @@ pmap_md_clean_page(struct vm_page_md *md, bool is_src)
 {
 }
 
-#ifdef notyet
-static inline void
-pmap_md_setvirtualend(vaddr_t va)
-{
-
-	pmap_limits.virtual_end = va;
-}
-#endif
-
 static inline size_t
 pte_index(vaddr_t va)
 {
