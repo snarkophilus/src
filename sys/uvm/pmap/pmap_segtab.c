@@ -157,7 +157,7 @@ __CTASSERT(NSEGPG % PMAP_SEGTABSIZE == 0);
 #endif
 __CTASSERT(NBPG >= sizeof(pmap_segtab_t));
 
-typedef struct  {
+typedef struct {
 	pmap_segtab_t *free_segtab0;	/* free list kept locally */
 	pmap_segtab_t *free_segtab;	/* free list kept locally */
 #ifdef DEBUG
