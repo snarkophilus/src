@@ -440,7 +440,7 @@ pmap_page_syncicache(struct vm_page *pg)
 	pmap_pvlist_check(mdpg);
 
 	UVMHIST_LOG(pmaphist, "pv %jx pv_pmap %jx", (uintptr_t)pv,
-	     (uintptr_t)pv->pv_pmap, 0, 0);
+	    (uintptr_t)pv->pv_pmap, 0, 0);
 
 	if (pv->pv_pmap != NULL) {
 		for (; pv != NULL; pv = pv->pv_next) {
@@ -503,8 +503,8 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	if (virtual_end == 0 || virtual_end > VM_MAX_KERNEL_ADDRESS)
 		virtual_end = VM_MAX_KERNEL_ADDRESS;
 
-        kasan_shadow_map((void *)pmap_limits.virtual_end,
-          (size_t)(virtual_end - pmap_limits.virtual_end));
+	kasan_shadow_map((void *)pmap_limits.virtual_end,
+	    (size_t)(virtual_end - pmap_limits.virtual_end));
 
 	/*
 	 * Update new end.
