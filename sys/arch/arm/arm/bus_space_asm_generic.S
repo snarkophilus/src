@@ -529,7 +529,7 @@ ENTRY_NP(generic_armv4_bs_c_2)
 
 	adds	r0, r0, r2
 	adds	r1, r1, r2
-	negs	r2, r2	
+	negs	r2, r2
 
 1:	ldrh	r3, [r0, r2]
 	strh	r3, [r1, r2]
