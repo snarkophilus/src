@@ -98,7 +98,7 @@ remote_event_signal(REMOTE_EVENT_T *event)
 
 	event->fired = 1;
 
-	dsb();		/* data barrier operation */
+	dsb(sy);		/* data barrier operation */
 
 	if (event->armed) {
 		bus_space_write_4(vchiq_softc->sc_iot, vchiq_softc->sc_ioh,
