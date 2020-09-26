@@ -161,7 +161,7 @@ ENTRY_NP(cpu_switchto_softint)
 	stp	x23, x24, [sp, #TF_X23]
 	stp	x25, x26, [sp, #TF_X25]
 	stp	x27, x28, [sp, #TF_X27]
-	stp	x29, x2, [sp, #TF_X29]	/* tf->lr = softint_cleanup; */
+	stp	x29, x2, [sp, #TF_X29]	/* tf->tf_lr = softint_cleanup; */
 
 	mrs	x19, tpidr_el1		/* x19 := curlwp */
 	mov	x4, sp
@@ -298,7 +298,7 @@ ENTRY_NP(lwp_trampoline)
 	/*
 	 * When the x27 function returns, it will jump to el0_trap_exit.
 	 */
-	adr	x30, el0_trap_exit	/* tail call via lr */
+	adr	lr, el0_trap_exit	/* tail call via lr */
 	mov	x0, x28			/* mov arg into place */
 	mov	x16, x27		/* use x16 as jump register, for BTI */
 	br	x16			/* call function with arg */
