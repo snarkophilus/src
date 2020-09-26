@@ -32,6 +32,8 @@
 #ifndef	_AARCH64_PMAP_COMMON_H_
 #define	_AARCH64_PMAP_COMMON_H_
 
+#include <arm/cpufunc.h>
+
 #define PMAP_HWPAGEWALKER		1
 
 #define PMAP_TLB_MAX			1
@@ -328,8 +330,7 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 
 	//XXXNH compiler tricks?
 	*ptep = pte;
-
-	// dsb probably required
+	dsb(ish);
 }
 
 static inline pd_entry_t
