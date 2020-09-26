@@ -1,7 +1,7 @@
 /*	$NetBSD$	*/
 
 /*-
- * Copyright (c) 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -61,8 +61,6 @@ __KERNEL_RCSID(0, "$NetBSD$");
 /* Set to LX_BLKPAG_GP if supported. */
 uint64_t pmap_attr_gp = 0;
 
-//static void	pmap_md_vca_page_wbinv(struct vm_page *, bool);
-
 /*
  * Misc variables
  */
@@ -71,11 +69,6 @@ vaddr_t virtual_end;
 vaddr_t pmap_curmaxkvaddr;
 
 bool pmap_devmap_bootstrap_done = false;
-
-/*
- * Virtual end of direct-mapped memory
- */
-vaddr_t pmap_directlimit;
 
 paddr_t
 vtophys(vaddr_t va)
