@@ -162,7 +162,6 @@ void pmap_segtab_activate(struct pmap *, struct lwp *);
 void pmap_segtab_deactivate(struct pmap *);
 void pmap_segtab_init(struct pmap *);
 void pmap_segtab_destroy(struct pmap *, pte_callback_t, uintptr_t);
-//void pmap_segtab_destroy(struct pmap *);
 #ifdef PMAP_HWPAGEWALKER
 pd_entry_t *pmap_pde_lookup(struct pmap *, vaddr_t, paddr_t *);
 bool pmap_pdetab_fixup(struct pmap *, vaddr_t);
@@ -277,7 +276,6 @@ void	pmap_pv_protect(paddr_t, vm_prot_t);
 #define	PMAP_WBINV	1
 #define	PMAP_INV	2
 
-//uint16_t pmap_pvlist_lock(struct vm_page_md *, bool);
 kmutex_t *pmap_pvlist_lock_addr(struct vm_page_md *);
 
 #define	PMAP_STEAL_MEMORY	/* enable pmap_steal_memory() */
