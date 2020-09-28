@@ -873,9 +873,9 @@ pmap_devmap_bootstrap(vaddr_t l0pt, const struct pmap_devmap *table)
 		    table[i].pd_size,
 		    table[i].pd_prot,
 		    table[i].pd_flags);
-	}
 
-	pmap_devmap_bootstrap_done = true;
+		pmap_devmap_bootstrap_done = true;
+	}
 }
 
 const struct pmap_devmap *
