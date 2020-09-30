@@ -337,7 +337,6 @@ pmap_md_ok_to_steal_p(const uvm_physseg_t bank, size_t npgs)
 
 /*
  *	Bootstrap the system enough to run with virtual memory.
- *	firstaddr is the first unused kseg0 address (not page aligned).
  */
 void
 pmap_bootstrap(void)
