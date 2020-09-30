@@ -90,18 +90,22 @@ UVMHIST_DECL(maphist);
 #define pmapexechist maphist
 #endif
 
-#if !defined(KASAN)
-
 /*
  * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
  */
+struct vm_page *pmap_md_alloc_poolpage(int);
+
+#if !defined(KASAN)
 vaddr_t pmap_map_poolpage(paddr_t);
 paddr_t pmap_unmap_poolpage(vaddr_t);
-struct vm_page *pmap_md_alloc_poolpage(int);
 #define	PMAP_ALLOC_POOLPAGE(flags)	pmap_md_alloc_poolpage(flags)
 #define	PMAP_MAP_POOLPAGE(pa)		pmap_map_poolpage(pa)
 #define	PMAP_UNMAP_POOLPAGE(va)		pmap_unmap_poolpage(va)
 #endif
+
+#define PMAP_MAP_PDETABPAGE(pa)		pmap_md_map_poolpage(pa, PAGE_SIZE)
+#define PMAP_MAP_SEGTABPAGE(pa)		pmap_md_map_poolpage(pa, PAGE_SIZE)
+#define PMAP_MAP_PTEPAGE(pa)		pmap_md_map_poolpage(pa, PAGE_SIZE)
 
 /*
  * The user address space is mapped using a two level structure where
@@ -129,7 +133,7 @@ typedef union pmap_pdetab {
 	union pmap_pdetab *	pde_next;
 } pmap_pdetab_t;
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 typedef union pmap_segtab {
 #ifdef _LP64
 	union pmap_segtab *	seg_seg[PMAP_SEGTABSIZE];
@@ -190,7 +194,7 @@ struct pmap {
 #if defined(PMAP_HWPAGEWALKER)
 	struct pglist		pm_pdetab_list;
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	struct pglist		pm_segtab_list;
 #endif
 #ifdef MULTIPROCESSOR
@@ -201,7 +205,7 @@ struct pmap {
 #if defined(PMAP_HWPAGEWALKER)
 	pmap_pdetab_t *		pm_pdetab;	/* pointer to HW PDEs */
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	pmap_segtab_t *		pm_segtab;	/* pointers to pages of PTEs; or  */
 						/* virtual shadow of HW PDEs */
 #endif

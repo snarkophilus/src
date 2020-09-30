@@ -211,7 +211,7 @@ pmap_pdetab_t	pmap_kern_pdetab PMAP_PDETAB_ALIGN = { /* top level pdetab for ker
 
 #endif
 
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 #ifndef PMAP_SEGTAB_ALIGN
 #define PMAP_SEGTAB_ALIGN	/* nothing */
 #endif
@@ -232,7 +232,7 @@ struct pmap_kernel kernel_pmap_store = {
 #ifdef PMAP_HWPAGEWALKER
 		.pm_pdetab = PMAP_INVALID_PDETAB_ADDRESS,
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 		.pm_segtab = &pmap_kern_segtab,
 #endif
 		.pm_minaddr = VM_MIN_KERNEL_ADDRESS,
@@ -639,7 +639,7 @@ pmap_bootstrap_common(void)
 #if defined(PMAP_HWPAGEWALKER)
 	TAILQ_INIT(&pm->pm_pdetab_list);
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	TAILQ_INIT(&pm->pm_segtab_list);
 #endif
 
@@ -727,7 +727,7 @@ pmap_create(void)
 #if defined(PMAP_HWPAGEWALKER)
 	TAILQ_INIT(&pmap->pm_pdetab_list);
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	TAILQ_INIT(&pmap->pm_segtab_list);
 #endif
 #endif
@@ -777,7 +777,7 @@ pmap_destroy(pmap_t pmap)
 #if defined(PMAP_HWPAGEWALKER)
 	KASSERT(TAILQ_EMPTY(&pmap->pm_pdetab_list));
 #endif
-#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_POOLPAGE)
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	KASSERT(TAILQ_EMPTY(&pmap->pm_segtab_list));
 #endif
 #endif
@@ -2289,11 +2289,11 @@ pmap_pvlist_lock_addr(struct vm_page_md *mdpg)
 void *
 pmap_pv_page_alloc(struct pool *pp, int flags)
 {
-	struct vm_page * const pg = PMAP_ALLOC_POOLPAGE(UVM_PGA_USERESERVE);
+	struct vm_page * const pg = pmap_md_alloc_poolpage(UVM_PGA_USERESERVE);
 	if (pg == NULL)
 		return NULL;
 
-	return (void *)pmap_map_poolpage(VM_PAGE_TO_PHYS(pg));
+	return (void *)pmap_md_map_poolpage(VM_PAGE_TO_PHYS(pg), PAGE_SIZE);
 }
 
 /*
