@@ -253,11 +253,10 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 
 #ifdef MODULAR
 	/*
-	 * aarch64 compiler (gcc & llvm) uses R_AARCH_CALL26/R_AARCH_JUMP26
-	 * for function calling/jumping.
-	 * (at this time, both compilers doesn't support -mlong-calls)
-	 * therefore kernel modules should be loaded within maximum 26bit word,
-	 * or +-128MB from kernel.
+	 * The aarch64 compilers (gcc & llvm) use R_AARCH_CALL26/R_AARCH_JUMP26
+	 * for function calls (bl)/jumps(b). At this time, neither compiler
+	 * supports -mlong-calls therefore the kernel modules should be loaded
+	 * within the maximum range of +/-128MB from kernel text.
 	 */
 #define MODULE_RESERVED_MAX	(1024 * 1024 * 128)
 #define MODULE_RESERVED_SIZE	(1024 * 1024 * 32)	/* good enough? */
