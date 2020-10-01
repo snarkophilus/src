@@ -455,13 +455,13 @@ static inline pt_entry_t
 pte_make_kenter_pa(paddr_t pa, struct vm_page_md *mdpg, vm_prot_t prot,
     u_int flags)
 {
-   	pt_entry_t pte = pa
+	pt_entry_t pte = pa
 	    | L2_S_PROTO
 	    | L2_S_PROT(PTE_KERNEL, prot)
 	    | ((flags & PMAP_NOCACHE) ? 0 : ((flags & PMAP_PTE)
 		? pte_l2_s_cache_mode_pt : pte_l2_s_cache_mode));
- 	if (prot & VM_PROT_EXECUTE)
- 		pte &= ~L2_XS_XN;
+	if (prot & VM_PROT_EXECUTE)
+	    pte &= ~L2_XS_XN;
 
 	if (flags & ARM32_MMAP_CACHEABLE) {
 		pte |= pte_l2_s_cache_mode;
