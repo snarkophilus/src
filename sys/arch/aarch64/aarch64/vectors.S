@@ -1,4 +1,4 @@
-/*	$NetBSD: vectors.S,v 1.18 2020/08/12 13:19:35 skrll Exp $	*/
+/*	$NetBSD: vectors.S,v 1.19 2020/09/30 16:35:49 skrll Exp $	*/
 
 #include <aarch64/asm.h>
 #include <aarch64/locore.h>
@@ -9,7 +9,7 @@
 #include "opt_ddb.h"
 #include "opt_dtrace.h"
 
-RCSID("$NetBSD$")
+RCSID("$NetBSD: vectors.S,v 1.19 2020/09/30 16:35:49 skrll Exp $")
 
 	ARMV8_DEFINE_OPTIONS
 
@@ -294,8 +294,6 @@ END(el1_vectors)
 	.cfi_restore lr
 	.cfi_restore x29
 	.endm
-
-
 /*
  * EL1 exception return for trap and interrupt.
  */

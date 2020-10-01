@@ -9,8 +9,8 @@
 #endif
 #endif
 
-#if defined (__ARM_ARCH_8A__)
-#define _ARM_ARCH_8		/* ARMv8 64-bit in AARCH32 */
+#if defined (__ARM_ARCH_8A__) || defined (__ARM_ARCH_8A)
+#define _ARM_ARCH_8
 #endif
 
 #if defined (_ARM_ARCH_8) || defined (__ARM_ARCH_7__) || \

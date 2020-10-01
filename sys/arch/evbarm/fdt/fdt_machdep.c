@@ -1,4 +1,4 @@
-/* $NetBSD: fdt_machdep.c,v 1.73 2020/06/27 18:44:02 jmcneill Exp $ */
+/* $NetBSD: fdt_machdep.c,v 1.74 2020/09/25 06:47:24 skrll Exp $ */
 
 /*-
  * Copyright (c) 2015-2017 Jared McNeill <jmcneill@invisible.ca>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fdt_machdep.c,v 1.73 2020/06/27 18:44:02 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fdt_machdep.c,v 1.74 2020/09/25 06:47:24 skrll Exp $");
 
 #include "opt_machdep.h"
 #include "opt_bootconfig.h"

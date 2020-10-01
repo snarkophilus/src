@@ -1,4 +1,4 @@
-/* $NetBSD: cpuswitch.S,v 1.25 2020/08/12 13:19:35 skrll Exp $ */
+/* $NetBSD: cpuswitch.S,v 1.28 2020/09/30 16:35:49 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
 #include "opt_ddb.h"
 #include "opt_kasan.h"
 
-RCSID("$NetBSD: cpuswitch.S,v 1.25 2020/08/12 13:19:35 skrll Exp $")
+RCSID("$NetBSD: cpuswitch.S,v 1.28 2020/09/30 16:35:49 skrll Exp $")
 
 	ARMV8_DEFINE_OPTIONS
 

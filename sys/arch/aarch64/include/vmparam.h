@@ -1,4 +1,4 @@
-/* $NetBSD: vmparam.h,v 1.14 2020/09/19 16:31:40 skrll Exp $ */
+/* $NetBSD: vmparam.h,v 1.15 2020/09/23 05:02:27 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
