@@ -254,42 +254,55 @@ END(el1_vectors)
 	ldp	x3, x4, [sp, #TF_X3]
 	.cfi_restore x4
 	.cfi_restore x3
+
 	ldp	x5, x6, [sp, #TF_X5]
 	.cfi_restore x6
 	.cfi_restore x5
+
 	ldp	x7, x8, [sp, #TF_X7]
 	.cfi_restore x8
 	.cfi_restore x7
+
 	ldp	x9, x10, [sp, #TF_X9]
 	.cfi_restore x10
 	.cfi_restore x9
+
 	ldp	x11, x12, [sp, #TF_X11]
 	.cfi_restore x12
 	.cfi_restore x11
+
 	ldp	x13, x14, [sp, #TF_X13]
 	.cfi_restore x14
 	.cfi_restore x13
+
 	ldp	x15, x16, [sp, #TF_X15]
 	.cfi_restore x16
 	.cfi_restore x15
+
 	ldp	x17, x18, [sp, #TF_X17]
 	.cfi_restore x18
 	.cfi_restore x17
+
 	ldp	x19, x20, [sp, #TF_X19]
 	.cfi_restore x20
 	.cfi_restore x19
+
 	ldp	x21, x22, [sp, #TF_X21]
 	.cfi_restore x22
 	.cfi_restore x21
+
 	ldp	x23, x24, [sp, #TF_X23]
 	.cfi_restore x24
 	.cfi_restore x23
+
 	ldp	x25, x26, [sp, #TF_X25]
 	.cfi_restore x26
 	.cfi_restore x25
+
 	ldp	x27, x28, [sp, #TF_X27]
 	.cfi_restore x28
 	.cfi_restore x27
+
 	ldp	x29, lr, [sp, #TF_X29]
 	.cfi_restore lr
 	.cfi_restore x29
