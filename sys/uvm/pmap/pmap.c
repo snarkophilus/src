@@ -249,7 +249,7 @@ struct pmap_limits pmap_limits = {	/* VA and PA limits */
 #ifdef UVMHIST
 static struct kern_history_ent pmapexechistbuf[10000];
 static struct kern_history_ent pmaphistbuf[10000];
-static struct kern_history_ent pmapxtabhistbuf[1000];
+static struct kern_history_ent pmapxtabhistbuf[50000];
 UVMHIST_DEFINE(pmapexechist);
 UVMHIST_DEFINE(pmaphist);
 UVMHIST_DEFINE(pmapxtabhist);
@@ -757,10 +757,12 @@ pmap_destroy(pmap_t pmap)
 {
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmaphist, "(pmap=%#jx)", (uintptr_t)pmap, 0, 0, 0);
+	UVMHIST_CALLARGS(pmapxtabhist, "(pmap=%#jx)", (uintptr_t)pmap, 0, 0, 0);
 
 	if (atomic_dec_uint_nv(&pmap->pm_count) > 0) {
 		PMAP_COUNT(dereference);
 		UVMHIST_LOG(pmaphist, " <-- done (deref)", 0, 0, 0, 0);
+		UVMHIST_LOG(pmapxtabhist, " <-- done (deref)", 0, 0, 0, 0);
 		return;
 	}
 
@@ -798,6 +800,7 @@ pmap_destroy(pmap_t pmap)
 	kpreempt_enable();
 
 	UVMHIST_LOG(pmaphist, " <-- done (freed)", 0, 0, 0, 0);
+	UVMHIST_LOG(pmapxtabhist, " <-- done (freed)", 0, 0, 0, 0);
 }
 
 /*
