@@ -417,14 +417,20 @@ static void
 pmap_segtab_pagefree(pmap_t pmap, struct pglist *list, vaddr_t kva, size_t size)
 {
 #ifdef PMAP_MAP_PTEPAGE
+	UVMHIST_FUNC(__func__);
+	UVMHIST_CALLARGS(pmapxtabhist, "pm %#jx list %#jx kva %#jx size %#jx",
+	    (uintptr_t)pmap, (uintptr_t)list, kva, size);
 	KASSERT(size == PAGE_SIZE);
 	if (size == PAGE_SIZE) {
 		//XXXNH???
+		UVMHIST_LOG(pmapxtabhist, "about to detach (kva %#jx)",
+		    kva, 0, 0, 0);
 		uvm_pagefree(pmap_page_detach(pmap, list, kva));
 		return;
 	}
 #endif
 	for (size_t i = 0; i < size; i += PAGE_SIZE) {
+
 		(void)pmap_page_detach(pmap, list, kva + i);
 	}
 
@@ -475,6 +481,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 		KASSERT(ok);
 	}
 
+	UVMHIST_LOG(pmapxtabhist, "about to attach",  0, 0, 0, 0);
 	pmap_page_attach(pmap, (vaddr_t)ptp, pg, &pmap->pm_ptp_list, 0);
 
 	*pa_p = pa;
@@ -487,6 +494,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 			return NULL;
 		panic("%s: cannot allocate page table page", __func__);
 	}
+	UVMHIST_LOG(pmapxtabhist, "about to attach",  0, 0, 0, 0);
 	pmap_page_attach(pmap, kva, NULL, &pmap->pm_ptp_list, 0);
 	ptp = (pmap_ptpage_t *)kva;
 #endif
@@ -532,6 +540,7 @@ pmap_ptpage_free(pmap_t pmap, pmap_ptpage_t *ptp, const char *caller)
 #endif
 	//pmap_md_vca_clean(pg, (vaddr_t)ptp, NBPG);
 #ifdef PMAP_PTP_CACHE
+	UVMHIST_LOG(pmapxtabhist, "about to detach",  0, 0, 0, 0);
 	pmap_page_detach(pmap, &pmap->pm_ptp_list, kva);
 	pmap_segtab_pagecache(&pmap_segtab_info.ptp_flist, ptp);
 #else
@@ -684,6 +693,7 @@ CTASSERT(NBPG / sizeof(*stp) == 1);
 #endif
 	}
 
+	UVMHIST_LOG(pmapxtabhist, "about to attach",  0, 0, 0, 0);
 	pmap_page_attach(pmap, (vaddr_t)stp, stp_pg, &pmap->pm_segtab_list, 0);
 
 	pmap_check_stp(stp, __func__,
@@ -793,6 +803,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 		UVMHIST_LOG(pmapxtabhist, " ptbp %#jx ptp %#jx",
 		    (uintptr_t)ptp_p, (uintptr_t)ptp, 0, 0);
 		const vaddr_t kva = (vaddr_t)ptp;
+		UVMHIST_LOG(pmapxtabhist, "about to detach",  0, 0, 0, 0);
 		pmap_page_detach(pmap, &pmap->pm_pdetab_list, kva);
 		pmap_pdetab_free(ptp);
 		*ptp_p = NULL;
@@ -851,6 +862,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 		    vinc == NBSEG ? "release seg" : "release xseg");
 
 		const vaddr_t kva = (vaddr_t)stp;
+		UVMHIST_LOG(pmapxtabhist, "about to detach",  0, 0, 0, 0);
 		pmap_page_detach(pmap, &pmap->pm_segtab_list, kva);
 		pmap_segtab_free(stp);
 		*stp_p = NULL;
@@ -1043,6 +1055,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 			opde = pte_pde_cas(pde_p, opde, npde);
 			if (__predict_false(pte_pde_valid_p(opde))) {
 				const vaddr_t kva = (vaddr_t)ptb;
+				UVMHIST_LOG(pmapxtabhist, "about to detach",
+				    0, 0, 0, 0);
 				pmap_page_detach(pmap, &pmap->pm_pdetab_list,
 				    kva);
 				pmap_pdetab_free(ptb);
@@ -1082,6 +1096,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 			pmap_segtab_t *ostb = atomic_cas_ptr(stb_p, NULL, stb);
 			if (__predict_false(ostb != NULL)) {
 				const vaddr_t kva = (vaddr_t)stb;
+				UVMHIST_LOG(pmapxtabhist, "about to detach",
+				    0, 0, 0, 0);
 				pmap_page_detach(pmap, &pmap->pm_segtab_list,
 				    kva);
 				pmap_segtab_free(stb);
