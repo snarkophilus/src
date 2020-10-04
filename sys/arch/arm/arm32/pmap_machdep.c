@@ -236,7 +236,6 @@ static void	pmap_md_vca_page_wbinv(struct vm_page_md *, bool);
  */
 vaddr_t virtual_avail;
 vaddr_t virtual_end;
-vaddr_t pmap_curmaxkvaddr;
 
 /*
  * Virtual end of direct-mapped memory
