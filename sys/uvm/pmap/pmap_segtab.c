@@ -280,7 +280,7 @@ pmap_ptpage(struct pmap *pmap, vaddr_t va)
 	vaddr_t pdetab_mask = PMAP_PDETABSIZE - 1;
 	pmap_pdetab_t *ptb = pmap->pm_pdetab;
 
-//	UVMHIST_LOG(pmaphist, "pm_pdetab %p", ptb, 0, 0, 0);
+//	UVMHIST_LOG(pmaphist, "pm_pdetab %#jx", ptb, 0, 0, 0);
 
 	KASSERT(pmap != pmap_kernel() || !pmap_md_direct_mapped_vaddr_p(va));
 
@@ -366,7 +366,7 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 	}
 
 	UVMHIST_LOG(pmapxtabhist, "kva %jx uobj %jx pg %jx list %jx",
-	    (uintptr_t)kva, (uintptr_t)pg, (uintptr_t)uobj, (uintptr_t)pglist);
+	    (uintptr_t)kva, (uintptr_t)uobj, (uintptr_t)pg, (uintptr_t)pglist);
 	mutex_enter(&pmap->pm_lock);
 	TAILQ_INSERT_TAIL(pglist, pg, pageq.queue);
 	uobj->uo_npages++;
@@ -395,8 +395,8 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 	struct vm_page * const pg = PHYS_TO_VM_PAGE(pa);
 	struct uvm_object * const uobj = &pmap->pm_uobject;
 
-	UVMHIST_LOG(pmapxtabhist, "kva %jx uobj %jx pg %jx pa %jx", (uintptr_t)va,
-	    (uintptr_t)uobj, (uintptr_t)pg, (uintptr_t)pa);
+	UVMHIST_LOG(pmapxtabhist, "kva %jx uobj %jx pg %jx list %jx",
+	    (uintptr_t)va, (uintptr_t)uobj, (uintptr_t)pg, (uintptr_t)list);
 
 	KASSERTMSG(pg->uobject == uobj, "pg->uobject %p vs uobj %p",
 	    pg->uobject, uobj);
@@ -491,7 +491,7 @@ pmap_ptpage_alloc(pmap_t pmap, int flags, paddr_t *pa_p)
 	ptp = (pmap_ptpage_t *)kva;
 #endif
 
-	UVMHIST_LOG(pmapxtabhist, "... ptp %p", (uintptr_t)ptp, 0, 0, 0);
+	UVMHIST_LOG(pmapxtabhist, "... ptp %#jx", (uintptr_t)ptp, 0, 0, 0);
 
 	return ptp;
 }
@@ -604,8 +604,8 @@ pmap_pdetab_alloc(struct pmap *pmap)
 	UVMHIST_LOG(pmapxtabhist, "about to attach",  0, 0, 0, 0);
 	pmap_page_attach(pmap, (vaddr_t)ptb, ptb_pg, &pmap->pm_pdetab_list, 0);
 
-	UVMHIST_LOG(pmapxtabhist, "... ptb %p found on freelist %d", (uintptr_t)ptb,
-	    found_on_freelist, 0, 0);
+	UVMHIST_LOG(pmapxtabhist, "... ptb %#jx found on freelist %d",
+	    (uintptr_t)ptb, found_on_freelist, 0, 0);
 
 	return ptb;
 }
@@ -775,7 +775,7 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 		/* get pointer to PDE */
 		pmap_ptpage_t *ptb = pmap_pde_to_ptpage(ptp->pde_pde[i]);
 		UVMHIST_LOG(pmapxtabhist,
-		    "   va %#jx ptp->pde_pde[%jd] (*%p) = %#jx", va, i,
+		    "   va %#jx ptp->pde_pde[%jd] (*%#jx) = %#jx", va, i,
 		    (uintptr_t)&ptp->pde_pde[i], ptp->pde_pde[i]);
 		if (ptb == NULL)
 			continue;
@@ -1019,7 +1019,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 
 #if defined(PMAP_HWPAGEWALKER)
 	pmap_pdetab_t *ptb = pmap->pm_pdetab;
-	UVMHIST_LOG(pmaphist, "pm_pdetab %p", (uintptr_t)ptb, 0, 0, 0);
+	UVMHIST_LOG(pmaphist, "pm_pdetab %#jx", (uintptr_t)ptb, 0, 0, 0);
 #endif
 #if defined(PMAP_HWPAGEWALKER) && defined(PMAP_MAP_PDETABPAGE)
 	vaddr_t segtab_mask = PMAP_PDETABSIZE - 1;
@@ -1031,7 +1031,8 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 		    &ptb->pde_pde[(va >> segshift) & segtab_mask];
 		pd_entry_t opde = *pde_p;
 
-		UVMHIST_LOG(pmaphist, "ptb %jx segshift %jd pde_p %p opde %jx",
+		UVMHIST_LOG(pmaphist,
+		    "ptb %#jx segshift %jd pde_p %#jx opde %#jx",
 		    ptb, segshift, pde_p, opde);
 
 		if (__predict_false(!pte_pde_valid_p(opde))) {
@@ -1050,7 +1051,7 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 			}
 		}
 		ptb = pmap_pde_to_pdetab(opde);
-		UVMHIST_LOG(pmaphist, "opde %jx ptb %p", opde, ptb, 0, 0);
+		UVMHIST_LOG(pmaphist, "opde %#jx ptb %#jx", opde, ptb, 0, 0);
 	}
 #elif defined(XSEGSHIFT)
 	pd_entry_t opde = ptb->pde_pde[(va >> segshift) & segtab_mask];
