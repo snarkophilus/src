@@ -634,7 +634,7 @@ pmap_alloc_pdp(struct pmap *pm, struct vm_page **pgp, int flags, bool waitok)
 		PMAP_COUNT(pdp_alloc);
 		PMAP_PAGE_INIT(VM_PAGE_TO_PP(pg), pa);
 	} else {
-		/* uvm_pageboot_alloc() returns AARCH64 KSEG address */
+		/* uvm_pageboot_alloc() returns a direct mapped address */
 		pg = NULL;
 		pa = AARCH64_KVA_TO_PA(
 		    uvm_pageboot_alloc(Ln_TABLE_SIZE));
