@@ -256,6 +256,11 @@ extern struct pmap_limits pmap_limits;
 
 extern u_int pmap_page_colormask;
 
+/*
+ * The current top of kernel VM
+ */
+extern vaddr_t pmap_curmaxkvaddr;
+
 #if defined(PMAP_HWPAGEWALKER)
 extern pmap_pdetab_t pmap_kern_pdetab;
 #else

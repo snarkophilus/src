@@ -35,9 +35,10 @@ __KERNEL_RCSID(1, "$NetBSD: aarch64_machdep.c,v 1.49 2020/09/30 16:47:55 skrll E
 #include "opt_arm_debug.h"
 #include "opt_cpuoptions.h"
 #include "opt_ddb.h"
+#include "opt_fdt.h"
+#include "opt_kasan.h"
 #include "opt_kernhist.h"
 #include "opt_modular.h"
-#include "opt_fdt.h"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -93,6 +94,11 @@ struct vm_map *phys_map;
 #ifdef MODULAR
 vaddr_t module_start, module_end;
 static struct vm_map module_map_store;
+#endif
+
+#ifdef KASAN
+vaddr_t kasan_kernelstart;
+vaddr_t kasan_kernelsize;
 #endif
 
 /* XXX */
@@ -180,7 +186,7 @@ cpu_kernel_vm_init(uint64_t memory_start __unused, uint64_t memory_size __unused
 	 *
 	 *    text     rwx => r-x
 	 *    rodata   rwx => r--
-	 *    data     rwx => rw-
+	 *    data     rwx => rw- (.bss included)
 	 *
 	 * kernel image has mapped by L2 block. (2Mbyte)
 	 */
@@ -195,6 +201,11 @@ cpu_kernel_vm_init(uint64_t memory_start __unused, uint64_t memory_size __unused
 	    kernstart_phys, kernend_phys, kernend_extra);
 	fdt_add_reserved_memory_range(kernstart_phys,
 	     kernend_phys - kernstart_phys + kernend_extra);
+
+#ifdef KASAN
+	kasan_kernelstart = kernstart;
+	kasan_kernelsize = L2_ROUND_BLOCK(kernend) - kernstart;
+#endif
 }
 
 
@@ -247,8 +258,10 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 
 	kernstart = trunc_page((vaddr_t)__kernel_text);
 	kernend = round_page((vaddr_t)_end);
+
 	kernstart_l2 = L2_TRUNC_BLOCK(kernstart);
 	kernend_l2 = L2_ROUND_BLOCK(kernend);
+
 	kernelvmstart = kernend_l2;
 
 #ifdef MODULAR
@@ -267,6 +280,10 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 	KASSERT(module_end > kernend_l2);
 	kernelvmstart = module_end;
 #endif /* MODULAR */
+
+	KASSERT(kernelvmstart < VM_KERNEL_VM_BASE);
+
+	kernelvmstart = VM_KERNEL_VM_BASE;
 
 	paddr_t kernstart_phys __unused = KERN_VTOPHYS(kernstart);
 	paddr_t kernend_phys __unused = KERN_VTOPHYS(kernend);
@@ -309,12 +326,13 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 	    "kernel_start_l2       = 0x%016lx\n"
 	    "kernel_start          = 0x%016lx\n"
 	    "kernel_end            = 0x%016lx\n"
+	    "(extra)               = 0x%016lx\n"
 	    "kernel_end_l2         = 0x%016lx\n"
 #ifdef MODULAR
 	    "module_start          = 0x%016lx\n"
 	    "module_end            = 0x%016lx\n"
 #endif
-	    "(kernel va area)\n"
+	    "(kernel va area)      = 0x%016lx\n"
 	    "(devmap va area)      = 0x%016lx\n"
 	    "VM_MAX_KERNEL_ADDRESS = 0x%016lx\n"
 	    "------------------------------------------\n",
@@ -330,11 +348,13 @@ initarm_common(vaddr_t kvm_base, vsize_t kvm_size,
 	    kernstart_l2,
 	    kernstart,
 	    kernend,
+	    kernend_extra,
 	    kernend_l2,
 #ifdef MODULAR
 	    module_start,
 	    module_end,
 #endif
+	    VM_KERNEL_VM_BASE,
 	    VM_KERNEL_IO_ADDRESS,
 	    VM_MAX_KERNEL_ADDRESS);
 

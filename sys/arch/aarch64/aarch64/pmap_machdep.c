@@ -40,10 +40,12 @@ __KERNEL_RCSID(0, "$NetBSD$");
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/buf.h>
 #include <sys/cpu.h>
 #include <sys/kernel.h>
 
 #include <uvm/uvm.h>
+#include <uvm/uvm_page.h>
 #include <uvm/pmap/pmap_pvt.h>
 
 #include <aarch64/cpufunc.h>
@@ -66,7 +68,6 @@ uint64_t pmap_attr_gp = 0;
  */
 vaddr_t virtual_avail;
 vaddr_t virtual_end;
-vaddr_t pmap_curmaxkvaddr;
 
 bool pmap_devmap_bootstrap_done = false;
 
@@ -356,12 +357,50 @@ pmap_md_io_vaddr_p(vaddr_t va)
 	return false;
 }
 
+static void
+pmap_md_grow(pmap_pdetab_t *ptb, vaddr_t va, vsize_t vshift,
+    vsize_t *remaining)
+{
+	KASSERT((va & (NBSEG - 1)) == 0);
+	const vaddr_t pdetab_mask = PMAP_PDETABSIZE - 1;
+	const vsize_t vinc = 1UL << vshift;
+
+	for (size_t i = (va >> vshift) & pdetab_mask;
+	    i < PMAP_PDETABSIZE; i++, va += vinc) {
+		pd_entry_t * const pde_p =
+		    &ptb->pde_pde[(va >> vshift) & pdetab_mask];
+
+		vaddr_t pdeva;
+		if (pte_pde_valid_p(*pde_p)) {
+			const paddr_t pa = pte_pde_to_paddr(*pde_p);
+			pdeva = pmap_md_direct_map_paddr(pa);
+		} else {
+			/*
+			 * uvm_pageboot_alloc() returns a direct mapped address
+			 */
+			pdeva = uvm_pageboot_alloc(Ln_TABLE_SIZE);
+			paddr_t pdepa = AARCH64_KVA_TO_PA(pdeva);
+			*pde_p = pte_pde_pdetab(pdepa, true);
+			memset((void *)pdeva, 0, PAGE_SIZE);
+		}
+
+		if (vshift > SEGSHIFT) {
+			pmap_md_grow((pmap_pdetab_t *)pdeva, va,
+			    vshift - SEGLENGTH, remaining);
+		} else {
+			if (*remaining > vinc)
+				*remaining -= vinc;
+			else
+				*remaining = 0;
+		}
+		if (*remaining == 0)
+			return;
+	}
+}
 
 void
 pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
-	VPRINTF("bootstrap(%" PRIxVADDR ", %" PRIxVADDR ")", vstart, vend);
-
 	pmap_t pm = pmap_kernel();
 
 	/*
@@ -425,7 +464,29 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 #endif
 
 
-	VPRINTF("limits ");
+	VPRINTF("nkmempages ");
+	/*
+	 * Compute the number of pages kmem_arena will have.  This will also
+	 * be called by uvm_km_bootstrap later, but that doesn't matter
+	 */
+	kmeminit_nkmempages();
+
+	/* Get size of buffer cache and set an upper limit */
+	buf_setvalimit((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 8);
+	vsize_t bufsz = buf_memcalc();
+	buf_setvalimit(bufsz);
+
+	vsize_t kvmsize = (VM_PHYS_SIZE + (ubc_nwins << ubc_winshift) +
+	    bufsz + 16 * NCARGS + pager_map_size) +
+	    /*(maxproc * UPAGES) + */nkmempages * NBPG;
+
+#ifdef SYSVSHM
+	kvmsize += shminfo.shmall;
+#endif
+
+	/* Calculate VA address space and roundup to NBSEG tables */
+	kvmsize = roundup(kvmsize, NBSEG);
+
 
 	/*
 	 * Initialize `FYI' variables.	Note we're relying on
@@ -436,13 +497,33 @@ pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
 	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
 
-	pmap_limits.virtual_start = virtual_avail;
-	pmap_limits.virtual_end = virtual_end;
+	/*
+	 * Update the naive settings in pmap_limits to the actual KVA range.
+	 */
+	pmap_limits.virtual_start = vstart;
+	pmap_limits.virtual_end = vend;
+
+	VPRINTF("\nlimits: %" PRIxVADDR " - %" PRIxVADDR "\n", vstart, vend);
+
+	const vaddr_t kvmstart = vstart;
+	pmap_curmaxkvaddr = vstart + kvmsize;
+
+	VPRINTF("kva   : %" PRIxVADDR " - %" PRIxVADDR "\n", kvmstart,
+	    pmap_curmaxkvaddr);
+
+	pmap_md_grow(pmap_kernel()->pm_pdetab, kvmstart, XSEGSHIFT, &kvmsize);
 
 	pool_init(&pmap_pmap_pool, PMAP_SIZE, 0, 0, 0, "pmappl",
 	    &pool_allocator_nointr, IPL_NONE);
+
+
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
-	    &pmap_pv_page_allocator, IPL_NONE);
+#ifdef KASAN
+	    NULL,
+#else
+	    &pmap_pv_page_allocator,
+#endif
+	    IPL_NONE);
 
 	pmap_pvlist_lock_init(/*arm_dcache_align*/ 128);
 

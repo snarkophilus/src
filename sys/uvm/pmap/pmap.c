@@ -242,8 +242,12 @@ struct pmap_kernel kernel_pmap_store = {
 
 struct pmap * const kernel_pmap_ptr = &kernel_pmap_store.kernel_pmap;
 
+/* The current top of kernel VM - gets updated by pmap_growkernel */
+vaddr_t pmap_curmaxkvaddr;
+
 struct pmap_limits pmap_limits = {	/* VA and PA limits */
 	.virtual_start = VM_MIN_KERNEL_ADDRESS,
+	.virtual_end = VM_MAX_KERNEL_ADDRESS,
 };
 
 #ifdef UVMHIST
@@ -485,9 +489,9 @@ pmap_growkernel(vaddr_t maxkvaddr)
 {
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmaphist, "maxkvaddr=%#jx (%#jx)",
-	    (uintptr_t)maxkvaddr, pmap_limits.virtual_end, 0, 0);
+	    (uintptr_t)maxkvaddr, pmap_curmaxkvaddr, 0, 0);
 
-	vaddr_t virtual_end = pmap_limits.virtual_end;
+	vaddr_t virtual_end = pmap_curmaxkvaddr;
 	maxkvaddr = pmap_round_seg(maxkvaddr) - 1;
 
 	/*
@@ -503,13 +507,13 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	if (virtual_end == 0 || virtual_end > VM_MAX_KERNEL_ADDRESS)
 		virtual_end = VM_MAX_KERNEL_ADDRESS;
 
-	kasan_shadow_map((void *)pmap_limits.virtual_end,
-	    (size_t)(virtual_end - pmap_limits.virtual_end));
+	kasan_shadow_map((void *)pmap_curmaxkvaddr,
+	    (size_t)(virtual_end - pmap_curmaxkvaddr));
 
 	/*
 	 * Update new end.
 	 */
-	pmap_limits.virtual_end = virtual_end;
+	pmap_curmaxkvaddr = virtual_end;
 
 	UVMHIST_LOG(pmaphist, " <-- done", 0, 0, 0, 0);
 

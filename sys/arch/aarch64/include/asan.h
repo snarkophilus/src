@@ -204,11 +204,14 @@ kasan_md_init(void)
 
 	CTASSERT((__MD_SHADOW_SIZE / L0_SIZE) == 64);
 
-	/* The VAs we've created until now. */
-	vaddr_t eva = pmap_growkernel(VM_KERNEL_VM_BASE);
+	extern vaddr_t kasan_kernelstart;
+	extern vaddr_t kasan_kernelsize;
 
-	kasan_shadow_map((void *)VM_MIN_KERNEL_ADDRESS,
-	    eva - VM_MIN_KERNEL_ADDRESS);
+	kasan_shadow_map((void *)kasan_kernelstart, kasan_kernelsize);
+
+        /* The VAs we've created until now. */
+        vaddr_t eva = pmap_growkernel(VM_KERNEL_VM_BASE);
+        kasan_shadow_map((void *)VM_KERNEL_VM_BASE, eva - VM_KERNEL_VM_BASE);
 }
 
 static inline bool
