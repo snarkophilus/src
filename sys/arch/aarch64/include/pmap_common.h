@@ -328,9 +328,8 @@ static inline void
 pte_set(pt_entry_t *ptep, pt_entry_t pte)
 {
 
-	//XXXNH compiler tricks?
 	*ptep = pte;
-	dsb(ish);
+	dsb(ishst);
 }
 
 static inline pd_entry_t
@@ -372,7 +371,8 @@ static inline pd_entry_t
 pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 {
 #ifdef MULTIPROCESSOR
-	return atomic_cas_64(pdep, opde, npde);
+	opde = atomic_cas_64(pdep, opde, npde);
+	dst(ishst);
 #else
 	*pdep = npde;
 	return opde;
