@@ -32,7 +32,7 @@
 #include "atomic_op_asm.h"
 
 ENTRY_NP(_atomic_cas_16)
-	mov	x4, x0			/* we need r0 for return value */
+	mov	x4, x0			/* we need x0 for return value */
 1:	ldxrh	w0, [x4]		/* load old value */
 	cmp	w0, w1			/*   compare? */
 	b.ne	2f
