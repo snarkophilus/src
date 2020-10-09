@@ -372,11 +372,11 @@ pte_pde_cas(pd_entry_t *pdep, pd_entry_t opde, pt_entry_t npde)
 {
 #ifdef MULTIPROCESSOR
 	opde = atomic_cas_64(pdep, opde, npde);
-	dst(ishst);
+	dsb(ishst);
 #else
 	*pdep = npde;
-	return opde;
 #endif
+	return opde;
 }
 
 static inline void

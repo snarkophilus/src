@@ -1,4 +1,4 @@
-/* $NetBSD: atomic_cas_8.S,v 1.2 2020/08/12 12:59:57 skrll Exp $ */
+/* $NetBSD: atomic_cas_8.S,v 1.3 2020/10/07 07:31:47 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
