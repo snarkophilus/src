@@ -1375,7 +1375,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(*histp, "(pmap=%#jx, va=%#jx, pa=%#jx",
 	    (uintptr_t)pmap, va, pa, 0);
-	UVMHIST_LOG(*histp, "prot=%#jx flags=%#jx)", prot, flags, 0, 0);
+	UVMHIST_LOG(*histp, "prot=%#jx flags=%jx)", prot, flags, 0, 0);
 
 	const bool good_color = PMAP_PAGE_COLOROK_P(pa, va);
 	if (is_kernel_pmap_p) {
@@ -1536,7 +1536,7 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 	struct vm_page_md * const mdpg = (pg ? VM_PAGE_TO_MD(pg) : NULL);
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "(va=%#jx pa=%#jx prot=%ju, flags=%#jx)",
+	UVMHIST_CALLARGS(pmaphist, "(va=%#jx pa=%#jx prot=%ju, flags=%jx)",
 	    va, pa, prot, flags);
 	PMAP_COUNT(kenter_pa);
 

@@ -741,7 +741,7 @@ pmap_tlb_update_addr(pmap_t pm, vaddr_t va, pt_entry_t pte, u_int flags)
 	int rv = -1;
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(maphist, " (pm=%#jx va=%#jx, pte=%#jx flags=%#jx)",
+	UVMHIST_CALLARGS(maphist, " (pm=%#jx va=%#jx, pte=%#jx flags=%jx)",
 	    (uintptr_t)pm, va, pte_value(pte), flags);
 
 	KASSERT(kpreempt_disabled());
