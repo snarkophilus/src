@@ -1135,7 +1135,6 @@ pmap_segtab_reserve(struct pmap *pmap, vaddr_t va)
 pt_entry_t *
 pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 {
-//	const size_t pte_idx = (va >> PGSHIFT) & (NPTEPG - 1);
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmaphist, "pm=%#jx va=%#jx flags=%jx",
 	    (uintptr_t)pmap, (uintptr_t)va, flags, 0);
