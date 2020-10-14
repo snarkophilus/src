@@ -1,4 +1,4 @@
-/* $NetBSD: atomic_op_asm.h,v 1.4 2020/10/07 07:34:29 skrll Exp $ */
+/* $NetBSD: atomic_op_asm.h,v 1.5 2020/10/13 21:17:35 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
