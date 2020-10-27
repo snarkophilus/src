@@ -72,6 +72,7 @@
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.392 2020/10/20 13:16:26 christos Exp $");
 
+#include "opt_execfmt.h"
 #include "opt_ptrace.h"
 #include "opt_dtrace.h"
 #include "opt_compat_sunos.h"
@@ -2356,7 +2357,7 @@ coredump_netbsd(struct lwp *l, struct coredump_iostate *iocookie)
 	return retval;
 }
 
-#if !defined(_LP64) || defined(COMPAT_NETBSD32)
+#ifdef EXEC_ELF32
 int
 coredump_elf32(struct lwp *l, struct coredump_iostate *iocookie)
 {
@@ -2367,7 +2368,7 @@ coredump_elf32(struct lwp *l, struct coredump_iostate *iocookie)
 }
 #endif
 
-#ifdef _LP64
+#ifdef EXEC_ELF64
 int
 coredump_elf64(struct lwp *l, struct coredump_iostate *iocookie)
 {
