@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sig.c,v 1.392 2020/10/20 13:16:26 christos Exp $	*/
+/*	$NetBSD: kern_sig.c,v 1.393 2020/10/26 17:35:39 christos Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008, 2019 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.392 2020/10/20 13:16:26 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sig.c,v 1.393 2020/10/26 17:35:39 christos Exp $");
 
 #include "opt_execfmt.h"
 #include "opt_ptrace.h"

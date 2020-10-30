@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_core.c,v 1.32 2020/10/20 13:47:30 christos Exp $	*/
+/*	$NetBSD: kern_core.c,v 1.33 2020/10/26 17:35:39 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_core.c,v 1.32 2020/10/20 13:47:30 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_core.c,v 1.33 2020/10/26 17:35:39 christos Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_execfmt.h"

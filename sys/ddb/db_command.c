@@ -1,4 +1,4 @@
-/*	$NetBSD: db_command.c,v 1.170 2020/04/13 11:43:27 skrll Exp $	*/
+/*	$NetBSD: db_command.c,v 1.173 2020/10/30 07:17:29 skrll Exp $	*/
 
 /*
  * Copyright (c) 1996, 1997, 1998, 1999, 2002, 2009, 2019
@@ -61,7 +61,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_command.c,v 1.170 2020/04/13 11:43:27 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_command.c,v 1.173 2020/10/30 07:17:29 skrll Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_aio.h"
@@ -236,13 +236,13 @@ static const struct db_command db_show_cmds[] = {
 	{ DDB_ADD_CMD("aio_jobs",	db_show_aio_jobs,	0,
 	    "Show aio jobs",NULL,NULL) },
 #endif
-	/*added from all sub cmds*/
 #ifdef _KERNEL
 	{ DDB_ADD_CMD("breaks",	db_listbreak_cmd, 	0,
 	    "Display all breaks.",NULL,NULL) },
 #endif
 	{ DDB_ADD_CMD("buf",	db_buf_print_cmd,	0,
 	    "Print the struct buf at address.", "[/f] address",NULL) },
+	/* added from all sub cmds */
 	{ DDB_ADD_CMD("callout",  db_show_callout,
 	    0 ,"List all used callout functions.",NULL,NULL) },
 	{ DDB_ADD_CMD("devices", db_show_all_devices,	0,NULL,NULL,NULL) },
@@ -262,6 +262,7 @@ static const struct db_command db_show_cmds[] = {
 	    "Print the UVM history logs.",
 	    NULL,NULL) },
 #endif
+	/* added from all sub cmds */
 	{ DDB_ADD_CMD("locks",	db_show_all_locks,
 	    0 ,"Show all held locks", "[/t]", NULL) },
 	{ DDB_ADD_CMD("lock",	db_lock_print_cmd,	0,NULL,NULL,NULL) },
@@ -294,10 +295,12 @@ static const struct db_command db_show_cmds[] = {
 	    "Print the current panic string",NULL,NULL) },
 	{ DDB_ADD_CMD("pool",	db_pool_print_cmd,	0,
 	    "Print the pool at address.", "[/clp] address",NULL) },
+	/* added from all sub cmds */
 	{ DDB_ADD_CMD("pools",	db_show_all_pools,
 	    0 ,"Show all pools",NULL,NULL) },
 	{ DDB_ADD_CMD("proc",	db_show_proc,
 	    0 ,"Print process information.",NULL,NULL) },
+	/* added from all sub cmds */
 	{ DDB_ADD_CMD("procs",	db_show_all_procs,
 	    0 ,"List all processes.",NULL,NULL) },
 	{ DDB_ADD_CMD("registers",	db_show_regs,		0,
