@@ -6,7 +6,8 @@ __LARGE_PAGE_SIZE = 0x200000 ;
 
 SECTIONS
 {
-	.text : AT (ADDR(.text) & 0x0fffffff)
+
+	.text : AT (KERNEL_PHYS)
 	{
 		*(.text)
 		*(.text.*)
