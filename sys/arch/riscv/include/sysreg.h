@@ -126,35 +126,35 @@ riscvreg_fcsr_write_frm(uint32_t __new)
 
 /* Supervisor Status Register */
 #ifndef _LP64
-#define SR_WPRI __BITS(30,20) | __BIT(17) | __BITS(12,9) | \
+#define SR_WPRI	__BITS(30,20) | __BIT(17) | __BITS(12,9) | \
                  __BITS(7,6) | __BITS(3,2)
-#define SR_SD __BIT(31)
+#define SR_SD	__BIT(31)
 /* Bits 30-20 are WPRI*/
 #endif /* !_LP64 */
 
 #ifdef _LP64
-#define SR_WPRI __BITS(62, 34) | __BITS(31,20) | __BIT(17) | \
+#define SR_WPRI	__BITS(62, 34) | __BITS(31,20) | __BIT(17) | \
                  __BITS(12,9) | __BITS(7,6) | __BITS(3,2)
 #define SR_SD	__BIT(63)
 /* Bits 62-34 are WPRI */
-#define SR_UXL __BITS(33,32)
+#define SR_UXL	__BITS(33,32)
 /* Bits 31-20 are WPRI*/
 #endif /* _LP64 */
 
 /* Both RV32 and RV64 have the bottom 20 bits shared */
-#define SR_MXR __BIT(19)
-#define SR_SUM __BIT(18)
+#define SR_MXR	__BIT(19)
+#define SR_SUM	__BIT(18)
 /* Bit 17 is WPRI */
-#define SR_XS __BITS(16,15)
-#define SR_FS __BITS(14,13)
+#define SR_XS	__BITS(16,15)
+#define SR_FS	__BITS(14,13)
 /* Bits 12-9 are WPRI */
-#define SR_SPP __BIT(8)
+#define SR_SPP	__BIT(8)
 /* Bits 7-6 are WPRI */
-#define SR_SPIE __BIT(5)
-#define SR_UPIE __BIT(4)
+#define SR_SPIE	__BIT(5)
+#define SR_UPIE	__BIT(4)
 /* Bits 3-2 are WPRI */
-#define SR_SIE __BIT(1)
-#define SR_UIE __BIT(0)
+#define SR_SIE	__BIT(1)
+#define SR_UIE	__BIT(0)
 
 /* Bit (XLEN-1)-10 is WIRI */
 #define SIP_SEIP __BIT(9)_
