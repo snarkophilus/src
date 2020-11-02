@@ -1,4 +1,4 @@
-/*	$NetBSD: make.h,v 1.176 2020/10/30 07:19:30 rillig Exp $	*/
+/*	$NetBSD: make.h,v 1.179 2020/11/01 17:47:26 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -364,7 +364,7 @@ typedef struct GNode {
      *
      * Also used for the global variable scopes VAR_GLOBAL, VAR_CMDLINE,
      * VAR_INTERNAL, which contain variables with arbitrary names. */
-    HashTable context;
+    HashTable /* of Var pointer */ context;
 
     /* The commands to be given to a shell to create this target. */
     StringList *commands;
@@ -629,7 +629,7 @@ Boolean Main_SetObjdir(const char *, ...) MAKE_ATTR_PRINTFLIKE(1, 2);
 int mkTempFile(const char *, char **);
 int str2Lst_Append(StringList *, char *, const char *);
 void GNode_FprintDetails(FILE *, const char *, const GNode *, const char *);
-Boolean NoExecute(GNode *gn);
+Boolean GNode_ShouldExecute(GNode *gn);
 
 /* See if the node was seen on the left-hand side of a dependency operator. */
 static MAKE_ATTR_UNUSED Boolean
@@ -643,6 +643,21 @@ GNode_Path(const GNode *gn)
 {
     return gn->path != NULL ? gn->path : gn->name;
 }
+
+static MAKE_ATTR_UNUSED const char *
+GNode_VarTarget(GNode *gn) { return Var_ValueDirect(TARGET, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarOodate(GNode *gn) { return Var_ValueDirect(OODATE, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarAllsrc(GNode *gn) { return Var_ValueDirect(ALLSRC, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarImpsrc(GNode *gn) { return Var_ValueDirect(IMPSRC, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarPrefix(GNode *gn) { return Var_ValueDirect(PREFIX, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarArchive(GNode *gn) { return Var_ValueDirect(ARCHIVE, gn); }
+static MAKE_ATTR_UNUSED const char *
+GNode_VarMember(GNode *gn) { return Var_ValueDirect(MEMBER, gn); }
 
 #ifdef __GNUC__
 #define UNCONST(ptr)	({		\
