@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.421 2020/08/12 18:30:46 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.422 2020/10/30 18:54:36 skrll Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -192,7 +192,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.421 2020/08/12 18:30:46 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.422 2020/10/30 18:54:36 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -677,7 +677,7 @@ pmap_pte_sync_current(pmap_t pm, pt_entry_t *ptep)
 {
 	if (PMAP_NEEDS_PTE_SYNC && pmap_is_cached(pm))
 		PTE_SYNC(ptep);
-	arm_dsb();
+	dsb(sy);
 }
 
 # define PTE_SYNC_CURRENT(pm, ptep)	pmap_pte_sync_current(pm, ptep)

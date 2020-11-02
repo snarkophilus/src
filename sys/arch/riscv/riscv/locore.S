@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.12 2020/03/14 16:12:16 skrll Exp $ */
+/* $NetBSD: locore.S,v 1.13 2020/10/31 15:18:09 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -58,8 +58,8 @@ ENTRY_NP(start)
 #endif
 
 	/* Save the phys addr from the start and end of the kernel */
-	la	s3, _C_LABEL(start)
-	la	s4, _C_LABEL(end)
+	PTR_LA	s3, _C_LABEL(start)
+	PTR_LA	s4, _C_LABEL(end)
 
 #if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
 #error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS

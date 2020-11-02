@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.176 2020/10/29 18:19:41 rillig Exp $
+# $NetBSD: Makefile,v 1.181 2020/11/01 19:02:22 rillig Exp $
 #
 # Unit tests for make(1)
 #
@@ -261,7 +261,6 @@ TESTS+=		suff-transform-endless
 TESTS+=		suff-transform-expand
 TESTS+=		suff-transform-select
 TESTS+=		sunshcmd
-TESTS+=		sysv
 TESTS+=		ternary
 TESTS+=		unexport
 TESTS+=		unexport-env
@@ -279,6 +278,7 @@ TESTS+=		var-op-default
 TESTS+=		var-op-expand
 TESTS+=		var-op-shell
 TESTS+=		var-op-sunsh
+TESTS+=		var-recursive
 TESTS+=		varcmd
 TESTS+=		vardebug
 TESTS+=		varfind
@@ -378,6 +378,7 @@ ENV.envfirst=		FROM_ENV=value-from-env
 ENV.varmisc=		FROM_ENV=env
 ENV.varmisc+=		FROM_ENV_BEFORE=env
 ENV.varmisc+=		FROM_ENV_AFTER=env
+ENV.varmod-localtime+=	TZ=Europe/Berlin
 
 # Override make flags for some of the tests; default is -k.
 # If possible, write ".MAKEFLAGS: -dv" in the test .mk file instead of
@@ -397,8 +398,6 @@ FLAGS.opt-warnings-as-errors= -W
 FLAGS.order=		-j1
 FLAGS.recursive=	-dL
 FLAGS.sh-leading-plus=	-n
-FLAGS.varmod-match-escape= -dv
-FLAGS.varname-dot-shell= -dpv
 FLAGS.varname-empty=	-dv '$${:U}=cmdline-u' '=cmline-plain'
 
 # Some tests need extra postprocessing.
@@ -431,17 +430,14 @@ SED_CMDS.varshell+=	-e 's,^${.SHELL:T}: ,,'
 SED_CMDS.varshell+=	-e '/command/s,No such.*,not found,'
 SED_CMDS.varname-dot-parsedir=	-e '/in some cases/ s,^make: "[^"]*,make: "<normalized>,'
 SED_CMDS.varname-dot-parsefile=	-e '/in some cases/ s,^make: "[^"]*,make: "<normalized>,'
-SED_CMDS.varname-dot-shell=	-e 's, = /.*, = (details omitted),'
-SED_CMDS.varname-dot-shell+=	-e 's,"/[^"]*","(details omitted)",'
-SED_CMDS.varname-dot-shell+=	-e 's,\[/[^]]*\],[(details omitted)],'
+SED_CMDS.varname-dot-shell=	-e 's, = /[^ ]*, = (details omitted),g'
+SED_CMDS.varname-dot-shell+=	-e 's,"/[^" ]*","(details omitted)",g'
+SED_CMDS.varname-dot-shell+=	-e 's,\[/[^] ]*\],[(details omitted)],g'
 
 # Some tests need an additional round of postprocessing.
 POSTPROC.deptgt-suffixes= \
 			${TOOL_SED} -n -e '/^\#\*\*\* Suffixes/,/^\#\*/p'
-POSTPROC.varmod-match-escape= ${TOOL_SED} -n -e '/^Pattern/p'
 POSTPROC.varname=	${TOOL_SED} -n -e '/^MAGIC/p' -e '/^ORDER_/p'
-POSTPROC.varname-dot-shell= \
-			awk '/\.SHELL/ || /^ParseReadLine/'
 POSTPROC.varname-empty=	${TOOL_SED} -n -e '/^Var_Set/p' -e '/^out:/p'
 
 # Some tests reuse other tests, which makes them unnecessarily fragile.

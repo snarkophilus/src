@@ -1,4 +1,4 @@
-/*	$NetBSD$	*/
+/*	$NetBSD: fdt_ddb.h,v 1.1 2020/10/30 16:08:45 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2020 The NetBSD Foundation, Inc.

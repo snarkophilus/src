@@ -1,4 +1,4 @@
-/* $NetBSD: sysreg.h,v 1.5 2020/03/14 16:12:16 skrll Exp $ */
+/* $NetBSD: sysreg.h,v 1.6 2020/11/01 21:09:48 skrll Exp $ */
 
 /*
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -212,20 +212,23 @@ riscvreg_status_set(uint32_t __mask)
 }
 
 // Cause register
-#define CAUSE_INST_MISALIGNED 0
-#define CAUSE_INST_ACCESS_FAULT 1
-#define CAUSE_INST_ILLEGAL 2
-#define CAUSE_BREAKPOINT 3
-/* 4 is Reserved */
-#define CAUSE_LOAD_ACCESS_FAULT 5
-#define CAUSE_STORE_MISALIGNED 6
-#define CAUSE_STORE_ACCESS_FAULT 7
-#define CAUSE_SYSCALL 8
-/* 9-11 is Reserved */
-#define CAUSE_INST_PAGE_FAULT 12
-#define CAUSE_LOAD_PAGE_FAULT 13
+#define CAUSE_FETCH_MISALIGNED		0
+#define CAUSE_FETCH_ACCESS		1
+#define CAUSE_ILLEGAL_INSTRUCTION	2
+#define CAUSE_BREAKPOINT		3
+#define CAUSE_LOAD_MISALIGNED		4
+#define CAUSE_LOAD_ACCESS		5
+#define CAUSE_STORE_MISALIGNED		6
+#define CAUSE_STORE_ACCESS		7
+#define CAUSE_SYSCALL			8
+#define CAUSE_USER_ECALL		8
+#define CAUSE_SUPERVISOR_ECALL		9
+/* 10 is reserved */
+#define CAUSE_MACHINE_ECALL		11
+#define CAUSE_FETCH_PAGE_FAULT		12
+#define CAUSE_LOAD_PAGE_FAULT		13
 /* 14 is Reserved */
-#define CAUSE_STORE_PAGE_FAULT 15
+#define CAUSE_STORE_PAGE_FAULT		15
 /* >= 16 is reserved */
 
 static inline uint64_t

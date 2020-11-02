@@ -1,4 +1,4 @@
-/*	$NetBSD: compat.c,v 1.169 2020/10/26 21:34:10 rillig Exp $	*/
+/*	$NetBSD: compat.c,v 1.173 2020/11/01 17:47:26 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990 The Regents of the University of California.
@@ -96,7 +96,7 @@
 #include "pathnames.h"
 
 /*	"@(#)compat.c	8.2 (Berkeley) 3/19/94"	*/
-MAKE_RCSID("$NetBSD: compat.c,v 1.169 2020/10/26 21:34:10 rillig Exp $");
+MAKE_RCSID("$NetBSD: compat.c,v 1.173 2020/11/01 17:47:26 rillig Exp $");
 
 static GNode *curTarg = NULL;
 static pid_t compatChild;
@@ -110,14 +110,11 @@ static void
 CompatDeleteTarget(GNode *gn)
 {
     if (gn != NULL && !Targ_Precious(gn)) {
-	char *file_freeIt;
-	const char *file = Var_Value(TARGET, gn, &file_freeIt);
+	const char *file = GNode_VarTarget(gn);
 
 	if (!opts.noExecute && eunlink(file) != -1) {
 	    Error("*** %s removed", file);
 	}
-
-	bmake_free(file_freeIt);
     }
 }
 
@@ -270,14 +267,14 @@ Compat_RunCommand(const char *cmdp, GNode *gn)
      * meta characters as documented in make(1).
      */
 
-    useShell = needshell(cmd, FALSE);
+    useShell = needshell(cmd);
 #endif
 
     /*
      * Print the command before echoing if we're not supposed to be quiet for
      * this one. We also print the command if -n given.
      */
-    if (!silent || NoExecute(gn)) {
+    if (!silent || !GNode_ShouldExecute(gn)) {
 	printf("%s\n", cmd);
 	fflush(stdout);
     }
@@ -286,7 +283,7 @@ Compat_RunCommand(const char *cmdp, GNode *gn)
      * If we're not supposed to execute any commands, this is as far as
      * we go...
      */
-    if (!doIt && NoExecute(gn)) {
+    if (!doIt && !GNode_ShouldExecute(gn)) {
 	return 0;
     }
     DEBUG1(JOB, "Execute: '%s'\n", cmd);
@@ -502,11 +499,8 @@ Compat_Make(GNode *gn, GNode *pgn)
 	    goto cohorts;
 	}
 
-	if (Lst_FindDatum(gn->implicitParents, pgn) != NULL) {
-	    char *target_freeIt;
-	    Var_Set(IMPSRC, Var_Value(TARGET, gn, &target_freeIt), pgn);
-	    bmake_free(target_freeIt);
-	}
+	if (Lst_FindDatum(gn->implicitParents, pgn) != NULL)
+	    Var_Set(IMPSRC, GNode_VarTarget(gn), pgn);
 
 	/*
 	 * All the children were made ok. Now youngestChild->mtime contains the
@@ -554,7 +548,7 @@ Compat_Make(GNode *gn, GNode *pgn)
 	    if (!opts.touchFlag || (gn->type & OP_MAKE)) {
 		curTarg = gn;
 #ifdef USE_META
-		if (useMeta && !NoExecute(gn)) {
+		if (useMeta && GNode_ShouldExecute(gn)) {
 		    meta_job_start(NULL, gn);
 		}
 #endif
@@ -567,7 +561,7 @@ Compat_Make(GNode *gn, GNode *pgn)
 	    gn->made = ERROR;
 	}
 #ifdef USE_META
-	if (useMeta && !NoExecute(gn)) {
+	if (useMeta && GNode_ShouldExecute(gn)) {
 	    if (meta_job_finish(NULL) != 0)
 		gn->made = ERROR;
 	}
@@ -597,10 +591,8 @@ Compat_Make(GNode *gn, GNode *pgn)
 	pgn->flags &= ~(unsigned)REMAKE;
     } else {
 	if (Lst_FindDatum(gn->implicitParents, pgn) != NULL) {
-	    char *target_freeIt;
-	    const char *target = Var_Value(TARGET, gn, &target_freeIt);
+	    const char *target = GNode_VarTarget(gn);
 	    Var_Set(IMPSRC, target != NULL ? target : "", pgn);
-	    bmake_free(target_freeIt);
 	}
 	switch(gn->made) {
 	    case BEINGMADE:

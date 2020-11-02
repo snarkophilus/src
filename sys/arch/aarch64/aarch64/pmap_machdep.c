@@ -557,7 +557,7 @@ pmap_md_xtab_activate(pmap_t pm, struct lwp *l)
 
 	const uint64_t old_tcrel1 = reg_tcr_el1_read();
 	reg_tcr_el1_write(old_tcrel1 | TCR_EPD0);
-	arm_isb();
+	isb();
 
 	struct cpu_info * const ci = curcpu();
 	struct pmap_asid_info * const pai = PMAP_PAI(pm, cpu_tlb_info(ci));
@@ -594,7 +594,7 @@ pmap_md_xtab_deactivate(pmap_t pm)
 	 */
 	const uint64_t old_tcrel1 = reg_tcr_el1_read();
 	reg_tcr_el1_write(old_tcrel1 | TCR_EPD0);
-	arm_isb();
+	isb();
 
 	//XXXNH needed cf TCR_EPD0
 	cpu_set_ttbr0(0);

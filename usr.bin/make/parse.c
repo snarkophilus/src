@@ -1,4 +1,4 @@
-/*	$NetBSD: parse.c,v 1.411 2020/10/30 07:19:30 rillig Exp $	*/
+/*	$NetBSD: parse.c,v 1.420 2020/11/01 00:24:57 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -117,7 +117,7 @@
 #include "pathnames.h"
 
 /*	"@(#)parse.c	8.3 (Berkeley) 3/19/94"	*/
-MAKE_RCSID("$NetBSD: parse.c,v 1.411 2020/10/30 07:19:30 rillig Exp $");
+MAKE_RCSID("$NetBSD: parse.c,v 1.420 2020/11/01 00:24:57 rillig Exp $");
 
 /* types and constants */
 
@@ -196,9 +196,9 @@ static GNode *mainNode;
 
 /* eval state */
 
-/* During parsing, the targets from the currently active dependency line,
- * or NULL if the current line does not belong to a dependency line, for
- * example because it is a variable assignment.
+/* During parsing, the targets from the left-hand side of the currently
+ * active dependency line, or NULL if the current line does not belong to a
+ * dependency line, for example because it is a variable assignment.
  *
  * See unit-tests/deptgt.mk, keyword "parse.c:targets". */
 static GNodeList *targets;
@@ -283,7 +283,7 @@ CurFile(void)
 /* include paths */
 SearchPath *parseIncPath;	/* dirs for "..." includes */
 SearchPath *sysIncPath;		/* dirs for <...> includes */
-SearchPath *defSysIncPath;		/* default for sysIncPath */
+SearchPath *defSysIncPath;	/* default for sysIncPath */
 
 /* parser tables */
 
@@ -432,41 +432,13 @@ load_getsize(int fd, size_t *ret)
 	return TRUE;
 }
 
-/*
- * Read in a file.
- *
- * Until the path search logic can be moved under here instead of
- * being in the caller in another source file, we need to have the fd
- * passed in already open. Bleh.
- *
- * If the path is NULL use stdin and (to insure against fd leaks)
- * assert that the caller passed in -1.
- */
-static struct loadedfile *
-loadfile(const char *path, int fd)
+static Boolean
+loadedfile_mmap(struct loadedfile *lf, int fd)
 {
-	struct loadedfile *lf;
 	static unsigned long pagesize = 0;
-	ssize_t result;
-	size_t bufpos;
-
-	lf = loadedfile_create(path);
-
-	if (path == NULL) {
-		assert(fd == -1);
-		fd = STDIN_FILENO;
-	} else {
-#if 0 /* notyet */
-		fd = open(path, O_RDONLY);
-		if (fd < 0) {
-			...
-			Error("%s: %s", path, strerror(errno));
-			exit(1);
-		}
-#endif
-	}
 
 	if (load_getsize(fd, &lf->len)) {
+
 		/* found a size, try mmap */
 		if (pagesize == 0)
 			pagesize = (unsigned long)sysconf(_SC_PAGESIZE);
@@ -474,7 +446,7 @@ loadfile(const char *path, int fd)
 			pagesize = 0x1000;
 		}
 		/* round size up to a page */
-		lf->maplen = pagesize * ((lf->len + pagesize - 1)/pagesize);
+		lf->maplen = pagesize * ((lf->len + pagesize - 1) / pagesize);
 
 		/*
 		 * XXX hack for dealing with empty files; remove when
@@ -501,9 +473,47 @@ loadfile(const char *path, int fd)
 				lf->maplen = 0;
 				lf->buf = b;
 			}
-			goto done;
+			return TRUE;
 		}
 	}
+	return FALSE;
+}
+
+/*
+ * Read in a file.
+ *
+ * Until the path search logic can be moved under here instead of
+ * being in the caller in another source file, we need to have the fd
+ * passed in already open. Bleh.
+ *
+ * If the path is NULL use stdin and (to insure against fd leaks)
+ * assert that the caller passed in -1.
+ */
+static struct loadedfile *
+loadfile(const char *path, int fd)
+{
+	struct loadedfile *lf;
+	ssize_t result;
+	size_t bufpos;
+
+	lf = loadedfile_create(path);
+
+	if (path == NULL) {
+		assert(fd == -1);
+		fd = STDIN_FILENO;
+	} else {
+#if 0 /* notyet */
+		fd = open(path, O_RDONLY);
+		if (fd < 0) {
+			...
+			Error("%s: %s", path, strerror(errno));
+			exit(1);
+		}
+#endif
+	}
+
+	if (loadedfile_mmap(lf, fd))
+		goto done;
 
 	/* cannot mmap; load the traditional way */
 
@@ -610,7 +620,7 @@ PrintLocation(FILE *f, const char *filename, size_t lineno)
 {
 	char dirbuf[MAXPATHLEN+1];
 	const char *dir, *base;
-	char *dir_freeIt, *base_freeIt;
+	void *dir_freeIt, *base_freeIt;
 
 	if (*filename == '/' || strcmp(filename, "(stdin)") == 0) {
 		(void)fprintf(f, "\"%s\" line %zu: ", filename, lineno);
@@ -1985,9 +1995,9 @@ VarAssign_Eval(const char *name, VarAssignOp op, const char *uvalue,
     if (op == VAR_APPEND) {
 	Var_Append(name, uvalue, ctxt);
     } else if (op == VAR_SUBST) {
-        VarAssign_EvalSubst(name, uvalue, ctxt, &avalue, &avalue_freeIt);
+	VarAssign_EvalSubst(name, uvalue, ctxt, &avalue, &avalue_freeIt);
     } else if (op == VAR_SHELL) {
-        VarAssign_EvalShell(name, uvalue, ctxt, &avalue, &avalue_freeIt);
+	VarAssign_EvalShell(name, uvalue, ctxt, &avalue, &avalue_freeIt);
     } else {
 	if (op == VAR_DEFAULT && Var_Exists(name, ctxt)) {
 	    *out_avalue_freeIt = NULL;
@@ -2341,31 +2351,49 @@ ParseSetParseFile(const char *filename)
     }
 }
 
+static Boolean
+StrContainsWord(const char *str, const char *word)
+{
+    size_t strLen = strlen(str);
+    size_t wordLen = strlen(word);
+    const char *p, *end;
+
+    if (strLen < wordLen)
+	return FALSE;		/* str is too short to contain word */
+
+    end = str + strLen - wordLen;
+    for (p = str; p != NULL; p = strchr(p, ' ')) {
+	if (*p == ' ')
+	    p++;
+	if (p > end)
+	    return FALSE;	/* cannot contain word */
+
+	if (memcmp(p, word, wordLen) == 0 &&
+	    (p[wordLen] == '\0' || p[wordLen] == ' '))
+	    return TRUE;
+    }
+    return FALSE;
+}
+
+/* XXX: Searching through a set of words with this linear search is
+ * inefficient for variables that contain thousands of words. */
+static Boolean
+VarContainsWord(const char *varname, const char *word)
+{
+    void *val_freeIt;
+    const char *val = Var_Value(varname, VAR_GLOBAL, &val_freeIt);
+    Boolean found = val != NULL && StrContainsWord(val, word);
+    bmake_free(val_freeIt);
+    return found;
+}
+
 /* Track the makefiles we read - so makefiles can set dependencies on them.
  * Avoid adding anything more than once. */
 static void
 ParseTrackInput(const char *name)
 {
-    char *fp = NULL;
-
-    const char *old = Var_Value(MAKE_MAKEFILES, VAR_GLOBAL, &fp);
-    if (old) {
-	size_t name_len = strlen(name);
-	const char *ep = old + strlen(old) - name_len;
-	/* does it contain name? */
-	for (; old != NULL; old = strchr(old, ' ')) {
-	    if (*old == ' ')
-		old++;
-	    if (old >= ep)
-		break;		/* cannot contain name */
-	    if (memcmp(old, name, name_len) == 0 &&
-		(old[name_len] == '\0' || old[name_len] == ' '))
-		goto cleanup;
-	}
-    }
-    Var_Append(MAKE_MAKEFILES, name, VAR_GLOBAL);
-cleanup:
-    bmake_free(fp);
+    if (!VarContainsWord(MAKE_MAKEFILES, name))
+	Var_Append(MAKE_MAKEFILES, name, VAR_GLOBAL);
 }
 
 
@@ -2989,7 +3017,7 @@ ParseDependency(char *line)
      * Attempt to avoid ';' inside substitution patterns.
      */
     {
-        char *semicolon = FindSemicolon(line);
+	char *semicolon = FindSemicolon(line);
 	if (*semicolon != '\0') {
 	    /* Terminate the dependency list at the ';' */
 	    *semicolon = '\0';
@@ -3192,4 +3220,10 @@ Parse_MainName(void)
 	Lst_Append(mainList, mainNode);
     Var_Append(".TARGETS", mainNode->name, VAR_GLOBAL);
     return mainList;
+}
+
+int
+Parse_GetFatals(void)
+{
+    return fatals;
 }

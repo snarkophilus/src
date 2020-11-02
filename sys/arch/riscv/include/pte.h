@@ -1,4 +1,4 @@
-/* $NetBSD: pte.h,v 1.4 2020/03/14 16:12:16 skrll Exp $ */
+/* $NetBSD: pte.h,v 1.5 2020/11/01 19:47:46 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.

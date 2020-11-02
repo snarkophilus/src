@@ -583,7 +583,7 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype, int user)
 			armreg_ats1cuw_write(va);
 		else
 			armreg_ats1cur_write(va);
-		arm_isb();
+		isb();
 		printf("fixup: par %#x\n", armreg_par_read());
 #endif
 #ifdef DDB
@@ -1008,7 +1008,7 @@ pmap_md_xtab_activate(pmap_t pm, struct lwp *l)
 	 */
 	const uint32_t old_ttbcr = armreg_ttbcr_read();
 	armreg_ttbcr_write(old_ttbcr | TTBCR_S_PD0);
-	arm_isb();
+	isb();
 
 	pmap_tlb_asid_acquire(pm, l);
 
@@ -1017,7 +1017,7 @@ pmap_md_xtab_activate(pmap_t pm, struct lwp *l)
 	 * Now we can reenable tablewalks since the CONTEXTIDR and TTRB0
 	 * have been updated.
 	 */
-	arm_isb();
+	isb();
 
 	if (pm != pmap_kernel()) {
 		armreg_ttbcr_write(old_ttbcr & ~TTBCR_S_PD0);
@@ -1044,10 +1044,10 @@ pmap_md_xtab_deactivate(pmap_t pm)
 	 */
 	const uint32_t old_ttbcr = armreg_ttbcr_read();
 	armreg_ttbcr_write(old_ttbcr | TTBCR_S_PD0);
-	arm_isb();
+	isb();
 	pmap_tlb_asid_deactivate(pm);
 	cpu_setttb(pmap_kernel()->pm_l1_pa, KERNEL_PID);
-	arm_isb();
+	isb();
 
 	ci->ci_pmap_cur = pmap_kernel();
 	KASSERTMSG(ci->ci_pmap_asid_cur == KERNEL_PID, "ci_pmap_asid_cur %u",
