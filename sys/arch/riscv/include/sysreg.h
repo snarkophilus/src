@@ -253,20 +253,6 @@ riscvreg_cycle_read(void)
 #endif
 }
 
-static inline uintptr_t
-riscvreg_ptbr_read(void)
-{
-	uintptr_t __ptbr;
-	__asm("csrr\t%0, sptbr" : "=r"(__ptbr));
-	return __ptbr;
-}
-
-static inline void
-riscvreg_ptbr_write(uint32_t __ptbr)
-{
-	__asm("csrw\tsptbr, %0" :: "r"(__ptbr));
-}
-
 #ifdef _LP64
 #define SATP_MODE	__BITS(63,60)
 #define SATP_ASID	__BITS(59,44)
