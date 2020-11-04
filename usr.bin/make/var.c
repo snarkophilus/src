@@ -1,4 +1,4 @@
-/*	$NetBSD: var.c,v 1.641 2020/11/01 23:17:40 rillig Exp $	*/
+/*	$NetBSD: var.c,v 1.657 2020/11/04 04:49:32 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -130,7 +130,7 @@
 #include "metachar.h"
 
 /*	"@(#)var.c	8.3 (Berkeley) 3/19/94" */
-MAKE_RCSID("$NetBSD: var.c,v 1.641 2020/11/01 23:17:40 rillig Exp $");
+MAKE_RCSID("$NetBSD: var.c,v 1.657 2020/11/04 04:49:32 rillig Exp $");
 
 #define VAR_DEBUG1(fmt, arg1) DEBUG1(VAR, fmt, arg1)
 #define VAR_DEBUG2(fmt, arg1, arg2) DEBUG2(VAR, fmt, arg1, arg2)
@@ -156,11 +156,6 @@ char var_Error[] = "";
  * typically a dynamic variable such as ${.TARGET}, whose expansion needs to
  * be deferred until it is defined in an actual target. */
 static char varUndefined[] = "";
-
-/* Special return value for Var_Parse, just to avoid allocating empty strings.
- * In contrast to var_Error and varUndefined, this is not an error marker but
- * just an ordinary successful return value. */
-static char emptyString[] = "";
 
 /*
  * Traditionally this make consumed $$ during := like any other expansion.
@@ -2299,7 +2294,7 @@ ApplyModifier_ShellCommand(const char **pp, ApplyModifiersState *st)
     if (st->eflags & VARE_WANTRES)
 	st->newVal = Cmd_Exec(cmd, &errfmt);
     else
-	st->newVal = emptyString;
+	st->newVal = bmake_strdup("");
     free(cmd);
 
     if (errfmt != NULL)
@@ -2983,6 +2978,8 @@ ok:
     }
 
     delim = st->startc == '(' ? ')' : '}';
+    /* TODO: Add test for using the ::= modifier in a := assignment line.
+     * Probably st->eflags should be passed down without VARE_ASSIGN here. */
     res = ParseModifierPart(pp, delim, st->eflags, st, &val, NULL, NULL, NULL);
     if (res != VPR_OK)
 	return AMR_CLEANUP;
@@ -3014,7 +3011,7 @@ ok:
 	}
     }
     free(val);
-    st->newVal = emptyString;
+    st->newVal = bmake_strdup("");
     return AMR_OK;
 }
 
@@ -3138,7 +3135,7 @@ ApplyModifier_SunShell(const char **pp, ApplyModifiersState *st)
 	    if (errfmt)
 		Error(errfmt, st->val);
 	} else
-	    st->newVal = emptyString;
+	    st->newVal = bmake_strdup("");
 	*pp = p + 2;
 	return AMR_OK;
     } else
@@ -3264,20 +3261,18 @@ typedef enum ApplyModifiersIndirectResult {
 } ApplyModifiersIndirectResult;
 
 /* While expanding a variable expression, expand and apply indirect
- * modifiers. */
+ * modifiers such as in ${VAR:${M_indirect}}. */
 static ApplyModifiersIndirectResult
 ApplyModifiersIndirect(
 	ApplyModifiersState *const st,
-	const char **inout_p,
+	const char **const inout_p,
 	void **const out_freeIt
 ) {
     const char *p = *inout_p;
-    const char *nested_p = p;
-    void *freeIt;
-    const char *rval;
-    char c;
+    const char *mods;
+    void *mods_freeIt;
 
-    (void)Var_Parse(&nested_p, st->ctxt, st->eflags, &rval, &freeIt);
+    (void)Var_Parse(&p, st->ctxt, st->eflags, &mods, &mods_freeIt);
     /* TODO: handle errors */
 
     /*
@@ -3285,38 +3280,35 @@ ApplyModifiersIndirect(
      * interested.  This means the expression ${VAR:${M_1}${M_2}}
      * is not accepted, but ${VAR:${M_1}:${M_2}} is.
      */
-    if (rval[0] != '\0' &&
-	(c = *nested_p) != '\0' && c != ':' && c != st->endc) {
+    if (mods[0] != '\0' && *p != '\0' && *p != ':' && *p != st->endc) {
 	if (DEBUG(LINT))
 	    Parse_Error(PARSE_FATAL,
 			"Missing delimiter ':' after indirect modifier \"%.*s\"",
-			(int)(nested_p - p), p);
+			(int)(p - *inout_p), *inout_p);
 
-	free(freeIt);
+	free(mods_freeIt);
 	/* XXX: apply_mods doesn't sound like "not interested". */
-	/* XXX: Why is the indirect modifier parsed again by
+	/* XXX: Why is the indirect modifier parsed once more by
 	 * apply_mods?  If any, p should be advanced to nested_p. */
 	return AMIR_APPLY_MODS;
     }
 
     VAR_DEBUG3("Indirect modifier \"%s\" from \"%.*s\"\n",
-	       rval, (int)(size_t)(nested_p - p), p);
+	       mods, (int)(p - *inout_p), *inout_p);
 
-    p = nested_p;
-
-    if (rval[0] != '\0') {
-	const char *rval_pp = rval;
+    if (mods[0] != '\0') {
+	const char *rval_pp = mods;
 	st->val = ApplyModifiers(&rval_pp, st->val, '\0', '\0', st->v,
-				&st->exprFlags, st->ctxt, st->eflags, out_freeIt);
-	if (st->val == var_Error
-	    || (st->val == varUndefined && !(st->eflags & VARE_UNDEFERR))
-	    || *rval_pp != '\0') {
-	    free(freeIt);
+				 &st->exprFlags, st->ctxt, st->eflags,
+				 out_freeIt);
+	if (st->val == var_Error || st->val == varUndefined ||
+	    *rval_pp != '\0') {
+	    free(mods_freeIt);
 	    *inout_p = p;
 	    return AMIR_OUT;	/* error already reported */
 	}
     }
-    free(freeIt);
+    free(mods_freeIt);
 
     if (*p == ':')
 	p++;
@@ -3334,15 +3326,15 @@ ApplyModifiersIndirect(
 /* Apply any modifiers (such as :Mpattern or :@var@loop@ or :Q or ::=value). */
 static char *
 ApplyModifiers(
-    const char **pp,		/* the parsing position, updated upon return */
+    const char **const pp,	/* the parsing position, updated upon return */
     char *const val,		/* the current value of the expression */
     char const startc,		/* '(' or '{', or '\0' for indirect modifiers */
     char const endc,		/* ')' or '}', or '\0' for indirect modifiers */
-    Var * const v,
-    VarExprFlags *exprFlags,
-    GNode * const ctxt,		/* for looking up and modifying variables */
+    Var *const v,
+    VarExprFlags *const exprFlags,
+    GNode *const ctxt,		/* for looking up and modifying variables */
     VarEvalFlags const eflags,
-    void ** const out_freeIt	/* free this after using the return value */
+    void **const out_freeIt	/* free this after using the return value */
 ) {
     ApplyModifiersState st = {
 	startc, endc, v, ctxt, eflags,
@@ -3361,6 +3353,13 @@ ApplyModifiers(
     assert(val != NULL);
 
     p = *pp;
+
+    if (*p == '\0' && endc != '\0') {
+	Error("Unclosed variable expression (expecting '%c') for \"%s\"",
+	      st.endc, st.v->name);
+	goto cleanup;
+    }
+
     while (*p != '\0' && *p != endc) {
 
 	if (*p == '$') {
@@ -3388,6 +3387,9 @@ ApplyModifiers(
 
 	if (res == AMR_UNKNOWN) {
 	    Error("Unknown modifier '%c'", *mod);
+	    /* Guess the end of the current modifier.
+	     * XXX: Skipping the rest of the modifier hides errors and leads
+	     * to wrong results.  Parsing should rather stop here. */
 	    for (p++; *p != ':' && *p != st.endc && *p != '\0'; p++)
 		continue;
 	    st.newVal = var_Error;
@@ -3406,10 +3408,8 @@ ApplyModifiers(
 		*out_freeIt = NULL;
 	    }
 	    st.val = st.newVal;
-	    if (st.val != var_Error && st.val != varUndefined &&
-		st.val != emptyString) {
+	    if (st.val != var_Error && st.val != varUndefined)
 		*out_freeIt = st.val;
-	    }
 	}
 	if (*p == '\0' && st.endc != '\0') {
 	    Error("Unclosed variable specification (expecting '%c') "
@@ -3421,6 +3421,7 @@ ApplyModifiers(
 	    Parse_Error(PARSE_FATAL,
 			"Missing delimiter ':' after modifier \"%.*s\"",
 			(int)(p - mod), mod);
+	    /* TODO: propagate parse error to the enclosing expression */
 	}
     }
 out:
@@ -3430,6 +3431,7 @@ out:
     return st.val;
 
 bad_modifier:
+    /* XXX: The modifier end is only guessed. */
     Error("Bad modifier `:%.*s' for %s",
 	  (int)strcspn(mod, ":)}"), mod, st.v->name);
 
@@ -3520,12 +3522,12 @@ ParseVarname(const char **pp, char startc, char endc,
 
 	/* A variable inside a variable, expand. */
 	if (*p == '$') {
-	    void *freeIt;
-	    const char *rval;
-	    (void)Var_Parse(&p, ctxt, eflags, &rval, &freeIt);
+	    const char *nested_val;
+	    void *nested_val_freeIt;
+	    (void)Var_Parse(&p, ctxt, eflags, &nested_val, &nested_val_freeIt);
 	    /* TODO: handle errors */
-	    Buf_AddStr(&buf, rval);
-	    free(freeIt);
+	    Buf_AddStr(&buf, nested_val);
+	    free(nested_val_freeIt);
 	} else {
 	    Buf_AddByte(&buf, *p);
 	    p++;
@@ -3536,7 +3538,7 @@ ParseVarname(const char **pp, char startc, char endc,
     return Buf_Destroy(&buf, FALSE);
 }
 
-static Boolean
+static VarParseResult
 ValidShortVarname(char varname, const char *start)
 {
     switch (varname) {
@@ -3547,11 +3549,11 @@ ValidShortVarname(char varname, const char *start)
     case '$':
 	break;			/* and continue below */
     default:
-	return TRUE;
+	return VPR_OK;
     }
 
     if (!DEBUG(LINT))
-	return FALSE;
+	return VPR_PARSE_SILENT;
 
     if (varname == '$')
 	Parse_Error(PARSE_FATAL,
@@ -3562,7 +3564,7 @@ ValidShortVarname(char varname, const char *start)
 	Parse_Error(PARSE_FATAL,
 		    "Invalid variable name '%c', at \"%s\"", varname, start);
 
-    return FALSE;
+    return VPR_PARSE_MSG;
 }
 
 /* Parse a single-character variable name such as $V or $@.
@@ -3579,6 +3581,7 @@ ParseVarnameShort(
 ) {
     char name[2];
     Var *v;
+    VarParseResult vpr;
 
     /*
      * If it's not bounded by braces of some sort, life is much simpler.
@@ -3586,10 +3589,11 @@ ParseVarnameShort(
      * value if it exists.
      */
 
-    if (!ValidShortVarname(startc, *pp)) {
+    vpr = ValidShortVarname(startc, *pp);
+    if (vpr != VPR_OK) {
 	(*pp)++;
 	*out_FALSE_val = var_Error;
-	*out_FALSE_res = VPR_PARSE_MSG;
+	*out_FALSE_res = vpr;
 	return FALSE;
     }
 
@@ -3626,7 +3630,7 @@ ParseVarnameLong(
 
 	VarParseResult *out_FALSE_res,
 	const char **out_FALSE_val,
-	void **out_FALSE_freePtr,
+	void **out_FALSE_freeIt,
 
 	char *out_TRUE_endc,
 	const char **out_TRUE_p,
@@ -3702,7 +3706,7 @@ ParseVarnameLong(
 		char *pstr = bmake_strsedup(start, p);
 		free(varname);
 		*out_FALSE_res = VPR_OK;
-		*out_FALSE_freePtr = pstr;
+		*out_FALSE_freeIt = pstr;
 		*out_FALSE_val = pstr;
 		return FALSE;
 	    }
@@ -3987,15 +3991,14 @@ Var_Subst(const char *str, GNode *ctxt, VarEvalFlags eflags, char **out_res)
 	    /* TODO: handle errors */
 
 	    if (val == var_Error || val == varUndefined) {
-		/*
-		 * If performing old-time variable substitution, skip over
-		 * the variable and continue with the substitution. Otherwise,
-		 * store the dollar sign and advance str so we continue with
-		 * the string...
-		 */
-		if (oldVars) {
+		if (!preserveUndefined) {
 		    p = nested_p;
 		} else if ((eflags & VARE_UNDEFERR) || val == var_Error) {
+		    /* XXX: This condition is wrong.  If val == var_Error,
+		     * this doesn't necessarily mean there was an undefined
+		     * variable.  It could equally well be a parse error; see
+		     * unit-tests/varmod-order.exp. */
+
 		    /*
 		     * If variable is undefined, complain and skip the
 		     * variable. The complaint will stop us from doing anything
