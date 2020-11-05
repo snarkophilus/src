@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.7 2020/01/08 17:38:42 ad Exp $
+#	$NetBSD: genassym.cf,v 1.9 2020/11/04 07:51:08 skrll Exp $
 #-
 # Copyright (c) 2014 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -47,27 +47,17 @@ include <uvm/uvm_extern.h>
 include <riscv/locore.h>
 include <riscv/sysreg.h>
 
-# define	SR_IM		SR_IM
-# define	SR_IM_LSHIFT	__SIZEOF_LONG__ * 8 - (ilog2(SR_IM) + 1)
-# define	SR_IM_RSHIFT	ilog2(__LOWEST_SET_BIT(SR_IM))
-define	SR_VM		SR_VM
-# define	SR_U64		SR_U64
-# define	SR_S64		SR_S64
-# define	SR_EF		SR_EF
-# define	SR_PEI		SR_PEI
+define	SR_SPP		SR_SPP
 define	SR_SIE		SR_SIE
-# define	SR_PS		SR_PS
-# define	SR_S		SR_S
-define	SR_SUM		SR_SUM
 
-define	SATP_PPN_SHIFT	SATP_PPN_SHIFT
-define	SATP_PPN_MASK	SATP_PPN_MASK
-define	SATP_ASID_SHIFT	SATP_ASID_SHIFT
-define	SATP_ASID_MASK	SATP_ASID_MASK
-define	SATP_MODE_SHIFT	SATP_MODE_SHIFT
-define	SATP_MODE_MASK	SATP_MODE_MASK
-define	SATP_MODE_SV39	SATP_MODE_SV39
-define	SATP_MODE_SV48	SATP_MODE_SV48
+#define	SATP_PPN_SHIFT	SATP_PPN_SHIFT
+#define	SATP_PPN_MASK	SATP_PPN_MASK
+#define	SATP_ASID_SHIFT	SATP_ASID_SHIFT
+#define	SATP_ASID_MASK	SATP_ASID_MASK
+#define	SATP_MODE_SHIFT	SATP_MODE_SHIFT
+#define	SATP_MODE_MASK	SATP_MODE_MASK
+#define	SATP_MODE_SV39	SATP_MODE_SV39
+#define	SATP_MODE_SV48	SATP_MODE_SV48
 
 define	CAUSE_SYSCALL	CAUSE_SYSCALL
 
@@ -117,7 +107,7 @@ define	TF_T6		offsetof(struct trapframe, tf_reg[_X_T6])
 define	TF_GP		offsetof(struct trapframe, tf_reg[_X_GP])
 define	TF_PC		offsetof(struct trapframe, tf_pc)
 define	TF_CAUSE	offsetof(struct trapframe, tf_cause)
-define	TF_BADADDR	offsetof(struct trapframe, tf_badaddr)
+define	TF_TVAL		offsetof(struct trapframe, tf_tval)
 define	TF_SR		offsetof(struct trapframe, tf_sr)
 
 define	L_CPU		offsetof(struct lwp, l_cpu)
@@ -225,4 +215,4 @@ define	Ln_ADDR_MASK	Ln_ADDR_MASK
 #define	PTE_SIZE	PTE_SIZE
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
-define	PM_MD_PTBR	offsetof(struct pmap, pm_md.md_ptbr)
+define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)

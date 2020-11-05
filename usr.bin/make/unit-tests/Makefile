@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.181 2020/11/01 19:02:22 rillig Exp $
+# $NetBSD: Makefile,v 1.188 2020/11/04 04:24:57 rillig Exp $
 #
 # Unit tests for make(1)
 #
@@ -37,8 +37,11 @@
 # src/tests/usr.bin/make/t_make.sh as well.
 TESTS+=		archive
 TESTS+=		archive-suffix
+TESTS+=		cmd-errors
+TESTS+=		cmd-errors-lint
 TESTS+=		cmd-interrupt
 TESTS+=		cmdline
+TESTS+=		cmdline-undefined
 TESTS+=		comment
 TESTS+=		cond-cmp-numeric
 TESTS+=		cond-cmp-numeric-eq
@@ -157,7 +160,6 @@ TESTS+=		directive-undef
 TESTS+=		directive-unexport
 TESTS+=		directive-unexport-env
 TESTS+=		directive-warning
-TESTS+=		directives
 TESTS+=		dollar
 TESTS+=		doterror
 TESTS+=		dotwait
@@ -437,7 +439,6 @@ SED_CMDS.varname-dot-shell+=	-e 's,\[/[^] ]*\],[(details omitted)],g'
 # Some tests need an additional round of postprocessing.
 POSTPROC.deptgt-suffixes= \
 			${TOOL_SED} -n -e '/^\#\*\*\* Suffixes/,/^\#\*/p'
-POSTPROC.varname=	${TOOL_SED} -n -e '/^MAGIC/p' -e '/^ORDER_/p'
 POSTPROC.varname-empty=	${TOOL_SED} -n -e '/^Var_Set/p' -e '/^out:/p'
 
 # Some tests reuse other tests, which makes them unnecessarily fragile.
@@ -544,8 +545,10 @@ sync-mi:
 	cvs update "$$mi";						\
 	testsdir="usr.bin/make/unit-tests";				\
 	fmt="./usr/tests/$$testsdir/%s\ttests-usr.bin-tests\tcompattestfile,atf\\n"; \
-	(cd "$$testsdir" && ls *.exp *.mk) | xargs printf "$$fmt" >> "$$mi"; \
-	distrib/sets/fmt-list "$$mi";					\
+	cat "$$mi" > "$$mi.tmp";					\
+	(cd "$$testsdir" && ls *.exp *.mk) | xargs printf "$$fmt" >> "$$mi.tmp"; \
+	distrib/sets/fmt-list "$$mi.tmp";				\
+	mv "$$mi.tmp" "$$mi";						\
 	cvs diff "$$mi" || true
 
 .if exists(${TEST_MAKE})

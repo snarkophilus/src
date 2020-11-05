@@ -108,7 +108,7 @@ pmap_procwr(struct proc *p, vaddr_t va, vsize_t len)
 
 #define __HAVE_PMAP_MD
 struct pmap_md {
-	paddr_t md_ptbr;
+	paddr_t md_ppn;
 	pd_entry_t *md_pdetab;
 };
 

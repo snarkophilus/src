@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.13 2020/10/31 15:18:09 skrll Exp $ */
+/* $NetBSD: locore.S,v 1.15 2020/11/04 07:09:46 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -36,11 +36,15 @@
 	.globl	_C_LABEL(cpu_Debugger_insn)
 
 ENTRY_NP(start)
+
 	/* Entry point from BBL.
 	 * Here's what we get for free:
 	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
 	 * Copy these to the s* registsers so they're saved.
 	*/
+
+	// We get loaded and starting running at or near 0, not where we
+	// should be. We need to construct an initial PDETAB
 
 	li	s11, VM_MAX_KERNEL_ADDRESS
 	li	s10, PAGE_SIZE
@@ -92,10 +96,6 @@ ENTRY_NP(start)
 	bgtz	a6, .Lfill		// loop if more
 #endif
 
-	csrw	sptbr, s1		// set the page table base
-	li	t0, SR_VM
-	csrs	sstatus, t0		// Enable VM
-
 	// We should have a VM so let's start using our real addresses
 	PTR_LA	t0, vmmu_on
 	INT_L	t0, (t0)
@@ -117,7 +117,7 @@ ENTRY_NP(start)
 	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
 	add	t2, s2, s11 		// PA -> VA
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
-	PTR_S	s2, PM_MD_PTBR(t1)	// PA of kernel PDETAB
+	PTR_S	s2, PM_MD_PPN(t1)	// PA of kernel PDETAB
 
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
@@ -244,29 +244,20 @@ ENTRY_NP(cpu_fast_switchto)
 	mv	s0, tp			// remember curlwp
 	mv	s1, sp			// remember kernel stack
 
-//#if 0
 	csrrci	t0, sstatus, SR_SIE	// disable interrupts
-//#endif
 	PTR_L	t1, L_CPU(tp)		// get curcpu()
 
 	PTR_S	sp, L_MD_KTF(tp)	// save trapframe ptr in oldlwp
 	mv	tp, a0			// set thread pointer to newlwp
 	PTR_S	tp, CI_CURLWP(t1)	// update curlwp
 	PTR_L	sp, L_MD_KTF(tp)	// switch to its stack
-//#if 0
 	csrw	sstatus, t0		// reenable interrupts
-//#endif
-	mv	a0, s0			// Pass the pinned lwp
 	call	_C_LABEL(softint_dispatch)
-//#if 0
 	csrrci	t0, sstatus, SR_SIE	// disable interrupts
-//#endif
 	PTR_L	t1, L_CPU(tp)		// get curcpu() again
 	mv	tp, s0			// return to pinned lwp
 	PTR_S	tp, CI_CURLWP(t1)	// restore curlwp
-//#if 0
 	csrw	sstatus, t0		// reeanble interrupts
-//#endif
 	mv	sp, s1			// restore stack pointer
 
 	REG_L	ra, TF_RA(sp)		// get return address
@@ -352,9 +343,9 @@ ENTRY_NP(cpu_exception_handler)
 
 	bltz	a3, intr_handler	// MSB is set if interrupt
 
-	// badaddr is only relavent for non-interrupts
-	csrr	a4, sbadaddr		// get badaddr
-	REG_S	a4, TF_BADADDR(sp)
+	// stval is only relavent for non-interrupts
+	csrr	a4, stval		// get stval
+	REG_S	a4, TF_TVAL(sp)
 
 	beqz	t1, trap_user		// this was a user trap
 	// This was a kernel exception

@@ -1,4 +1,4 @@
-/* $NetBSD: reg.h,v 1.2 2015/03/27 06:57:21 matt Exp $ */
+/* $NetBSD: reg.h,v 1.5 2020/11/04 07:41:34 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -32,19 +32,18 @@
 #ifndef _RISCV_REG_H_
 #define _RISCV_REG_H_
 
-// x0 = 0
-// x1 = ra (return address)
-// x2 = sp (stack pointer)
-// x3 = gp (global pointer)
-// x4 = tp (thread pointer)
-// x5-x7 = t0-t2 (temporary)
-// x8 = s0/fp (saved register / frame pointer)
-// x9 = s1 (saved register)
-// x10-x11 = a0-a1 (arguments/return values)
-// x12-x17 = a2-a7 (arguments)
-// x18-r27 = s2-s11 (saved registers)
-// x28-x31 = t3-r6 (temporaries)
-// x26-x30 = t0-t4 (temporary)
+// x0		= 0
+// x1		= ra		(return address)
+// x2		= sp		(stack pointer)
+// x3		= gp		(global pointer)
+// x4		= tp		(thread pointer)
+// x5 - x7	= t0 - t2	(temporary)
+// x8		= s0/fp		(saved register / frame pointer)
+// x9		= s1		(saved register)
+// x10 - x11	= a0 - a1	(arguments/return values)
+// x12 - x17	= a2 - a7	(arguments)
+// x18 - x27	= s2 - s11	(saved registers)
+// x28 - x31	= t3 - r6	(temporaries)
 
 struct reg {	// synced with register_t in <riscv/types.h>
 #ifdef _LP64
@@ -122,14 +121,5 @@ struct fpreg {
 	_BSD_FPREG_T_	r_fpreg[33];
 };
 #define r_fcsr		r_fpreg[32].u_u64
-
-#define	SATP_PPN_SHIFT	0
-#define	SATP_PPN_MASK	(0xfffffffffffULL << SATP_PPN_SHIFT)
-#define	SATP_ASID_SHIFT	44
-#define	SATP_ASID_MASK	(0xffffULL << SATP_ASID_SHIFT)
-#define	SATP_MODE_SHIFT	60
-#define	SATP_MODE_MASK	(0xfULL << SATP_MODE_SHIFT)
-#define	SATP_MODE_SV39	(8ULL << SATP_MODE_SHIFT)
-#define	SATP_MODE_SV48	(9ULL << SATP_MODE_SHIFT)
 
 #endif /* _RISCV_REG_H_ */

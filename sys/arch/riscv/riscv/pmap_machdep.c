@@ -39,7 +39,8 @@ __RCSID("$NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $");
 
 #include <uvm/uvm.h>
 
-#include <riscv/locore.h>
+//#include <riscv/locore.h>
+#include <riscv/sysreg.h>
 
 int riscv_poolpage_vmfreelist = VM_FREELIST_DEFAULT;
 
@@ -138,13 +139,28 @@ pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
 void
 pmap_md_xtab_activate(struct pmap *pmap, struct lwp *l)
 {
-	riscvreg_ptbr_write(pmap->pm_md.md_ptbr);
+//	UVMHIST_FUNC(__func__); UVMHIST_CALLED(maphist);
+
+//	struct cpu_info * const ci = curcpu();
+        struct pmap_asid_info * const pai = PMAP_PAI(pmap, cpu_tlb_info(ci));
+
+	 uint64_t satp =
+#ifdef _LP64
+	    __SHIFTIN(SATP_MODE_SV39, SATP_MODE) |
+#else
+	    __SHIFTIN(SATP_MODE_SV32, SATP_MDDE) |
+#endif
+	    __SHIFTIN(pai->pai_asid, SATP_ASID) |
+	    __SHIFTIN(pmap->pm_md.md_ppn, SATP_PPN);
+
+	riscvreg_satp_write(satp);
 }
 
 void
 pmap_md_xtab_deactivate(struct pmap *pmap)
 {
-	riscvreg_ptbr_write(0);
+
+	riscvreg_satp_write(0);
 }
 
 void
@@ -158,7 +174,7 @@ pmap_md_pdetab_init(struct pmap *pmap)
 
 
 	pmap->pm_md.md_pdetab[NPDEPG-1] = pmap_kernel()->pm_md.md_pdetab[NPDEPG-1];
-	pmap->pm_md.md_ptbr =
+	pmap->pm_md.md_ppn =
 	    pmap_md_direct_mapped_vaddr_to_paddr((vaddr_t)pmap->pm_pdetab) >> PAGE_SHIFT;
 }
 
@@ -179,7 +195,7 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 
 	/* Get the PPN for l1_pte */
 	/* XXX HACK */
-	pm->pm_md.md_ptbr = (paddr_t)(((__uint64_t)&l1_pte - virt_map) >> PAGE_SHIFT);
+	pm->pm_md.md_ppn = (paddr_t)(((__uint64_t)&l1_pte - virt_map) >> PAGE_SHIFT);
 
 	/* Setup basic info like pagesize=PAGE_SIZE */
 	uvm_md_init();

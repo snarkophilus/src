@@ -1,4 +1,4 @@
-/*	$NetBSD: parse.c,v 1.420 2020/11/01 00:24:57 rillig Exp $	*/
+/*	$NetBSD: parse.c,v 1.426 2020/11/04 13:31:58 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -117,7 +117,7 @@
 #include "pathnames.h"
 
 /*	"@(#)parse.c	8.3 (Berkeley) 3/19/94"	*/
-MAKE_RCSID("$NetBSD: parse.c,v 1.420 2020/11/01 00:24:57 rillig Exp $");
+MAKE_RCSID("$NetBSD: parse.c,v 1.426 2020/11/04 13:31:58 rillig Exp $");
 
 /* types and constants */
 
@@ -125,7 +125,7 @@ MAKE_RCSID("$NetBSD: parse.c,v 1.420 2020/11/01 00:24:57 rillig Exp $");
  * Structure for a file being read ("included file")
  */
 typedef struct IFile {
-    char *fname;		/* name of file */
+    char *fname;		/* name of file (relative? absolute?) */
     Boolean fromForLoop;	/* simulated .include by the .for loop */
     int lineno;			/* current line number in file */
     int first_lineno;		/* line number of start of text */
@@ -1832,7 +1832,6 @@ Parse_IsVar(const char *p, VarAssign *out_var)
 {
     VarAssignParsed pvar;
     const char *firstSpace = NULL;
-    char ch;
     int level = 0;
 
     /* Skip to variable name */
@@ -1850,7 +1849,8 @@ Parse_IsVar(const char *p, VarAssign *out_var)
 #endif
 
     /* Scan for one of the assignment operators outside a variable expansion */
-    while ((ch = *p++) != 0) {
+    while (*p != '\0') {
+	char ch = *p++;
 	if (ch == '(' || ch == '{') {
 	    level++;
 	    continue;
@@ -1919,20 +1919,18 @@ VarAssign_EvalSubst(const char *name, const char *uvalue, GNode *ctxt,
 {
     const char *avalue = uvalue;
     char *evalue;
-    /*
-     * Allow variables in the old value to be undefined, but leave their
-     * expressions alone -- this is done by forcing oldVars to be false.
-     * XXX: This can cause recursive variables, but that's not hard to do,
-     * and this allows someone to do something like
-     *
-     *  CFLAGS = $(.INCLUDES)
-     *  CFLAGS := -I.. $(CFLAGS)
-     *
-     * And not get an error.
-     */
-    Boolean oldOldVars = oldVars;
+    Boolean savedPreserveUndefined = preserveUndefined;
 
-    oldVars = FALSE;
+    /* TODO: Can this assignment to preserveUndefined be moved further down
+     * to the actually interesting Var_Subst call, without affecting any
+     * edge cases?
+     *
+     * It might affect the implicit expansion of the variable name in the
+     * Var_Exists and Var_Set calls, even though it's unlikely that anyone
+     * cared about this edge case when adding this code.  In addition,
+     * variable assignments should not refer to any undefined variables in
+     * the variable name. */
+    preserveUndefined = TRUE;
 
     /*
      * make sure that we set the variable the first time to nothing
@@ -1943,7 +1941,7 @@ VarAssign_EvalSubst(const char *name, const char *uvalue, GNode *ctxt,
 
     (void)Var_Subst(uvalue, ctxt, VARE_WANTRES|VARE_ASSIGN, &evalue);
     /* TODO: handle errors */
-    oldVars = oldOldVars;
+    preserveUndefined = savedPreserveUndefined;
     avalue = evalue;
     Var_Set(name, avalue, ctxt);
 

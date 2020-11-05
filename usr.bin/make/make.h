@@ -1,4 +1,4 @@
-/*	$NetBSD: make.h,v 1.179 2020/11/01 17:47:26 rillig Exp $	*/
+/*	$NetBSD: make.h,v 1.188 2020/11/04 13:40:20 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -171,7 +171,7 @@ typedef int Boolean;
 #include "buf.h"
 #include "make_malloc.h"
 
-typedef enum  {
+typedef enum GNodeMade {
     UNMADE,			/* Not examined yet */
     DEFERRED,			/* Examined once (building child) */
     REQUESTED,			/* on toBeMade list */
@@ -330,9 +330,6 @@ typedef struct GNode {
      * file.c has the node for file.o in this list. */
     GNodeList *implicitParents;
 
-    /* Other nodes of the same name, for the '::' operator. */
-    GNodeList *cohorts;
-
     /* The nodes that depend on this one, or in other words, the nodes for
      * which this is a source. */
     GNodeList *parents;
@@ -348,6 +345,8 @@ typedef struct GNode {
      * in the normal sense. */
     GNodeList *order_succ;
 
+    /* Other nodes of the same name, for the '::' dependency operator. */
+    GNodeList *cohorts;
     /* The "#n" suffix for this cohort, or "" for other nodes */
     char cohort_num[8];
     /* The number of unmade instances on the cohorts list */
@@ -373,20 +372,19 @@ typedef struct GNode {
      * but the Suff module) */
     struct Suff *suffix;
 
-    /* filename where the GNode got defined */
+    /* Filename where the GNode got defined */
     const char *fname;
-    /* line number where the GNode got defined */
+    /* Line number where the GNode got defined */
     int lineno;
 } GNode;
 
-/*
- * Error levels for parsing. PARSE_FATAL means the process cannot continue
- * once the top-level makefile has been parsed. PARSE_WARNING and PARSE_INFO
- * mean it can.
- */
+/* Error levels for diagnostics during parsing. */
 typedef enum ParseErrorLevel {
+    /* Exit when the current top-level makefile has been parsed completely. */
     PARSE_FATAL = 1,
+    /* Print "warning"; may be upgraded to fatal by the -w option. */
     PARSE_WARNING,
+    /* Informational, mainly used during development of makefiles. */
     PARSE_INFO
 } ParseErrorLevel;
 
@@ -409,13 +407,6 @@ typedef enum CondEvalResult {
 #define PREFIX		"*"	/* Common prefix */
 #define ARCHIVE		"!"	/* Archive in "archive(member)" syntax */
 #define MEMBER		"%"	/* Member in "archive(member)" syntax */
-
-#define FTARGET		"@F"	/* file part of TARGET */
-#define DTARGET		"@D"	/* directory part of TARGET */
-#define FIMPSRC		"<F"	/* file part of IMPSRC */
-#define DIMPSRC		"<D"	/* directory part of IMPSRC */
-#define FPREFIX		"*F"	/* file part of PREFIX */
-#define DPREFIX		"*D"	/* directory part of PREFIX */
 
 /*
  * Global Variables
@@ -444,15 +435,34 @@ extern char	var_Error[];	/* Value returned by Var_Parse when an error
 extern time_t	now;		/* The time at the start of this whole
 				 * process */
 
-extern Boolean	oldVars;	/* Do old-style variable substitution */
+/*
+ * If FALSE (the default behavior), undefined subexpressions in a variable
+ * expression are discarded.  If TRUE (only during variable assignments using
+ * the ':=' assignment operator, in the top-level expansion), they are
+ * preserved and possibly expanded later when the variable from the
+ * subexpression has been defined.
+ *
+ * Example for a ':=' assignment:
+ *	CFLAGS = $(.INCLUDES)
+ *	CFLAGS := -I.. $(CFLAGS)
+ *	# If .INCLUDES (an undocumented special variable, by the way) is
+ *	# still undefined, the updated CFLAGS becomes "-I.. $(.INCLUDES)".
+ */
+extern Boolean preserveUndefined;
 
-extern SearchPath *sysIncPath;	/* The system include path. */
-extern SearchPath *defSysIncPath; /* The default system include path. */
+/* Used for .include "...". */
+extern SearchPath *parseIncPath;
+/* Used for .include <...>, for the built-in sys.mk and makefiles from the
+ * command line arguments. */
+extern SearchPath *sysIncPath;
+/* The default for sysIncPath. */
+extern SearchPath *defSysIncPath;
 
-extern char	curdir[];	/* Startup directory */
-extern char	*progname;	/* The program name */
-extern char	*makeDependfile; /* .depend */
-extern char	**savedEnv;	 /* if we replaced environ this will be non-NULL */
+extern char curdir[];		/* Startup directory */
+extern char *progname;		/* The program name */
+extern char *makeDependfile;	/* .depend */
+/* If we replaced environ, this will be non-NULL. */
+extern char **savedEnv;
 
 extern int	makelevel;
 
@@ -469,7 +479,7 @@ extern pid_t	myPid;
 #define	MAKE_EXPORTED	".MAKE.EXPORTED"   /* variables we export */
 #define	MAKE_MAKEFILES	".MAKE.MAKEFILES"  /* all makefiles already loaded */
 #define	MAKE_LEVEL	".MAKE.LEVEL"	   /* recursion level */
-#define MAKEFILE_PREFERENCE ".MAKE.MAKEFILE_PREFERENCE"
+#define MAKE_MAKEFILE_PREFERENCE ".MAKE.MAKEFILE_PREFERENCE"
 #define MAKE_DEPENDFILE	".MAKE.DEPENDFILE" /* .depend */
 #define MAKE_MODE	".MAKE.MODE"
 #ifndef MAKE_LEVEL_ENV
