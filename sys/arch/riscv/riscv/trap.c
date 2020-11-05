@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.12 2020/11/04 07:09:46 skrll Exp $	*/
+/*	$NetBSD: trap.c,v 1.13 2020/11/04 20:04:01 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -34,7 +34,7 @@
 #define __PMAP_PRIVATE
 #define __UFETCHSTORE_PRIVATE
 
-__RCSID("$NetBSD: trap.c,v 1.12 2020/11/04 07:09:46 skrll Exp $");
+__RCSID("$NetBSD: trap.c,v 1.13 2020/11/04 20:04:01 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
