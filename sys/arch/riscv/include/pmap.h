@@ -155,7 +155,6 @@ pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *nptep)
 static inline void
 pmap_md_vca_remove(struct vm_page_md *mdpg, vaddr_t va)
 {
-
 }
 
 static inline void
