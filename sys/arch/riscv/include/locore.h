@@ -113,11 +113,6 @@ struct faultbuf {
 
 CTASSERT(sizeof(label_t) == sizeof(struct faultbuf));
 
-struct mainbus_attach_args {
-	const char *maa_name;
-	u_int maa_instance;
-};
-
 #ifdef _KERNEL
 extern int cpu_printfataltraps;
 
