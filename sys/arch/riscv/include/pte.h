@@ -70,6 +70,10 @@ typedef uint32_t pd_entry_t;
 #define	PTE_R		__BIT(1)	// Read
 #define	PTE_V		__BIT(0)	// Valid
 
+#define PTE_KERN	(PTE_V | PTE_A | PTE_D | PTE_G)
+#define PTE_RW		(PTE_R | PTE_W)
+#define PTE_RX		(PTE_R | PTE_X)
+
 #define PA_TO_PTE(pa)	(((pa) >> PAGE_SHIFT) << PTE_PPN_SHIFT)
 #define PTE_TO_PA(pte)	(((pte) >> PTE_PPN_SHIFT) << PAGE_SHIFT)
 
