@@ -37,11 +37,12 @@
 
 ENTRY_NP(start)
 
-	/* Entry point from BBL.
+	/*
+	 * Entry point from BBL.
 	 * Here's what we get for free:
 	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
 	 * Copy these to the s* registsers so they're saved.
-	*/
+	 */
 
 	// We get loaded and starting running at or near 0, not where we
 	// should be. We need to construct an initial PDETAB
