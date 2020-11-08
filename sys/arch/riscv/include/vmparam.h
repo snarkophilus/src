@@ -1,4 +1,4 @@
-/*	$NetBSD: vmparam.h,v 1.6 2020/10/06 13:42:03 christos Exp $	*/
+/*	$NetBSD: vmparam.h,v 1.7 2020/11/07 14:48:45 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
