@@ -37,16 +37,16 @@
 
 ENTRY_NP(start)
 
-	/* set the stack pointer for boot */
-	la	s8, bootstk
-	mv	sp, s8
-
 	/*
 	 * Entry point from BBL.
 	 * Here's what we get for free:
 	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
 	 * Copy these to the s* registsers so they're saved.
 	 */
+
+	/* set the stack pointer for boot */
+	la	s8, bootstk
+	mv	sp, s8
 
 	// We get loaded and starting running at or near 0, not where we
 	// should be. We need to construct an initial PDETAB
