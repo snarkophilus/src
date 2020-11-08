@@ -70,7 +70,7 @@ ENTRY_NP(start)
 	PTR_LA	s3, _C_LABEL(start)
 	PTR_LA	s4, _C_LABEL(end)
 
-#if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != (VM_MAX_KERNEL_ADDRESS >> XSEGSHIFT)
+#if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != ((VM_MAX_KERNEL_ADDRESS - 1) >> XSEGSHIFT)
 #error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
 #endif
 	// We allocated the kernel first PTE page so let's insert in the
