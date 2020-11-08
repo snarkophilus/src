@@ -73,7 +73,6 @@ ENTRY_NP(start)
 	// page table.  For now, we assume it's in the same PDE page as the
 	// direct-mapped memory.
 	or	t0, s4, t4
-	or	t0, t0, PTE_T
 #if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
 	add	t1, t1, s3
