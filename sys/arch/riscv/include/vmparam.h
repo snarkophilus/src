@@ -110,12 +110,12 @@
 #define VM_MIN_ADDRESS		((vaddr_t)0x00000000)
 #ifdef _LP64	/* Sv39 */
 #define VM_MAXUSER_ADDRESS	((vaddr_t)0x0000004000000000 - 16 * PAGE_SIZE)
-#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xFFFFFFC000000000)
-#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xFFFFFFD000000000) /* MIN + 64GB */
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xffffffc000000000)
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffffc040000000) /* MIN + 1GB */
 #else		/* Sv32 */
-#define VM_MAXUSER_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0xFFFFFFFF80000000 */
-#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0xFFFFFFFF80000000 */
-#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)-0x40000000)	/* 0xFFFFFFFFC0000000 */
+#define VM_MAXUSER_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0xffffffff80000000 */
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0fffffffff80000000 */
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)-0x40000000)	/* 0xffffffffc0000000 */
 #endif
 #define VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define VM_MAXUSER_ADDRESS32	((vaddr_t)(1UL << 31))/* 0x0000000080000000 */
