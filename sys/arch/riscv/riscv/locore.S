@@ -37,6 +37,10 @@
 
 ENTRY_NP(start)
 
+	/* set the stack pointer for boot */
+	la	s8, bootstk
+	mv	sp, s8
+
 	/*
 	 * Entry point from BBL.
 	 * Here's what we get for free:
@@ -545,6 +549,7 @@ virt_map:
 	.global _C_LABEL(lwp0uspace)
 _C_LABEL(lwp0uspace):
 	.space	UPAGES * PAGE_SIZE
+bootstk:
 
 	.align PGSHIFT
 mmutables_start:
