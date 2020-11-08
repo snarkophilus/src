@@ -74,17 +74,17 @@ ENTRY_NP(start)
 	// direct-mapped memory.
 	or	t0, s4, t4
 	or	t0, t0, PTE_T
-#if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
-	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
+#if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
+	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
 	add	t1, t1, s3
 	REG_S	t0, 0(t1)
 #else
 	REG_S	t0, 0(s3)
 #endif
 
-	li	t0, ((VM_MAX_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG-1)) * SZREG
+	li	t0, ((VM_MAX_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
 	add	s3, s3, t0
-	srli	a7, a7, (SEGSHIFT-PGSHIFT) // pages to segments
+	srli	a7, a7, (SEGSHIFT - PGSHIFT) // pages to segments
 	li	t3, NBSEG		// load for ease
 
 	//
