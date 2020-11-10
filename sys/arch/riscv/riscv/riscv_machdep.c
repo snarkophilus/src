@@ -77,9 +77,6 @@ const pcu_ops_t * const pcu_ops_md_defs[PCU_UNIT_COUNT] = {
  * keep it in data */
 __uint64_t kern_vtopdiff __attribute__((__section__(".data")));
 
-/* XXX Find a better way */
-__uint64_t kern_vstart __attribute__((__section__(".data")));
-
 SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
 {
 	sysctl_createv(clog, 0, NULL, NULL,
@@ -370,7 +367,6 @@ init_mmu(paddr_t dtb, paddr_t end)
 
 	/* Global used later for VTOPHYS and PHYSTOV */
 	kern_vtopdiff = VM_MAX_KERNEL_ADDRESS - 0x80000000ULL;
-	kern_vstart = VM_MIN_KERNEL_ADDRESS - phys_base + end + 0x200000;
 
 	/* L2 PTE with entry for Kernel VA, pointing to L2 PTE */
 	l2_pte[i] = (((paddr_t)&l1_pte >> PAGE_SHIFT) << L0_SHIFT) | PTE_V;
@@ -422,7 +418,7 @@ riscv_init_lwp0_uarea(void)
 }
 
 void
-init_riscv(register_t hartid, paddr_t dtb, paddr_t kernstart, paddr_t kernend)
+init_riscv(register_t hartid, paddr_t dtb)
 {
 	/* Main screen turn on */
 	consinit();
@@ -431,7 +427,8 @@ init_riscv(register_t hartid, paddr_t dtb, paddr_t kernstart, paddr_t kernend)
 	boothowto |= AB_DEBUG;
 
 	/* Just pretend we have a gig of ram until FDT is implemented */
-	pmap_bootstrap(0x80000000ULL, 0xc0000000ULL, kern_vstart, kernend);
+	pmap_bootstrap(0x80000000ULL, 0xc0000000ULL,
+	    VM_KERNEL_VM_BASE, VM_KERNEL_VM_SIZE);
 
 	/* Finish setting up lwp0 on our end before we call main() */
 	riscv_init_lwp0_uarea();

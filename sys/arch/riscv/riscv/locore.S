@@ -196,8 +196,6 @@ ENTRY_NP(start)
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, s1			// dtb
-	mv	a2, s3			// kernel start
-	mv	a3, s4			// kernel end
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
