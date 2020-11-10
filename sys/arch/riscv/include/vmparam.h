@@ -109,14 +109,28 @@
  */
 #define VM_MIN_ADDRESS		((vaddr_t)0x00000000)
 #ifdef _LP64	/* Sv39 */
+/*
+ * kernel virtual space layout:
+ *   0xffff_ffc0_0000_0000  -   64GiB  KERNEL VM Space (inc. text/data/bss)
+ *  (0xffff_ffc0_4000_0000      +1GiB) KERNEL VM start of KVA
+ *  (0xffff_ffd0_0000_0000      64GiB) reserved
+ *   0xffff_ffe0_0000_0000  -  128GiB  direct mapping
+ */
 #define VM_MAXUSER_ADDRESS	((vaddr_t)0x0000004000000000 - 16 * PAGE_SIZE)
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xffffffc000000000)
-#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffffc040000000) /* MIN + 1GB */
+
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffffd000000000)
+
+#define VM_KERNEL_VM_SIZE	0x40000000	 /* 1 GiB (1 gigapage)*/
 #else		/* Sv32 */
 #define VM_MAXUSER_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0xffffffff80000000 */
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0fffffffff80000000 */
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)-0x40000000)	/* 0xffffffffc0000000 */
+
+#define VM_KERNEL_VM_SIZE	0x2000000	 /* 32 MiB (8 megapages) */
 #endif
+#define VM_KERNEL_VM_ADDRESS	VM_MIN_KERNEL_ADDRESS
+
 #define VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define VM_MAXUSER_ADDRESS32	((vaddr_t)(1UL << 31))/* 0x0000000080000000 */
 
