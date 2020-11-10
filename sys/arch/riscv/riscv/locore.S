@@ -32,20 +32,25 @@
 #include <machine/asm.h>
 #include "assym.h"
 
+#define RISCV_BSS_MMUTABLES
+
 	.globl	_C_LABEL(exception_userexit)
 	.globl	_C_LABEL(cpu_Debugger_insn)
 
 ENTRY_NP(start)
 
 	/*
-	 * Entry point from BBL.
+	 * Entry point from BBL / OpenSBI.
 	 * Here's what we get for free:
 	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
 	 * Copy these to the s* registsers so they're saved.
 	 */
 
+	mv	s0, a0
+	mv	s1, a1
+
 	/* set the stack pointer for boot */
-	la	s8, bootstk
+	PTR_LA	s8, bootstk
 	mv	sp, s8
 
 	// We get loaded and starting running at or near 0, not where we
@@ -55,66 +60,102 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
-	/*
-	 * XXX XXX XXX: This is completely broken and wrong, we should map only
-	 * the kernel sections, and the direct map should be mapped later in C.
-	 */
-
 #if 0
 	// The kernel doesn't use gp/_gp since we'd have to reload it on
 	// each exception.
 	PTR_LA	gp, _C_LABEL(_gp)
 #endif
 
+#if 0
+	PTR_LA	s8, 1f
+	jal	1f
+1:
+	sub	s8, s8, x1
+#endif
 
+	// physical address
+	PTR_LA	s8, start
 
-
-
+//	li	a0, 'X'
+//	call	_C_LABEL(com_platform_early_putchar)
 
 
 	PTR_LA	a0, _C_LABEL(__bss_start)
-	PTR_LA	s1, _C_LABEL(_end)
+	PTR_LA	s6, _C_LABEL(_end)
 
-	add	s1, s1, s10		// PAGE_SIZE
-	addi	s1, s1, -1		//   -1 == PAGE_MASK
-	neg	a1, a0			// -PAGE_SIZE
-	and	s1, s1, a1		// s1 is page aligned end of kernel
-					// s1 = uarea
+#if !defined(RISCV_BSS_MMUTABLES)
+	add	s6, s6, s10		// PAGE_SIZE
+	addi	s6, s6, -1		//   -1 == PAGE_MASK
+	neg	a1, s10			// -PAGE_SIZE
+	and	s6, s6, a1		// s6 is page aligned end of kernel
+					// s6 = uarea
 	add	s2, s1, s9		// s2 = first PDE page
 #ifdef _LP64
 	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
 #else
-	mv	s3, 22
+	mv	s3, s2
 #endif
 	add	s4, s3, s10		// s4 = first kernel PTE page
-	add	s5, s1, s9		// s5 = kernel_end
+	add	s5, s6, s9		// s5 = bootstk
 	sub	a2, s5, a0
+#else
+	li	a1, 0
+	PTR_LA	s2, _C_LABEL(l1_pte)
+#ifdef _LP64
+	PTR_LA	s3, _C_LABEL(l2_pte)
+//	PTR_LA	s4, _C_LABEL(l3_pte)
+#endif
+	PTR_LA	s5, _C_LABEL(bootstk)
+	PTR_LA	s6, _C_LABEL(lwp0uspace)
+	sub	a2, s1, a0
+#endif
+					// a1 byte value is '0' from -PAGE_SIZE
 	call	memset			// zero through kernel_end
 
+
+
+
+	/*
+	 * XXX XXX XXX: This is completely broken and wrong, we should map only
+	 * the kernel sections, and the direct map should be mapped later in C.
+	 */
+
+
+#if notyetorever
 	// As a temporary hack, word 0 contains the amount of memory in MB
 	INT_L	a7, (zero)		// load memory size
-	slli	a7, a7, (20-PGSHIFT)	// convert MB to pages
-.L01:	PTR_LA	t0, physmem
+	slli	a7, a7, (20 - PGSHIFT)	// convert MB to pages
+	PTR_LA	t0, physmem
 	INT_S	a7, (t0)		// store it in physmem
+#endif
+
+
+	// s2	L1 PDE
+	// s3	L2 PDE (_LP64 SV39 only)
+	// s4	L3 PDE (_LP64 SV48 only)
+	// s5	bootstk
+	// s6	lwp0uspace
+
 
 	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
 #ifdef _LP64
-	REG_S	t4, 0(s2)		// keep a mapping for the first 8GB.
+	REG_S	t4, 0(s2)		// keep a mapping for the first 1GB.
 	or	t0, s3, t4		// point to next page
 	REG_S	t0, -SZREG(s3)		// store in highest first level PDE
 #endif
+
+
+
+
 
 
 	/* Save the phys addr from the start and end of the kernel */
 	PTR_LA	s3, _C_LABEL(start)
 	PTR_LA	s4, _C_LABEL(end)
 
-#if (VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) != ((VM_MAX_KERNEL_ADDRESS - 1) >> XSEGSHIFT)
-#error VM_MIN_KERNEL_ADDRESS not in same first level PDE as VM_MAX_KERNEL_ADDRESS
-#endif
 	// We allocated the kernel first PTE page so let's insert in the
-	// page table.  For now, we assume it's in the same PDE page as the
-	// direct-mapped memory.
+	// page table.
+
 	or	t0, s4, t4
 #if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
@@ -128,16 +169,6 @@ ENTRY_NP(start)
 	add	s3, s3, t0
 	srli	a7, a7, (SEGSHIFT - PGSHIFT) // pages to segments
 	li	t3, NBSEG		// load for ease
-
-	//
-	// Fill in the PDEs to direct map memory.
-	//
-.Lfill:	REG_S	t4, 0(s3)		// store PDE
-	add	t4, t4, t3		// advance PA in PDE to next segment
-	add	s3, s3, SZREG		// advance to next PDE slot
-	addi	a7, a7, -1		// count down segment
-	bgtz	a6, .Lfill		// loop if more
-
 
 	// We should have a VM so let's start using our real addresses
 	PTR_LA	t0, vmmu_on
@@ -468,7 +499,7 @@ _C_LABEL(exception_userexit):
 	j	exception_kernexit
 
 trap_syscall:
-.L0:	PTR_L	ra, exception_userexit
+	PTR_LA	ra, exception_userexit
 	PTR_L	t0, L_PROC(tp)		// get proc struct
 	PTR_L	t0, P_MD_SYSCALL(t0)	// get syscall address from proc
 	jr	t0			// and jump to it
@@ -590,6 +621,7 @@ _C_LABEL(lwp0uspace):
 	.space	UPAGES * PAGE_SIZE
 bootstk:
 
+#if defined(RISCV_BSS_MMUTABLES)
 	.align PGSHIFT
 mmutables_start:
 	.global _C_LABEL(l2_pte)
@@ -602,3 +634,4 @@ l1_pte:
 l1_dtb:
 	.space PAGE_SIZE
 mmutables_end:
+#endif
