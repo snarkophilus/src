@@ -1,11 +1,11 @@
 /*	$NetBSD: riscv_machdep.c,v 1.13 2020/11/04 20:05:47 skrll Exp $	*/
 
 /*-
- * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2019, 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Matt Thomas of 3am Software Foundry, and by Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
