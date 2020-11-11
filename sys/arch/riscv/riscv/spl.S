@@ -1,4 +1,4 @@
-/* $NetBSD: spl.S,v 1.4 2020/11/04 07:09:46 skrll Exp $ */
+/* $NetBSD: spl.S,v 1.5 2020/11/10 06:58:46 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -32,7 +32,7 @@
 #include <machine/asm.h>
 #include "assym.h"
 
-__RCSID("$NetBSD: spl.S,v 1.4 2020/11/04 07:09:46 skrll Exp $")
+__RCSID("$NetBSD: spl.S,v 1.5 2020/11/10 06:58:46 skrll Exp $")
 
 #if notyet
 	.data
