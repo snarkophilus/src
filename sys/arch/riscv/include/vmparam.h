@@ -121,15 +121,14 @@
 
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffffd000000000)
 
-#define VM_KERNEL_VM_SIZE	0x40000000	 /* 1 GiB (1 gigapage)*/
 #else		/* Sv32 */
 #define VM_MAXUSER_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0xffffffff80000000 */
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)-0x7fffffff-1)/* 0fffffffff80000000 */
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)-0x40000000)	/* 0xffffffffc0000000 */
 
-#define VM_KERNEL_VM_SIZE	0x2000000	 /* 32 MiB (8 megapages) */
 #endif
 #define VM_KERNEL_VM_BASE	VM_MIN_KERNEL_ADDRESS
+#define VM_KERNEL_VM_SIZE	0x2000000	 /* 32 MiB (8 / 16 megapages) */
 
 #define VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define VM_MAXUSER_ADDRESS32	((vaddr_t)(1UL << 31))/* 0x0000000080000000 */

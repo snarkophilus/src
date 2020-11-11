@@ -179,6 +179,8 @@ define	RW_READER	RW_READER
 
 define	VM_MIN_KERNEL_ADDRESS	VM_MIN_KERNEL_ADDRESS
 define	VM_MAX_KERNEL_ADDRESS	VM_MAX_KERNEL_ADDRESS
+define	VM_KERNEL_VM_SIZE	VM_KERNEL_VM_SIZE
+
 
 define	USPACE		USPACE
 ifdef XSEGSHIFT
@@ -217,6 +219,7 @@ define	Ln_ADDR_MASK	Ln_ADDR_MASK
 #define	PTE_PPN2_S	PTE_PPN2_S
 #define	PTE_PPN3_S	PTE_PPN3_S
 #define	PTE_SIZE	PTE_SIZE
+define PTE_PPN_SHIFT	PTE_PPN_SHIFT
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)

@@ -1,11 +1,11 @@
 /* $NetBSD: locore.S,v 1.20 2020/11/08 10:08:28 skrll Exp $ */
 
 /*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Matt Thomas of 3am Software Foundry, and by Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,6 +53,15 @@ ENTRY_NP(start)
 	PTR_LA	s8, bootstk
 	mv	sp, s8
 
+	PTR_LA	s11, start
+	LD	s8, .Lstart
+
+	sub	s8, s8, s11
+
+	/* address of kern_vtopdiff (relative) */
+	PTR_LA	s11, kern_vtopdiff
+	PTR_S	s8, 0(s11)	/* kern_vtopdiff = start(virt) - start(phys) */
+
 	// We get loaded and starting running at or near 0, not where we
 	// should be. We need to construct an initial PDETAB
 
@@ -66,29 +75,15 @@ ENTRY_NP(start)
 	PTR_LA	gp, _C_LABEL(_gp)
 #endif
 
-#if 0
-	PTR_LA	s8, 1f
-	jal	1f
-1:
-	sub	s8, s8, x1
-#endif
-
-	// physical address
-	PTR_LA	s8, start
-
-//	li	a0, 'X'
-//	call	_C_LABEL(com_platform_early_putchar)
-
-
 	PTR_LA	a0, _C_LABEL(__bss_start)
-	PTR_LA	s6, _C_LABEL(_end)
+	PTR_LA	s5, _C_LABEL(_end)
 
 #if !defined(RISCV_BSS_MMUTABLES)
-	add	s6, s6, s10		// PAGE_SIZE
-	addi	s6, s6, -1		//   -1 == PAGE_MASK
+	add	s5, s5, s10		// PAGE_SIZE
+	addi	s5, s5, -1		//   -1 == PAGE_MASK
 	neg	a1, s10			// -PAGE_SIZE
-	and	s6, s6, a1		// s6 is page aligned end of kernel
-					// s6 = uarea
+	and	s5, s5, a1		// s5 is page aligned end of kernel
+					// s5 = uarea
 	add	s2, s1, s9		// s2 = first PDE page
 #ifdef _LP64
 	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
@@ -96,8 +91,8 @@ ENTRY_NP(start)
 	mv	s3, s2
 #endif
 	add	s4, s3, s10		// s4 = first kernel PTE page
-	add	s5, s6, s9		// s5 = bootstk
-	sub	a2, s5, a0
+	add	s6, s5, s9		// s5 = bootstk
+	sub	a2, s6, a0
 #else
 	li	a1, 0
 	PTR_LA	s2, _C_LABEL(l1_pte)
@@ -105,87 +100,86 @@ ENTRY_NP(start)
 	PTR_LA	s3, _C_LABEL(l2_pte)
 //	PTR_LA	s4, _C_LABEL(l3_pte)
 #endif
-	PTR_LA	s5, _C_LABEL(bootstk)
-	PTR_LA	s6, _C_LABEL(lwp0uspace)
-	sub	a2, s1, a0
+	PTR_LA	s6, _C_LABEL(bootstk)
+	PTR_LA	s5, _C_LABEL(lwp0uspace)
+	sub	a2, s6, a0
 #endif
 					// a1 byte value is '0' from -PAGE_SIZE
 	call	memset			// zero through kernel_end
 
-
-
-
-	/*
-	 * XXX XXX XXX: This is completely broken and wrong, we should map only
-	 * the kernel sections, and the direct map should be mapped later in C.
-	 */
-
-
-#if notyetorever
-	// As a temporary hack, word 0 contains the amount of memory in MB
-	INT_L	a7, (zero)		// load memory size
-	slli	a7, a7, (20 - PGSHIFT)	// convert MB to pages
-	PTR_LA	t0, physmem
-	INT_S	a7, (t0)		// store it in physmem
-#endif
-
-
-	// s2	L1 PDE
+	// s2	L1 PDE (SV32:4MiB mega pages, SV{39,48}: 2MiB megapages)
 	// s3	L2 PDE (_LP64 SV39 only)
 	// s4	L3 PDE (_LP64 SV48 only)
 	// s5	bootstk
 	// s6	lwp0uspace
 
-
-	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
-#ifdef _LP64
-	REG_S	t4, 0(s2)		// keep a mapping for the first 1GB.
-	or	t0, s3, t4		// point to next page
-	REG_S	t0, -SZREG(s3)		// store in highest first level PDE
-#endif
-
-
-
-
-
-
 	/* Save the phys addr from the start and end of the kernel */
-	PTR_LA	s3, _C_LABEL(start)
-	PTR_LA	s4, _C_LABEL(end)
+//	PTR_LA	t2, _C_LABEL(start)
+//	PTR_LA	t3, _C_LABEL(end)
 
-	// We allocated the kernel first PTE page so let's insert in the
+	li	t3, PTE_KERN
+	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
+
+	// We allocated the kernel first PDE page so let's insert in the
 	// page table.
-
-	or	t0, s4, t4
-#if ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
-	li	t1, ((VM_MIN_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
+#if _LP64
+	srli	t0, s2, (PGSHIFT - PTE_PPN_SHIFT)
+	or	t0, t0, t3		// Assumes s2[11:0] == 0
+#if ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
+	li	t1, ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
 	add	t1, t1, s3
 	REG_S	t0, 0(t1)
 #else
 	REG_S	t0, 0(s3)
 #endif
-
-	li	t0, ((VM_MAX_KERNEL_ADDRESS >> SEGSHIFT) & (NPDEPG - 1)) * SZREG
-	add	s3, s3, t0
-	srli	a7, a7, (SEGSHIFT - PGSHIFT) // pages to segments
+#endif
+					// Number of megapages
+	li	a7, ((VM_KERNEL_VM_SIZE - 1) >> SEGSHIFT)
 	li	t3, NBSEG		// load for ease
 
-	// We should have a VM so let's start using our real addresses
-	PTR_LA	t0, vmmu_on
-	INT_L	t0, (t0)
-	jr	t0
+	//
+	// Fill in the PDEs for kernel.
+	//
+	PTR_LA	t0, start
+	srli	t0, t0, (PGSHIFT - PTE_PPN_SHIFT)
+	or	t0, t0, t4
+.Lfill:
+	REG_S	t0, 0(s2)		// store PDE
+	add	t0, t0, t3		// advance PA in PDE to next segment
+	add	s2, s2, SZREG		// advance to next PDE slot
+	addi	a7, a7, -1		// count down segment
+	bnez	a7, .Lfill		// loop if more
 
+	/* Set supervisor trap vector base register */
+	PTR_LA	t0, .Lmmu_on
+	add	t0, t0, s8
+	csrw	stvec, t0
+
+	/* Set supervisor address translation and protection register */
+	srli	s3, s3, PGSHIFT
+#if _LP64
+	li	t0, SATP_MODE_SV39
+#else
+	li	t0, SATP_MODE_SV32
+#endif
+	or	s3, s3, t0
+	sfence.vma
+	csrw	satp, s3
+
+	.align 2
 .Lmmu_on:
 	// MMU is on!
 	csrw	sscratch, zero		// zero in sscratch to mark kernel
 
 	PTR_LA	tp, _C_LABEL(lwp0)	// put curlwp in tp
 
+	/* Set supervisor trap vector base register */
 	PTR_LA	a0, _C_LABEL(cpu_exception_handler)
 	csrw	stvec, a0
 
+	PTR_LA	s1, bootstk		// top of lwp0uspace
 	PTR_S	s1, L_PCB(tp)		// set uarea of lwp (already zeroed)
-	addi	sp, s2, -TF_LEN		// switch to new stack
+	addi	sp, s1, -TF_LEN		// switch to new stack
 	PTR_S	sp, L_MD_UTF(tp)	// store pointer to empty trapframe
 
 	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
@@ -196,13 +190,29 @@ ENTRY_NP(start)
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, s1			// dtb
+1:
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
 END(start)
 
+.Lstart:
+#if _LP64
+	.quad	start
+#else
+	.word	start
+#endif
+
 vmmu_on:
 	.quad	.Lmmu_on
+
+
+ENTRY_NP(uartputc)
+#ifdef EARLYCONS
+	call	___CONCAT(EARLYCONS, _platform_early_putchar)
+#endif
+	ret
+
 
 //
 // struct lwp *cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
@@ -608,11 +618,7 @@ ENTRY(mpentry)
 	j	1b
 END(mpentry)
 
-	/* Used for finding virtual / physical offsets */
-	.globl virt_map
-virt_map:
-	.quad	virt_map
-
+	.bss
 	.align PGSHIFT
 	.global _C_LABEL(lwp0uspace)
 _C_LABEL(lwp0uspace):
@@ -622,9 +628,11 @@ bootstk:
 #if defined(RISCV_BSS_MMUTABLES)
 	.align PGSHIFT
 mmutables_start:
+#if _LP64
 	.global _C_LABEL(l2_pte)
 l2_pte:
 	.space PAGE_SIZE
+#endif
 	.global _C_LABEL(l1_pte)
 l1_pte:
 	.space PAGE_SIZE

@@ -39,7 +39,7 @@ __RCSID("$NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $");
 
 #include <uvm/uvm.h>
 
-//#include <riscv/locore.h>
+#include <riscv/machdep.h>
 #include <riscv/sysreg.h>
 
 int riscv_poolpage_vmfreelist = VM_FREELIST_DEFAULT;
@@ -182,7 +182,6 @@ void
 pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 {
 	extern __uint64_t l1_pte[512];
-	extern __uint64_t virt_map;
 //	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
 	pmap_t pm = pmap_kernel();
 
@@ -195,7 +194,7 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 
 	/* Get the PPN for l1_pte */
 	/* XXX HACK */
-	pm->pm_md.md_ppn = (paddr_t)(((__uint64_t)&l1_pte - virt_map) >> PAGE_SHIFT);
+	pm->pm_md.md_ppn = atop(KERN_VTOPHYS((vaddr_t)l1_pte));
 
 	/* Setup basic info like pagesize=PAGE_SIZE */
 	uvm_md_init();
