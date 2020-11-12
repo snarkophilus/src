@@ -29,6 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_console.h"
+
 #include <machine/asm.h>
 #include "assym.h"
 
@@ -69,12 +71,6 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
-#if 0
-	// The kernel doesn't use gp/_gp since we'd have to reload it on
-	// each exception.
-	PTR_LA	gp, _C_LABEL(_gp)
-#endif
-
 	PTR_LA	a0, _C_LABEL(__bss_start)
 	PTR_LA	s5, _C_LABEL(_end)
 
@@ -113,10 +109,6 @@ ENTRY_NP(start)
 	// s5	bootstk
 	// s6	lwp0uspace
 
-	/* Save the phys addr from the start and end of the kernel */
-//	PTR_LA	t2, _C_LABEL(start)
-//	PTR_LA	t3, _C_LABEL(end)
-
 	li	t3, PTE_KERN
 	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
 
@@ -133,9 +125,10 @@ ENTRY_NP(start)
 	REG_S	t0, 0(s3)
 #endif
 #endif
+
 					// Number of megapages
-	li	a7, ((VM_KERNEL_VM_SIZE - 1) >> SEGSHIFT)
-	li	t3, NBSEG		// load for ease
+	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)
+	li	t3, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
 
 	//
 	// Fill in the PDEs for kernel.
@@ -150,21 +143,40 @@ ENTRY_NP(start)
 	addi	a7, a7, -1		// count down segment
 	bnez	a7, .Lfill		// loop if more
 
+	li	t4, PTE_KERN | PTE_R | PTE_W
+
+	// DTB physical address
+	mv	t0, s1
+	srli	t0, t0, PGSHIFT
+	slli	t0, t0, PTE_PPN_SHIFT
+	or	t0, t0, t4
+	REG_S	t0, 0(s2)
+	add	s2, s2, SZREG		// advance to next PDE slot
+
+#ifdef CONSADDR
+	ld	t0, .Lconsaddr
+	srli	t0, t0, PGSHIFT
+	slli	t0, t0, PTE_PPN_SHIFT
+	or	t0, t0, t4
+	REG_S	t0, 0(s2)
+	add	s2, s2, SZREG		// advance to next PDE slot
+#endif
+
 	/* Set supervisor trap vector base register */
 	PTR_LA	t0, .Lmmu_on
 	add	t0, t0, s8
 	csrw	stvec, t0
 
 	/* Set supervisor address translation and protection register */
-	srli	s3, s3, PGSHIFT
+	srli	t1, s3, PGSHIFT
 #if _LP64
 	li	t0, SATP_MODE_SV39
 #else
 	li	t0, SATP_MODE_SV32
 #endif
-	or	s3, s3, t0
+	or	t0, t0, t1
 	sfence.vma
-	csrw	satp, s3
+	csrw	satp, t0
 
 	.align 2
 .Lmmu_on:
@@ -177,20 +189,25 @@ ENTRY_NP(start)
 	PTR_LA	a0, _C_LABEL(cpu_exception_handler)
 	csrw	stvec, a0
 
-	PTR_LA	s1, bootstk		// top of lwp0uspace
-	PTR_S	s1, L_PCB(tp)		// set uarea of lwp (already zeroed)
-	addi	sp, s1, -TF_LEN		// switch to new stack
+	PTR_LA	s2, bootstk		// top of lwp0uspace
+	PTR_S	s2, L_PCB(tp)		// set uarea of lwp (already zeroed)
+	addi	sp, s2, -TF_LEN		// switch to new stack
 	PTR_S	sp, L_MD_UTF(tp)	// store pointer to empty trapframe
 
 	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
-	add	t2, s2, s11 		// PA -> VA
+	add	t2, s3, s8 		// PA -> VA
+	srli	t3, s3, PGSHIFT
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
-	PTR_S	s2, PM_MD_PPN(t1)	// PA of kernel PDETAB
+	PTR_S	t3, PM_MD_PPN(t1)	// PA of kernel PDETAB
+
+#if notyet
+	mv	a0, s1			// dtb
+	call	_C_LABEL(init_mmu)
+#endif
 
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, s1			// dtb
-1:
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
@@ -203,15 +220,12 @@ END(start)
 	.word	start
 #endif
 
-vmmu_on:
-	.quad	.Lmmu_on
-
-
 ENTRY_NP(uartputc)
 #ifdef EARLYCONS
-	call	___CONCAT(EARLYCONS, _platform_early_putchar)
-#endif
+	tail	___CONCAT(EARLYCONS, _platform_early_putchar)
+#else
 	ret
+#endif
 
 
 //
