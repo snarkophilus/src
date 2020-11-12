@@ -34,6 +34,14 @@
 
 #define	_C_LABEL(x)	x
 
+#ifdef __STDC__
+# define __CONCAT(x,y)	x ## y
+# define __STRING(x)	#x
+#else
+# define __CONCAT(x,y)	x/**/y
+# define __STRING(x)	"x"
+#endif
+
 /*
  * Define -pg profile entry code.
  * Must always be noreorder, must never use a macro instruction

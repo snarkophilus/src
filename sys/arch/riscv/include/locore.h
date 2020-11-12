@@ -211,8 +211,6 @@ void	cpu_lwp_trampoline(void);
 
 void *	cpu_sendsig_getframe(struct lwp *, int, bool *);
 
-paddr_t	init_mmu(paddr_t dtb, paddr_t end);
-void	init_riscv(register_t, paddr_t, paddr_t, paddr_t);
 #endif
 
 #endif /* _RISCV_LOCORE_H_ */

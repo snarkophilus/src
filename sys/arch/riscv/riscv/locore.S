@@ -31,6 +31,8 @@
 
 #include "opt_console.h"
 
+#include <sys/cdefs.h>
+
 #include <machine/asm.h>
 #include "assym.h"
 
@@ -200,11 +202,6 @@ ENTRY_NP(start)
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
 	PTR_S	t3, PM_MD_PPN(t1)	// PA of kernel PDETAB
 
-#if notyet
-	mv	a0, s1			// dtb
-	call	_C_LABEL(init_mmu)
-#endif
-
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, s1			// dtb
@@ -218,6 +215,13 @@ END(start)
 	.quad	start
 #else
 	.word	start
+#endif
+
+.Lconsaddr:
+#if _LP64
+	.quad	CONSADDR
+#else
+	.word	CONSADDR
 #endif
 
 ENTRY_NP(uartputc)
