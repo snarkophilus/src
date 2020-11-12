@@ -47,6 +47,7 @@
 #include <uvm/pmap/vmpagemd.h>
 
 #include <riscv/pte.h>
+#include <riscv/sysreg.h>
 
 #define	PMAP_SEGTABSIZE		NPTEPG
 #define	PMAP_PDETABSIZE		NPTEPG
@@ -58,7 +59,8 @@
 #define XSEGOFSET	(PTE_PPN1 | SEGOFSET)
 #define SEGSHIFT	(PGSHIFT + PGSHIFT - 3)
 #else
-#define SEGSHIFT	L3_SHIFT
+#define SEGSHIFT	(PGSHIFT + PGSHIFT - 2)
+#define XSEGSHIFT	SEGSHIFT
 #endif
 
 #define SEGOFSET	(PTE_PPN0|PAGE_MASK)
@@ -66,10 +68,6 @@
 #define KERNEL_PID	0
 
 #define PMAP_HWPAGEWALKER		1
-#define PMAP_TLB_BITMAP_LENGHTH		4096 /* This is actually
-					      * ignored in
-					      * uvm/pmap_tlb.h */
-#define PMAP_TLB_NUM_PIDS		4096
 #define PMAP_TLB_MAX			1
 #ifdef _LP64
 #define PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)(VM_MIN_KERNEL_ADDRESS - PAGE_SIZE))
@@ -78,6 +76,8 @@
 #define PMAP_INVALID_PDETAB_ADDRESS	((pmap_pdetab_t *)0xdeadbeef)
 #define PMAP_INVALID_SEGTAB_ADDRESS	((pmap_segtab_t *)0xdeadbeef)
 #endif
+#define PMAP_TLB_NUM_PIDS		(__SHIFTOUT_MASK(SATP_ASID) + 1)
+#define PMAP_TLB_BITMAP_LENGTH          PMAP_TLB_NUM_PIDS
 #define PMAP_TLB_FLUSH_ASID_ON_RESET	false
 
 #define pmap_phys_address(x)		(x)
