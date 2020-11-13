@@ -29,10 +29,6 @@
 #ifndef _EVBARM_FDT_PLATFORM_H
 #define _EVBARM_FDT_PLATFORM_H
 
-#ifndef _LOCORE
-void fdt_add_reserved_memory_range(uint64_t, uint64_t);
-#endif
-
 #define KERNEL_IO_VBASE		VM_KERNEL_IO_ADDRESS
 #define KERNEL_IO_VSIZE		VM_KERNEL_IO_SIZE
 

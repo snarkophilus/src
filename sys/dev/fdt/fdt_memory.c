@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_bootconfig.h"
+#include "opt_fdt.h"
 
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: fdt_memory.c,v 1.4 2020/01/27 01:15:09 jmcneill Exp $");
@@ -37,7 +37,11 @@ __KERNEL_RCSID(0, "$NetBSD: fdt_memory.c,v 1.4 2020/01/27 01:15:09 jmcneill Exp 
 #include <sys/param.h>
 #include <sys/queue.h>
 
-#include <evbarm/fdt/fdt_memory.h>
+#include <dev/fdt/fdt_memory.h>
+
+#ifndef FDT_MEMORY_RANGES
+#define FDT_MEMORY_RANGES	256
+#endif
 
 struct fdt_memory_range {
 	struct fdt_memory               mr_mem;
@@ -48,18 +52,18 @@ struct fdt_memory_range {
 static TAILQ_HEAD(fdt_memory_rangehead, fdt_memory_range) fdt_memory_ranges =
     TAILQ_HEAD_INITIALIZER(fdt_memory_ranges);
 
-static struct fdt_memory_range fdt_memory_range_pool[DRAM_BLOCKS];
+static struct fdt_memory_range fdt_memory_range_pool[FDT_MEMORY_RANGES];
 
 static struct fdt_memory_range *
 fdt_memory_range_alloc(void)
 {
-	for (size_t n = 0; n < DRAM_BLOCKS; n++)
+	for (size_t n = 0; n < FDT_MEMORY_RANGES; n++)
 		if (!fdt_memory_range_pool[n].mr_used) {
 			fdt_memory_range_pool[n].mr_used = true;
 			return &fdt_memory_range_pool[n];
 		}
 
-	printf("%s: no free memory ranges, increase DRAM_BLOCKS!\n", __func__);
+	printf("%s: no free memory ranges, increase FDT_MEMORY_RANGES!\n", __func__);
 	return NULL;
 }
 

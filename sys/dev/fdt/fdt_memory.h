@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _EVBARM_FDT_FDT_MEMORY_H
-#define _EVBARM_FDT_FDT_MEMORY_H
+#ifndef _DEV_FDT_MEMORY_H
+#define _DEV_FDT_MEMORY_H
 
 struct fdt_memory {
 	uint64_t	start;
@@ -41,4 +41,11 @@ void	fdt_memory_add_range(uint64_t, uint64_t);
 void	fdt_memory_remove_range(uint64_t, uint64_t);
 void	fdt_memory_foreach(void (*)(const struct fdt_memory *, void *), void *);
 
-#endif /* !_EVBARM_FDT_FDT_MEMORY_H */
+static inline void
+fdt_add_reserved_memory_range(uint64_t addr, uint64_t size)
+{
+
+        fdt_memory_remove_range(addr, size);
+}
+
+#endif /* !_DEV_FDT_MEMORY_H */

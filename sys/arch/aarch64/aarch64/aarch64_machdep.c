@@ -73,8 +73,8 @@ __KERNEL_RCSID(1, "$NetBSD: aarch64_machdep.c,v 1.54 2020/11/10 07:51:19 skrll E
 #include <aarch64/vmparam.h>
 #include <aarch64/kcore.h>
 
-#include <arch/evbarm/fdt/platform.h>
 #include <arm/fdt/arm_fdtvar.h>
+#include <dev/fdt/fdt_memory.h>
 
 #ifdef VERBOSE_INIT_ARM
 #define VPRINTF(...)	printf(__VA_ARGS__)

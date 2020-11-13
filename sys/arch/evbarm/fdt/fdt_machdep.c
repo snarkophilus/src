@@ -89,10 +89,10 @@ __KERNEL_RCSID(0, "$NetBSD: fdt_machdep.c,v 1.78 2020/11/07 08:28:15 skrll Exp $
 #include <evbarm/include/autoconf.h>
 #include <evbarm/fdt/machdep.h>
 #include <evbarm/fdt/platform.h>
-#include <evbarm/fdt/fdt_memory.h>
 
 #include <arm/fdt/arm_fdtvar.h>
 #include <dev/fdt/fdt_private.h>
+#include <dev/fdt/fdt_memory.h>
 
 #ifdef EFI_RUNTIME
 #include <arm/arm/efi_runtime.h>
@@ -201,12 +201,6 @@ fdt_get_memory(uint64_t *pstart, uint64_t *pend)
 		if (cur_addr + cur_size > *pend)
 			*pend = cur_addr + cur_size;
 	}
-}
-
-void
-fdt_add_reserved_memory_range(uint64_t addr, uint64_t size)
-{
-	fdt_memory_remove_range(addr, size);
 }
 
 /*

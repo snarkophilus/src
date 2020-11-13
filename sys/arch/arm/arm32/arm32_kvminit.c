@@ -150,6 +150,7 @@ __KERNEL_RCSID(0, "$NetBSD: arm32_kvminit.c,v 1.66 2020/10/30 18:54:36 skrll Exp
 #if defined(FDT)
 #include <arch/evbarm/fdt/platform.h>
 #include <arm/fdt/arm_fdtvar.h>
+#include <dev/fdt/fdt_memory.h>
 #endif
 
 #ifdef MULTIPROCESSOR
