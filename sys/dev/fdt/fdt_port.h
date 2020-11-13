@@ -41,8 +41,8 @@
  * to save power (stop clocks, disable output buffers, turn on/off power, ...)
  */
 
-#ifndef _DEV_FDT_FDT_PORT_H_
-#define _DEV_FDT_FDT_PORT_H_
+#ifndef _DEV_FDT_PORT_H_
+#define _DEV_FDT_PORT_H_
 
 struct drm_device;
 
@@ -123,4 +123,4 @@ int fdt_endpoint_activate_direct(struct fdt_endpoint *, bool);
  */
 int fdt_endpoint_enable(struct fdt_endpoint *, bool);
 
-#endif /* _DEV_FDT_FDT_PORT_H_ */
+#endif /* _DEV_FDT_PORT_H_ */
