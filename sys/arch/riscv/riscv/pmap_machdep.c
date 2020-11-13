@@ -193,7 +193,6 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	pm->pm_pdetab = (pmap_pdetab_t *)&l1_pte;
 
 	/* Get the PPN for l1_pte */
-	/* XXX HACK */
 	pm->pm_md.md_ppn = atop(KERN_VTOPHYS((vaddr_t)l1_pte));
 
 	/* Setup basic info like pagesize=PAGE_SIZE */
