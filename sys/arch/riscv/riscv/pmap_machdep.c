@@ -1,11 +1,11 @@
 /* $NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $ */
 
 /*
- * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2019, 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas (of 3am Software Foundry) and Maxime Villard.
+ * by Matt Thomas (of 3am Software Foundry), Maxime Villard, and Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,18 +29,26 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_riscv_debug.h"
+
 #define __PMAP_PRIVATE
 
 #include <sys/cdefs.h>
-
 __RCSID("$NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $");
 
 #include <sys/param.h>
+#include <sys/buf.h>
 
 #include <uvm/uvm.h>
 
 #include <riscv/machdep.h>
 #include <riscv/sysreg.h>
+
+#ifdef VERBOSE_INIT_RISCV
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
 
 int riscv_poolpage_vmfreelist = VM_FREELIST_DEFAULT;
 
@@ -179,7 +187,7 @@ pmap_md_pdetab_init(struct pmap *pmap)
 }
 
 void
-pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
+pmap_bootstrap(vaddr_t vstart, vaddr_t vend)
 {
 	extern __uint64_t l1_pte[512];
 //	pmap_pdetab_t * const kptb = &pmap_kern_pdetab;
@@ -187,7 +195,7 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 
 	pmap_bootstrap_common();
 
-	kend = (kend + 0x200000 - 1) & -0x200000;
+//	kend = (kend + 0x200000 - 1) & -0x200000;
 
 	/* Use the tables we already built in init_mmu() */
 	pm->pm_pdetab = (pmap_pdetab_t *)&l1_pte;
@@ -199,10 +207,78 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	uvm_md_init();
 
 	/* init the lock */
+	// XXXNH per cpu?
 	pmap_tlb_info_init(&pmap_tlb0_info);
 
-	/* TODO: Pretend we have a gigabyte of RAM until this gets FDT */
+#ifdef MULTIPROCESSOR
+	VPRINTF("kcpusets ");
 
+	kcpuset_create(&pm->pm_onproc, true);
+	kcpuset_create(&pm->pm_active, true);
+	KASSERT(pm->pm_onproc != NULL);
+	KASSERT(pm->pm_active != NULL);
+	kcpuset_set(pm->pm_onproc, cpu_number());
+	kcpuset_set(pm->pm_active, cpu_number());
+#endif
+
+
+
+	VPRINTF("nkmempages ");
+	/*
+	 * Compute the number of pages kmem_arena will have.  This will also
+	 * be called by uvm_km_bootstrap later, but that doesn't matter
+	 */
+	kmeminit_nkmempages();
+
+	/* Get size of buffer cache and set an upper limit */
+	buf_setvalimit((VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) / 8);
+	vsize_t bufsz = buf_memcalc();
+	buf_setvalimit(bufsz);
+
+	vsize_t kvmsize = (VM_PHYS_SIZE + (ubc_nwins << ubc_winshift) +
+	    bufsz + 16 * NCARGS + pager_map_size) +
+	    /*(maxproc * UPAGES) + */nkmempages * NBPG;
+
+#ifdef SYSVSHM
+	kvmsize += shminfo.shmall;
+#endif
+
+	/* Calculate VA address space and roundup to NBSEG tables */
+	kvmsize = roundup(kvmsize, NBSEG);
+
+
+	/*
+	 * Initialize `FYI' variables.	Note we're relying on
+	 * the fact that BSEARCH sorts the vm_physmem[] array
+	 * for us.  Must do this before uvm_pageboot_alloc()
+	 * can be called.
+	 */
+	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
+	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
+
+	/*
+	 * Update the naive settings in pmap_limits to the actual KVA range.
+	 */
+	pmap_limits.virtual_start = vstart;
+	pmap_limits.virtual_end = vend;
+
+	VPRINTF("\nlimits: %" PRIxVADDR " - %" PRIxVADDR "\n", vstart, vend);
+
+
+
+#if 0
+	const vaddr_t kvmstart = vstart;
+	pmap_curmaxkvaddr = vstart + kvmsize;
+
+	VPRINTF("kva   : %" PRIxVADDR " - %" PRIxVADDR "\n", kvmstart,
+	    pmap_curmaxkvaddr);
+
+	pmap_md_grow(pmap_kernel()->pm_pdetab, kvmstart, XSEGSHIFT, &kvmsize);
+#endif
+
+
+
+#if 0
 	/* Don't physload the space where the kernel is loaded, just
 	 * the space after it. */
 	uvm_page_physload(atop(round_page(kend)), atop(pend),
@@ -211,12 +287,7 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 
 	/* XXX - How do I really set this? */
 	physmem = btoc(0x40000000);
-
-	/* XXX: Mostly from MIPS =) */
-	pmap_limits.avail_start = ptoa(uvm_physseg_get_start(uvm_physseg_get_first()));
-	pmap_limits.avail_end = ptoa(uvm_physseg_get_end(uvm_physseg_get_last()));
-	pmap_limits.virtual_start = kstart;
-	pmap_limits.virtual_end = VM_MAX_KERNEL_ADDRESS;
+#endif
 
 	/*
 	 * Initialize the pools.
@@ -226,7 +297,7 @@ pmap_bootstrap(paddr_t pstart, paddr_t pend, vaddr_t kstart, paddr_t kend)
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
 	    &pmap_pv_page_allocator, IPL_NONE);
 
-	tlb_set_asid(0);
+	pmap_pvlist_lock_init(/*riscv_dcache_align*/ 64);
 }
 
 /* -------------------------------------------------------------------------- */

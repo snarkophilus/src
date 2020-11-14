@@ -202,9 +202,11 @@ ENTRY_NP(start)
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
 	PTR_S	t3, PM_MD_PPN(t1)	// PA of kernel PDETAB
 
+	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
+
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
-	mv	a1, s1			// dtb
+	mv	a1, t0			// vdtb
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */

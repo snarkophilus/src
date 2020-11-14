@@ -63,7 +63,8 @@
 #define XSEGSHIFT	SEGSHIFT
 #endif
 
-#define SEGOFSET	(PTE_PPN0|PAGE_MASK)
+CTASSERT(NBSEG == (1ULL << SEGSHIFT));
+#define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #define KERNEL_PID	0
 
@@ -129,12 +130,15 @@ void	pmap_md_xtab_deactivate(struct pmap *);
 void	pmap_md_pdetab_init(struct pmap *);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
 
-void	pmap_bootstrap(paddr_t pstart, paddr_t pend, paddr_t kstart, paddr_t kend);
+void	pmap_bootstrap(paddr_t kstart, paddr_t kend);
 
 extern vaddr_t pmap_direct_base;
 extern vaddr_t pmap_direct_end;
 #define PMAP_DIRECT_MAP(pa)	(pmap_direct_base + (pa))
 #define PMAP_DIRECT_UNMAP(va)	((paddr_t)(va) - pmap_direct_base)
+
+#define MEGAPAGE_TRUNC(x)	((x) & ~SEGOFSET)
+#define MEGAPAGE_ROUND(x)	MEGAPAGE_TRUNC((x) + SEGOFSET)
 
 #ifdef __PMAP_PRIVATE
 static inline void

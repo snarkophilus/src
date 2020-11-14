@@ -1,11 +1,11 @@
 /*	$NetBSD: vmparam.h,v 1.7 2020/11/07 14:48:45 skrll Exp $	*/
 
 /*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Matt Thomas of 3am Software Foundry, and Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -132,6 +132,20 @@
 
 #define VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define VM_MAXUSER_ADDRESS32	((vaddr_t)(1UL << 31))/* 0x0000000080000000 */
+
+#ifdef _LP64
+/*
+ * Since we have the address space, we map all of physical memory (RAM)
+ * using block page table entries.
+ */
+#define RISCV_DIRECTMAP_MASK	((vaddr_t) 0xffffffe000000000L)
+#define RISCV_DIRECTMAP_SIZE	(-RISCV_DIRECTMAP_MASK)	/* 128GiB */
+#define RISCV_DIRECTMAP_START	RISCV_DIRECTMAP_MASK
+#define RISCV_DIRECTMAP_END	(RISCV_DIRECTMAP_START + RISCV_DIRECTMAP_SIZE)
+#define RISCV_KVA_P(va)	(((vaddr_t) (va) & RISCV_DIRECTMAP_MASK) != 0)
+#define RISCV_PA_TO_KVA(pa)	((vaddr_t) ((pa) | RISCV_DIRECTMAP_START))
+#define RISCV_KVA_TO_PA(va)	((paddr_t) ((va) & ~RISCV_DIRECTMAP_MASK))
+#endif
 
 /*
  * The address to which unspecified mapping requests default

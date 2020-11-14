@@ -81,22 +81,21 @@ typedef __int32_t	__register_t;
 #define __SIMPLELOCK_LOCKED	1
 #define __SIMPLELOCK_UNLOCKED	0
 
+#define __HAVE_COMMON___TLS_GET_ADDR
+#define __HAVE_COMPAT_NETBSD32
+#define __HAVE_CPU_COUNTER
+#define __HAVE_CPU_DATA_FIRST
 #define __HAVE_FAST_SOFTINTS
 #define __HAVE_MM_MD_DIRECT_MAPPED_PHYS
-#define __HAVE_CPU_COUNTER
+#define __HAVE_NEW_STYLE_BUS_H
 #define __HAVE_SYSCALL_INTERN
-#define __HAVE_CPU_DATA_FIRST
-#define __HAVE___LWP_GETPRIVATE_FAST
-#define __HAVE_COMMON___TLS_GET_ADDR
 #define __HAVE_TLS_VARIANT_I
+#define __HAVE___LWP_GETPRIVATE_FAST
+
 #ifdef __LP64
 #define __HAVE_ATOMIC64_OPS
 #define __HAVE_CPU_UAREA_ROUTINES
 #endif
-
-//#define __HAVE_NEW_STYLE_BUS_H
-#define __HAVE_NO_BUS_DMA
-#define	__HAVE_COMPAT_NETBSD32
 
 //#if defined(_KERNEL)
 //#define __HAVE_RAS

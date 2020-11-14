@@ -36,6 +36,7 @@ quote #define __PMAP_PRIVATE
 
 include <sys/param.h>
 include <sys/bitops.h>
+include <sys/bus.h>
 include <sys/cpu.h>
 include <sys/intr.h>
 include <sys/lwp.h>
@@ -223,3 +224,6 @@ define PTE_PPN_SHIFT	PTE_PPN_SHIFT
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)
+
+# for bus_space_asm
+define	BS_STRIDE		offsetof(struct bus_space, bs_stride)

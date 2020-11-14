@@ -29,34 +29,109 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-
 #include "opt_modular.h"
+#include "opt_riscv_debug.h"
 
+#include <sys/cdefs.h>
 __RCSID("$NetBSD: riscv_machdep.c,v 1.13 2020/11/04 20:05:47 skrll Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/asan.h>
 #include <sys/cpu.h>
 #include <sys/exec.h>
-#include <sys/lwp.h>
-#include <sys/sysctl.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
+#include <sys/lwp.h>
 #include <sys/module.h>
+#include <sys/msgbuf.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/syscall.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 
+#include <dev/cons.h>
 #include <uvm/uvm_extern.h>
 
 #include <riscv/locore.h>
+#include <riscv/machdep.h>
 #include <riscv/pte.h>
 #include <riscv/umprintf.h>
 
 int cpu_printfataltraps;
 char machine[] = MACHINE;
 char machine_arch[] = MACHINE_ARCH;
+
+#include <libfdt.h>
+#include <dev/fdt/fdtvar.h>
+#include <dev/fdt/fdt_memory.h>
+
+#ifdef VERBOSE_INIT_RISCV
+#define VPRINTF(...)	printf(__VA_ARGS__)
+#else
+#define VPRINTF(...)	__nothing
+#endif
+
+#if 0
+#define FDT_BUF_SIZE	(512*1024)
+static uint8_t fdt_data[FDT_BUF_SIZE];
+#endif
+
+#ifndef FDT_MAX_BOOT_STRING
+#define FDT_MAX_BOOT_STRING 1024
+#endif
+
+char bootargs[FDT_MAX_BOOT_STRING] = "";
+char *boot_args = NULL;
+
+static void
+earlyconsputc(dev_t dev, int c)
+{
+	uartputc(c);
+}
+
+static int
+earlyconsgetc(dev_t dev)
+{
+	return 0;
+}
+
+static struct consdev earlycons = {
+	.cn_putc = earlyconsputc,
+	.cn_getc = earlyconsgetc,
+	.cn_pollc = nullcnpollc,
+};
+
+/*
+ * Get all of physical memory, including holes.
+ */
+static void
+fdt_get_memory(uint64_t *pstart, uint64_t *pend)
+{
+	const int memory = OF_finddevice("/memory");
+	uint64_t cur_addr, cur_size;
+	int index;
+
+	/* Assume the first entry is the start of memory */
+	if (fdtbus_get_reg64(memory, 0, &cur_addr, &cur_size) != 0)
+		panic("Cannot determine memory size");
+
+	*pstart = cur_addr;
+	*pend = cur_addr + cur_size;
+
+	VPRINTF("FDT /memory [%d] @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
+	    0, *pstart, *pend - *pstart);
+
+	for (index = 1;
+	     fdtbus_get_reg64(memory, index, &cur_addr, &cur_size) == 0;
+	     index++) {
+		VPRINTF("FDT /memory [%d] @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
+		    index, cur_addr, cur_size);
+
+		if (cur_addr + cur_size > *pend)
+			*pend = cur_addr + cur_size;
+	}
+}
 
 struct vm_map *phys_map;
 
@@ -73,8 +148,10 @@ const pcu_ops_t * const pcu_ops_md_defs[PCU_UNIT_COUNT] = {
 #endif
 };
 
-/* Used by PHYSTOV and VTOPHYS -- Will be set be BSS is zeroed so
- * keep it in data */
+/*
+ * Used by PHYSTOV and VTOPHYS -- Will be set be BSS is zeroed so
+ * keep it in data
+ */
 __uint64_t kern_vtopdiff __attribute__((__section__(".data")));
 
 SYSCTL_SETUP(sysctl_machdep_setup, "sysctl machdep subtree setup")
@@ -349,31 +426,71 @@ cpu_startup(void)
 	printf("avail memory = %s\n", pbuf);
 }
 
-paddr_t
-init_mmu(paddr_t dtb, paddr_t end)
+
+
+static void
+cpu_kernel_vm_init(void)
 {
-	extern paddr_t virt_map;
-	virt_map = (paddr_t)virt_map - (paddr_t)&virt_map;
+	extern char __kernel_text[];
+	extern char _end[];
+//	extern char __data_start[];
+//	extern char __rodata_start[];
+
+	vaddr_t kernstart = trunc_page((vaddr_t)__kernel_text);
+	vaddr_t kernend = round_page((vaddr_t)_end);
+	paddr_t kernstart_phys = KERN_VTOPHYS(kernstart);
+	paddr_t kernend_phys = KERN_VTOPHYS(kernend);
+//	vaddr_t data_start = (vaddr_t)__data_start;
+//	vaddr_t rodata_start = (vaddr_t)__rodata_start;
+
+	VPRINTF("%s: kernel phys start %lx end %lx\n", __func__,
+	    kernstart_phys, kernend_phys);
+	fdt_add_reserved_memory_range(kernstart_phys,
+	     kernend_phys - kernstart_phys);
+
+#if 0
+	/* add direct mappings of whole memory */
+	const pt_entry_t dmattr =
+	    LX_BLKPAG_ATTR_NORMAL_WB |
+	    LX_BLKPAG_AP_RW |
+	    LX_BLKPAG_PXN |
+	    LX_BLKPAG_UXN;
+	for (blk = 0; blk < bootconfig.dramblocks; blk++) {
+		uint64_t start, end;
+
+		start = trunc_page(bootconfig.dram[blk].address);
+		end = round_page(bootconfig.dram[blk].address +
+		    (uint64_t)bootconfig.dram[blk].pages * PAGE_SIZE);
+
+		pmapboot_enter_range(AARCH64_PA_TO_KVA(start), start,
+		    end - start, dmattr, printf);
+	}
+#endif
+
+#ifdef KASAN
+	kasan_kernelstart = kernstart;
+	kasan_kernelsize = L2_ROUND_BLOCK(kernend) - kernstart;
+#endif
+
+
+
+}
+
+paddr_t
+init_mmu(paddr_t dtb)
+{
 	extern __uint64_t l2_pte[512];
 	extern __uint64_t l1_pte[512];
-//	extern __uint64_t l2_dtb[512];
-	__uint64_t phys_base = VM_MIN_KERNEL_ADDRESS - virt_map;
+
+	__uint64_t phys_base = KERN_VTOPHYS(VM_MIN_KERNEL_ADDRESS);
 	__uint64_t phys_base_2mb_chunk = phys_base >> 21;
 	__uint64_t l1_perms = PTE_V | PTE_D | PTE_A | PTE_R | PTE_W | PTE_X;
 	__uint64_t i = pl2_i(VM_MIN_KERNEL_ADDRESS);
 
-
-	end = (end + 0x200000 - 1) & -0x200000;
-
-	/* Global used later for VTOPHYS and PHYSTOV */
-	kern_vtopdiff = VM_MAX_KERNEL_ADDRESS - 0x80000000ULL;
+	paddr_t end = (phys_base + VM_KERNEL_VM_SIZE + 0x200000 - 1) & -0x200000;
 
 	/* L2 PTE with entry for Kernel VA, pointing to L2 PTE */
-	l2_pte[i] = (((paddr_t)&l1_pte >> PAGE_SHIFT) << L0_SHIFT) | PTE_V;
-
-	/* Map all of memory into the last gig */
-	/* XXX THIS IS SUPER, SUPER WRONG. */
-	l2_pte[pl2_i(VM_MAX_KERNEL_ADDRESS)] = ((0x80000000ULL >> PAGE_SHIFT) << L0_SHIFT) | l1_perms;
+	l2_pte[i] = PA_TO_PTE((paddr_t)&l1_pte) | PTE_V;
 
 	/* L2 PTE with entry for Kernel PA, pointing to L1 PTE */
 	/* i = ((paddr_t)&start >> L2_SHIFT) & Ln_ADDR_MASK; */
@@ -389,7 +506,7 @@ init_mmu(paddr_t dtb, paddr_t end)
 
 	/* Build the L1 Page Table we just pointed to */
 	for (i = 0; ((phys_base_2mb_chunk + i) << 21) < end; ++i) {
-		l1_pte[i] = ((phys_base_2mb_chunk + i) << L0_SHIFT)
+		l1_pte[i] = ((phys_base_2mb_chunk + i) << PTE_PPN_SHIFT)
 		    | l1_perms;
 	}
 
@@ -417,18 +534,204 @@ riscv_init_lwp0_uarea(void)
 	lwp0.l_md.md_utf = lwp0.l_md.md_ktf = tf;
 }
 
+//#define NHGO
+#if defined(NHGO)
+volatile int nhgo;
+#endif
 void
-init_riscv(register_t hartid, paddr_t dtb)
+init_riscv(register_t hartid, vaddr_t vdtb)
 {
-	/* Main screen turn on */
+
+	/* set temporally to work printf()/panic() even before consinit() */
+	cn_tab = &earlycons;
+
+#if defined(NHGO)
+	while (!nhgo);
+#endif
+	/* Load FDT */
+	void *fdt_addr_r = (void *)vdtb;
+	int error = fdt_check_header(fdt_addr_r);
+	if (error == 0) {
+#if 0
+		/* If the DTB is too big, try to pack it in place first. */
+		if (fdt_totalsize(fdt_addr_r) > sizeof(fdt_data))
+			(void)fdt_pack(fdt_addr_r);
+		error = fdt_open_into(fdt_addr_r, fdt_data, sizeof(fdt_data));
+		if (error != 0)
+			panic("fdt_move failed: %s", fdt_strerror(error));
+#endif
+		fdtbus_init(fdt_addr_r);
+	} else {
+		panic("fdt_check_header failed: %s", fdt_strerror(error));
+	}
+#if 0
+	/* Lookup platform specific backend */
+	plat = arm_fdt_platform();
+	if (plat == NULL)
+		panic("Kernel does not support this device");
+
+#endif
+	/* Early console may be available, announce ourselves. */
+	VPRINTF("FDT<%p>\n", fdt_addr_r);
+
+	const int chosen = OF_finddevice("/chosen");
+	if (chosen >= 0)
+		OF_getprop(chosen, "bootargs", bootargs, sizeof(bootargs));
+	boot_args = bootargs;
+
+#if 0
+	/*
+	 * If stdout-path is specified on the command line, override the
+	 * value in /chosen/stdout-path before initializing console.
+	 */
+	VPRINTF("stdout\n");
+	fdt_update_stdout_path();
+#endif
+
+
+	VPRINTF("consinit ");
 	consinit();
+	VPRINTF("ok\n");
+
+	/* Talk to the user */
+	printf("NetBSD/riscv (fdt) booting ...\n");
+
+
+#ifdef BOOT_ARGS
+	char mi_bootargs[] = BOOT_ARGS;
+	parse_mi_bootargs(mi_bootargs);
+#endif
 
 	/* SPAM me while testing */
 	boothowto |= AB_DEBUG;
 
-	/* Just pretend we have a gig of ram until FDT is implemented */
-	pmap_bootstrap(0x80000000ULL, 0xc0000000ULL,
-	    VM_KERNEL_VM_BASE, VM_KERNEL_VM_SIZE);
+	uint64_t memory_start, memory_end;
+	fdt_get_memory(&memory_start, &memory_end);
+
+#if !defined(_LP64)
+	/* Cannot map memory above largest page number */
+	uint64_t maxppn = __SHIFTOUT_MASK(PTE_PPN);
+	if (atop(memory_end) >= maxppn)
+		memory_end = ptoa(maxppn - 1);
+
+#endif
+	uint64_t memory_size __unused = memory_end - memory_start;
+
+	/* Perform PT build and VM init */
+	cpu_kernel_vm_init();
+
+#if 0
+	VPRINTF("bootargs: %s\n", bootargs);
+
+	parse_mi_bootargs(boot_args);
+#endif
+
+
+	// initarm_common
+	extern char __kernel_text[];
+	extern char _end[];
+//	extern char __data_start[];
+//	extern char __rodata_start[];
+
+	vaddr_t kernstart = trunc_page((vaddr_t)__kernel_text);
+	vaddr_t kernend = round_page((vaddr_t)_end);
+	paddr_t kernstart_phys __unused = KERN_VTOPHYS(kernstart);
+	paddr_t kernend_phys __unused = KERN_VTOPHYS(kernend);
+
+	vaddr_t kernelvmstart;
+
+	vaddr_t kernstart_mega __unused = MEGAPAGE_TRUNC(kernstart);
+	vaddr_t kernend_mega = MEGAPAGE_ROUND(kernend);
+
+	kernelvmstart = kernend_mega;
+
+#define DPRINTF(v)	VPRINTF("%24s = 0x%16lx\n", #v, v);
+
+	VPRINTF("------------------------------------------\n");
+	DPRINTF(kern_vtopdiff);
+	DPRINTF(memory_start);
+	DPRINTF(memory_end);
+	DPRINTF(memory_size);
+	DPRINTF(kernstart_phys);
+	DPRINTF(kernend_phys)
+//	DPRINTF(pagetables_start_phys);
+//	DPRINTF(pagetables_end_phys);
+//	DPRINTF(msgbuf);
+//	DPRINTF(physical_end);
+	DPRINTF(VM_MIN_KERNEL_ADDRESS);
+	DPRINTF(kernstart_mega);
+	DPRINTF(kernstart);
+	DPRINTF(kernend);
+	DPRINTF(kernend_mega);
+#if 0
+#ifdef MODULAR
+	DPRINTF(module_start);
+	DPRINTF(module_end);
+#endif
+#endif
+	DPRINTF(VM_MAX_KERNEL_ADDRESS);
+	VPRINTF("------------------------------------------\n");
+
+#undef DPRINTF
+
+
+#if 0
+#ifdef MODULAR
+	/*
+	 * The aarch64 compilers (gcc & llvm) use R_AARCH_CALL26/R_AARCH_JUMP26
+	 * for function calls (bl)/jumps(b). At this time, neither compiler
+	 * supports -mlong-calls therefore the kernel modules should be loaded
+	 * within the maximum range of +/-128MB from kernel text.
+	 */
+#define MODULE_RESERVED_MAX	(1024 * 1024 * 128)
+#define MODULE_RESERVED_SIZE	(1024 * 1024 * 32)	/* good enough? */
+	module_start = kernelvmstart;
+	module_end = kernend_mega + MODULE_RESERVED_SIZE;
+	if (module_end >= kernstart_mega + MODULE_RESERVED_MAX)
+		module_end = kernstart_mega + MODULE_RESERVED_MAX;
+	KASSERT(module_end > kernend_mega);
+	kernelvmstart = module_end;
+#endif /* MODULAR */
+#endif
+	KASSERT(kernelvmstart < VM_KERNEL_VM_BASE);
+
+	kernelvmstart = VM_KERNEL_VM_BASE;
+
+//	paddr_t kernstart_phys __unused = KERN_VTOPHYS(kernstart);
+//	paddr_t kernend_phys __unused = KERN_VTOPHYS(kernend);
+
+
+	/*
+	 * msgbuf is allocated from the bottom of any one of memory blocks
+	 * to avoid corruption due to bootloader or changing kernel layout.
+	 */
+	paddr_t msgbufaddr = 0;
+
+
+
+	KASSERT(msgbufaddr != 0);	/* no space for msgbuf */
+	initmsgbuf((void *)RISCV_PA_TO_KVA(msgbufaddr), MSGBUFSIZE);
+
+
+
+
+
+
+
+
+	uvm_md_init();
+
+	/*
+	 * pass memory pages to uvm
+	 */
+#if 0
+				uvm_page_physload(start, segend, start, segend,
+				    vm_freelist);
+#endif
+
+	pmap_bootstrap(kernelvmstart, VM_MAX_KERNEL_ADDRESS);
+
+	kasan_init();
 
 	/* Finish setting up lwp0 on our end before we call main() */
 	riscv_init_lwp0_uarea();

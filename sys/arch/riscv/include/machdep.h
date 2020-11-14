@@ -1,11 +1,11 @@
-/*	$NetBSD: proc.h,v 1.3 2015/03/31 06:47:47 matt Exp $	*/
+/*	$NetBSD$	*/
 
 /*-
- * Copyright (c) 2014 The NetBSD Foundation, Inc.
+ * Copyright (c) 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas of 3am Software Foundry.
+ * by Nick Hudson
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,48 +29,40 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _RISCV_PROC_H_
-#define _RISCV_PROC_H_
+#ifndef _RISCV_MACHDEP_H_
+#define _RISCV_MACHDEP_H_
 
-#include <sys/param.h>
-#include <riscv/vmparam.h>
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD$");
 
-struct lwp;
+#include <sys/proc.h>
+#include <sys/lwp.h>
+#include <sys/siginfo.h>
 
-/*
- * Machine-dependent part of the lwp structure for RISCV
- */
-struct trapframe;
+static inline paddr_t
+riscv_kern_vtophys(vaddr_t va)
+{
+	extern unsigned long kern_vtopdiff;
 
-struct mdlwp {
-	struct trapframe *md_utf;	/* trapframe from userspace */
-	struct trapframe *md_ktf;	/* trapframe from userspace */
-	struct faultbuf *md_onfault;	/* registers to store on fault */
-	register_t md_usp;		/* for locore.S */
-	vaddr_t	md_ss_addr;		/* single step address for ptrace */
-	int	md_ss_instr;		/* single step instruction for ptrace */
-	volatile int md_astpending;	/* AST pending on return to userland */
-#if 0
-#if USPACE > PAGE_SIZE
-	int	md_upte[USPACE/4096];	/* ptes for mapping u page */
-#else
-	int	md_dpte[USPACE/4096];	/* dummy ptes to keep the same */
-#endif
-#endif
-};
+	return va - kern_vtopdiff;
+}
 
-struct mdproc {
-					/* syscall entry for this process */
-	void	(*md_syscall)(struct trapframe *);
-};
+static inline vaddr_t
+riscv_kern_phystov(paddr_t pa)
+{
+	extern unsigned long kern_vtopdiff;
 
-#ifdef _KERNEL
-#define	LWP0_CPU_INFO	&cpu_info_store	/* staticly set in lwp0 */
-#if 0
-#define LWP0_MD_INITIALIZER {   \
-                .md_utf = (void *)0xdeadbeef, \
-        }
-#endif
-#endif /* _KERNEL */
+	return pa + kern_vtopdiff;
+}
 
-#endif /* _RISCV_PROC_H_ */
+#define KERN_VTOPHYS(va)	riscv_kern_vtophys(va)
+#define KERN_PHYSTOV(pa)	riscv_kern_phystov(pa)
+
+
+void	uartputc(int);
+
+paddr_t	init_mmu(paddr_t);
+void	init_riscv(register_t, vaddr_t);
+
+
+#endif	/* _RISCV_MACHDEP_H_ */

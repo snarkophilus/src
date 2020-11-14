@@ -26,6 +26,11 @@ options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
 maxusers	64		# estimated number of users
 
+options 	FDT
+
+options 	EARLYCONS=com, CONSADDR=0x10000000
+options 	VERBOSE_INIT_RISCV
+
 # Standard system options
 #options 	FPE		# Floating-point extension support
 options 	NTP		# NTP phase/frequency locked loop
@@ -62,6 +67,7 @@ options 	DIAGNOSTIC	# inexpensive kernel consistency checks
 #options  	SYSCTL_DEBUG
 #options  	SYSCTL_DEBUG_SETUP
 #options  	SYSCTL_DEBUG_CREATE
+
 
 #
 # Because gcc omits the frame pointer for any -O level, the line below
@@ -147,13 +153,20 @@ config		netbsd	root on ? type ?
 #
 # Device configuration
 #
-mainbus0	at root
-cpu0		at mainbus0
-htif0		at mainbus0
-htifcons0	at htif0
-htifdisk0	at htif0
-ld0		at htifdisk0
+mainbus0 	at root
+simplebus* 	at fdt? pass 0
 
+
+# UART
+com* 		at fdt?			# UART
+
+# Virtio devices
+virtio* 	at fdt?			# Virtio MMIO device
+#viomb* 	at virtio?		# Virtio memory balloon device
+ld* 		at virtio?		# Virtio disk device
+vioif* 		at virtio?		# Virtio network device
+viornd* 	at virtio?		# Virtio entropy device
+#vioscsi* 	at virtio?		# Virtio SCSI device
 
 # Pseudo-Devices
 
