@@ -31,8 +31,6 @@
 
 #include "opt_console.h"
 
-#include <sys/cdefs.h>
-
 #include <machine/asm.h>
 #include "assym.h"
 
