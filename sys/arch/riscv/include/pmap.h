@@ -49,22 +49,29 @@
 #include <riscv/pte.h>
 #include <riscv/sysreg.h>
 
-#define	PMAP_SEGTABSIZE		NPTEPG
-#define	PMAP_PDETABSIZE		NPTEPG
-#define NBSEG		(PAGE_SIZE * NPTEPG)
+#define PMAP_SEGTABSIZE	NPTEPG
+#define PMAP_PDETABSIZE	NPTEPG
 
 #ifdef _LP64
-#define NBXSEG		(NBSEG * NSEGPG)
-#define XSEGSHIFT	(SEGSHIFT + PGSHIFT - 3)
-#define XSEGOFSET	(PTE_PPN1 | SEGOFSET)
-#define SEGSHIFT	(PGSHIFT + PGSHIFT - 3)
+#define PTPSHIFT	3
+/* This is SV48. */
+//#define SEGLENGTH + SEGSHIFT + SEGSHIFT */
+
+/* This is SV39. */
+#define XSEGSHIFT	(SEGSHIFT + SEGLENGTH)
+#define NBXSEG		(1ULL << XSEGSHIFT)
+#define XSEGOFSET	(NBXSEG - 1)		/* byte offset into xsegment */
+#define XSEGLENGTH	(PGSHIFT - 3)
+#define NXSEGPG		(1 << XSEGLENGTH)
 #else
-#define SEGSHIFT	(PGSHIFT + PGSHIFT - 2)
-#define XSEGSHIFT	SEGSHIFT
+#define PTPSHIFT	2
+#define XSEGSHIFT	SEGLENGTH
 #endif
 
-CTASSERT(NBSEG == (1ULL << SEGSHIFT));
-#define	SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
+#define SEGLENGTH	(PGSHIFT - PTPSHIFT)
+#define SEGSHIFT	(SEGLENGTH + PGSHIFT)
+#define NBSEG		(1 << SEGSHIFT)		/* bytes/segment */
+#define SEGOFSET	(NBSEG - 1)		/* byte offset into segment */
 
 #define KERNEL_PID	0
 
