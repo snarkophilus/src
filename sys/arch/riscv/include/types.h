@@ -37,13 +37,15 @@
 #include <riscv/int_types.h>
 
 #if defined(_KERNEL) || defined(_KMEMUSER) || defined(_KERNTYPES) || defined(_STANDALONE)
-typedef __UINTPTR_TYPE__	paddr_t;
-typedef __UINTPTR_TYPE__	psize_t;
+
+typedef __uint64_t	paddr_t;
+typedef __uint64_t	psize_t;
+#define	PRIxPADDR	PRIx64
+#define	PRIxPSIZE	PRIx64
+#define	PRIuPSIZE	PRIu64
+
 typedef __UINTPTR_TYPE__	vaddr_t;
 typedef __UINTPTR_TYPE__	vsize_t;
-#define PRIxPADDR	PRIxPTR
-#define PRIxPSIZE	PRIxPTR
-#define PRIuPSIZE	PRIuPTR
 #define PRIxVADDR	PRIxPTR
 #define PRIxVSIZE	PRIxPTR
 #define PRIuVSIZE	PRIuPTR
