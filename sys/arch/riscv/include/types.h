@@ -40,9 +40,9 @@
 
 typedef __uint64_t	paddr_t;
 typedef __uint64_t	psize_t;
-#define	PRIxPADDR	PRIx64
-#define	PRIxPSIZE	PRIx64
-#define	PRIuPSIZE	PRIu64
+#define PRIxPADDR	PRIx64
+#define PRIxPSIZE	PRIx64
+#define PRIuPSIZE	PRIu64
 
 typedef __UINTPTR_TYPE__	vaddr_t;
 typedef __UINTPTR_TYPE__	vsize_t;
