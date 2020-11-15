@@ -551,19 +551,20 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 	/* Load FDT */
 	void *fdt_addr_r = (void *)vdtb;
 	int error = fdt_check_header(fdt_addr_r);
-	if (error == 0) {
+	if (error != 0)
+	    panic("fdt_check_header failed: %s", fdt_strerror(error));
+
 #if 0
-		/* If the DTB is too big, try to pack it in place first. */
-		if (fdt_totalsize(fdt_addr_r) > sizeof(fdt_data))
-			(void)fdt_pack(fdt_addr_r);
-		error = fdt_open_into(fdt_addr_r, fdt_data, sizeof(fdt_data));
-		if (error != 0)
-			panic("fdt_move failed: %s", fdt_strerror(error));
+	/* If the DTB is too big, try to pack it in place first. */
+	if (fdt_totalsize(fdt_addr_r) > sizeof(fdt_data))
+		(void)fdt_pack(fdt_addr_r);
+	error = fdt_open_into(fdt_addr_r, fdt_data, sizeof(fdt_data));
+	if (error != 0)
+		panic("fdt_move failed: %s", fdt_strerror(error));
+
 #endif
-		fdtbus_init(fdt_addr_r);
-	} else {
-		panic("fdt_check_header failed: %s", fdt_strerror(error));
-	}
+	fdtbus_init(fdt_addr_r);
+
 #if 0
 	/* Lookup platform specific backend */
 	plat = arm_fdt_platform();
