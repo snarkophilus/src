@@ -6,3 +6,15 @@ concurrent fault with multithreaded processes on that one.  The stats
 (wired_count etc) aren't updated atomically.  I'm concerned about ordering
 of PV entry ops with regard to PTE insertions but it's probably not an issue
 for us just yet given the way the locking works in UVM.
+
+
+XSEGSHIFT is the shift required to get the last index, e.g.
+
+RV64 SV39 it's 30 (aka, 12 (PGSHIFT) + (12 - 3(sizeof(pte)) * 2 (number of levels(3) - 1))
+RV64 SV48 it's 39 (aka, 12 (PGHSIFT) + (12 - 3(sizeof(pte)) * 3 (number of levels(4) - 1))
+RV64 SV32 it's 22 (aka, 12 (PGHSIFT) + (12 - 2(sizeof(pte)) * 1 (number of levels(2) - 1))
+
+AA64 ...
+
+
+MIPS ...
