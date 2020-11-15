@@ -42,6 +42,8 @@
 # define __STRING(x)	"x"
 #endif
 
+#define ___CONCAT(x,y)	__CONCAT(x,y)
+
 /*
  * Define -pg profile entry code.
  * Must always be noreorder, must never use a macro instruction
