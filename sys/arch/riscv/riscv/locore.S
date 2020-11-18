@@ -103,14 +103,13 @@ ENTRY_NP(start)
 					// a1 byte value is '0' from -PAGE_SIZE
 	call	memset			// zero through kernel_end
 
-	// s2	L1 PDE (SV32:4MiB mega pages, SV{39,48}: 2MiB megapages)
+	// s2	L1 PDE (SV32:4MiB megapages, SV{39,48}: 2MiB megapages)
 	// s3	L2 PDE (_LP64 SV39 only)
 	// s4	L3 PDE (_LP64 SV48 only)
 	// s5	bootstk
 	// s6	lwp0uspace
 
-	li	t3, PTE_KERN
-	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
+	li	t3, PTE_KERN		// for megapages
 
 	// We allocated the kernel first PDE page so let's insert in the
 	// page table.
@@ -126,9 +125,13 @@ ENTRY_NP(start)
 #endif
 #endif
 
-					// Number of megapages
-	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)
+#if PGSHIFT < PTE_PPN_SHIFT
+#error Code assumes PGSHIFT is greater than PTE_PPN_SHIFT
+#endif
+
+	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)	// # of megapages
 	li	t3, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
+	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
 
 	//
 	// Fill in the PDEs for kernel.
