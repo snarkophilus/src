@@ -205,6 +205,12 @@ ENTRY_NP(start)
 
 	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
 
+	/* Set the global pointer */
+	.option push
+	.option norelax
+	lla	gp, __global_pointer$
+	.option pop
+
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, t0			// vdtb

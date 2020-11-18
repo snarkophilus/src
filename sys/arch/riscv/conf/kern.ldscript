@@ -40,8 +40,6 @@ SECTIONS
 	{
 		PROVIDE(__data_start = .);
 		*(.data)
-		*(.sdata)
-		*(.sdata.*)
 	}
 
 	. = ALIGN(COHERENCY_UNIT);
@@ -56,6 +54,12 @@ SECTIONS
 	}
 	. = ALIGN(COHERENCY_UNIT);
 
+	.sdata :
+	{
+		__global_pointer$ = . + 0x800;
+		*(.sdata)
+		*(.sdata.*)
+	}
 	_edata = .;
 	PROVIDE (edata = .);
 
