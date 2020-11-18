@@ -36,6 +36,18 @@
 RCSID("$NetBSD$")
 
 
+/* void bs_c_1(a0: tag, a1: src, srcoffset, dst, dstoffset, count); */
+/* void bs_c_2(a0: tag, a1: src, srcoffset, dst, dstoffset, count); */
+/* void bs_c_4(a0: tag, a1: src, srcoffset, dst, dstoffset, count); */
+/* void bs_c_8(a0: tag, a1: src, srcoffset, dst, dstoffset, count); */
+
+/* void bs_sr_1(a0: tag, a1: addr, a2: offset, a3: value, a4: count); */
+/* void bs_sr_2(a0: tag, a1: addr, a2: offset, a3: value, a4: count); */
+/* void bs_sr_4(a0: tag, a1: addr, a2: offset, a3: value, a4: count); */
+/* void bs_sr_8(a0: tag, a1: addr, a2: offset, a3: value, a4: count); */
+
+
+/* uint8_t bs_r_1(a0: tag, a1: addr, a2: offset); */
 ENTRY_NP(generic_bs_r_1)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -44,7 +56,7 @@ ENTRY_NP(generic_bs_r_1)
 	ret
 END(generic_bs_r_1)
 
-
+/* uint16_t bs_r_2(a0: tag, a1: addr, a2: offset); */
 ENTRY_NP(generic_bs_r_2)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -53,6 +65,7 @@ ENTRY_NP(generic_bs_r_2)
 	ret
 END(generic_bs_r_2)
 
+/* uint32_t bs_r_4(a0: tag, a1: addr, a2: offset); */
 ENTRY_NP(generic_bs_r_4)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -62,6 +75,7 @@ ENTRY_NP(generic_bs_r_4)
 END(generic_bs_r_4)
 
 #ifdef _LP64
+/* uint64_t bs_r_8(a0: tag, a1: addr, a2: offset); */
 ENTRY_NP(generic_bs_r_8)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -71,7 +85,11 @@ ENTRY_NP(generic_bs_r_8)
 END(generic_bs_r_4)
 #endif
 
+/* void bs_rm_1(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 ENTRY_NP(generic_bs_rm_1)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
 	PTR_ADD	a2, a2, a1		/* add to address */
@@ -82,11 +100,20 @@ ENTRY_NP(generic_bs_rm_1)
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rm_1: count == 0"
 END(generic_bs_rm_1)
 
 
 
+/* void bs_rm_2(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 ENTRY_NP(generic_bs_rm_2)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
 	PTR_ADD	a2, a2, a1		/* add to address */
@@ -97,10 +124,19 @@ ENTRY_NP(generic_bs_rm_2)
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rm_2: count == 0"
 END(generic_bs_rm_2)
 
 
+/* void bs_rm_4(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 ENTRY_NP(generic_bs_rm_4)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
 	PTR_ADD	a2, a2, a1		/* add to address */
@@ -111,10 +147,19 @@ ENTRY_NP(generic_bs_rm_4)
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rm_4: count == 0"
 END(generic_bs_rm_4)
 
 #ifdef _LP64
+/* void bs_rm_8(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 ENTRY_NP(generic_bs_rm_8)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
 	PTR_ADD	a2, a2, a1		/* add to address */
@@ -125,13 +170,19 @@ ENTRY_NP(generic_bs_rm_8)
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
-END(generic_bs_rm_4)
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rm_8: count == 0"
+END(generic_bs_rm_8)
 #endif
 
-
-
-
+/* void bs_rr_1(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 ENTRY_NP(generic_bs_rr_1)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	li	t0, 1
 	srl	t0, t0, a5		/* delta = 1 << stride */
@@ -145,11 +196,21 @@ ENTRY_NP(generic_bs_rr_1)
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rr_1: count == 0"
 END(generic_bs_rr_1)
 
+/* void bs_rr_2(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+/* void bs_rr_4(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+/* void bs_rr_8(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 
 
 
+
+/* void bs_w_1(a0: tag, a1: addr, a2: offset, a3: value); */
 ENTRY_NP(generic_bs_w_1)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -159,6 +220,7 @@ ENTRY_NP(generic_bs_w_1)
 END(generic_bs_w_1)
 
 
+/* void bs_w_2(a0: tag, a1: addr, a2: offset, a3: value); */
 ENTRY_NP(generic_bs_w_2)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -167,6 +229,7 @@ ENTRY_NP(generic_bs_w_2)
 	ret
 END(generic_bs_w_2)
 
+/* void bs_w_4(a0: tag, a1: addr, a2: offset, a3: value); */
 ENTRY_NP(generic_bs_w_4)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -176,6 +239,7 @@ ENTRY_NP(generic_bs_w_4)
 END(generic_bs_w_4)
 
 #ifdef _LP64
+/* void bs_w_8(a0: tag, a1: addr, a2: offset, a3: value); */
 ENTRY_NP(generic_bs_w_8)
 	PTR_L	a5, BS_STRIDE(a0)	/* stride */
 	PTR_SLL	a2, a2, a5		/* offset <<= stride */
@@ -185,7 +249,99 @@ ENTRY_NP(generic_bs_w_8)
 END(generic_bs_w_8)
 #endif
 
+/* void bs_wm_1(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+ENTRY_NP(generic_bs_wm_1)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
+	PTR_L	a5, BS_STRIDE(a0)	/* stride */
+	PTR_SLL	a2, a2, a5		/* offset <<= stride */
+	PTR_ADD	a2, a2, a1		/* add to address */
+1:
+	lbu	a0, 0(a3)		/* load 8-bit */
+	sb	a0, 0(a2)
+	add 	a3, a3, 1
+	add	a4, a4, -1		/* count-- */
+	bnez	a4, 1b
+	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_wm_1: count == 0"
+END(generic_bs_wm_1)
 
 
+/* void bs_wm_2(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+ENTRY_NP(generic_bs_wm_2)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
+	PTR_L	a5, BS_STRIDE(a0)	/* stride */
+	PTR_SLL	a2, a2, a5		/* offset <<= stride */
+	PTR_ADD	a2, a2, a1		/* add to address */
+1:
+	lhu	a0, 0(a3)		/* load 16-bit */
+	sh	a0, 0(a2)		/* store 16-bit */
+	add 	a3, a3, 2
+	add	a4, a4, -1		/* count-- */
+	bnez	a4, 1b
+	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_wm_2: count == 0"
+END(generic_bs_wm_2)
 
 
+/* void bs_wm_4(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+ENTRY_NP(generic_bs_wm_4)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
+	PTR_L	a5, BS_STRIDE(a0)	/* stride */
+	PTR_SLL	a2, a2, a5		/* offset <<= stride */
+	PTR_ADD	a2, a2, a1		/* add to address */
+1:
+	lw	a0, 0(a3)		/* load 32-bit */
+	sw	a0, 0(a2)		/* store 32-bit */
+	add 	a3, a3, 4
+	add	a4, a4, -1		/* count-- */
+	bnez	a4, 1b
+	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_wm_4: count == 0"
+END(generic_bs_wm_4)
+
+#ifdef _LP64
+/* void bs_wm_8(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+ENTRY_NP(generic_bs_wm_8)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
+	PTR_L	a5, BS_STRIDE(a0)	/* stride */
+	PTR_SLL	a2, a2, a5		/* offset <<= stride */
+	PTR_ADD	a2, a2, a1		/* add to address */
+1:
+	ld	a0, 0(a3)		/* load 64-bit */
+	sd	a0, 0(a2)		/* store 64-bit */
+	add 	a3, a3, 8
+	add	a4, a4, -1		/* count-- */
+	bnez	a4, 1b
+	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_wm_8: count == 0"
+END(generic_bs_wm_8)
+#endif
+
+/* void bs_wr_1(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+/* void bs_wr_2(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+/* void bs_wr_4(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+/* void bs_wr_8(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
