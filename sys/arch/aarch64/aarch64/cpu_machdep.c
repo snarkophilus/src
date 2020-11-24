@@ -111,11 +111,11 @@ softint_init_md(lwp_t *l, u_int level, uintptr_t *machdep)
 void
 dosoftints(void)
 {
+	const int opl = splhigh();;
 	struct cpu_info * const ci = curcpu();
-	const int opl = ci->ci_cpl;
 	const uint32_t softiplmask = SOFTIPLMASK(opl);
 
-	splhigh();
+	KASSERT(ci->ci_intr_depth == 0);
 	for (;;) {
 		u_int softints = ci->ci_softints & softiplmask;
 		KASSERT((softints != 0) == ((ci->ci_softints >> opl) != 0));
