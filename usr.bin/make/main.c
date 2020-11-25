@@ -242,7 +242,7 @@ parse_debug_option_F(const char *modules)
 }
 
 static void
-parse_debug_option_F(const char *modules)
+parse_debug_options(const char *argvalue)
 {
 	const char *modules;
 	DebugFlags debug = opts.debug;
@@ -256,22 +256,22 @@ parse_debug_option_F(const char *modules)
 			debug = DEBUG_ALL;
 			break;
 		case 'a':
-			opts.debug |= DEBUG_ARCH;
+			debug |= DEBUG_ARCH;
 			break;
 		case 'C':
-			opts.debug |= DEBUG_CWD;
+			debug |= DEBUG_CWD;
 			break;
 		case 'c':
-			opts.debug |= DEBUG_COND;
+			debug |= DEBUG_COND;
 			break;
 		case 'd':
-			opts.debug |= DEBUG_DIR;
+			debug |= DEBUG_DIR;
 			break;
 		case 'e':
-			opts.debug |= DEBUG_ERROR;
+			debug |= DEBUG_ERROR;
 			break;
 		case 'f':
-			opts.debug |= DEBUG_FOR;
+			debug |= DEBUG_FOR;
 			break;
 		case 'g':
 			if (modules[1] == '1') {
@@ -286,43 +286,43 @@ parse_debug_option_F(const char *modules)
 			}
 			break;
 		case 'h':
-			opts.debug |= DEBUG_HASH;
+			debug |= DEBUG_HASH;
 			break;
 		case 'j':
-			opts.debug |= DEBUG_JOB;
+			debug |= DEBUG_JOB;
 			break;
 		case 'L':
 			opts.lint = TRUE;
 			break;
 		case 'l':
-			opts.debug |= DEBUG_LOUD;
+			debug |= DEBUG_LOUD;
 			break;
 		case 'M':
-			opts.debug |= DEBUG_META;
+			debug |= DEBUG_META;
 			break;
 		case 'm':
-			opts.debug |= DEBUG_MAKE;
+			debug |= DEBUG_MAKE;
 			break;
 		case 'n':
-			opts.debug |= DEBUG_SCRIPT;
+			debug |= DEBUG_SCRIPT;
 			break;
 		case 'p':
-			opts.debug |= DEBUG_PARSE;
+			debug |= DEBUG_PARSE;
 			break;
 		case 's':
-			opts.debug |= DEBUG_SUFF;
+			debug |= DEBUG_SUFF;
 			break;
 		case 't':
-			opts.debug |= DEBUG_TARG;
+			debug |= DEBUG_TARG;
 			break;
 		case 'V':
 			opts.debugVflag = TRUE;
 			break;
 		case 'v':
-			opts.debug |= DEBUG_VAR;
+			debug |= DEBUG_VAR;
 			break;
 		case 'x':
-			opts.debug |= DEBUG_SHELL;
+			debug |= DEBUG_SHELL;
 			break;
 		case 'F':
 			parse_debug_option_F(modules + 1);

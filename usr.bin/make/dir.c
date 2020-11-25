@@ -489,7 +489,6 @@ Dir_SetPATH(void)
 		if (cur != NULL)
 			Var_Append(".PATH", cur->name, VAR_GLOBAL);
 	}
-    }
 
 	for (ln = dirSearchPath->first; ln != NULL; ln = ln->next) {
 		CachedDir *dir = ln->datum;
@@ -1287,7 +1286,6 @@ Dir_FindHereOrAbove(const char *here, const char *search_path)
 			dirbase_end--;
 		*dirbase_end = '\0';	/* chop! */
 	}
-	free(try);
 
 	free(dirbase);
 	return NULL;
@@ -1579,12 +1577,6 @@ static int
 percentage(int num, int den)
 {
 	return den != 0 ? num * 100 / den : 0;
-}
-
-static int
-percentage(int num, int den)
-{
-    return den != 0 ? num * 100 / den : 0;
 }
 
 /********** DEBUG INFO **********/
