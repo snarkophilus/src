@@ -381,10 +381,6 @@ Compat_RunCommand(const char *cmdp, GNode *gn)
 			break;
 		}
 	}
-    }
-
-    if (retstat < 0)
-	Fatal("error in wait: %d: %s", retstat, strerror(errno));
 
 	if (retstat < 0)
 		Fatal("error in wait: %d: %s", retstat, strerror(errno));
@@ -394,9 +390,9 @@ Compat_RunCommand(const char *cmdp, GNode *gn)
 	} else if (WIFEXITED(reason)) {
 		status = WEXITSTATUS(reason);	/* exited */
 #if defined(USE_META) && defined(USE_FILEMON_ONCE)
-	if (useMeta) {
-	    meta_cmd_finish(NULL);
-	}
+		if (useMeta) {
+		    meta_cmd_finish(NULL);
+		}
 #endif
 		if (status != 0) {
 			if (DEBUG(ERROR))

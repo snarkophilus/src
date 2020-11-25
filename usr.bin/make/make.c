@@ -123,16 +123,6 @@ debug_printf(const char *fmt, ...)
 	va_end(args);
 }
 
-void
-debug_printf(const char *fmt, ...)
-{
-    va_list args;
-
-    va_start(args, fmt);
-    vfprintf(opts.debug_file, fmt, args);
-    va_end(args);
-}
-
 MAKE_ATTR_DEAD static void
 make_abort(GNode *gn, int line)
 {

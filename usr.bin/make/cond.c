@@ -382,12 +382,6 @@ is_separator(char ch)
 	return ch == '\0' || ch_isspace(ch) || strchr("!=><)", ch) != NULL;
 }
 
-static Boolean
-is_separator(char ch)
-{
-    return ch == '\0' || ch_isspace(ch) || strchr("!=><)", ch) != NULL;
-}
-
 /*-
  * Parse a string from a variable reference or an optionally quoted
  * string.  This is called for the lhs and rhs of string comparisons.
