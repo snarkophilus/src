@@ -58,6 +58,8 @@
 
 #include <machine/asm.h>
 
+	.option norelax
+
 #define NOT_IMPL(func, methodstr)					\
 	.global _C_LABEL(func)					;	\
 _C_LABEL(func):							;	\

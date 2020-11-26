@@ -41,7 +41,9 @@ __KERNEL_RCSID(1, "$NetBSD$");
 #include <riscv/bus_funcs.h>
 
 /* Prototypes for all the bus_space structure functions */
-bs_protos(generic)
+bs_protos(generic);
+bs_protos(bs_notimpl);
+
 
 struct bus_space riscv_generic_bs_tag = {
 	.bs_cookie = &riscv_generic_bs_tag,
@@ -72,27 +74,27 @@ struct bus_space riscv_generic_bs_tag = {
 
 	/* read region */
 	.bs_rr_1 = generic_bs_rr_1,
-	.bs_rr_2 = generic_bs_rr_2,
-	.bs_rr_4 = generic_bs_rr_4,
-	.bs_rr_8 = generic_bs_rr_8,
+	.bs_rr_2 = bs_notimpl_bs_rr_2 /*generic_bs_rr_2*/,
+	.bs_rr_4 = bs_notimpl_bs_rr_4 /*generic_bs_rr_4*/,
+	.bs_rr_8 = bs_notimpl_bs_rr_8 /*generic_bs_rr_8*/,
 
 	/* write region */
-	.bs_wr_1 = generic_bs_wr_1,
-	.bs_wr_2 = generic_bs_wr_2,
-	.bs_wr_4 = generic_bs_wr_4,
-	.bs_wr_8 = generic_bs_wr_8,
+	.bs_wr_1 = bs_notimpl_bs_wr_1 /*generic_bs_wr_1*/,
+	.bs_wr_2 = bs_notimpl_bs_wr_2 /*generic_bs_wr_2*/,
+	.bs_wr_4 = bs_notimpl_bs_wr_4 /*generic_bs_wr_4*/,
+	.bs_wr_8 = bs_notimpl_bs_wr_8 /*generic_bs_wr_8*/,
 
 	/* copy region */
-	.bs_c_1 = generic_bs_c_1,
-	.bs_c_2 = generic_bs_c_2,
-	.bs_c_4 = generic_bs_c_4,
-	.bs_c_8 = generic_bs_c_8,
+	.bs_c_1 = bs_notimpl_bs_c_1 /* generic_bs_c_1 */,
+	.bs_c_2 = bs_notimpl_bs_c_2 /* generic_bs_c_2 */,
+	.bs_c_4 = bs_notimpl_bs_c_4 /* generic_bs_c_4 */,
+	.bs_c_8 = bs_notimpl_bs_c_8 /* generic_bs_c_8 */,
 
 	/* set region */
-	.bs_sr_1 = generic_bs_sr_1,
-	.bs_sr_2 = generic_bs_sr_2,
-	.bs_sr_4 = generic_bs_sr_4,
-	.bs_sr_8 = generic_bs_sr_8,
+	.bs_sr_1 = bs_notimpl_bs_sr_1 /* generic_bs_sr_1 */,
+	.bs_sr_2 = bs_notimpl_bs_sr_2 /* generic_bs_sr_2 */,
+	.bs_sr_4 = bs_notimpl_bs_sr_4 /* generic_bs_sr_4 */,
+	.bs_sr_8 = bs_notimpl_bs_sr_8 /* generic_bs_sr_8 */,
 
 	/* read multi */
 	.bs_rm_1 = generic_bs_rm_1,
@@ -107,10 +109,10 @@ struct bus_space riscv_generic_bs_tag = {
 	.bs_wm_8 = generic_bs_wm_8,
 
 	/* set multi */
-	.bs_sm_1 = generic_bs_sm_1,
-	.bs_sm_2 = generic_bs_sm_2,
-	.bs_sm_4 = generic_bs_sm_4,
-	.bs_sm_8 = generic_bs_sm_8,
+	.bs_sm_1 = bs_notimpl_bs_sm_1 /* generic_bs_sm_1 */,
+	.bs_sm_2 = bs_notimpl_bs_sm_2 /* generic_bs_sm_2 */,
+	.bs_sm_4 = bs_notimpl_bs_sm_4 /* generic_bs_sm_4 */,
+	.bs_sm_8 = bs_notimpl_bs_sm_8 /* generic_bs_sm_8 */,
 
 #ifdef __BUS_SPACE_HAS_STREAM_METHODS
 	/* read stream */
@@ -128,14 +130,14 @@ struct bus_space riscv_generic_bs_tag = {
 	/* read region stream */
 	.bs_rr_1_s = generic_bs_rr_1,
 	.bs_rr_2_s = generic_bs_rr_2,
-	.bs_rr_4_s = generic_bs_rr_4,
-	.bs_rr_8_s = generic_bs_rr_8,
+	.bs_rr_4_s = bs_notimpl_bs_rr_4 /*generic_bs_rr_4*/,
+	.bs_rr_8_s = bs_notimpl_bs_rr_8 /*generic_bs_rr_8*/,
 
 	/* write region stream */
-	.bs_wr_1_s = generic_bs_wr_1,
-	.bs_wr_2_s = generic_bs_wr_2,
-	.bs_wr_4_s = generic_bs_wr_4,
-	.bs_wr_8_s = generic_bs_wr_8,
+	.bs_wr_1_s = bs_notimpl_bs_wr_1 /*generic_bs_wr_1*/,
+	.bs_wr_2_s = bs_notimpl_bs_wr_2 /*generic_bs_wr_2*/,
+	.bs_wr_4_s = bs_notimpl_bs_wr_4 /*generic_bs_wr_4*/,
+	.bs_wr_8_s = bs_notimpl_bs_wr_8 /*generic_bs_wr_8*/,
 
 	/* read multi stream */
 	.bs_rm_1_s = generic_bs_rm_1,
@@ -195,26 +197,26 @@ struct bus_space riscv_generic_a4x_bs_tag = {
 	/* read region */
 	.bs_rr_1 = generic_bs_rr_1,
 	.bs_rr_2 = generic_bs_rr_2,
-	.bs_rr_4 = generic_bs_rr_4,
-	.bs_rr_8 = generic_bs_rr_8,
+	.bs_rr_4 = bs_notimpl_bs_rr_4,
+	.bs_rr_8 = bs_notimpl_bs_rr_8,
 
 	/* write region */
-	.bs_wr_1 = generic_bs_wr_1,
-	.bs_wr_2 = generic_bs_wr_2,
-	.bs_wr_4 = generic_bs_wr_4,
-	.bs_wr_8 = generic_bs_wr_8,
+	.bs_wr_1 = bs_notimpl_bs_wr_1 /*generic_bs_wr_1*/,
+	.bs_wr_2 = bs_notimpl_bs_wr_2 /*generic_bs_wr_2*/,
+	.bs_wr_4 = bs_notimpl_bs_wr_4 /*generic_bs_wr_4*/,
+	.bs_wr_8 = bs_notimpl_bs_wr_8 /*generic_bs_wr_8*/,
 
 	/* copy region */
-	.bs_c_1 = generic_bs_c_1,
-	.bs_c_2 = generic_bs_c_2,
-	.bs_c_4 = generic_bs_c_4,
-	.bs_c_8 = generic_bs_c_8,
+	.bs_c_1 = bs_notimpl_bs_c_1 /* generic_bs_c_1 */,
+	.bs_c_2 = bs_notimpl_bs_c_2 /* generic_bs_c_2 */,
+	.bs_c_4 = bs_notimpl_bs_c_4 /* generic_bs_c_4 */,
+	.bs_c_8 = bs_notimpl_bs_c_8 /* generic_bs_c_8 */,
 
 	/* set region */
-	.bs_sr_1 = generic_bs_sr_1,
-	.bs_sr_2 = generic_bs_sr_2,
-	.bs_sr_4 = generic_bs_sr_4,
-	.bs_sr_8 = generic_bs_sr_8,
+	.bs_sr_1 = bs_notimpl_bs_sr_1 /* generic_bs_sr_1 */,
+	.bs_sr_2 = bs_notimpl_bs_sr_2 /* generic_bs_sr_2 */,
+	.bs_sr_4 = bs_notimpl_bs_sr_4 /* generic_bs_sr_4 */,
+	.bs_sr_8 = bs_notimpl_bs_sr_8 /* generic_bs_sr_8 */,
 
 	/* read multi */
 	.bs_rm_1 = generic_bs_rm_1,
@@ -229,10 +231,10 @@ struct bus_space riscv_generic_a4x_bs_tag = {
 	.bs_wm_8 = generic_bs_wm_8,
 
 	/* set multi */
-	.bs_sm_1 = generic_bs_sm_1,
-	.bs_sm_2 = generic_bs_sm_2,
-	.bs_sm_4 = generic_bs_sm_4,
-	.bs_sm_8 = generic_bs_sm_8,
+	.bs_sm_1 = bs_notimpl_bs_sm_1 /* generic_bs_sm_1 */,
+	.bs_sm_2 = bs_notimpl_bs_sm_2 /* generic_bs_sm_2 */,
+	.bs_sm_4 = bs_notimpl_bs_sm_4 /* generic_bs_sm_4 */,
+	.bs_sm_8 = bs_notimpl_bs_sm_8 /* generic_bs_sm_8 */,
 
 #ifdef __BUS_SPACE_HAS_STREAM_METHODS
 	/* read stream */
@@ -250,14 +252,14 @@ struct bus_space riscv_generic_a4x_bs_tag = {
 	/* read region stream */
 	.bs_rr_1_s = generic_bs_rr_1,
 	.bs_rr_2_s = generic_bs_rr_2,
-	.bs_rr_4_s = generic_bs_rr_4,
-	.bs_rr_8_s = generic_bs_rr_8,
+	.bs_rr_4_s = bs_notimpl_bs_rr_4 /*generic_bs_rr_4*/,
+	.bs_rr_8_s = bs_notimpl_bs_rr_8 /*generic_bs_rr_8*/,
 
 	/* write region stream */
-	.bs_wr_1_s = generic_bs_wr_1,
-	.bs_wr_2_s = generic_bs_wr_2,
-	.bs_wr_4_s = generic_bs_wr_4,
-	.bs_wr_8_s = generic_bs_wr_8,
+	.bs_wr_1_s = bs_notimpl_bs_wr_1 /*generic_bs_wr_1*/,
+	.bs_wr_2_s = bs_notimpl_bs_wr_2 /*generic_bs_wr_2*/,
+	.bs_wr_4_s = bs_notimpl_bs_wr_4 /*generic_bs_wr_4*/,
+	.bs_wr_8_s = bs_notimpl_bs_wr_8 /*generic_bs_wr_8*/,
 
 	/* read multi stream */
 	.bs_rm_1_s = generic_bs_rm_1,
