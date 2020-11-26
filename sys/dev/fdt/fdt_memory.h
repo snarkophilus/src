@@ -37,15 +37,12 @@ struct fdt_memory {
 	uint64_t	end;
 };
 
+void	fdt_memory_init(void);
+void	fdt_memory_get(uint64_t *, uint64_t *);
 void	fdt_memory_add_range(uint64_t, uint64_t);
 void	fdt_memory_remove_range(uint64_t, uint64_t);
+void	fdt_memory_remove_reserved(uint64_t, uint64_t);
+
 void	fdt_memory_foreach(void (*)(const struct fdt_memory *, void *), void *);
-
-static inline void
-fdt_add_reserved_memory_range(uint64_t addr, uint64_t size)
-{
-
-        fdt_memory_remove_range(addr, size);
-}
 
 #endif /* !_DEV_FDT_MEMORY_H */

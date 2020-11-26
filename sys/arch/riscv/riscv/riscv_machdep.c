@@ -102,37 +102,6 @@ static struct consdev earlycons = {
 	.cn_pollc = nullcnpollc,
 };
 
-/*
- * Get all of physical memory, including holes.
- */
-static void
-fdt_get_memory(uint64_t *pstart, uint64_t *pend)
-{
-	const int memory = OF_finddevice("/memory");
-	uint64_t cur_addr, cur_size;
-	int index;
-
-	/* Assume the first entry is the start of memory */
-	if (fdtbus_get_reg64(memory, 0, &cur_addr, &cur_size) != 0)
-		panic("Cannot determine memory size");
-
-	*pstart = cur_addr;
-	*pend = cur_addr + cur_size;
-
-	VPRINTF("FDT /memory [%d] @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
-	    0, *pstart, *pend - *pstart);
-
-	for (index = 1;
-	     fdtbus_get_reg64(memory, index, &cur_addr, &cur_size) == 0;
-	     index++) {
-		VPRINTF("FDT /memory [%d] @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
-		    index, cur_addr, cur_size);
-
-		if (cur_addr + cur_size > *pend)
-			*pend = cur_addr + cur_size;
-	}
-}
-
 struct vm_map *phys_map;
 
 struct trapframe cpu_ddb_regs;
@@ -445,40 +414,11 @@ cpu_kernel_vm_init(void)
 
 	VPRINTF("%s: kernel phys start %lx end %lx\n", __func__,
 	    kernstart_phys, kernend_phys);
-	fdt_add_reserved_memory_range(kernstart_phys,
+
+	fdt_memory_remove_range(kernstart_phys,
 	     kernend_phys - kernstart_phys);
 
-#if 0
-	/* add direct mappings of whole memory */
-	const pt_entry_t dmattr =
-	    LX_BLKPAG_ATTR_NORMAL_WB |
-	    LX_BLKPAG_AP_RW |
-	    LX_BLKPAG_PXN |
-	    LX_BLKPAG_UXN;
-	for (blk = 0; blk < bootconfig.dramblocks; blk++) {
-		uint64_t start, end;
 
-		start = trunc_page(bootconfig.dram[blk].address);
-		end = round_page(bootconfig.dram[blk].address +
-		    (uint64_t)bootconfig.dram[blk].pages * PAGE_SIZE);
-
-		pmapboot_enter_range(AARCH64_PA_TO_KVA(start), start,
-		    end - start, dmattr, printf);
-	}
-#endif
-
-#ifdef KASAN
-	kasan_kernelstart = kernstart;
-	kasan_kernelsize = L2_ROUND_BLOCK(kernend) - kernstart;
-#endif
-
-
-
-}
-
-paddr_t
-init_mmu(paddr_t dtb)
-{
 	extern __uint64_t l2_pte[512];
 	extern __uint64_t l1_pte[512];
 
@@ -516,7 +456,31 @@ init_mmu(paddr_t dtb)
 	/* i = ((paddr_t)dtb >> L2_SHIFT) & Ln_ADDR_MASK; */
 	/* l1_dtb[i] = (dtb << PTE_PPN0_S) | PTE_V | PTE_A | PTE_R; */
 
-	return phys_base;
+#if 0
+	/* add direct mappings of whole memory */
+	const pt_entry_t dmattr =
+	    LX_BLKPAG_ATTR_NORMAL_WB |
+	    LX_BLKPAG_AP_RW |
+	    LX_BLKPAG_PXN |
+	    LX_BLKPAG_UXN;
+	for (blk = 0; blk < bootconfig.dramblocks; blk++) {
+		uint64_t start, end;
+
+		start = trunc_page(bootconfig.dram[blk].address);
+		end = round_page(bootconfig.dram[blk].address +
+		    (uint64_t)bootconfig.dram[blk].pages * PAGE_SIZE);
+
+		pmapboot_enter_range(AARCH64_PA_TO_KVA(start), start,
+		    end - start, dmattr, printf);
+	}
+#endif
+
+#ifdef KASAN
+	kasan_kernelstart = kernstart;
+	kasan_kernelsize = L2_ROUND_BLOCK(kernend) - kernstart;
+#endif
+
+
 }
 
 static void
@@ -534,6 +498,15 @@ riscv_init_lwp0_uarea(void)
 	lwp0.l_md.md_utf = lwp0.l_md.md_ktf = tf;
 }
 
+
+static void
+riscv_print_memory(const struct fdt_memory *m, void *arg)
+{
+
+        VPRINTF("FDT /memory @ 0x%" PRIx64 " size 0x%" PRIx64 "\n",
+            m->start, m->end - m->start);
+}
+
 //#define NHGO
 #if defined(NHGO)
 volatile int nhgo;
@@ -549,21 +522,21 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 	while (!nhgo);
 #endif
 	/* Load FDT */
-	void *fdt_addr_r = (void *)vdtb;
-	int error = fdt_check_header(fdt_addr_r);
+	void *fdt_data = (void *)vdtb;
+	int error = fdt_check_header(fdt_data);
 	if (error != 0)
 	    panic("fdt_check_header failed: %s", fdt_strerror(error));
 
 #if 0
 	/* If the DTB is too big, try to pack it in place first. */
-	if (fdt_totalsize(fdt_addr_r) > sizeof(fdt_data))
-		(void)fdt_pack(fdt_addr_r);
-	error = fdt_open_into(fdt_addr_r, fdt_data, sizeof(fdt_data));
+	if (fdt_totalsize(fdt_data) > sizeof(static_fdt_data))
+		(void)fdt_pack(fdt_data);
+	error = fdt_open_into(fdt_data, static_fdt_data, sizeof(static_fdt_data));
 	if (error != 0)
 		panic("fdt_move failed: %s", fdt_strerror(error));
 
 #endif
-	fdtbus_init(fdt_addr_r);
+	fdtbus_init(fdt_data);
 
 #if 0
 	/* Lookup platform specific backend */
@@ -573,7 +546,7 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 
 #endif
 	/* Early console may be available, announce ourselves. */
-	VPRINTF("FDT<%p>\n", fdt_addr_r);
+	VPRINTF("FDT<%p>\n", fdt_data);
 
 	const int chosen = OF_finddevice("/chosen");
 	if (chosen >= 0)
@@ -589,6 +562,10 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 	fdt_update_stdout_path();
 #endif
 
+	/*
+	 * Done making changes to the FDT.
+	 */
+	fdt_pack(fdt_data);
 
 	VPRINTF("consinit ");
 	consinit();
@@ -596,7 +573,6 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 
 	/* Talk to the user */
 	printf("NetBSD/riscv (fdt) booting ...\n");
-
 
 #ifdef BOOT_ARGS
 	char mi_bootargs[] = BOOT_ARGS;
@@ -607,16 +583,23 @@ init_riscv(register_t hartid, vaddr_t vdtb)
 	boothowto |= AB_DEBUG;
 
 	uint64_t memory_start, memory_end;
-	fdt_get_memory(&memory_start, &memory_end);
+	fdt_memory_get(&memory_start, &memory_end);
 
-#if !defined(_LP64)
+	fdt_memory_foreach(riscv_print_memory, NULL);
+
 	/* Cannot map memory above largest page number */
-	uint64_t maxppn = __SHIFTOUT_MASK(PTE_PPN);
-	if (atop(memory_end) >= maxppn)
-		memory_end = ptoa(maxppn - 1);
+	const uint64_t maxppn = __SHIFTOUT_MASK(PTE_PPN) - 1;
+	const uint64_t memory_limit = ptoa(maxppn);
 
-#endif
+	if (memory_end > memory_limit) {
+		fdt_memory_remove_range(memory_limit, memory_end);
+		memory_end = memory_limit;
+	}
+
 	uint64_t memory_size __unused = memory_end - memory_start;
+
+	VPRINTF("%s: memory start %" PRIx64 " end %" PRIx64 " (len %"
+	    PRIx64 ")\n", __func__, memory_start, memory_end, memory_size);
 
 	/* Perform PT build and VM init */
 	cpu_kernel_vm_init();

@@ -200,7 +200,7 @@ cpu_kernel_vm_init(uint64_t memory_start __unused, uint64_t memory_size __unused
 
 	VPRINTF("%s: kernel phys start %lx end %lx+%lx\n", __func__,
 	    kernstart_phys, kernend_phys, kernend_extra);
-	fdt_add_reserved_memory_range(kernstart_phys,
+	fdt_memory_remove_range(kernstart_phys,
 	     kernend_phys - kernstart_phys + kernend_extra);
 
 #ifdef KASAN

@@ -37,6 +37,8 @@ __KERNEL_RCSID(0, "$NetBSD: fdt_memory.c,v 1.4 2020/01/27 01:15:09 jmcneill Exp 
 #include <sys/param.h>
 #include <sys/queue.h>
 
+#include <libfdt.h>
+#include <dev/fdt/fdtvar.h>
 #include <dev/fdt/fdt_memory.h>
 
 #ifndef FDT_MEMORY_RANGES
@@ -71,6 +73,69 @@ static void
 fdt_memory_range_free(struct fdt_memory_range *mr)
 {
 	mr->mr_used = false;
+}
+
+/*
+ * Get all of physical memory, including holes.
+ */
+void
+fdt_memory_get(uint64_t *pstart, uint64_t *pend)
+{
+	const int memory = OF_finddevice("/memory");
+	uint64_t cur_addr, cur_size;
+
+	for (int index = 0;
+	     fdtbus_get_reg64(memory, index, &cur_addr, &cur_size) == 0;
+	     index++) {
+		fdt_memory_add_range(cur_addr, cur_size);
+
+		/* Assume the first entry is the start of memory */
+		if (index == 0) {
+			*pstart = cur_addr;
+			*pend = cur_addr + cur_size;
+			continue;
+		}
+		if (cur_addr + cur_size > *pend)
+			*pend = cur_addr + cur_size;
+	}
+}
+
+/*
+ * Exclude memory ranges from memory config from the device tree
+ */
+void
+fdt_memory_remove_reserved(uint64_t min_addr, uint64_t max_addr)
+{
+	uint64_t lstart = 0, lend = 0;
+	uint64_t addr, size;
+	int index, error;
+
+	const int num = fdt_num_mem_rsv(fdtbus_get_data());
+	for (index = 0; index <= num; index++) {
+		error = fdt_get_mem_rsv(fdtbus_get_data(), index,
+		    &addr, &size);
+		if (error != 0)
+			continue;
+		if (lstart <= addr && addr <= lend) {
+			size -= (lend - addr);
+			addr = lend;
+		}
+		if (size == 0)
+			continue;
+		if (addr + size <= min_addr)
+			continue;
+		if (addr >= max_addr)
+			continue;
+		if (addr < min_addr) {
+			size -= (min_addr - addr);
+			addr = min_addr;
+		}
+		if (addr + size > max_addr)
+			size = max_addr - addr;
+		fdt_memory_remove_range(addr, size);
+		lstart = addr;
+		lend = addr + size;
+	}
 }
 
 void

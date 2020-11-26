@@ -258,7 +258,7 @@ arm32_bootmem_init(paddr_t memstart, psize_t memsize, vsize_t kernelstart)
 	bmi->bmi_kernelend = kernelend;
 
 #if defined(FDT)
-	fdt_add_reserved_memory_range(bmi->bmi_kernelstart,
+	fdt_memory_remove_range(bmi->bmi_kernelstart,
 	    bmi->bmi_kernelend - bmi->bmi_kernelstart);
 #endif
 
@@ -404,7 +404,7 @@ valloc_pages(struct bootmem_info *bmi, pv_addr_t *pv, size_t npages,
 	KASSERT((armreg_ttbr_read() & ~(L1_TABLE_SIZE - 1)) != free_pv->pv_pa);
 
 #if defined(FDT)
-	fdt_add_reserved_memory_range(free_pv->pv_pa, nbytes);
+	fdt_memory_remove_range(free_pv->pv_pa, nbytes);
 #endif
 	pv->pv_pa = free_pv->pv_pa;
 	pv->pv_va = free_pv->pv_va;
