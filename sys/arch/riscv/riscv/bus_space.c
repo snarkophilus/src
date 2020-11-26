@@ -277,7 +277,7 @@ int
 generic_bs_map(void *t, bus_addr_t bpa, bus_size_t size, int flag,
     bus_space_handle_t *bshp)
 {
-	const struct pmap_devmap *pd;
+//	const struct pmap_devmap *pd;
 	paddr_t startpa, endpa, pa;
 	vaddr_t va;
 	int pmapflags;
@@ -312,6 +312,8 @@ generic_bs_map(void *t, bus_addr_t bpa, bus_size_t size, int flag,
 		pmapflags = PMAP_DEV;
 #endif
 
+	pmapflags = 0;
+
 	for (pa = startpa; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE, pmapflags);
 	}
@@ -326,9 +328,10 @@ generic_bs_unmap(void *t, bus_space_handle_t bsh, bus_size_t size)
 	vaddr_t va;
 	vsize_t sz;
 
+#if 0
 	if (pmap_devmap_find_va(bsh, size) != NULL)
 		return;
-
+#endif
 	va = trunc_page(bsh);
 	sz = round_page(bsh + size) - va;
 
