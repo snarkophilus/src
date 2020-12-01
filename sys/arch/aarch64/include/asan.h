@@ -1,4 +1,4 @@
-/*	$NetBSD: asan.h,v 1.14 2020/11/10 07:51:19 skrll Exp $	*/
+/*	$NetBSD: asan.h,v 1.15 2020/11/26 08:25:01 skrll Exp $	*/
 
 /*
  * Copyright (c) 2018-2020 Maxime Villard, m00nbsd.net
