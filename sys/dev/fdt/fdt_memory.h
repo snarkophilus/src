@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _DEV_FDT_MEMORY_H
-#define _DEV_FDT_MEMORY_H
+#ifndef _DEV_FDT_FDT_MEMORY_H_
+#define _DEV_FDT_FDT_MEMORY_H_
 
 struct fdt_memory {
 	uint64_t	start;
@@ -45,4 +45,4 @@ void	fdt_memory_remove_reserved(uint64_t, uint64_t);
 
 void	fdt_memory_foreach(void (*)(const struct fdt_memory *, void *), void *);
 
-#endif /* !_DEV_FDT_MEMORY_H */
+#endif /* _DEV_FDT_FDT_MEMORY_H_ */
