@@ -701,6 +701,7 @@ cpu_hatch(struct cpu_info *ci)
 	 * ci_index are each cpu0=0, cpu1=1, cpu2=undef, cpu3=2.
 	 * therefore we have to use device_unit instead of ci_index for mbox.
 	 */
+
 	cpu_clr_mbox(device_unit(ci->ci_dev));
 }
 #endif /* MULTIPROCESSOR */
