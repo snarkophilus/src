@@ -1,4 +1,4 @@
-# $NetBSD: files.fdt,v 1.56 2020/10/30 16:08:45 skrll Exp $
+# $NetBSD: files.fdt,v 1.57 2020/12/12 09:27:31 skrll Exp $
 
 include	"external/bsd/libfdt/conf/files.libfdt"
 

@@ -1,4 +1,4 @@
-/* $NetBSD: platform.h,v 1.9 2020/09/19 16:31:40 skrll Exp $ */
+/* $NetBSD: platform.h,v 1.10 2020/12/12 09:27:31 skrll Exp $ */
 
 /*-
  * Copyright (c) 2015-2017 Jared McNeill <jmcneill@invisible.ca>
