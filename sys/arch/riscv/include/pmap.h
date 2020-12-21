@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.7 2020/11/15 08:09:56 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.8 2020/12/20 16:38:25 skrll Exp $ */
 
 /*
  * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
@@ -130,7 +130,6 @@ paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
 vaddr_t	pmap_md_direct_map_paddr(paddr_t);
 void	pmap_md_init(void);
 bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
-//void    pmap_md_page_syncicache(struct vm_page *, const kcpuset_t *);
 
 void	pmap_md_xtab_activate(struct pmap *, struct lwp *);
 void	pmap_md_xtab_deactivate(struct pmap *);

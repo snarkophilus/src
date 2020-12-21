@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.57 2020/10/08 14:02:40 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.58 2020/12/20 16:38:26 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.57 2020/10/08 14:02:40 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.58 2020/12/20 16:38:26 skrll Exp $");
 
 /*
  *	Manages physical address maps.
@@ -1433,7 +1433,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, u_int flags)
 		PMAP_COUNT(unmanaged_mappings);
 	}
 
-	KASSERTMSG(mdpg == NULL || mdpp ==NULL, "mdpg %p mdpp %p", mdpg, mdpp);
+	KASSERTMSG(mdpg == NULL || mdpp == NULL, "mdpg %p mdpp %p", mdpg, mdpp);
 
 	struct vm_page_md *md = (mdpg != NULL) ? mdpg : mdpp;
 	pt_entry_t npte = pte_make_enter(pa, md, prot, flags,

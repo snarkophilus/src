@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_machdep.c,v 1.30 2020/09/10 17:26:38 skrll Exp $	*/
+/*	$NetBSD: pmap_machdep.c,v 1.33 2020/12/20 16:38:25 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap_machdep.c,v 1.30 2020/09/10 17:26:38 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap_machdep.c,v 1.33 2020/12/20 16:38:25 skrll Exp $");
 
 /*
  *	Manages physical address maps.
@@ -642,7 +642,8 @@ pmap_copy_page(paddr_t src_pa, paddr_t dst_pa)
 	pt_entry_t src_pte, dst_pte;
 
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "(src_pa=%#lx, dst_pa=%#lx)", src_pa, dst_pa, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "(src_pa=%#lx, dst_pa=%#lx)", src_pa, dst_pa,
+	    0, 0);
 	PMAP_COUNT(copied_pages);
 
 	struct vm_page * const src_pg = PHYS_TO_VM_PAGE(src_pa);
@@ -925,8 +926,7 @@ tlb_walk(void *ctx, tlb_walkfunc_t func)
 bool
 pmap_md_vca_add(struct vm_page_md *mdpg, vaddr_t va, pt_entry_t *ptep)
 {
-	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLED(pmaphist);
+	UVMHIST_FUNC(__func__); UVMHIST_CALLED(pmaphist);
 	if (!MIPS_HAS_R4K_MMU || !MIPS_CACHE_VIRTUAL_ALIAS)
 		return false;
 

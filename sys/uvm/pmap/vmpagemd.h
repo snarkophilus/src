@@ -1,4 +1,4 @@
-/*	$NetBSD: vmpagemd.h,v 1.16 2019/12/30 18:28:06 ad Exp $	*/
+/*	$NetBSD: vmpagemd.h,v 1.17 2020/12/20 16:38:26 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2011 The NetBSD Foundation, Inc.
@@ -143,6 +143,7 @@ pmap_pvlist_unlock(struct vm_page_md *mdpg)
 static __inline bool
 pmap_pvlist_locked_p(struct vm_page_md *mdpg)
 {
+
 	return mutex_owned(pmap_pvlist_lock_addr(mdpg));
 }
 #endif /* _KERNEL */

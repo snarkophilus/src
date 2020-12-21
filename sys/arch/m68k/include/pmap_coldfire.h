@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap_coldfire.h,v 1.3 2020/08/07 07:19:45 skrll Exp $	*/
+/*	$NetBSD: pmap_coldfire.h,v 1.4 2020/12/20 16:38:25 skrll Exp $	*/
 /*-
  * Copyright (c) 2013 The NetBSD Foundation, Inc.
  * All rights reserved.

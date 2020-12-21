@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.h,v 1.74 2020/08/17 03:19:35 mrg Exp $	*/
+/*	$NetBSD: pmap.h,v 1.75 2020/12/20 16:38:25 skrll Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -186,6 +186,7 @@ struct tlbmask {
 #include <uvm/uvm_pmap.h>
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
+#include <uvm/pmap/pmap_pvt.h>
 #include <uvm/pmap/pmap_tlb.h>
 #include <uvm/pmap/pmap_synci.h>
 
@@ -291,6 +292,14 @@ int sbmips_cca_for_pa(paddr_t);
 
 #undef PMAP_CCA_FOR_PA
 #define	PMAP_CCA_FOR_PA(pa)	sbmips_cca_for_pa(pa)
+#endif
+
+#ifdef __HAVE_PMAP_PV_TRACK
+struct pmap_page {
+        struct vm_page_md       pp_md;
+};
+
+#define PMAP_PAGE_TO_MD(ppage)  (&((ppage)->pp_md))
 #endif
 
 #endif	/* _KERNEL */
