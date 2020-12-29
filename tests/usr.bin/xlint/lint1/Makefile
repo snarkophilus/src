@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.17 2020/12/28 09:58:56 rillig Exp $
+# $NetBSD: Makefile,v 1.20 2020/12/28 12:47:39 rillig Exp $
 
 NOMAN=		# defined
 
@@ -26,6 +26,7 @@ FILES+=		d_c99_nested_struct.c
 FILES+=		d_c99_recursive_init.c
 FILES+=		d_c99_struct_init.c
 FILES+=		d_c99_union_cast.c
+FILES+=		d_c99_union_cast.exp
 FILES+=		d_c99_union_init1.c
 FILES+=		d_c99_union_init2.c
 FILES+=		d_c99_union_init3.c
@@ -44,12 +45,14 @@ FILES+=		d_constant_conv1.exp
 FILES+=		d_constant_conv2.c
 FILES+=		d_constant_conv2.exp
 FILES+=		d_cvt_constant.c
+FILES+=		d_cvt_constant.exp
 FILES+=		d_cvt_in_ternary.c
 FILES+=		d_ellipsis_in_switch.c
 FILES+=		d_gcc_compound_statements1.c
 FILES+=		d_gcc_compound_statements2.c
 FILES+=		d_gcc_compound_statements3.c
 FILES+=		d_gcc_extension.c
+FILES+=		d_gcc_extension.exp
 FILES+=		d_gcc_func.c
 FILES+=		d_gcc_variable_array_init.c
 FILES+=		d_incorrect_array_size.c
@@ -60,6 +63,8 @@ FILES+=		d_nested_structs.c
 FILES+=		d_nolimit_init.c
 FILES+=		d_packed_structs.c
 FILES+=		d_shift_to_narrower_type.c
+FILES+=		d_struct_init_nested.c
+FILES+=		d_struct_init_nested.exp
 FILES+=		d_type_conv1.c
 FILES+=		d_type_conv1.exp
 FILES+=		d_type_conv2.c
