@@ -308,12 +308,12 @@ struct vm_page_md {
 /* for page descriptor page only */
 #define	mdpg_ptep_parent	mdpg_pp.pp_pv.pv_ptep
 
-#define VM_MDPAGE_INIT(pg)					\
-	do {							\
-		PMAP_PAGE_INIT(&(pg)->mdpage.mdpg_pp, 0);	\
+#define VM_MDPAGE_INIT(pg)				\
+	do {						\
+		PMAP_PAGE_INIT(&(pg)->mdpage.mdpg_pp);	\
 	} while (/*CONSTCOND*/ 0)
 
-#define PMAP_PAGE_INIT(pp, pa)						\
+#define PMAP_PAGE_INIT(pp)						\
 	do {								\
 		mutex_init(&(pp)->pp_pvlock, MUTEX_NODEBUG, IPL_NONE);	\
 		(pp)->pp_pv.pv_next = NULL;				\

@@ -94,7 +94,7 @@ struct pmap_page {
 #define PP_ATTRS_A	0x02	/* Accessed */
 #define PP_ATTRS_W	0x04	/* Writable */
 
-#define	PMAP_PAGE_INIT(pp, pa) \
+#define	PMAP_PAGE_INIT(pp) \
 do { \
 	LIST_INIT(&(pp)->pp_pvlist); \
 	mutex_init(&(pp)->pp_lock, MUTEX_NODEBUG, IPL_VM); \

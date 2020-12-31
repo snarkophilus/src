@@ -92,7 +92,7 @@ pmap_pv_track(paddr_t start, psize_t size)
 
 #ifdef PMAP_PAGE_INIT
 	for (size_t i = 0; i < npages; i++)
-		PMAP_PAGE_INIT(&pvt->pvt_pages[i], start + i * PAGE_SIZE);
+		PMAP_PAGE_INIT(&pvt->pvt_pages[i]);
 #endif
 
 	mutex_enter(&pv_unmanaged.lock);

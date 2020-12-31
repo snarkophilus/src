@@ -148,14 +148,13 @@ pmap_md_nptep(pt_entry_t *ptep)
 //XXXXNH somewhere else?
 #define __HAVE_PMAP_PV_TRACK
 
-#define PMAP_PAGE_INIT(pp, pa)				\
+#define PMAP_PAGE_INIT(pp)				\
 do {							\
 	(pp)->pp_md.mdpg_first.pv_next = NULL;		\
 	(pp)->pp_md.mdpg_first.pv_pmap = NULL;		\
 	(pp)->pp_md.mdpg_first.pv_va = 0;		\
 	(pp)->pp_md.mdpg_attrs = 0;			\
 	VM_PAGEMD_PVLIST_LOCK_INIT(&(pp)->pp_md);	\
-	(pp)->pp_pa = (pa);				\
 } while (/* CONSTCOND */ 0)
 
 #define	__HAVE_PMAP_MD
@@ -193,7 +192,6 @@ bool	pmap_md_io_vaddr_p(vaddr_t);
 
 struct pmap_page {
 	struct vm_page_md	pp_md;
-	paddr_t			pp_pa;
 };
 
 #define PMAP_PAGE_TO_MD(ppage)	(&((ppage)->pp_md))

@@ -638,7 +638,7 @@ pmap_alloc_pdp(struct pmap *pm, struct vm_page **pgp, int flags, bool waitok)
 		pg->wire_count = 1;	/* max = 1 + Ln_ENTRIES = 513 */
 		pa = VM_PAGE_TO_PHYS(pg);
 		PMAP_COUNT(pdp_alloc);
-		PMAP_PAGE_INIT(VM_PAGE_TO_PP(pg), pa);
+		PMAP_PAGE_INIT(VM_PAGE_TO_PP(pg));
 	} else {
 		/* uvm_pageboot_alloc() returns a direct mapping address */
 		pg = NULL;
