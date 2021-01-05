@@ -72,11 +72,6 @@ char machine_arch[] = MACHINE_ARCH;
 #define VPRINTF(...)	__nothing
 #endif
 
-#if 0
-#define FDT_BUF_SIZE	(512*1024)
-static uint8_t fdt_data[FDT_BUF_SIZE];
-#endif
-
 #ifndef FDT_MAX_BOOT_STRING
 #define FDT_MAX_BOOT_STRING 1024
 #endif
