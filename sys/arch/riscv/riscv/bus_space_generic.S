@@ -204,6 +204,34 @@ ENTRY_NP(generic_bs_rr_1)
 END(generic_bs_rr_1)
 
 /* void bs_rr_2(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
+ENTRY_NP(generic_bs_rr_2)
+#ifdef DIAGNOSTIC
+	beqz	a4, 2f
+#endif
+	PTR_L	a5, BS_STRIDE(a0)	/* stride */
+	li	t0, 1
+	srl	t0, t0, a5		/* delta = 1 << stride */
+// if (delta < 2)
+//     delta = 2
+
+
+	PTR_SLL	a2, a2, a5		/* offset <<= stride */
+	PTR_ADD	a2, a2, a1		/* add to address */
+1:
+	lhu	a0, 0(a2)		/* load 16-bit */
+	sh	a0, 0(a3)		/* *dst = value */
+	add	a2, a2, t0		/* src += delta */
+	add 	a3, a3, 2		/* dst++ */
+	add	a4, a4, -1		/* count-- */
+	bnez	a4, 1b
+	ret
+2:
+	la	x0, 3f
+	tail	_C_LABEL(panic)
+3:
+	.asciz	"_bs_rr_2: count == 0"
+END(generic_bs_rr_2)
+
 /* void bs_rr_4(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 /* void bs_rr_8(a0: tag, a1: addr, a2: offset, a3: datap, a4: count); */
 

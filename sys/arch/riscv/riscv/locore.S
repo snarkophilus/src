@@ -71,6 +71,11 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
+
+//	li	a0, 'X'
+//	call	_C_LABEL(com_platform_early_putchar)
+
+
 	PTR_LA	a0, _C_LABEL(__bss_start)
 	PTR_LA	s5, _C_LABEL(_end)
 
@@ -108,6 +113,10 @@ ENTRY_NP(start)
 	// s4	L3 PDE (_LP64 SV48 only)
 	// s5	bootstk
 	// s6	lwp0uspace
+
+	/* Save the phys addr from the start and end of the kernel */
+//	PTR_LA	t2, _C_LABEL(start)
+//	PTR_LA	t3, _C_LABEL(end)
 
 	li	t3, PTE_KERN		// for megapages
 
@@ -187,6 +196,8 @@ ENTRY_NP(start)
 	csrw	sscratch, zero		// zero in sscratch to mark kernel
 
 	PTR_LA	tp, _C_LABEL(lwp0)	// put curlwp in tp
+	.global vstart
+vstart:
 
 	/* Set supervisor trap vector base register */
 	PTR_LA	a0, _C_LABEL(cpu_exception_handler)
@@ -203,17 +214,27 @@ ENTRY_NP(start)
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
 	PTR_S	t3, PM_MD_PPN(t1)	// PA of kernel PDETAB
 
+#if notyet
+	mv	a0, s1			// dtb
+	call	_C_LABEL(init_mmu)
+#endif
+
+
 	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
 
+#if 1
+// XXXNH >>>--- taken from FreeBSD ---
 	/* Set the global pointer */
 	.option push
 	.option norelax
 	lla	gp, __global_pointer$
 	.option pop
+#endif
 
-	// Now we should ready to start initializing the kernel.
+// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, t0			// vdtb
+	//mv	a1, s1			// dtb (physical)
 	call	_C_LABEL(init_riscv)	// do MD startup
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
