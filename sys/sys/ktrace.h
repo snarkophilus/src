@@ -67,8 +67,8 @@ struct ktr_header {
 			short	_version;	/* trace record version */
 			short	_type;		/* trace record type */
 #endif
-			pid_t	ktr_pid;		/* process id */
-			char	ktr_comm[MAXCOMLEN+1];	/* command name */
+			pid_t	_pid;		/* process id */
+			char	_comm[MAXCOMLEN+1];	/* command name */
 			union {
 				struct { /* v0 */
 					struct {
@@ -107,6 +107,8 @@ struct ktr_header {
 #define	ktr_olen	_v012._len		/* was ktr_len */
 #define	ktr_oversion	_v012._version		/* was ktr_version */
 #define	ktr_otype	_v012._type		/* was ktr_type */
+#define ktr_opid	_v012._pid		/* was ktr_pid */
+#define ktr_ocomm	_v012._comm		/* was ktr_comm */
 #define ktr_olid	_v012._v._v2._lid	/* was ktr_lid */
 #define ktr_oolid	_v012._v._v1._lid	/* was ktr_olid */
 #define ktr_otime	_v012._v._v2._ts	/* was ktr_time */
