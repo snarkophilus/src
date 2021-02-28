@@ -57,47 +57,98 @@
  * ktrace record header
  */
 struct ktr_header {
-	int	ktr_len;		/* length of record minus length of old header */
-#if BYTE_ORDER == LITTLE_ENDIAN
-	short	ktr_type;		/* trace record type */
-	short	ktr_version;		/* trace record version */
-#else
-	short	ktr_version;		/* trace record version */
-	short	ktr_type;		/* trace record type */
-#endif
-	pid_t	ktr_pid;		/* process id */
-	char	ktr_comm[MAXCOMLEN+1];	/* command name */
 	union {
-		struct { /* v0 */
-			struct {
-				int32_t tv_sec;
-				long tv_usec;
-			} _tv;
-			const void *_buf;
-		} _v0;
-		struct { /* v1 */
-			struct {
-				int32_t tv_sec;
-				long tv_nsec;
-			} _ts;
-			lwpid_t _lid;
-		} _v1;
-		struct { /* v2 */
-			struct timespec _ts;
-			lwpid_t _lid;
-		} _v2;
-	} _v;
+		struct { /* v0-v2 */
+			int	_len;		/* length of record minus length of old header */
+#if BYTE_ORDER == LITTLE_ENDIAN
+			short	_type;		/* trace record type */
+			short	_version;	/* trace record version */
+#else
+			short	_version;	/* trace record version */
+			short	_type;		/* trace record type */
+#endif
+			pid_t	ktr_pid;		/* process id */
+			char	ktr_comm[MAXCOMLEN+1];	/* command name */
+			union {
+				struct { /* v0 */
+					struct {
+						int32_t tv_sec;
+						long tv_usec;
+					} _tv;
+					const void *_buf;
+				} _v0;
+				struct { /* v1 */
+					struct {
+						int32_t tv_sec;
+						long tv_nsec;
+					} _ts;
+					lwpid_t _lid;
+				} _v1;
+				struct { /* v2 */
+					struct timespec _ts;
+					lwpid_t _lid;
+				} _v2;
+			} _v;
+		} _v012;
+		struct { /* v3 */
+			int32_t	_len;
+			int16_t _version;
+			int16_t	_type;
+			char	_comm[MAXCOMLEN];
+			int64_t	_ts_tv_sec;
+			int32_t	_ts_tv_nsec;
+			int32_t	_pid;
+			int32_t	_lid;
+			int32_t _unused;
+		} _v3;
+	};
 };
 
-#define ktr_lid		_v._v2._lid
-#define ktr_olid	_v._v1._lid
-#define ktr_time	_v._v2._ts
-#define ktr_otv		_v._v0._tv
-#define ktr_ots		_v._v1._ts
-#define ktr_ts		_v._v2._ts
-#define ktr_unused	_v._v0._buf
+#define	ktr_olen	_v012._len		/* was ktr_len */
+#define	ktr_oversion	_v012._version		/* was ktr_version */
+#define	ktr_otype	_v012._type		/* was ktr_type */
+#define ktr_olid	_v012._v._v2._lid	/* was ktr_lid */
+#define ktr_oolid	_v012._v._v1._lid	/* was ktr_olid */
+#define ktr_otime	_v012._v._v2._ts	/* was ktr_time */
+#define ktr_ootv	_v012._v._v0._tv	/* was ktr_otv */
+#define ktr_oots	_v012._v._v1._ts	/* was ktr_ots */
+#define ktr_ots		_v012._v._v2._ts	/* was ktr_ts */
+#define ktr_ounused	_v012._v._v0._buf	/* was ktr_unused */
+
+/* XXXXXX remove all member "x" prefixes once coverted */
+#define	ktr_xlen	_v3._len
+#define	ktr_xversion	_v3._version
+#define	ktr_xtype	_v3._type
+#define	ktr_xcomm	_v3._comm
+#define	ktr_xpid	_v3._pid
+#define	ktr_xlid	_v3._lid
+#define	ktr_xts_sec	_v3._ts_tv_sec
+#define	ktr_xts_nsec	_v3._ts_tv_nsec
+#define	ktr_xunused	_v3._unused;
 
 #define	KTR_SHIMLEN	offsetof(struct ktr_header, ktr_pid)
+
+#define	KTR_SET_LEN(ktr, len)	(ktr)->ktr_xlen = htobe32(len)
+#define	KTR_SET_VERS(ktr, ver)	(ktr)->ktr_xversion = htobe16(ver)
+#define	KTR_SET_TYPE(ktr, type)	(ktr)->ktr_xtype = htobe16(type)
+#define	KTR_SET_COMM(ktr, comm)	memcpy(kth->ktr_xcomm, (comm), MAXCOMLEN)
+#define	KTR_SET_PID(ktr, pid)	(ktr)->ktr_xpid = htobe32(pid)
+#define	KTR_SET_LID(ktr, lid)	(ktr)->ktr_xlid = htobe32(lid)
+#define	KTR_SET_TIME(ktr, ts)	do {							\
+					(ktr)->ktr_xts_sec = htobe64((ts)->tv_sec);	\
+					(ktr)->ktr_xts_nsec = htobe32((ts)->tv_nsec);	\
+				} while (0)
+
+#define	KTR_GET_LEN(ktr)	be32toh((ktr)->ktr_xlen)
+#define	KTR_GET_VERS(ktr)	be16toh((ktr)->ktr_xversion)
+#define	KTR_GET_TYPE(ktr)	be16toh((ktr)->ktr_xtype)
+#define	KTR_GET_COMM(ktr)	((ktr)->ktr_xcomm)
+#define	KTR_GET_PID(ktr)	be32toh((ktr)->ktr_xpid)
+#define	KTR_GET_LID(ktr)	be32toh((ktr)->ktr_xlid)
+#define	KTR_GET_TIME(ktr, ts)	do {							\
+					(ts)->tv_sec = be64toh((ktr)->ktr_xts_sec);	\
+					(ts)->tv_nsec = be32toh((ktr)->ktr_xts_nsec);	\
+				} while (0)
 
 /*
  * Test for kernel trace point
@@ -113,25 +164,57 @@ struct ktr_header {
  * KTR_SYSCALL - system call record
  */
 #define KTR_SYSCALL	1
-struct ktr_syscall {
+struct ktr_osyscall {
 	int	ktr_code;		/* syscall number */
 	int	ktr_argsize;		/* size of arguments */
 	/*
 	 * followed by ktr_argsize/sizeof(register_t) "register_t"s
 	 */
 };
+struct ktr_syscall {
+	int32_t	xktr_code;		/* syscall number */
+	int32_t	xktr_argsize;		/* size of arguments */
+	/*
+	 * followed by ktr_argsize/sizeof(int64_t) "register_t"s
+	 */
+	int64_t xktr_args[0];
+};
+#define	KTR_SYSCALL_SET_CODE(ktr, code)		(ktr)->xktr_code = htobe32(code)
+#define	KTR_SYSCALL_SET_ARGSIZE(ktr, size)	(ktr)->xktr_argsize = htobe32(size)
+#define	KTR_SYSCALL_SET_ARG(ktr, n, arg)	(ktr)->xktr_args[n] = htobe64(arg)
+
+#define	KTR_SYSCALL_GET_CODE(ktr)		be32toh((ktr)->xktr_code)
+#define	KTR_SYSCALL_GET_ARGSIZE(ktr)		be32toh((ktr)->xktr_argsize)
+#define	KTR_SYSCALL_GET_ARG(ktr, n)		be64toh((ktr)->xktr_args[n])
 
 /*
  * KTR_SYSRET - return from system call record
  */
 #define KTR_SYSRET	2
-struct ktr_sysret {
+struct ktr_osysret {
 	short	ktr_code;
 	short	ktr_eosys;		/* XXX unused */
 	int	ktr_error;
 	__register_t ktr_retval;
 	__register_t ktr_retval_1;
 };
+struct ktr_sysret {
+	int16_t	xktr_code;
+	int32_t	xktr_error;
+	int64_t xktr_retval;
+	int64_t xktr_retval_1;
+};
+#define	KTR_SYSRET_SET_CODE(ktr, code)		(ktr)->xktr_code = htobe16(code)
+#define	KTR_SYSRET_SET_ERROR(ktr, error)	(ktr)->xktr_error = htobe32(error)
+#define	KTR_SYSRET_SET_RETVAL(ktr, ret)		(ktr)->xktr_retval = htobe64(ret)
+#define	KTR_SYSRET_SET_RETVAL1(ktr, ret)	(ktr)->xktr_retval_1 = htobe64(ret)
+
+#define	KTR_SYSRET_GET_CODE(ktr)		htobe16((ktr)->xktr_code)
+#define	KTR_SYSRET_GET_ERROR(ktr)		htobe32((ktr)->xktr_error)
+#define	KTR_SYSRET_GET_RETVAL(ktr)		htobe64((ktr)->xktr_retval)
+#define	KTR_SYSRET_GET_RETVAL1(ktr)		htobe64((ktr)->xktr_retval_1)
+
+#define	KTR_SYSRET_OFFSET_RETVAL1	(offsetof(struct ktr_sysret, xktr_retval_1))
 
 /*
  * KTR_NAMEI - namei record
@@ -143,19 +226,31 @@ struct ktr_sysret {
  * KTR_GENIO - trace generic process i/o
  */
 #define KTR_GENIO	4
-struct ktr_genio {
+struct ktr_ogenio {
 	int	ktr_fd;
 	enum	uio_rw ktr_rw;
 	/*
 	 * followed by data successfully read/written
 	 */
 };
+struct ktr_genio {
+	int32_t	xktr_fd;
+	int32_t	xktr_rw;
+	/*
+	 * followed by data successfully read/written
+	 */
+};
+#define	KTR_GENIO_SET_FD(genio, fd)	(genio)->xktr_fd = htobe32(fd)
+#define	KTR_GENIO_SET_RW(genio, rw)	(genio)->xktr_rw = htobe32(rw)
+
+#define	KTR_GENIO_GET_FD(genio)		be32toh((genio)->xktr_fd)
+#define	KTR_GENIO_GET_RW(genio)		be32toh((genio)->xktr_rw)
 
 /*
  * KTR_PSIG - trace processed signal
  */
 #define	KTR_PSIG	5
-struct ktr_psig {
+struct ktr_opsig {
 	int	signo;
 	sig_t	action;
 	sigset_t mask;
@@ -164,14 +259,51 @@ struct ktr_psig {
 	 * followed by optional siginfo_t
 	 */
 };
+struct ktr_psig {
+	int32_t	xsigno;
+	int32_t	xcode;
+	int64_t	xaction;
+	struct {
+		uint32_t	__bits[4];
+	} xmask;
+	/*
+	 * followed by optional ktr_siginfo_t	XXXXXX ugh
+	 */
+};
+#define	KTR_PSIG_SET_SIG(psig, sig)	(psig)->xsigno = htobe32(sig)
+#define	KTR_PSIG_SET_CODE(psig, code)	(psig)->xcode = htobe32(code)
+#define	KTR_PSIG_SET_ACTION(psig, act)	(psig)->xaction = htobe64((intptr_t)(act))
+#define	KTR_PSIG_SET_MASK(psig, mask)					\
+	do {								\
+		/* XXX magic "4" */					\
+		(psig)->xmask.__bits[0] = htobe32(mask->__bits[0]);	\
+		(psig)->xmask.__bits[1] = htobe32(mask->__bits[1]);	\
+		(psig)->xmask.__bits[2] = htobe32(mask->__bits[2]);	\
+		(psig)->xmask.__bits[3] = htobe32(mask->__bits[3]);	\
+	} while (0)
+#define	KTR_PSIG_GET_SIG(psig)		be32toh((psig)->xsigno)
+#define	KTR_PSIG_GET_CODE(psig)		be32toh((psig)->xcode)
+#define	KTR_PSIG_GET_ACTION(psig)	be64toh((psig)->xaction)
+
+/* The following track <sys/sigtypes) __sigmask/__sigword/__sigismember */
+#define	__KTR_PSIG_SIGMASK(n)		(1U << (((unsigned int)be32toh(n) - 1) & 31))
+#define	__KTR_PSIG_SIGWORD(n)		(((unsigned int)(n) - 1) >> 5)
+#define	KTR_PSIG_SIGISMEMBER(psig, n)	\
+	(((psig)->xmask.__bits[__KTR_PSIG_SIGWORD(n)] & __KTR_PSIG_SIGMASK(n)) != 0)
+
+#define	KTR_SIG_DFL			((intptr_t)SIG_DFL)
 
 /*
  * KTR_CSW - trace context switches
  */
 #define KTR_CSW		6
-struct ktr_csw {
+struct ktr_ocsw {
 	int	out;	/* 1 if switch out, 0 if switch in */
 	int	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
+};
+struct ktr_csw {
+	int32_t	out;	/* 1 if switch out, 0 if switch in */
+	int32_t	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
 };
 
 /*
@@ -206,14 +338,25 @@ struct ktr_user {
  * The structure is no longer used, but retained for compatibility.
  */
 #define	KTR_SAUPCALL	13
-struct ktr_saupcall {
-	int ktr_type;
+struct ktr_osaupcall {
+	int ktr_sutype;		/* was ktr_type */
 	int ktr_nevent;
 	int ktr_nint;
 	void *ktr_sas;
 	void *ktr_ap;
 	/*
 	 * followed by nevent sa_t's from sas[]
+	 */
+};
+struct ktr_saupcall {
+	int32_t	xktr_sutype;		/* was ktr_type */
+	int32_t	xktr_nevent;
+	int32_t	xktr_nint;
+	int32_t	_fill;
+	int64_t	xktr_sas;
+	int64_t	xktr_ap;
+	/*
+	 * followed by nevent sa_t's from sas[]		XXXXXX what are these??
 	 */
 };
 
@@ -230,6 +373,10 @@ struct ktr_saupcall {
 struct ktr_execfd {
 	int   ktr_fd;
 	u_int ktr_dtype; /* one of DTYPE_* constants */
+};
+struct ktr_oexecfd {
+	int32_t	xktr_fd;
+	uint32_t xktr_dtype; /* one of DTYPE_* constants */
 };
 
 /*
@@ -263,6 +410,7 @@ struct ktr_execfd {
 #define	KTRFACv0	(0 << KTRFAC_VER_SHIFT)
 #define	KTRFACv1	(1 << KTRFAC_VER_SHIFT)
 #define	KTRFACv2	(2 << KTRFAC_VER_SHIFT)
+#define	KTRFACv3	(3 << KTRFAC_VER_SHIFT)
 
 #ifndef	_KERNEL
 
@@ -434,7 +582,6 @@ ktrexecfd(int fd, u_int dtype)
 
 struct ktrace_entry;
 int	ktealloc(struct ktrace_entry **, void **, lwp_t *, int, size_t);
-void	ktesethdrlen(struct ktrace_entry *, size_t);
 void	ktraddentry(lwp_t *, struct ktrace_entry *, int);
 /* Flags for ktraddentry (3rd arg) */
 #define	KTA_NOWAIT		0x0000

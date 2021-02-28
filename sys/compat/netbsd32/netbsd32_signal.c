@@ -593,10 +593,10 @@ netbsd32_ktrpsig(int sig, sig_t action, const sigset_t *mask,
 		kbuf->kp.code = KSI_TRAPCODE(ksi);
 		(void)memset(&kbuf->si, 0, sizeof(kbuf->si));
 		netbsd32_ksi_to_ksi32(&kbuf->si._info, &ksi->ksi_info);
-		ktesethdrlen(kte, sizeof(*kbuf));
+		KTR_SET_LEN(kte, sizeof(*kbuf));
 	} else {
 		kbuf->kp.code = 0;
-		ktesethdrlen(kte, sizeof(struct netbsd32_ktr_psig));
+		KTR_SET_LEN(kte, sizeof(struct netbsd32_ktr_psig));
 	}
 
 	ktraddentry(l, kte, KTA_WAITOK);

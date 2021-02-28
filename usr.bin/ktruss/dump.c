@@ -63,6 +63,7 @@ __RCSID("$NetBSD: dump.c,v 1.47 2020/01/14 11:28:35 kamil Exp $");
 #include <unistd.h>
 #include <vis.h>
 
+#if 0	/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 #include "ktrace.h"
 #include "misc.h"
 #include "setemul.h"
@@ -826,3 +827,11 @@ ktrcsw(struct ktr_entry *kte)
 
 	free(kte);
 }
+#else	/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+int timestamp, decimal, fancy = 1, tail, maxdata;
+void dumpfile(const char *file, int fd, int trpoints);
+void
+dumpfile(const char *file, int fd, int trpoints)
+{
+}
+#endif	/* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */

@@ -496,6 +496,7 @@ ktealloc(struct ktrace_entry **ktep, void **bufp, lwp_t *l, int type,
 	struct proc *p = l->l_proc;
 	struct ktrace_entry *kte;
 	struct ktr_header *kth;
+	struct timespec ts;
 	void *buf;
 
 	if (ktrenter(l))
@@ -510,26 +511,22 @@ ktealloc(struct ktrace_entry **ktep, void **bufp, lwp_t *l, int type,
 	kte->kte_bufsz = sz;
 	kte->kte_buf = buf;
 
+	/* XXXXXX do we only ever allocate v3 records now?  otherwise this all falls apart. */
 	kth = &kte->kte_kth;
+	nanotime(&ts);
 	(void)memset(kth, 0, sizeof(*kth));
-	kth->ktr_len = sz;
-	kth->ktr_type = type;
-	kth->ktr_pid = p->p_pid;
-	memcpy(kth->ktr_comm, p->p_comm, MAXCOMLEN);
-	kth->ktr_version = KTRFAC_VERSION(p->p_traceflag);
-	kth->ktr_lid = l->l_lid;
-	nanotime(&kth->ktr_ts);
+	KTR_SET_LEN(kth, sz);
+	KTR_SET_TYPE(kth, type);
+	KTR_SET_PID(kth, p->p_pid);
+	KTR_SET_COMM(kth, p->p_comm);
+	KTR_SET_VERS(kth, KTRFAC_VERSION(p->p_traceflag));
+	KTR_SET_LID(kth, l->l_lid);
+	KTR_SET_TIME(kth, &ts);
 
 	*ktep = kte;
 	*bufp = buf;
 
 	return 0;
-}
-
-void
-ktesethdrlen(struct ktrace_entry *kte, size_t l)
-{
-	kte->kte_kth.ktr_len = l;
 }
 
 void
@@ -539,23 +536,21 @@ ktr_syscall(register_t code, const register_t args[], int narg)
 	struct proc *p = l->l_proc;
 	struct ktrace_entry *kte;
 	struct ktr_syscall *ktp;
-	register_t *argp;
 	size_t len;
 	u_int i;
 
 	if (!KTRPOINT(p, KTR_SYSCALL))
 		return;
 
-	len = sizeof(struct ktr_syscall) + narg * sizeof argp[0];
+	len = sizeof(struct ktr_syscall) + narg * sizeof(int64_t);
 
 	if (ktealloc(&kte, (void *)&ktp, l, KTR_SYSCALL, len))
 		return;
 
-	ktp->ktr_code = code;
-	ktp->ktr_argsize = narg * sizeof argp[0];
-	argp = (register_t *)(ktp + 1);
+	KTR_SYSCALL_SET_CODE(ktp, code);
+	KTR_SYSCALL_SET_ARGSIZE(ktp, narg * sizeof(int64_t));
 	for (i = 0; i < narg; i++)
-		*argp++ = args[i];
+		KTR_SYSCALL_SET_ARG(ktp, i, args[i]);
 
 	ktraddentry(l, kte, KTA_WAITOK);
 }
@@ -574,11 +569,10 @@ ktr_sysret(register_t code, int error, register_t *retval)
 	    sizeof(struct ktr_sysret)))
 		return;
 
-	ktp->ktr_code = code;
-	ktp->ktr_eosys = 0;			/* XXX unused */
-	ktp->ktr_error = error;
-	ktp->ktr_retval = retval && error == 0 ? retval[0] : 0;
-	ktp->ktr_retval_1 = retval && error == 0 ? retval[1] : 0;
+	KTR_SYSRET_SET_CODE(ktp, code);
+	KTR_SYSRET_SET_ERROR(ktp, error);
+	KTR_SYSRET_SET_RETVAL(ktp, retval && error == 0 ? retval[0] : 0);
+	KTR_SYSRET_SET_RETVAL1(ktp, retval && error == 0 ? retval[1] : 0);
 
 	ktraddentry(l, kte, KTA_WAITOK);
 }
@@ -692,18 +686,18 @@ ktr_io(lwp_t *l, int fd, enum uio_rw rw, struct iovec *iov, size_t len)
 	if (ktealloc(&kte, (void *)&ktp, l, KTR_GENIO, buflen))
 		return;
 
-	ktp->ktr_fd = fd;
-	ktp->ktr_rw = rw;
+	KTR_GENIO_SET_FD(ktp, fd);
+	KTR_GENIO_SET_RW(ktp, rw);
 
 	cp = (void *)(ktp + 1);
 	buflen -= sizeof(struct ktr_genio);
-	kte->kte_kth.ktr_len = sizeof(struct ktr_genio);
+	KTR_SET_LEN(&kte->kte_kth, sizeof(struct ktr_genio));
 
 	while (buflen > 0) {
 		cnt = uimin(iov->iov_len, buflen);
 		if (copyin(iov->iov_base, cp, cnt) != 0)
 			goto out;
-		kte->kte_kth.ktr_len += cnt;
+		KTR_SET_LEN(&kte->kte_kth, KTR_GET_LEN(&kte->kte_kth) + cnt);	/* XXXXXX need KTR_INCR_LEN(ktr, diff) ?? */
 		cp += cnt;
 		buflen -= cnt;
 		resid -= cnt;
@@ -789,18 +783,20 @@ ktr_psig(int sig, sig_t action, const sigset_t *mask,
 	if (ktealloc(&kte, (void *)&kbuf, l, KTR_PSIG, sizeof(*kbuf)))
 		return;
 
-	kbuf->kp.signo = (char)sig;
-	kbuf->kp.action = action;
-	kbuf->kp.mask = *mask;
+	KTR_PSIG_SET_SIG(&kbuf->kp, (char)sig);
+	KTR_PSIG_SET_ACTION(&kbuf->kp, action);
+	CTASSERT(NSIG <= 128);
+	KTR_PSIG_SET_MASK(&kbuf->kp, mask);
 
 	if (ksi) {
-		kbuf->kp.code = KSI_TRAPCODE(ksi);
+		KTR_PSIG_SET_CODE(&kbuf->kp, KSI_TRAPCODE(ksi));
 		(void)memset(&kbuf->si, 0, sizeof(kbuf->si));
+printf("%s: ugh siginfo_t\n", __func__);	/* XXXXXX look at netbsd32_ksi_to_ksi32() */
 		kbuf->si._info = ksi->ksi_info;
-		kte->kte_kth.ktr_len = sizeof(*kbuf);
+		KTR_SET_LEN(&kte->kte_kth, sizeof(*kbuf));
 	} else {
-		kbuf->kp.code = 0;
-		kte->kte_kth.ktr_len = sizeof(struct ktr_psig);
+		KTR_PSIG_SET_CODE(&kbuf->kp, 0);
+		KTR_SET_LEN(&kte->kte_kth, sizeof(struct ktr_psig));
 	}
 
 	ktraddentry(l, kte, KTA_WAITOK);
@@ -865,18 +861,20 @@ ktr_csw(int out, int user)
 		ts = &l->l_ktrcsw;
 		switch (KTRFAC_VERSION(p->p_traceflag)) {
 		case 0:
-			kte->kte_kth.ktr_otv.tv_sec = ts->tv_sec;
-			kte->kte_kth.ktr_otv.tv_usec = ts->tv_nsec / 1000;
+			kte->kte_kth.ktr_ootv.tv_sec = ts->tv_sec;
+			kte->kte_kth.ktr_ootv.tv_usec = ts->tv_nsec / 1000;
 			break;
 		case 1:
+			kte->kte_kth.ktr_oots.tv_sec = ts->tv_sec;
+			kte->kte_kth.ktr_oots.tv_nsec = ts->tv_nsec;
+			break;
+		case 2:
 			kte->kte_kth.ktr_ots.tv_sec = ts->tv_sec;
 			kte->kte_kth.ktr_ots.tv_nsec = ts->tv_nsec;
 			break;
-		case 2:
-			kte->kte_kth.ktr_ts.tv_sec = ts->tv_sec;
-			kte->kte_kth.ktr_ts.tv_nsec = ts->tv_nsec;
-			break;
+		case htobe16(3):
 		default:
+			KTR_SET_TIME(&kte->kte_kth, ts);
 			break;
 		}
 
@@ -926,7 +924,7 @@ ktruser(const char *id, void *addr, size_t len, int ustr)
 
 	user_dta = (void *)(ktp + 1);
 	if ((error = copyin(addr, user_dta, len)) != 0)
-		kte->kte_kth.ktr_len = 0;
+		KTR_SET_LEN(&kte->kte_kth, 0);
 
 	ktraddentry(l, kte, KTA_WAITOK);
 	return error;
@@ -1288,35 +1286,35 @@ next:
 		kth = &kte->kte_kth;
 
 		hlen = sizeof(struct ktr_header);
-		switch (kth->ktr_version) {
+		switch KTR_GET_VERS(kth) {
 		case 0:
-			ts = kth->ktr_time;
+			ts = kth->ktr_otime;
 
-			kth->ktr_otv.tv_sec = ts.tv_sec;
-			kth->ktr_otv.tv_usec = ts.tv_nsec / 1000;
-			kth->ktr_unused = NULL;
-			hlen -= sizeof(kth->_v) -
-			    MAX(sizeof(kth->_v._v0), sizeof(kth->_v._v1));
+			kth->ktr_ootv.tv_sec = ts.tv_sec;
+			kth->ktr_ootv.tv_usec = ts.tv_nsec / 1000;
+			kth->ktr_ounused = NULL;
+			hlen -= sizeof(kth->_v012._v) -
+			    MAX(sizeof(kth->_v012._v._v0), sizeof(kth->_v012._v._v1));
 			break;
 		case 1:
-			ts = kth->ktr_time;
-			lid = kth->ktr_lid;
+			ts = kth->ktr_otime;
+			lid = kth->ktr_olid;
 
-			kth->ktr_ots.tv_sec = ts.tv_sec;
-			kth->ktr_ots.tv_nsec = ts.tv_nsec;
-			kth->ktr_olid = lid;
-			hlen -= sizeof(kth->_v) -
-			    MAX(sizeof(kth->_v._v0), sizeof(kth->_v._v1));
+			kth->ktr_oots.tv_sec = ts.tv_sec;
+			kth->ktr_oots.tv_nsec = ts.tv_nsec;
+			kth->ktr_oolid = lid;
+			hlen -= sizeof(kth->_v012._v) -
+			    MAX(sizeof(kth->_v012._v._v0), sizeof(kth->_v012._v._v1));
 			break;
 		}
 		iov->iov_base = (void *)kth;
 		iov++->iov_len = hlen;
 		auio.uio_resid += hlen;
 		auio.uio_iovcnt++;
-		if (kth->ktr_len > 0) {
+		if (KTR_GET_LEN(kth) > 0) {			//XXX old ktr_len
 			iov->iov_base = kte->kte_buf;
-			iov++->iov_len = kth->ktr_len;
-			auio.uio_resid += kth->ktr_len;
+			iov++->iov_len = KTR_GET_LEN(kth);	//XXX old ktr_len
+			auio.uio_resid += KTR_GET_LEN(kth);	//XXX old ktr_len
 			auio.uio_iovcnt++;
 		}
 	} while ((kte = TAILQ_NEXT(kte, kte_list)) != NULL &&

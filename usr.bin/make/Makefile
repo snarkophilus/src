@@ -104,6 +104,7 @@ USE_META?=	yes
 SRCS+=		meta.c
 CPPFLAGS+=	-DUSE_META
 
+USE_FILEMON=	no	# XXXXXX
 USE_FILEMON?=	ktrace
 .  if ${USE_FILEMON:tl} != "no"
 

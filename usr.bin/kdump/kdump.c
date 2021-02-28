@@ -284,12 +284,12 @@ main(int argc, char **argv)
 	if (!freopen(tracefile, "r", stdin))
 		err(1, "%s", tracefile);
 	while (fread_tail(&ktr_header, sizeof(struct ktr_header), 1)) {
-		if (trpoints & (1 << ktr_header.ktr_type) &&
-		    (do_pid == -1 || ktr_header.ktr_pid == do_pid))
+		if (trpoints & (1 << KTR_GET_TYPE(&ktr_header)) &&
+		    (do_pid == -1 || KTR_GET_PID(&ktr_header) == do_pid))
 			col = dumpheader(&ktr_header);
 		else
 			col = -1;
-		if ((ktrlen = ktr_header.ktr_len) > INT_MAX)
+		if ((ktrlen = KTR_GET_LEN(&ktr_header)) > INT_MAX)
 			errx(1, "bogus length 0x%x", ktrlen);
 		if (ktrlen > size) {
 			while (ktrlen > size)
@@ -304,9 +304,9 @@ main(int argc, char **argv)
 			continue;
 
 		/* update context to match currently processed record */
-		ectx_sanify(ktr_header.ktr_pid);
+		ectx_sanify(KTR_GET_PID(&ktr_header));
 
-		switch (ktr_header.ktr_type) {
+		switch (KTR_GET_TYPE(&ktr_header)) {
 		case KTR_SYSCALL:
 			ktrsyscall(m);
 			break;
@@ -428,11 +428,11 @@ dumpheader(struct ktr_header *kth)
 	struct timespec temp;
 	int col;
 
-	if (__predict_false(kth->ktr_version != KTRFAC_VERSION(KTRFACv2)))
+	if (__predict_false(KTR_GET_VERS(kth) != KTRFAC_VERSION(KTRFACv3)))
 		errx(EXIT_FAILURE, "Unsupported ktrace version %x",
-		     kth->ktr_version);
+		     KTR_GET_VERS(kth));
 
-	switch (kth->ktr_type) {
+	switch (KTR_GET_TYPE(kth)) {
 	case KTR_SYSCALL:
 		type = "CALL";
 		break;
@@ -474,36 +474,36 @@ dumpheader(struct ktr_header *kth)
 		break;
 	default:
 		(void)snprintf(unknown, sizeof(unknown), "UNKNOWN(%d)",
-		    kth->ktr_type);
+		    KTR_GET_TYPE(kth));
 		type = unknown;
 	}
 
-	col = printf("%6d %6d ", kth->ktr_pid, kth->ktr_lid);
-	col += printf("%-8.*s ", MAXCOMLEN, kth->ktr_comm);
+	col = printf("%6d %6d ", KTR_GET_PID(kth), KTR_GET_LID(kth));
+	col += printf("%-8.*s ", MAXCOMLEN, KTR_GET_COMM(kth));
 	if (timestamp) {
 		if (timestamp & TIMESTAMP_ABSOLUTE) {
-			temp.tv_sec = kth->ktr_ts.tv_sec;
-			temp.tv_nsec = kth->ktr_ts.tv_nsec;
+			KTR_GET_TIME(kth, &temp);
 			col += output_ts(&temp);
 		}
 
 		if (timestamp & TIMESTAMP_ELAPSED) {
 			if (starttime.tv_sec == 0) {
-				starttime.tv_sec = kth->ktr_ts.tv_sec;
-				starttime.tv_nsec = kth->ktr_ts.tv_nsec;
+				KTR_GET_TIME(kth, &starttime);
 				temp.tv_sec = temp.tv_nsec = 0;
 			} else
-				timespecsub(&kth->ktr_ts, &starttime, &temp);
+				timespecsub(&temp, &starttime, &temp);
 			col += output_ts(&temp);
 		}
 
 		if (timestamp & TIMESTAMP_RELATIVE) {
-			if (prevtime.tv_sec == 0)
+			if (prevtime.tv_sec == 0) {
 				temp.tv_sec = temp.tv_nsec = 0;
-			else
-				timespecsub(&kth->ktr_ts, &prevtime, &temp);
-			prevtime.tv_sec = kth->ktr_ts.tv_sec;
-			prevtime.tv_nsec = kth->ktr_ts.tv_nsec;
+			} else {
+				/* XXXXXX double check the following works as expected */
+				KTR_GET_TIME(kth, &temp);
+				timespecsub(&temp, &prevtime, &temp);
+			}
+			KTR_GET_TIME(kth, &prevtime);
 			col += output_ts(&temp);
 		}
 	}
@@ -686,23 +686,24 @@ futexput(u_long op)
 static void
 ktrsyscall(struct ktr_syscall *ktr)
 {
-	int argcount;
+	int code, argcount;
 	const struct emulation *emul = cur_emul;
-	register_t *ap;
+	int64_t *ap;
 	char c;
 	const char *cp;
 	const char *sys_name;
 
-	argcount = ktr->ktr_argsize / sizeof (*ap);
+	argcount = KTR_SYSCALL_GET_ARGSIZE(ktr) / sizeof (*ap);
 
 	emul_changed = 0;
+	code = KTR_SYSCALL_GET_CODE(ktr);
 
 	if (numeric ||
-	    ((ktr->ktr_code >= emul->nsysnames || ktr->ktr_code < 0))) {
+	    ((code >= emul->nsysnames || code < 0))) {
 		sys_name = "?";
-		(void)printf("[%d]", ktr->ktr_code);
+		(void)printf("[%d]", code);
 	} else {
-		sys_name = emul->sysnames[ktr->ktr_code];
+		sys_name = emul->sysnames[code];
 		(void)printf("%s", sys_name);
 	}
 #define NETBSD32_	"netbsd32_"
@@ -857,8 +858,8 @@ static void
 ktrsysret(struct ktr_sysret *ktr, int len)
 {
 	const struct emulation *emul;
-	int error = ktr->ktr_error;
-	int code = ktr->ktr_code;
+	int error = KTR_SYSRET_GET_ERROR(ktr);
+	int code = KTR_SYSRET_GET_CODE(ktr);
 
 	if (emul_changed)  {
 		/* In order to get system call name right in execve return */
@@ -874,11 +875,11 @@ ktrsysret(struct ktr_sysret *ktr, int len)
 
 	switch (error) {
 	case 0:
-		rprint(ktr->ktr_retval);
-		if (len > (int)offsetof(struct ktr_sysret, ktr_retval_1) &&
-		    ktr->ktr_retval_1 != 0) {
+		rprint(KTR_SYSRET_GET_RETVAL(ktr));
+		if (len > (int)KTR_SYSRET_OFFSET_RETVAL1 &&
+		    KTR_SYSRET_GET_RETVAL1(ktr) != 0) {
 			(void)printf(", ");
-			rprint(ktr->ktr_retval_1);
+			rprint(KTR_SYSRET_GET_RETVAL1(ktr));
 		}
 		break;
 
@@ -972,7 +973,7 @@ ktremul(char *name, size_t len, size_t bufsize)
 		len = bufsize - 1;
 
 	name[len] = '\0';
-	setemul(name, ktr_header.ktr_pid, 1);
+	setemul(name, KTR_GET_PID(&ktr_header), 1);
 	emul_changed = 1;
 
 	(void)printf("\"%s\"\n", name);
@@ -1126,10 +1127,10 @@ ktrgenio(struct ktr_genio *ktr, int len)
 	int datalen = len - sizeof (struct ktr_genio);
 	char *dp = (char *)ktr + sizeof (struct ktr_genio);
 
-	if (ktr->ktr_fd != -1)
-		printf("fd %d ", ktr->ktr_fd);
+	if (KTR_GENIO_GET_FD(ktr) != -1)
+		printf("fd %d ", KTR_GENIO_GET_FD(ktr));
 	printf("%s %d bytes\n", 
-	    ktr->ktr_rw == UIO_READ ? "read" : "wrote", datalen);
+	    KTR_GENIO_GET_RW(ktr) == UIO_READ ? "read" : "wrote", datalen);
 	if (maxdata == 0)
 		return;
 	if (maxdata > 0 && datalen > maxdata)
@@ -1153,14 +1154,15 @@ ktrpsig(void *v, int len)
 	siginfo_t *si = &psig->si;
 	const char *code;
 
-	(void)printf("SIG%s ", signame(psig->ps.signo, 0));
-	if (psig->ps.action == SIG_DFL)
+	(void)printf("SIG%s ", signame(KTR_PSIG_GET_SIG(&psig->ps), 0));
+	if (KTR_PSIG_GET_ACTION(&psig->ps) == KTR_SIG_DFL)
 		(void)printf("SIG_DFL");
 	else {
-		(void)printf("caught handler=%p mask=(", psig->ps.action);
+		(void)printf("caught handler=%#"PRIx64" mask=(",
+		    KTR_PSIG_GET_ACTION(&psig->ps));
 		first = 1;
 		for (signo = 1; signo < NSIG; signo++) {
-			if (sigismember(&psig->ps.mask, signo)) {
+			if (KTR_PSIG_SIGISMEMBER(&psig->ps, signo)) {
 				if (first)
 					first = 0;
 				else
@@ -1172,9 +1174,9 @@ ktrpsig(void *v, int len)
 	}
 	switch (len) {
 	case sizeof(struct ktr_psig):
-		if (psig->ps.code)
-			printf(" code=0x%x", psig->ps.code);
-		printf(psig->ps.action == SIG_DFL ? "\n" : ")\n");
+		if (KTR_PSIG_GET_CODE(&psig->ps))
+			printf(" code=0x%x", KTR_PSIG_GET_CODE(&psig->ps));
+		printf(KTR_PSIG_GET_ACTION(&psig->ps) == KTR_SIG_DFL ? "\n" : ")\n");
 		return;
 	case sizeof(*psig):
 		if (si->si_code == 0) {

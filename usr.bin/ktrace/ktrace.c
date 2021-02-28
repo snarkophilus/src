@@ -92,7 +92,7 @@ main(int argc, char *argv[])
 	append = ops = pidset = trset = synclog = 0;
 	trpoints = 0;
 	block = 1;
-	vers = 2;
+	vers = 3;
 	pid = 0;	/* Appease GCC */
 
 #ifdef KTRUSS
