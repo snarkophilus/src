@@ -511,17 +511,31 @@ ktealloc(struct ktrace_entry **ktep, void **bufp, lwp_t *l, int type,
 	kte->kte_bufsz = sz;
 	kte->kte_buf = buf;
 
-	/* XXXXXX do we only ever allocate v3 records now?  otherwise this all falls apart. */
 	kth = &kte->kte_kth;
 	nanotime(&ts);
 	(void)memset(kth, 0, sizeof(*kth));
-	KTR_SET_LEN(kth, sz);
-	KTR_SET_TYPE(kth, type);
-	KTR_SET_PID(kth, p->p_pid);
-	KTR_SET_COMM(kth, p->p_comm);
-	KTR_SET_VERS(kth, KTRFAC_VERSION(p->p_traceflag));
-	KTR_SET_LID(kth, l->l_lid);
-	KTR_SET_TIME(kth, &ts);
+	switch (KTRFAC_VERSION(p->p_traceflag)) {
+	case KTRFACv0:
+	case KTRFACv1:
+	case KTRFACv2:
+		kth->ktr_olen = sz;
+		kth->ktr_otype = type;
+		kth->ktr_opid = p->p_pid;
+		memcpy(kth->ktr_ocomm, p->p_comm, MAXCOMLEN);
+		kth->ktr_oversion = KTRFAC_VERSION(p->p_traceflag);
+		kth->ktr_olid = l->l_lid;
+		kth->ktr_ots = ts;
+		break;
+	default:
+		KTR_SET_LEN(kth, sz);
+		KTR_SET_TYPE(kth, type);
+		KTR_SET_PID(kth, p->p_pid);
+		KTR_SET_COMM(kth, p->p_comm);
+		KTR_SET_VERS(kth, KTRFAC_VERSION(p->p_traceflag));
+		KTR_SET_LID(kth, l->l_lid);
+		KTR_SET_TIME(kth, &ts);
+		break;
+	}
 
 	*ktep = kte;
 	*bufp = buf;
