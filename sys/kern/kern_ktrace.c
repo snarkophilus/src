@@ -1180,6 +1180,10 @@ ktrops(lwp_t *curl, struct proc *p, int ops, int facs,
 	case KTRFACv0:
 	case KTRFACv1:
 	case KTRFACv2:
+		/* XXXXXX writing v0/1/2 records currently unsupported */
+		error = EINVAL;
+		goto out;
+	case KTRFACv3:
 		break;
 	default:
 		error = EINVAL;
