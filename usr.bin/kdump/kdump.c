@@ -894,10 +894,13 @@ static void
 ktrexecfd(struct ktr_execfd *ktr)
 {
 	static const char *dnames[] = { DTYPE_NAMES };
-	if (ktr->ktr_dtype < __arraycount(dnames))
-		printf("%s %d\n", dnames[ktr->ktr_dtype], ktr->ktr_fd);
+	uint32_t dtype = KTR_EXECFD_GET_DTYPE(ktr);
+	int32_t fd = KTR_EXECFD_GET_FD(ktr);
+
+	if (dtype < __arraycount(dnames))
+		printf("%s %d\n", dnames[dtype], fd);
 	else
-		printf("UNKNOWN(%u) %d\n", ktr->ktr_dtype, ktr->ktr_fd);
+		printf("UNKNOWN(%u) %d\n", dtype, fd);
 }
 
 static void
@@ -1260,28 +1263,32 @@ static void
 ktrcsw(struct ktr_csw *cs)
 {
 
-	(void)printf("%s %s\n", cs->out ? "stop" : "resume",
-	    cs->user ? "user" : "kernel");
+	(void)printf("%s %s\n", KTR_CSW_GET_OUT(cs) ? "stop" : "resume",
+	    KTR_CSW_GET_USER(cs) ? "user" : "kernel");
 }
 
 static void
 ktruser_msghdr(const char *name, const void *buf, size_t len)
 {
-	struct msghdr m;
+	struct ktr_msghdr m;
 
 	if (len != sizeof(m))
 		warnx("%.*s: len %zu != %zu", KTR_USER_MAXIDLEN, name, len,
 		    sizeof(m));
 	memcpy(&m, buf, len);
-	printf("%.*s: [name=%p, namelen=%zu, iov=%p, iovlen=%zu, control=%p, "
-	    "controllen=%zu, flags=%x]\n", KTR_USER_MAXIDLEN, name,
-	    m.msg_name, (size_t)m.msg_namelen, m.msg_iov, (size_t)m.msg_iovlen,
-	    m.msg_control, (size_t)m.msg_controllen, m.msg_flags);
+	printf("%.*s: [name=%#"PRIx64", namelen=%u, iov=%#"PRIx64", iovlen=%u,"
+	    "control=%#"PRIx64", controllen=%u, flags=%x]\n",
+	    KTR_USER_MAXIDLEN, name,
+	    KTR_MSGHDR_GET_NAME(&m), KTR_MSGHDR_GET_NAMELEN(&m),
+	    KTR_MSGHDR_GET_IOV(&m), KTR_MSGHDR_GET_IOVLEN(&m),
+	    KTR_MSGHDR_GET_CONTROL(&m), KTR_MSGHDR_GET_CONTROLLEN(&m),
+	    KTR_MSGHDR_GET_FLAGS(&m));
 }
 
 static void
 ktruser_soname(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	char fmt[512];
 	sockaddr_snprintf(fmt, sizeof(fmt), "%a", buf);
 	printf("%.*s: [%s]\n", KTR_USER_MAXIDLEN, name, fmt);
@@ -1290,6 +1297,7 @@ ktruser_soname(const char *name, const void *buf, size_t len)
 static void
 ktruser_xattr_name(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	printf("%.*s: [%*s]\n", KTR_USER_MAXIDLEN, name, (int)len,
 	    (const char *)buf);
 }
@@ -1297,6 +1305,7 @@ ktruser_xattr_name(const char *name, const void *buf, size_t len)
 static void
 ktruser_xattr_val(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	const uint8_t *p = buf;
 	printf("%.*s: ", KTR_USER_MAXIDLEN, name);
 	for (size_t i = 0; i < len; i++)
@@ -1307,6 +1316,7 @@ ktruser_xattr_val(const char *name, const void *buf, size_t len)
 static void
 ktruser_xattr_list(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	const uint8_t *p = buf, *ep = p + len;
 	printf("%.*s:", KTR_USER_MAXIDLEN, name);
 	while (p < ep) {
@@ -1320,19 +1330,21 @@ ktruser_xattr_list(const char *name, const void *buf, size_t len)
 static void
 ktruser_control(const char *name, const void *buf, size_t len)
 {
-	struct cmsghdr m;
+	struct ktr_cmsghdr m;
 
 	if (len < sizeof(m))
 		warnx("%.*s: len %zu < %zu", KTR_USER_MAXIDLEN, name, len,
 		    sizeof(m));
 	memcpy(&m, buf, sizeof(m));
-	printf("%.*s: [len=%zu, level=%d, type=%d]\n", KTR_USER_MAXIDLEN, name,
-	    (size_t)m.cmsg_len, m.cmsg_level, m.cmsg_type);
+	printf("%.*s: [len=%u, level=%d, type=%d]\n", KTR_USER_MAXIDLEN, name,
+	    KTR_CMSGHDR_GET_LEN(&m), KTR_CMSGHDR_GET_LEVEL(&m),
+	    KTR_CMSGHDR_GET_TYPE(&m));
 }
 
 static void
 ktruser_malloc(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	struct ut { void *p; size_t s; void *r; } m;
 
 	if (len != sizeof(m))
@@ -1354,6 +1366,7 @@ ktruser_malloc(const char *name, const void *buf, size_t len)
 static void
 ktruser_misc(const char *name, const void *buf, size_t len)
 {
+	/* XXXXXX audit v3 */
 	size_t i;
 	const char *dta = buf;
 
