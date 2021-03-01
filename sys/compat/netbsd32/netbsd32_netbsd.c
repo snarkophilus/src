@@ -153,11 +153,7 @@ struct emul emul_netbsd32 = {
 	.e_usertrap =		NULL,
 	.e_ucsize =		sizeof(ucontext32_t),
 	.e_startlwp =		startlwp32,
-#ifdef notyet
-	.e_ktrpsig =		netbsd32_ktrpsig,
-#else
-	.e_ktrpsig =		NULL,
-#endif
+	.e_ktrpsig =		ktr_psig,
 };
 
 int
