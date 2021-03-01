@@ -517,7 +517,6 @@ enum rump_vtype	{ RUMP_VNON, RUMP_VREG, RUMP_VDIR, RUMP_VBLK, RUMP_VCHR, RUMP_VL
 #define RUMP_KTROP_CLEAR		1	
 #define RUMP_KTROP_CLEARFILE		2	
 #define	RUMP_KTROP_MASK		0x3
-#define	RUMP_KTR_SHIMLEN	offsetof(struct ktr_header, ktr_pid)
 #define RUMP_KTR_SYSCALL	1
 #define RUMP_KTR_SYSRET	2
 #define RUMP_KTR_NAMEI	3

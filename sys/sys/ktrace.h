@@ -128,8 +128,6 @@ struct ktr_header {
 #define	ktr_xts_nsec	_v3._ts_tv_nsec
 #define	ktr_xunused	_v3._unused;
 
-#define	KTR_SHIMLEN	offsetof(struct ktr_header, ktr_pid)
-
 #define	KTR_SET_LEN(ktr, len)	(ktr)->ktr_xlen = htobe32(len)
 #define	KTR_SET_VERS(ktr, ver)	(ktr)->ktr_xversion = htobe16(ver)
 #define	KTR_SET_TYPE(ktr, type)	(ktr)->ktr_xtype = htobe16(type)
