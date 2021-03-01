@@ -117,7 +117,7 @@ struct ktr_header {
 #define ktr_ots		_v012._v._v2._ts	/* was ktr_ts */
 #define ktr_ounused	_v012._v._v0._buf	/* was ktr_unused */
 
-/* XXXXXX remove all member "x" prefixes once coverted */
+/* XXXXXX remove all member "x" prefixes once coverted? */
 #define	ktr_xlen	_v3._len
 #define	ktr_xversion	_v3._version
 #define	ktr_xtype	_v3._type
@@ -304,9 +304,14 @@ struct ktr_ocsw {
 	int	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
 };
 struct ktr_csw {
-	int32_t	out;	/* 1 if switch out, 0 if switch in */
-	int32_t	user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
+	int32_t	xktr_out;	/* 1 if switch out, 0 if switch in */
+	int32_t	xktr_user;	/* 1 if usermode (ivcsw), 0 if kernel (vcsw) */
 };
+#define	KTR_CSW_SET_OUT(csw, out)	(csw)->xktr_out = htobe32(out)
+#define	KTR_CSW_SET_USER(csw, user)	(csw)->xktr_user = htobe32(user)
+
+#define	KTR_CSW_GET_OUT(csw)		be32toh((csw)->xktr_out)
+#define	KTR_CSW_GET_USER(csw)		be32toh((csw)->xktr_user)
 
 /*
  * KTR_EMUL - emulation change
@@ -372,14 +377,19 @@ struct ktr_saupcall {
  * KTR_EXEC_FD - Opened file descriptor from exec
  */
 #define KTR_EXEC_FD		15
-struct ktr_execfd {
+struct ktr_oexecfd {
 	int   ktr_fd;
 	u_int ktr_dtype; /* one of DTYPE_* constants */
 };
-struct ktr_oexecfd {
+struct ktr_execfd {
 	int32_t	xktr_fd;
 	uint32_t xktr_dtype; /* one of DTYPE_* constants */
 };
+#define	KTR_EXECFD_SET_FD(efd, fd)	(efd)->xktr_fd = htobe32(fd)
+#define	KTR_EXECFD_SET_DTYPE(efd, dt)	(efd)->xktr_dtype = htobe32(dt)
+
+#define	KTR_EXECFD_GET_FD(efd)		be32toh((efd)->xktr_fd)
+#define	KTR_EXECFD_GET_DTYPE(efd)	be32toh((efd)->xktr_dtype)
 
 /*
  * kernel trace points (in p_traceflag)
@@ -413,6 +423,12 @@ struct ktr_oexecfd {
 #define	KTRFACv1	(1 << KTRFAC_VER_SHIFT)
 #define	KTRFACv2	(2 << KTRFAC_VER_SHIFT)
 #define	KTRFACv3	(3 << KTRFAC_VER_SHIFT)
+
+#define	KTRFAC_OLD_FMT	2	/* pre-MI ktrace records */
+
+#define	KTE_IS_OLD_FORMAT(kte)	(KTRFAC_VERSION((kte)->kte_kth.ktr_oversion) <= KTRFAC_OLD_FMT)
+#define	KTR_IS_OLD_FORMAT(ktr)	(KTRFAC_VERSION((ktr)->ktr_oversion) <= KTRFAC_OLD_FMT)
+
 
 #ifndef	_KERNEL
 
