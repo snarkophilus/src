@@ -330,6 +330,25 @@ struct ktr_user {
 	 */
 };
 
+/* mirrors struct msghdr from <sys/socket.h> */
+struct ktr_msghdr {
+	int64_t	msg_name;	/* optional address */
+	int32_t msg_namelen;	/* size of address */
+	int32_t	msg_iovlen;	/* # elements in msg_iov (order swapped with next) */
+	int64_t msg_iov;	/* scatter/gather array (order swapped with prev) */
+	int64_t	msg_control;	/* ancillary data, see below */
+	int32_t	msg_controllen;	/* ancillary data buffer len */
+	int32_t	msg_flags;	/* flags on received message */
+};
+
+/* mirrors struct cmsghdr from <sys/socket.h> */
+struct ktr_cmsghdr {
+	int32_t	cmsg_len;	/* data byte count, including hdr */
+	int32_t	cmsg_level;	/* originating protocol */
+	int32_t	cmsg_type;	/* protocol-specific type */
+	int32_t _fill;
+};
+
 /*
  * KTR_EXEC_ARG, KTR_EXEC_ENV - Arguments and environment from exec
  */
