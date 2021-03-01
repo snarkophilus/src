@@ -332,22 +332,45 @@ struct ktr_user {
 
 /* mirrors struct msghdr from <sys/socket.h> */
 struct ktr_msghdr {
-	int64_t	msg_name;	/* optional address */
-	int32_t msg_namelen;	/* size of address */
-	int32_t	msg_iovlen;	/* # elements in msg_iov (order swapped with next) */
-	int64_t msg_iov;	/* scatter/gather array (order swapped with prev) */
-	int64_t	msg_control;	/* ancillary data, see below */
-	int32_t	msg_controllen;	/* ancillary data buffer len */
-	int32_t	msg_flags;	/* flags on received message */
+	int64_t	xmsg_name;	/* optional address */
+	int32_t xmsg_namelen;	/* size of address */
+	int32_t	xmsg_iovlen;	/* # elements in msg_iov (order swapped with next) */
+	int64_t xmsg_iov;	/* scatter/gather array (order swapped with prev) */
+	int64_t	xmsg_control;	/* ancillary data, see below */
+	int32_t	xmsg_controllen; /* ancillary data buffer len */
+	int32_t	xmsg_flags;	/* flags on received message */
 };
+#define	KTR_MSGHDR_SET_NAME(msg, n)	(msg)->xmsg_name = htobe64((intptr_t)(n))
+#define	KTR_MSGHDR_SET_NAMELEN(msg, nl)	(msg)->xmsg_namelen = htobe32(nl)
+#define	KTR_MSGHDR_SET_IOVLEN(msg, il)	(msg)->xmsg_iovlen = htobe32(il)
+#define	KTR_MSGHDR_SET_IOV(msg, i)	(msg)->xmsg_iov = htobe64((intptr_t)(i))
+#define	KTR_MSGHDR_SET_CONTROL(msg, c)	(msg)->xmsg_control = htobe64((intptr_t)(c))
+#define	KTR_MSGHDR_SET_CONTROLLEN(msg, cl) (msg)->xmsg_controllen = htobe32(cl)
+#define	KTR_MSGHDR_SET_FLAGS(msg, f)	(msg)->xmsg_flags = htobe32(f)
+
+#define	KTR_MSGHDR_GET_NAME(msg)	htobe64((msg)->xmsg_name)
+#define	KTR_MSGHDR_GET_NAMELEN(msg)	htobe32((msg)->xmsg_namelen)
+#define	KTR_MSGHDR_GET_IOVLEN(msg)	htobe32((msg)->xmsg_iovlen)
+#define	KTR_MSGHDR_GET_IOV(msg)		htobe64((msg)->xmsg_iov)
+#define	KTR_MSGHDR_GET_CONTROL(msg)	htobe64((msg)->xmsg_control)
+#define	KTR_MSGHDR_GET_CONTROLLEN(msg)	htobe32((msg)->xmsg_controllen)
+#define	KTR_MSGHDR_GET_FLAGS(msg)	htobe32((msg)->xmsg_flags)
 
 /* mirrors struct cmsghdr from <sys/socket.h> */
 struct ktr_cmsghdr {
-	int32_t	cmsg_len;	/* data byte count, including hdr */
-	int32_t	cmsg_level;	/* originating protocol */
-	int32_t	cmsg_type;	/* protocol-specific type */
+	int32_t	xcmsg_len;	/* data byte count, including hdr */
+	int32_t	xcmsg_level;	/* originating protocol */
+	int32_t	xcmsg_type;	/* protocol-specific type */
 	int32_t _fill;
 };
+
+#define	KTR_CMSGHDR_SET_LEN(msg, l)	(msg)->xcmsg_len = htobe32(l)
+#define	KTR_CMSGHDR_SET_LEVEL(msg, l)	(msg)->xcmsg_level = htobe32(l)
+#define	KTR_CMSGHDR_SET_TYPE(msg, t)	(msg)->xcmsg_type = htobe32(t)
+
+#define	KTR_CMSGHDR_GET_LEN(msg)	htobe32((msg)->xcmsg_len)
+#define	KTR_CMSGHDR_GET_LEVEL(msg)	htobe32((msg)->xcmsg_level)
+#define	KTR_CMSGHDR_GET_TYPE(msg)	htobe32((msg)->xcmsg_type)
 
 /*
  * KTR_EXEC_ARG, KTR_EXEC_ENV - Arguments and environment from exec
