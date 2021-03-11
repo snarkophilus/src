@@ -1,4 +1,4 @@
-/*	$NetBSD: indent.c,v 1.27 2020/04/23 00:17:34 joerg Exp $	*/
+/*	$NetBSD: indent.c,v 1.41 2021/03/09 19:46:28 rillig Exp $	*/
 
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
@@ -46,7 +46,7 @@ static char sccsid[] = "@(#)indent.c	5.17 (Berkeley) 6/7/93";
 #include <sys/cdefs.h>
 #ifndef lint
 #if defined(__NetBSD__)
-__RCSID("$NetBSD: indent.c,v 1.27 2020/04/23 00:17:34 joerg Exp $");
+__RCSID("$NetBSD: indent.c,v 1.41 2021/03/09 19:46:28 rillig Exp $");
 #elif defined(__FreeBSD__)
 __FBSDID("$FreeBSD: head/usr.bin/indent/indent.c 340138 2018-11-04 19:24:49Z oshogbo $");
 #endif
@@ -65,8 +65,7 @@ __FBSDID("$FreeBSD: head/usr.bin/indent/indent.c 340138 2018-11-04 19:24:49Z osh
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "indent_globs.h"
-#include "indent_codes.h"
+
 #include "indent.h"
 
 struct options opt;
@@ -134,18 +133,245 @@ const char *simple_backup_suffix = ".BAK";	/* Suffix to use for backup
 						 * files */
 char        bakfile[MAXPATHLEN] = "";
 
+static void
+check_size_code(size_t desired_size)
+{
+    if (e_code + (desired_size) >= l_code) {
+	int nsize = l_code - s_code + 400 + desired_size;
+	int code_len = e_code - s_code;
+	codebuf = (char *)realloc(codebuf, nsize);
+	if (codebuf == NULL)
+	    err(1, NULL);
+	e_code = codebuf + code_len + 1;
+	l_code = codebuf + nsize - 5;
+	s_code = codebuf + 1;
+    }
+}
+
+static void
+check_size_label(size_t desired_size)
+{
+    if (e_lab + (desired_size) >= l_lab) {
+	int nsize = l_lab - s_lab + 400 + desired_size;
+	int label_len = e_lab - s_lab;
+	labbuf = (char *)realloc(labbuf, nsize);
+	if (labbuf == NULL)
+	    err(1, NULL);
+	e_lab = labbuf + label_len + 1;
+	l_lab = labbuf + nsize - 5;
+	s_lab = labbuf + 1;
+    }
+}
+
+#if HAVE_CAPSICUM
+static void
+init_capsicum(void)
+{
+    cap_rights_t rights;
+
+    /* Restrict input/output descriptors and enter Capsicum sandbox. */
+    cap_rights_init(&rights, CAP_FSTAT, CAP_WRITE);
+    if (caph_rights_limit(fileno(output), &rights) < 0)
+	err(EXIT_FAILURE, "unable to limit rights for %s", out_name);
+    cap_rights_init(&rights, CAP_FSTAT, CAP_READ);
+    if (caph_rights_limit(fileno(input), &rights) < 0)
+	err(EXIT_FAILURE, "unable to limit rights for %s", in_name);
+    if (caph_enter() < 0)
+	err(EXIT_FAILURE, "unable to enter capability mode");
+}
+#endif
+
+static void
+search_brace(token_type *inout_type_code, int *inout_force_nl,
+	     int *inout_comment_buffered, int *inout_last_else)
+{
+    while (ps.search_brace) {
+	switch (*inout_type_code) {
+	case newline:
+	    if (sc_end == NULL) {
+		save_com = sc_buf;
+		save_com[0] = save_com[1] = ' ';
+		sc_end = &save_com[2];
+	    }
+	    *sc_end++ = '\n';
+	    /*
+	     * We may have inherited a force_nl == true from the previous
+	     * token (like a semicolon). But once we know that a newline
+	     * has been scanned in this loop, force_nl should be false.
+	     *
+	     * However, the force_nl == true must be preserved if newline
+	     * is never scanned in this loop, so this assignment cannot be
+	     * done earlier.
+	     */
+	    *inout_force_nl = false;
+	case form_feed:
+	    break;
+	case comment:
+	    if (sc_end == NULL) {
+		/*
+		 * Copy everything from the start of the line, because
+		 * pr_comment() will use that to calculate original
+		 * indentation of a boxed comment.
+		 */
+		memcpy(sc_buf, in_buffer, buf_ptr - in_buffer - 4);
+		save_com = sc_buf + (buf_ptr - in_buffer - 4);
+		save_com[0] = save_com[1] = ' ';
+		sc_end = &save_com[2];
+	    }
+	    *inout_comment_buffered = true;
+	    *sc_end++ = '/';	/* copy in start of comment */
+	    *sc_end++ = '*';
+	    for (;;) {		/* loop until the end of the comment */
+		*sc_end = *buf_ptr++;
+		if (buf_ptr >= buf_end)
+		    fill_buffer();
+		if (*sc_end++ == '*' && *buf_ptr == '/')
+		    break;	/* we are at end of comment */
+		if (sc_end >= &save_com[sc_size]) {	/* check for temp buffer
+							 * overflow */
+		    diag(1, "Internal buffer overflow - Move big comment from right after if, while, or whatever");
+		    fflush(output);
+		    exit(1);
+		}
+	    }
+	    *sc_end++ = '/';	/* add ending slash */
+	    if (++buf_ptr >= buf_end)	/* get past / in buffer */
+		fill_buffer();
+	    break;
+	case lbrace:
+	    /*
+	     * Put KNF-style lbraces before the buffered up tokens and
+	     * jump out of this loop in order to avoid copying the token
+	     * again under the default case of the switch below.
+	     */
+	    if (sc_end != NULL && opt.btype_2) {
+		save_com[0] = '{';
+		/*
+		 * Originally the lbrace may have been alone on its own
+		 * line, but it will be moved into "the else's line", so
+		 * if there was a newline resulting from the "{" before,
+		 * it must be scanned now and ignored.
+		 */
+		while (isspace((unsigned char)*buf_ptr)) {
+		    if (++buf_ptr >= buf_end)
+			fill_buffer();
+		    if (*buf_ptr == '\n')
+			break;
+		}
+		goto sw_buffer;
+	    }
+	    /* FALLTHROUGH */
+	default:		/* it is the start of a normal statement */
+	{
+	    int remove_newlines;
+
+	    remove_newlines =
+		    /* "} else" */
+		    (*inout_type_code == keyword_do_else && *token == 'e' &&
+		     e_code != s_code && e_code[-1] == '}')
+		    /* "else if" */
+		    || (*inout_type_code == keyword_for_if_while &&
+			*token == 'i' && *inout_last_else && opt.else_if);
+	    if (remove_newlines)
+		*inout_force_nl = false;
+	    if (sc_end == NULL) {	/* ignore buffering if
+					 * comment wasn't saved up */
+		ps.search_brace = false;
+		return;
+	    }
+	    while (sc_end > save_com && isblank((unsigned char)sc_end[-1])) {
+		sc_end--;
+	    }
+	    if (opt.swallow_optional_blanklines ||
+		(!*inout_comment_buffered && remove_newlines)) {
+		*inout_force_nl = !remove_newlines;
+		while (sc_end > save_com && sc_end[-1] == '\n') {
+		    sc_end--;
+		}
+	    }
+	    if (*inout_force_nl) {	/* if we should insert a nl here, put
+					 * it into the buffer */
+		*inout_force_nl = false;
+		--line_no;	/* this will be re-increased when the
+				 * newline is read from the buffer */
+		*sc_end++ = '\n';
+		*sc_end++ = ' ';
+		if (opt.verbose) /* print error msg if the line was
+				 * not already broken */
+		    diag(0, "Line broken");
+	    }
+	    for (const char *t_ptr = token; *t_ptr; ++t_ptr)
+		*sc_end++ = *t_ptr;
+
+	    sw_buffer:
+	    ps.search_brace = false;	/* stop looking for start of stmt */
+	    bp_save = buf_ptr;	/* save current input buffer */
+	    be_save = buf_end;
+	    buf_ptr = save_com;	/* fix so that subsequent calls to
+				 * lexi will take tokens out of save_com */
+	    *sc_end++ = ' ';	/* add trailing blank, just in case */
+	    buf_end = sc_end;
+	    sc_end = NULL;
+	    break;
+	}
+	}			/* end of switch */
+	/*
+	 * We must make this check, just in case there was an unexpected
+	 * EOF.
+	 */
+	if (*inout_type_code != end_of_file) {
+	    /*
+	     * The only intended purpose of calling lexi() below is to
+	     * categorize the next token in order to decide whether to
+	     * continue buffering forthcoming tokens. Once the buffering
+	     * is over, lexi() will be called again elsewhere on all of
+	     * the tokens - this time for normal processing.
+	     *
+	     * Calling it for this purpose is a bug, because lexi() also
+	     * changes the parser state and discards leading whitespace,
+	     * which is needed mostly for comment-related considerations.
+	     *
+	     * Work around the former problem by giving lexi() a copy of
+	     * the current parser state and discard it if the call turned
+	     * out to be just a look ahead.
+	     *
+	     * Work around the latter problem by copying all whitespace
+	     * characters into the buffer so that the later lexi() call
+	     * will read them.
+	     */
+	    if (sc_end != NULL) {
+		while (*buf_ptr == ' ' || *buf_ptr == '\t') {
+		    *sc_end++ = *buf_ptr++;
+		    if (sc_end >= &save_com[sc_size]) {
+			errx(1, "input too long");
+		    }
+		}
+		if (buf_ptr >= buf_end) {
+		    fill_buffer();
+		}
+	    }
+
+	    struct parser_state transient_state;
+	    transient_state = ps;
+	    *inout_type_code = lexi(&transient_state);	/* read another token */
+	    if (*inout_type_code != newline && *inout_type_code != form_feed &&
+		*inout_type_code != comment && !transient_state.search_brace) {
+		ps = transient_state;
+	    }
+	}
+    }
+
+    *inout_last_else = 0;
+}
+
 int
 main(int argc, char **argv)
 {
-#if HAVE_CAPSICUM
-    cap_rights_t rights;
-#endif
-
     int         dec_ind;	/* current indentation for declarations */
     int         di_stack[20];	/* a stack of structure indentation levels */
     int         force_nl;	/* when true, code must be broken */
-    int         hd_type = 0;	/* used to store type of stmt for if (...),
-				 * for (...), etc */
+    token_type  hd_type = end_of_file; /* used to store type of stmt
+				 * for if (...), for (...), etc */
     int		i;		/* local loop counter */
     int         scase;		/* set to true when we see a case, so we will
 				 * know what to do with the following colon */
@@ -154,14 +380,12 @@ main(int argc, char **argv)
     int         squest;		/* when this is positive, we have seen a ?
 				 * without the matching : in a <c>?<s>:<s>
 				 * construct */
-    const char *t_ptr;		/* used for copying tokens */
     int		tabs_to_var;	/* true if using tabs to indent to var name */
-    int         type_code;	/* the type of token, returned by lexi */
+    token_type	type_code;	/* returned by lexi */
 
     int         last_else = 0;	/* true iff last keyword was an else */
     const char *profile_name = NULL;
     const char *envval = NULL;
-    struct parser_state transient_state; /* a copy for lookup */
 
     /*-----------------------------------------------*\
     |		      INITIALIZATION		      |
@@ -193,7 +417,7 @@ main(int argc, char **argv)
     l_token = tokenbuf + bufsize - 5;
     combuf[0] = codebuf[0] = labbuf[0] = ' ';	/* set up code, label, and
 						 * comment buffers */
-    combuf[1] = codebuf[1] = labbuf[1] = '\0';
+    combuf[1] = codebuf[1] = labbuf[1] = tokenbuf[1] = '\0';
     opt.else_if = 1;		/* Default else-if special processing to on */
     s_lab = e_lab = labbuf + 1;
     s_code = e_code = codebuf + 1;
@@ -228,7 +452,7 @@ main(int argc, char **argv)
         simple_backup_suffix = envval;
 
     /*--------------------------------------------------*\
-    |   		COMMAND LINE SCAN		 |
+    |			COMMAND LINE SCAN		 |
     \*--------------------------------------------------*/
 
 #ifdef undef
@@ -310,15 +534,7 @@ main(int argc, char **argv)
     }
 
 #if HAVE_CAPSICUM
-    /* Restrict input/output descriptors and enter Capsicum sandbox. */
-    cap_rights_init(&rights, CAP_FSTAT, CAP_WRITE);
-    if (caph_rights_limit(fileno(output), &rights) < 0)
-	err(EXIT_FAILURE, "unable to limit rights for %s", out_name);
-    cap_rights_init(&rights, CAP_FSTAT, CAP_READ);
-    if (caph_rights_limit(fileno(input), &rights) < 0)
-	err(EXIT_FAILURE, "unable to limit rights for %s", in_name);
-    if (caph_enter() < 0)
-	err(EXIT_FAILURE, "unable to enter capability mode");
+    init_capsicum();
 #endif
 
     if (opt.com_ind <= 1)
@@ -369,185 +585,9 @@ main(int argc, char **argv)
 	 * a buffer. This allows proper handling of both kinds of brace
 	 * placement (-br, -bl) and cuddling "else" (-ce).
 	 */
+	search_brace(&type_code, &force_nl, &comment_buffered, &last_else);
 
-	while (ps.search_brace) {
-	    switch (type_code) {
-	    case newline:
-		if (sc_end == NULL) {
-		    save_com = sc_buf;
-		    save_com[0] = save_com[1] = ' ';
-		    sc_end = &save_com[2];
-		}
-		*sc_end++ = '\n';
-		/*
-		 * We may have inherited a force_nl == true from the previous
-		 * token (like a semicolon). But once we know that a newline
-		 * has been scanned in this loop, force_nl should be false.
-		 *
-		 * However, the force_nl == true must be preserved if newline
-		 * is never scanned in this loop, so this assignment cannot be
-		 * done earlier.
-		 */
-		force_nl = false;
-	    case form_feed:
-		break;
-	    case comment:
-		if (sc_end == NULL) {
-		    /*
-		     * Copy everything from the start of the line, because
-		     * pr_comment() will use that to calculate original
-		     * indentation of a boxed comment.
-		     */
-		    memcpy(sc_buf, in_buffer, buf_ptr - in_buffer - 4);
-		    save_com = sc_buf + (buf_ptr - in_buffer - 4);
-		    save_com[0] = save_com[1] = ' ';
-		    sc_end = &save_com[2];
-		}
-		comment_buffered = true;
-		*sc_end++ = '/';	/* copy in start of comment */
-		*sc_end++ = '*';
-		for (;;) {	/* loop until we get to the end of the comment */
-		    *sc_end = *buf_ptr++;
-		    if (buf_ptr >= buf_end)
-			fill_buffer();
-		    if (*sc_end++ == '*' && *buf_ptr == '/')
-			break;	/* we are at end of comment */
-		    if (sc_end >= &save_com[sc_size]) {	/* check for temp buffer
-							 * overflow */
-			diag(1, "Internal buffer overflow - Move big comment from right after if, while, or whatever");
-			fflush(output);
-			exit(1);
-		    }
-		}
-		*sc_end++ = '/';	/* add ending slash */
-		if (++buf_ptr >= buf_end)	/* get past / in buffer */
-		    fill_buffer();
-		break;
-	    case lbrace:
-		/*
-		 * Put KNF-style lbraces before the buffered up tokens and
-		 * jump out of this loop in order to avoid copying the token
-		 * again under the default case of the switch below.
-		 */
-		if (sc_end != NULL && opt.btype_2) {
-		    save_com[0] = '{';
-		    /*
-		     * Originally the lbrace may have been alone on its own
-		     * line, but it will be moved into "the else's line", so
-		     * if there was a newline resulting from the "{" before,
-		     * it must be scanned now and ignored.
-		     */
-		    while (isspace((unsigned char)*buf_ptr)) {
-			if (++buf_ptr >= buf_end)
-			    fill_buffer();
-			if (*buf_ptr == '\n')
-			    break;
-		    }
-		    goto sw_buffer;
-		}
-		/* FALLTHROUGH */
-	    default:		/* it is the start of a normal statement */
-		{
-		    int remove_newlines;
-
-		    remove_newlines =
-			/* "} else" */
-			(type_code == sp_nparen && *token == 'e' &&
-			    e_code != s_code && e_code[-1] == '}')
-			/* "else if" */
-			|| (type_code == sp_paren && *token == 'i' &&
-			    last_else && opt.else_if);
-		    if (remove_newlines)
-			force_nl = false;
-		    if (sc_end == NULL) {	/* ignore buffering if
-						 * comment wasn't saved up */
-			ps.search_brace = false;
-			goto check_type;
-		    }
-		    while (sc_end > save_com && isblank((unsigned char)sc_end[-1])) {
-			sc_end--;
-		    }
-		    if (opt.swallow_optional_blanklines ||
-			(!comment_buffered && remove_newlines)) {
-			force_nl = !remove_newlines;
-			while (sc_end > save_com && sc_end[-1] == '\n') {
-			    sc_end--;
-			}
-		    }
-		    if (force_nl) {	/* if we should insert a nl here, put
-					 * it into the buffer */
-			force_nl = false;
-			--line_no;	/* this will be re-increased when the
-					 * newline is read from the buffer */
-			*sc_end++ = '\n';
-			*sc_end++ = ' ';
-			if (opt.verbose) /* print error msg if the line was
-					 * not already broken */
-			    diag(0, "Line broken");
-		    }
-		    for (t_ptr = token; *t_ptr; ++t_ptr)
-			*sc_end++ = *t_ptr;
-
-	    sw_buffer:
-		    ps.search_brace = false;	/* stop looking for start of
-						 * stmt */
-		    bp_save = buf_ptr;	/* save current input buffer */
-		    be_save = buf_end;
-		    buf_ptr = save_com;	/* fix so that subsequent calls to
-					 * lexi will take tokens out of
-					 * save_com */
-		    *sc_end++ = ' ';/* add trailing blank, just in case */
-		    buf_end = sc_end;
-		    sc_end = NULL;
-		    break;
-		}
-	    }			/* end of switch */
-	    /*
-	     * We must make this check, just in case there was an unexpected
-	     * EOF.
-	     */
-	    if (type_code != 0) {
-		/*
-		 * The only intended purpose of calling lexi() below is to
-		 * categorize the next token in order to decide whether to
-		 * continue buffering forthcoming tokens. Once the buffering
-		 * is over, lexi() will be called again elsewhere on all of
-		 * the tokens - this time for normal processing.
-		 *
-		 * Calling it for this purpose is a bug, because lexi() also
-		 * changes the parser state and discards leading whitespace,
-		 * which is needed mostly for comment-related considerations.
-		 *
-		 * Work around the former problem by giving lexi() a copy of
-		 * the current parser state and discard it if the call turned
-		 * out to be just a look ahead.
-		 *
-		 * Work around the latter problem by copying all whitespace
-		 * characters into the buffer so that the later lexi() call
-		 * will read them.
-		 */
-		if (sc_end != NULL) {
-		    while (*buf_ptr == ' ' || *buf_ptr == '\t') {
-			*sc_end++ = *buf_ptr++;
-			if (sc_end >= &save_com[sc_size]) {
-			    errx(1, "input too long");
-			}
-		    }
-		    if (buf_ptr >= buf_end) {
-			fill_buffer();
-		    }
-		}
-		transient_state = ps;
-		type_code = lexi(&transient_state);	/* read another token */
-		if (type_code != newline && type_code != form_feed &&
-		    type_code != comment && !transient_state.search_brace) {
-		    ps = transient_state;
-		}
-	    }
-	}			/* end of while (search_brace) */
-	last_else = 0;
-check_type:
-	if (type_code == 0) {	/* we got eof */
+	if (type_code == end_of_file) {	/* we got eof */
 	    if (s_lab != e_lab || s_code != e_code
 		    || s_com != e_com)	/* must dump end of line */
 		dump_line();
@@ -566,7 +606,7 @@ check_type:
 	if (
 		(type_code != comment) &&
 		(type_code != newline) &&
-		(type_code != preesc) &&
+		(type_code != preprocessing) &&
 		(type_code != form_feed)) {
 	    if (force_nl &&
 		    (type_code != semicolon) &&
@@ -585,7 +625,7 @@ check_type:
 					 * in a line. fix it */
 		int len = e_com - s_com;
 
-		CHECK_SIZE_CODE(len + 3);
+		check_size_code(len + 3);
 		*e_code++ = ' ';
 		memcpy(e_code, s_com, len);
 		e_code += len;
@@ -604,13 +644,13 @@ check_type:
 	/*-----------------------------------------------------*\
 	|	   do switch on type of token scanned		|
 	\*-----------------------------------------------------*/
-	CHECK_SIZE_CODE(3);	/* maximum number of increments of e_code
-				 * before the next CHECK_SIZE_CODE or
+	check_size_code(3);	/* maximum number of increments of e_code
+				 * before the next check_size_code or
 				 * dump_line() is 2. After that there's the
 				 * final increment for the null character. */
 	switch (type_code) {	/* now, decide what to do with the token */
 
-	case form_feed:	/* found a form feed in line */
+	case form_feed:		/* found a form feed in line */
 	    ps.use_ff = true;	/* a form feed is treated much like a newline */
 	    dump_line();
 	    ps.want_blank = false;
@@ -643,10 +683,8 @@ check_type:
 	    else if (ps.want_blank &&
 		    ((ps.last_token != ident && ps.last_token != funcname) ||
 		    opt.proc_calls_space ||
-		    /* offsetof (1) is never allowed a space; sizeof (2) gets
-		     * one iff -bs; all other keywords (>2) always get a space
-		     * before lparen */
-			ps.keyword + opt.Bill_Shannon > 2))
+		    (ps.keyword == rw_sizeof ? opt.Bill_Shannon :
+		    ps.keyword != rw_0 && ps.keyword != rw_offsetof)))
 		*e_code++ = ' ';
 	    ps.want_blank = false;
 	    *e_code++ = token[0];
@@ -665,7 +703,7 @@ check_type:
 					 * initialization */
 	    }
 	    /* parenthesized type following sizeof or offsetof is not a cast */
-	    if (ps.keyword == 1 || ps.keyword == 2)
+	    if (ps.keyword == rw_offsetof || ps.keyword == rw_sizeof)
 		ps.not_cast_mask |= 1 << ps.p_l_follow;
 	    break;
 
@@ -689,7 +727,7 @@ check_type:
 	    if (sp_sw && (ps.p_l_follow == 0)) {	/* check for end of if
 							 * (...), or some such */
 		sp_sw = false;
-		force_nl = true;/* must force newline after if */
+		force_nl = true;	/* must force newline after if */
 		ps.last_u_d = true;	/* inform lexi that a following
 					 * operator is unary */
 		ps.in_stmt = false;	/* dont use stmt continuation
@@ -723,18 +761,18 @@ check_type:
 	    {
 		int len = e_token - s_token;
 
-		CHECK_SIZE_CODE(len);
+		check_size_code(len);
 		memcpy(e_code, token, len);
 		e_code += len;
 	    }
 	    ps.want_blank = false;
 	    break;
 
-	case binary_op:	/* any binary operation */
+	case binary_op:		/* any binary operation */
 	    {
 		int len = e_token - s_token;
 
-		CHECK_SIZE_CODE(len + 1);
+		check_size_code(len + 1);
 		if (ps.want_blank)
 		    *e_code++ = ' ';
 		memcpy(e_code, token, len);
@@ -743,7 +781,7 @@ check_type:
 	    ps.want_blank = true;
 	    break;
 
-	case postop:		/* got a trailing ++ or -- */
+	case postfix_op:	/* got a trailing ++ or -- */
 	    *e_code++ = token[0];
 	    *e_code++ = token[1];
 	    ps.want_blank = true;
@@ -759,7 +797,7 @@ check_type:
 	    ps.want_blank = true;
 	    break;
 
-	case casestmt:		/* got word 'case' or 'default' */
+	case case_label:	/* got word 'case' or 'default' */
 	    scase = true;	/* so we can process the later colon properly */
 	    goto copy_id;
 
@@ -785,7 +823,7 @@ check_type:
 	    {
 		int len = e_code - s_code;
 
-		CHECK_SIZE_LAB(len + 3);
+		check_size_label(len + 3);
 		memcpy(e_lab, s_code, len);
 		e_lab += len;
 		*e_lab++ = ':';
@@ -803,8 +841,8 @@ check_type:
 
 	case semicolon:	/* got a ';' */
 	    if (ps.dec_nest == 0)
-		ps.in_or_st = false;/* we are not in an initialization or
-				     * structure declaration */
+		ps.in_or_st = false;	/* we are not in an initialization or
+					 * structure declaration */
 	    scase = false;	/* these will only need resetting in an error */
 	    squest = 0;
 	    if (ps.last_token == rparen)
@@ -826,7 +864,7 @@ check_type:
 						 * structure declaration, we
 						 * arent any more */
 
-	    if ((!sp_sw || hd_type != forstmt) && ps.p_l_follow > 0) {
+	    if ((!sp_sw || hd_type != for_exprs) && ps.p_l_follow > 0) {
 
 		/*
 		 * This should be true iff there were unbalanced parens in the
@@ -954,30 +992,31 @@ check_type:
 	    }
 	    prefix_blankline_requested = 0;
 	    parse(rbrace);	/* let parser know about this */
-	    ps.search_brace = opt.cuddle_else && ps.p_stack[ps.tos] == ifhead
+	    ps.search_brace = opt.cuddle_else
+	    	&& ps.p_stack[ps.tos] == if_expr_stmt
 		&& ps.il[ps.tos] >= ps.ind_level;
 	    if (ps.tos <= 1 && opt.blanklines_after_procs && ps.dec_nest <= 0)
 		postfix_blankline_requested = 1;
 	    break;
 
-	case swstmt:		/* got keyword "switch" */
+	case switch_expr:	/* got keyword "switch" */
 	    sp_sw = true;
-	    hd_type = swstmt;	/* keep this for when we have seen the
+	    hd_type = switch_expr; /* keep this for when we have seen the
 				 * expression */
 	    goto copy_id;	/* go move the token into buffer */
 
-	case sp_paren:		/* token is if, while, for */
+	case keyword_for_if_while:
 	    sp_sw = true;	/* the interesting stuff is done after the
 				 * expression is scanned */
-	    hd_type = (*token == 'i' ? ifstmt :
-		       (*token == 'w' ? whilestmt : forstmt));
+	    hd_type = (*token == 'i' ? if_expr :
+		       (*token == 'w' ? while_expr : for_exprs));
 
 	    /*
 	     * remember the type of header for later use by parser
 	     */
 	    goto copy_id;	/* copy the token into line */
 
-	case sp_nparen:	/* got else, do */
+	case keyword_do_else:
 	    ps.in_stmt = false;
 	    if (*token == 'e') {
 		if (e_code != s_code && (!opt.cuddle_else || e_code[-1] != '}')) {
@@ -988,7 +1027,7 @@ check_type:
 		}
 		force_nl = true;/* also, following stuff must go onto new line */
 		last_else = 1;
-		parse(elselit);
+		parse(keyword_else);
 	    }
 	    else {
 		if (e_code != s_code) {	/* make sure this starts a line */
@@ -999,16 +1038,16 @@ check_type:
 		}
 		force_nl = true;/* also, following stuff must go onto new line */
 		last_else = 0;
-		parse(dolit);
+		parse(keyword_do);
 	    }
 	    goto copy_id;	/* move the token into line */
 
 	case type_def:
-	case storage:
+	case storage_class:
 	    prefix_blankline_requested = 0;
 	    goto copy_id;
 
-	case structure:
+	case keyword_struct_union_enum:
 	    if (ps.p_l_follow > 0)
 		goto copy_id;
 	    /* FALLTHROUGH */
@@ -1076,7 +1115,7 @@ check_type:
 	    {
 		int len = e_token - s_token;
 
-		CHECK_SIZE_CODE(len + 1);
+		check_size_code(len + 1);
 		if (ps.want_blank)
 		    *e_code++ = ' ';
 		memcpy(e_code, s_token, len);
@@ -1086,11 +1125,11 @@ check_type:
 		ps.want_blank = true;
 	    break;
 
-	case strpfx:
+	case string_prefix:
 	    {
 		int len = e_token - s_token;
 
-		CHECK_SIZE_CODE(len + 1);
+		check_size_code(len + 1);
 		if (ps.want_blank)
 		    *e_code++ = ' ';
 		memcpy(e_code, token, len);
@@ -1126,12 +1165,12 @@ check_type:
 	    }
 	    break;
 
-	case preesc:		/* got the character '#' */
+	case preprocessing:	/* '#' */
 	    if ((s_com != e_com) ||
 		    (s_lab != e_lab) ||
 		    (s_code != e_code))
 		dump_line();
-	    CHECK_SIZE_LAB(1);
+	    check_size_label(1);
 	    *e_lab++ = '#';	/* move whole line to 'label' buffer */
 	    {
 		int         in_comment = 0;
@@ -1145,12 +1184,12 @@ check_type:
 			fill_buffer();
 		}
 		while (*buf_ptr != '\n' || (in_comment && !had_eof)) {
-		    CHECK_SIZE_LAB(2);
+		    check_size_label(2);
 		    *e_lab = *buf_ptr++;
 		    if (buf_ptr >= buf_end)
 			fill_buffer();
 		    switch (*e_lab++) {
-		    case BACKSLASH:
+		    case '\\':
 			if (!in_comment) {
 			    *e_lab++ = *buf_ptr++;
 			    if (buf_ptr >= buf_end)
@@ -1213,7 +1252,7 @@ check_type:
 		    buf_end = sc_end;
 		    sc_end = NULL;
 		}
-		CHECK_SIZE_LAB(1);
+		check_size_label(1);
 		*e_lab = '\0';	/* null terminate line */
 		ps.pcase = false;
 	    }
@@ -1240,11 +1279,10 @@ check_type:
 		else
 		    ifdef_level--;
 	    } else {
-		struct directives {
+		static const struct directives {
 		    int size;
 		    const char *string;
-		}
-		recognized[] = {
+		} recognized[] = {
 		    {7, "include"},
 		    {6, "define"},
 		    {5, "undef"},
@@ -1275,10 +1313,15 @@ check_type:
 	case comment:		/* we have gotten a / followed by * this is a biggie */
 	    pr_comment();
 	    break;
+
+	default:
+	    break;
 	}			/* end of big switch stmt */
 
 	*e_code = '\0';		/* make sure code section is null terminated */
-	if (type_code != comment && type_code != newline && type_code != preesc)
+	if (type_code != comment &&
+	    type_code != newline &&
+	    type_code != preprocessing)
 	    ps.last_token = type_code;
     }				/* end of main while (1) loop */
 }
@@ -1344,13 +1387,13 @@ indent_declaration(int cur_dec_ind, int tabs_to_var)
     if (tabs_to_var) {
 	int tpos;
 
-	CHECK_SIZE_CODE(cur_dec_ind / opt.tabsize);
+	check_size_code(cur_dec_ind / opt.tabsize);
 	while ((tpos = opt.tabsize * (1 + pos / opt.tabsize)) <= cur_dec_ind) {
 	    *e_code++ = '\t';
 	    pos = tpos;
 	}
     }
-    CHECK_SIZE_CODE(cur_dec_ind - pos + 1);
+    check_size_code(cur_dec_ind - pos + 1);
     while (pos < cur_dec_ind) {
 	*e_code++ = ' ';
 	pos++;
