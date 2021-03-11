@@ -1090,6 +1090,21 @@ ktr_kuser(const char *id, const void *addr, size_t len)
 	ktraddentry(l, kte, KTA_WAITOK);
 }
 
+void ktr_msghdr(struct msghdr *mh)
+{
+	struct ktr_msghdr m;
+
+	KTR_MSGHDR_SET_NAME(&m, mh->msg_name);
+	KTR_MSGHDR_SET_NAMELEN(&m, mh->msg_namelen);
+	KTR_MSGHDR_SET_IOVLEN(&m, mh->msg_iovlen);
+	KTR_MSGHDR_SET_IOV(&m, mh->msg_iov);
+	KTR_MSGHDR_SET_CONTROL(&m, mh->msg_control);
+	KTR_MSGHDR_SET_CONTROLLEN(&m, mh->msg_controllen);
+	KTR_MSGHDR_SET_FLAGS(&m, mh->msg_flags);
+
+	ktr_kuser("msghdr", &m, sizeof(m));
+}
+
 void
 ktr_mib(const int *name, u_int namelen)
 {

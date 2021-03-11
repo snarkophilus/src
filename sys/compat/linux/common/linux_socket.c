@@ -814,7 +814,7 @@ linux_sys_recvmsg(struct lwp *l, const struct linux_sys_recvmsg_args *uap, regis
 			/* Some flag unsupported by Linux */
 			error = EINVAL;
 		else {
-			ktrkuser("msghdr", &msg, sizeof(msg));
+			ktrmsghdr(&msg);
 			bsd_to_linux_msghdr(&msg, &lmsg);
 			error = copyout(&lmsg, SCARG(uap, msg), sizeof(lmsg));
 		}
@@ -1842,7 +1842,7 @@ linux_sys_sendmmsg(struct lwp *l, const struct linux_sys_sendmmsg_args *uap,
 		if (error)
 			break;
 
-		ktrkuser("msghdr", msg, sizeof *msg);
+		ktrmsghdr(msg);
 		lmsg.msg_len = *retval;
 		error = copyout(&lmsg, SCARG(uap, msgvec) + dg, sizeof(lmsg));
 		if (error)

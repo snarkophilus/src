@@ -546,7 +546,7 @@ do_sys_sendmsg_so(struct lwp *l, int s, struct socket *so, file_t *fp,
 	size_t		len, iovsz;
 	int		i, error;
 
-	ktrkuser("msghdr", mp, sizeof(*mp));
+	ktrmsghdr(mp);
 
 	/* If the caller passed us stuff in mbufs, we must free them. */
 	to = (mp->msg_flags & MSG_NAMEMBUF) ? mp->msg_name : NULL;
@@ -751,7 +751,7 @@ sys_recvmsg(struct lwp *l, const struct sys_recvmsg_args *uap,
 	if (from != NULL)
 		m_free(from);
 	if (error == 0) {
-		ktrkuser("msghdr", &msg, sizeof(msg));
+		ktrmsghdr(&msg);
 		error = copyout(&msg, SCARG(uap, msg), sizeof(msg));
 	}
 
@@ -796,7 +796,7 @@ sys_sendmmsg(struct lwp *l, const struct sys_sendmmsg_args *uap,
 		if (error)
 			break;
 
-		ktrkuser("msghdr", msg, sizeof(*msg));
+		ktrmsghdr(msg);
 		mmsg.msg_len = *retval;
 		error = copyout(&mmsg, SCARG(uap, mmsg) + dg, sizeof(mmsg));
 		if (error)
@@ -923,7 +923,7 @@ do_sys_recvmsg_so(struct lwp *l, int s, struct socket *so, struct msghdr *mp,
 	size_t		len, iovsz;
 	int		i, error;
 
-	ktrkuser("msghdr", mp, sizeof(*mp));
+	ktrmsghdr(mp);
 
 	*from = NULL;
 	if (control != NULL)
@@ -1096,7 +1096,7 @@ sys_recvmmsg(struct lwp *l, const struct sys_recvmmsg_args *uap,
 		if (error)
 			break;
 
-		ktrkuser("msghdr", msg, sizeof *msg);
+		ktrmsghdr(msg);
 		mmsg.msg_len = *retval;
 
 		error = copyout(&mmsg, SCARG(uap, mmsg) + dg, sizeof(mmsg));

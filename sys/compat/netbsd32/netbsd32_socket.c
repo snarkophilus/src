@@ -210,7 +210,7 @@ msg_recv_copyout(struct lwp *l, struct netbsd32_msghdr *msg32,
 	msg32->msg_namelen = msg->msg_namelen;
 	msg32->msg_controllen = msg->msg_controllen;
 	msg32->msg_flags = msg->msg_flags;
-	ktrkuser("msghdr", msg, sizeof(*msg));
+	ktrmsghdr(msg);
 	if (arg == NULL)
 		return 0;
 	return copyout(msg32, arg, sizeof(*arg));
@@ -599,7 +599,7 @@ netbsd32_sendmmsg(struct lwp *l, const struct netbsd32_sendmmsg_args *uap,
 		if (error)
 			break;
 
-		ktrkuser("msghdr", msg, sizeof(*msg));
+		ktrmsghdr(msg);
 		mmsg.msg_len = *retval;
 		netbsd32_from_mmsghdr(&mmsg32, &mmsg);
 		error = copyout(&mmsg32, mmsg32p + dg, sizeof(mmsg32));

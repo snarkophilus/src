@@ -342,8 +342,8 @@ struct ktr_msghdr {
 };
 #define	KTR_MSGHDR_SET_NAME(msg, n)	(msg)->xmsg_name = htobe64((intptr_t)(n))
 #define	KTR_MSGHDR_SET_NAMELEN(msg, nl)	(msg)->xmsg_namelen = htobe32(nl)
-#define	KTR_MSGHDR_SET_IOVLEN(msg, il)	(msg)->xmsg_iovlen = htobe32(il)
 #define	KTR_MSGHDR_SET_IOV(msg, i)	(msg)->xmsg_iov = htobe64((intptr_t)(i))
+#define	KTR_MSGHDR_SET_IOVLEN(msg, il)	(msg)->xmsg_iovlen = htobe32(il)
 #define	KTR_MSGHDR_SET_CONTROL(msg, c)	(msg)->xmsg_control = htobe64((intptr_t)(c))
 #define	KTR_MSGHDR_SET_CONTROLLEN(msg, cl) (msg)->xmsg_controllen = htobe32(cl)
 #define	KTR_MSGHDR_SET_FLAGS(msg, f)	(msg)->xmsg_flags = htobe32(f)
@@ -492,6 +492,9 @@ extern int ktrace_on;
 int ktruser(const char *, void *, size_t, int);
 bool ktr_point(int);
 
+/* forward declarations */
+struct msghdr;
+
 void ktr_csw(int, int);
 void ktr_emul(void);
 void ktr_geniov(int, enum uio_rw, struct iovec *, size_t, int);
@@ -507,6 +510,7 @@ void ktr_mib(const int *a , u_int b);
 void ktr_execarg(const void *, size_t);
 void ktr_execenv(const void *, size_t);
 void ktr_execfd(int, u_int);
+void ktr_msghdr(struct msghdr *);
 
 int  ktrace_common(lwp_t *, int, int, int, file_t **);
 
@@ -636,6 +640,13 @@ ktrexecfd(int fd, u_int dtype)
 {
 	if (__predict_false(ktrace_on))
 		ktr_execfd(fd, dtype);
+}
+
+static __inline void
+ktrmsghdr(struct msghdr *a)
+{
+	if (__predict_false(ktrace_on))
+		ktr_msghdr(a);
 }
 
 struct ktrace_entry;
