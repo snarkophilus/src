@@ -43,7 +43,7 @@
 
 #define PMAP_TLB_FLUSH_ASID_ON_RESET	(true)
 
-// XXXNH some implementations support 16bit asid
+/* Maximum number of ASIDs. Some CPUs have less.*/
 #define PMAP_TLB_NUM_PIDS		65536
 #define PMAP_TLB_BITMAP_LENGTH		PMAP_TLB_NUM_PIDS
 #define cpu_set_tlb_info(ci, ti)        ((void)((ci)->ci_tlb_info = (ti)))
@@ -52,6 +52,21 @@
 #else
 #define cpu_tlb_info(ci)		(&pmap_tlb0_info)
 #endif
+static inline tlb_asid_t
+pmap_md_tlb_asid_max(void)
+{
+	switch (__SHIFTOUT(reg_id_aa64mmfr0_el1_read(), ID_AA64MMFR0_EL1_ASIDBITS)) {
+	case ID_AA64MMFR0_EL1_ASIDBITS_8BIT:
+		return 1U << 8;
+	case ID_AA64MMFR0_EL1_ASIDBITS_16BIT:
+		return 1U << 16;
+	default:
+		return 0;
+	}
+}
+
+
+
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
 #define PMAP_PDETABSIZE	(PAGE_SIZE / sizeof(pd_entry_t))
