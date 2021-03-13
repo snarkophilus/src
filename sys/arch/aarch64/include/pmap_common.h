@@ -57,9 +57,9 @@ pmap_md_tlb_asid_max(void)
 {
 	switch (__SHIFTOUT(reg_id_aa64mmfr0_el1_read(), ID_AA64MMFR0_EL1_ASIDBITS)) {
 	case ID_AA64MMFR0_EL1_ASIDBITS_8BIT:
-		return 1U << 8;
+		return (1U << 8) - 1;
 	case ID_AA64MMFR0_EL1_ASIDBITS_16BIT:
-		return 1U << 16;
+		return (1U << 16) - 1;
 	default:
 		return 0;
 	}

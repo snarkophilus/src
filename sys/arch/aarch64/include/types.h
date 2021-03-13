@@ -59,7 +59,7 @@ typedef __uint32_t register32_t;
 #define PRIxREGISTER	PRIx64
 #define PRIxREGISTER32	PRIx32
 
-typedef unsigned int	tlb_asid_t;
+typedef unsigned short	tlb_asid_t;
 
 #if defined(_KERNEL)
 #define LBL_X19	0
