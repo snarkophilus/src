@@ -821,7 +821,7 @@ pmap_segtab_release(pmap_t pmap, pmap_segtab_t **stp_p, bool free_stp,
 	UVMHIST_FUNC(__func__);
 	UVMHIST_CALLARGS(pmapxtabhist, "pm=%#jx stpp=%#jx free=%jd",
 	    (uintptr_t)pmap, (uintptr_t)stp, free_stp, 0);
-	UVMHIST_LOG(pmapxtabhist, " callback=%#jx flags=%jx va=%#jx vinc=%#jx",
+	UVMHIST_LOG(pmapxtabhist, " callback=%#jx flags=%#jx va=%#jx vinc=%#jx",
 	    (uintptr_t)callback, flags, (uintptr_t)va, (uintptr_t)vinc);
 
 	for (size_t i = (va / vinc) & (PMAP_SEGTABSIZE - 1);
@@ -1136,7 +1136,7 @@ pt_entry_t *
 pmap_pte_reserve(pmap_t pmap, vaddr_t va, int flags)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "pm=%#jx va=%#jx flags=%jx",
+	UVMHIST_CALLARGS(pmaphist, "pm=%#jx va=%#jx flags=%#jx",
 	    (uintptr_t)pmap, (uintptr_t)va, flags, 0);
 	pmap_ptpage_t *ptp;
 	paddr_t pa = 0;
