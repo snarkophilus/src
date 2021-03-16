@@ -727,13 +727,11 @@ pmap_create(void)
 
 //	TAILQ_INIT(&pmap->pm_pvp_list);
 	TAILQ_INIT(&pmap->pm_ptp_list);
-#ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)
 	TAILQ_INIT(&pmap->pm_pdetab_list);
 #endif
 #if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
 	TAILQ_INIT(&pmap->pm_segtab_list);
-#endif
 #endif
 
 	pmap_segtab_init(pmap);
