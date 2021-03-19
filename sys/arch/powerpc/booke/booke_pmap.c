@@ -206,6 +206,9 @@ pmap_bootstrap(vaddr_t startkernel, vaddr_t endkernel,
 		    + kv_nsegtabs * NBSEG;
 	}
 
+	/* we don't need pmap_growkernel */
+	pmap_curmaxkvaddr = pmap_limits.virtual_end;
+
 	/*
 	 * Now actually allocate the kernel PTE array (must be done
 	 * after virtual_end is initialized).

@@ -488,11 +488,17 @@ vaddr_t
 pmap_growkernel(vaddr_t maxkvaddr)
 {
 	UVMHIST_FUNC(__func__);
-	UVMHIST_CALLARGS(pmaphist, "maxkvaddr=%#jx (%#jx)",
-	    (uintptr_t)maxkvaddr, pmap_curmaxkvaddr, 0, 0);
+	UVMHIST_CALLARGS(pmaphist, "maxkvaddr=%#jx (%#jx)", maxkvaddr,
+	    pmap_curmaxkvaddr, 0, 0);
 
 	vaddr_t virtual_end = pmap_curmaxkvaddr;
 	maxkvaddr = pmap_round_seg(maxkvaddr) - 1;
+
+	/*
+	 * Don't exceed VM_MAX_KERNEL_ADDRESS!
+	 */
+	if (maxkvaddr == 0 || maxkvaddr > VM_MAX_KERNEL_ADDRESS)
+		maxkvaddr = VM_MAX_KERNEL_ADDRESS;
 
 	/*
 	 * Reserve PTEs for the new KVA space.
@@ -500,12 +506,6 @@ pmap_growkernel(vaddr_t maxkvaddr)
 	for (; virtual_end < maxkvaddr; virtual_end += NBSEG) {
 		pmap_pte_reserve(pmap_kernel(), virtual_end, 0);
 	}
-
-	/*
-	 * Don't exceed VM_MAX_KERNEL_ADDRESS!
-	 */
-	if (virtual_end == 0 || virtual_end > VM_MAX_KERNEL_ADDRESS)
-		virtual_end = VM_MAX_KERNEL_ADDRESS;
 
 	kasan_shadow_map((void *)pmap_curmaxkvaddr,
 	    (size_t)(virtual_end - pmap_curmaxkvaddr));

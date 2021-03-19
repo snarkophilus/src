@@ -484,6 +484,7 @@ pmap_bootstrap(void)
 	}
 	KASSERT(pmap_pte_lookup(pmap_kernel(), VM_MIN_KERNEL_ADDRESS) == sysmap);
 
+	pmap_curmaxkvaddr = pmap_limits.virtual_end;
 	/*
 	 * Initialize the pools.
 	 */
