@@ -878,7 +878,6 @@ pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
 {
 	pt_entry_t attr;
 	psize_t blocksize;
-	int rc;
 
 	vsize_t resid = round_page(size);
 	vsize_t mapped = 0;
@@ -899,17 +898,12 @@ pmap_map_chunk(vaddr_t va, paddr_t pa, vsize_t size,
 		pte &= ~LX_TYPE;
 		attr |= pte;
 
-		rc = pmapboot_enter(va, pa, blocksize, blocksize, attr, NULL);
-		if (rc != 0)
-			panic("%s: pmapboot_enter failed. %lx is already mapped?\n",
-			    __func__, va);
+		pmapboot_enter(va, pa, blocksize, blocksize, attr, NULL);
 
 		va += blocksize;
 		pa += blocksize;
 		resid -= blocksize;
 		mapped += blocksize;
-
-		aarch64_tlbi_by_va(va);
 	}
 
 	return mapped;
