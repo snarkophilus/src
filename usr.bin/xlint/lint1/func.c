@@ -1,4 +1,4 @@
-/*	$NetBSD: func.c,v 1.78 2021/03/20 16:16:32 rillig Exp $	*/
+/*	$NetBSD: func.c,v 1.92 2021/03/21 15:44:57 rillig Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Jochen Pohl
@@ -37,7 +37,7 @@
 
 #include <sys/cdefs.h>
 #if defined(__RCSID) && !defined(lint)
-__RCSID("$NetBSD: func.c,v 1.78 2021/03/20 16:16:32 rillig Exp $");
+__RCSID("$NetBSD: func.c,v 1.92 2021/03/21 15:44:57 rillig Exp $");
 #endif
 
 #include <stdlib.h>
@@ -170,7 +170,7 @@ void
 popctrl(int env)
 {
 	cstk_t	*ci;
-	clst_t	*cl, *next;
+	case_label_t *cl, *next;
 
 	lint_assert(cstmt != NULL);
 	lint_assert(cstmt->c_env == env);
@@ -178,7 +178,7 @@ popctrl(int env)
 	ci = cstmt;
 	cstmt = ci->c_surrounding;
 
-	for (cl = ci->c_clst; cl != NULL; cl = next) {
+	for (cl = ci->c_case_labels; cl != NULL; cl = next) {
 		next = cl->cl_next;
 		free(cl);
 	}
@@ -196,7 +196,7 @@ check_statement_reachable(void)
 	if (!reached && !rchflg) {
 		/* statement not reached */
 		warning(193);
-		reached = true;
+		reached = true;	/* only to suppress further warnings */
 	}
 }
 
@@ -223,7 +223,7 @@ funcdef(sym_t *fsym)
 	 * Put all symbols declared in the argument list back to the
 	 * symbol table.
 	 */
-	for (sym = dcs->d_fpsyms; sym != NULL; sym = sym->s_dlnxt) {
+	for (sym = dcs->d_func_proto_syms; sym != NULL; sym = sym->s_dlnxt) {
 		if (sym->s_block_level != -1) {
 			lint_assert(sym->s_block_level == 1);
 			inssym(1, sym);
@@ -282,9 +282,9 @@ funcdef(sym_t *fsym)
 	 * if this is an old style definition and we had already a
 	 * prototype.
 	 */
-	dcs->d_fdpos = fsym->s_def_pos;
+	dcs->d_func_def_pos = fsym->s_def_pos;
 
-	if ((rdsym = dcs->d_rdcsym) != NULL) {
+	if ((rdsym = dcs->d_redeclared_symbol) != NULL) {
 
 		if (!check_redeclaration(fsym, (dowarn = false, &dowarn))) {
 
@@ -378,7 +378,7 @@ funcend(void)
 		warning(216, funcsym->s_name);
 
 	/* Print warnings for unused arguments */
-	arg = dcs->d_fargs;
+	arg = dcs->d_func_args;
 	n = 0;
 	while (arg != NULL && (nargusg == -1 || n < nargusg)) {
 		check_usage_sym(dcs->d_asm, arg);
@@ -396,8 +396,9 @@ funcend(void)
 	if (dcs->d_scl == EXTERN && funcsym->s_inline) {
 		outsym(funcsym, funcsym->s_scl, DECL);
 	} else {
-		outfdef(funcsym, &dcs->d_fdpos, cstmt->c_had_return_value,
-			funcsym->s_osdef, dcs->d_fargs);
+		outfdef(funcsym, &dcs->d_func_def_pos,
+		    cstmt->c_had_return_value, funcsym->s_osdef,
+		    dcs->d_func_args);
 	}
 
 	/*
@@ -406,7 +407,7 @@ funcend(void)
 	 */
 	lint_assert(dcs->d_next == NULL);
 	lint_assert(dcs->d_ctx == EXTERN);
-	rmsyms(dcs->d_fpsyms);
+	rmsyms(dcs->d_func_proto_syms);
 
 	/* must be set on level 0 */
 	reached = true;
@@ -447,7 +448,7 @@ check_case_label_enum(const tnode_t *tn, const cstk_t *ci)
 static void
 check_case_label(tnode_t *tn, cstk_t *ci)
 {
-	clst_t	*cl;
+	case_label_t *cl;
 	val_t	*v;
 	val_t	nv;
 	tspec_t	t;
@@ -498,7 +499,7 @@ check_case_label(tnode_t *tn, cstk_t *ci)
 	free(v);
 
 	/* look if we had this value already */
-	for (cl = ci->c_clst; cl != NULL; cl = cl->cl_next) {
+	for (cl = ci->c_case_labels; cl != NULL; cl = cl->cl_next) {
 		if (cl->cl_val.v_quad == nv.v_quad)
 			break;
 	}
@@ -515,10 +516,10 @@ check_case_label(tnode_t *tn, cstk_t *ci)
 		 * append the value to the list of
 		 * case values
 		 */
-		cl = xcalloc(1, sizeof (clst_t));
+		cl = xcalloc(1, sizeof *cl);
 		cl->cl_val = nv;
-		cl->cl_next = ci->c_clst;
-		ci->c_clst = cl;
+		cl->cl_next = ci->c_case_labels;
+		ci->c_case_labels = cl;
 	}
 }
 
@@ -604,6 +605,11 @@ if1(tnode_t *tn)
 	if (tn != NULL)
 		expr(tn, false, true, false, false);
 	pushctrl(T_IF);
+
+	if (tn != NULL && tn->tn_op == CON && !tn->tn_system_dependent) {
+		reached = constant_is_nonzero(tn);
+		cstmt->c_always_then = reached;
+	}
 }
 
 /*
@@ -614,8 +620,8 @@ void
 if2(void)
 {
 
-	cstmt->c_rchif = reached;
-	reached = true;
+	cstmt->c_reached_end_of_then = reached;
+	reached = !cstmt->c_always_then;
 }
 
 /*
@@ -625,12 +631,13 @@ if2(void)
 void
 if3(bool els)
 {
-
-	if (els) {
-		reached |= cstmt->c_rchif;
-	} else {
+	if (cstmt->c_reached_end_of_then)
 		reached = true;
-	}
+	else if (cstmt->c_always_then)
+		reached = false;
+	else if (!els)
+		reached = true;
+
 	popctrl(T_IF);
 }
 
@@ -694,7 +701,7 @@ switch2(void)
 {
 	int	nenum = 0, nclab = 0;
 	sym_t	*esym;
-	clst_t	*cl;
+	case_label_t *cl;
 
 	lint_assert(cstmt->c_swtype != NULL);
 
@@ -710,7 +717,7 @@ switch2(void)
 		     esym != NULL; esym = esym->s_next) {
 			nenum++;
 		}
-		for (cl = cstmt->c_clst; cl != NULL; cl = cl->cl_next)
+		for (cl = cstmt->c_case_labels; cl != NULL; cl = cl->cl_next)
 			nclab++;
 		if (hflag && eflag && nenum != nclab && !cstmt->c_default) {
 			/* enumeration value(s) not handled in switch */
@@ -747,6 +754,7 @@ switch2(void)
 void
 while1(tnode_t *tn)
 {
+	bool body_reached;
 
 	if (!reached) {
 		/* loop not entered at top */
@@ -759,11 +767,13 @@ while1(tnode_t *tn)
 
 	pushctrl(T_WHILE);
 	cstmt->c_loop = true;
-	if (tn != NULL && tn->tn_op == CON)
-		cstmt->c_infinite = constant_is_nonzero(tn);
+	cstmt->c_maybe_endless = is_nonzero(tn);
+	body_reached = !is_zero(tn);
 
 	check_getopt_begin_while(tn);
 	expr(tn, false, true, true, false);
+
+	reached = body_reached;
 }
 
 /*
@@ -778,7 +788,7 @@ while2(void)
 	 * The end of the loop can be reached if it is no endless loop
 	 * or there was a break statement which was reached.
 	 */
-	reached = !cstmt->c_infinite || cstmt->c_break;
+	reached = !cstmt->c_maybe_endless || cstmt->c_break;
 	rchflg = false;
 
 	check_getopt_end_while();
@@ -814,26 +824,25 @@ do2(tnode_t *tn)
 	 * If there was a continue statement, the expression controlling the
 	 * loop is reached.
 	 */
-	if (cstmt->c_cont)
+	if (cstmt->c_continue)
 		reached = true;
 
 	if (tn != NULL)
 		tn = check_controlling_expression(tn);
 
 	if (tn != NULL && tn->tn_op == CON) {
-		cstmt->c_infinite = constant_is_nonzero(tn);
-		if (!cstmt->c_infinite && cstmt->c_cont)
+		cstmt->c_maybe_endless = constant_is_nonzero(tn);
+		if (!cstmt->c_maybe_endless && cstmt->c_continue)
 			/* continue in 'do ... while (0)' loop */
 			error(323);
 	}
 
 	expr(tn, false, true, true, true);
 
-	/*
-	 * The end of the loop is only reached if it is no endless loop
-	 * or there was a break statement which could be reached.
-	 */
-	reached = !cstmt->c_infinite || cstmt->c_break;
+	if (cstmt->c_maybe_endless)
+		reached = false;
+	if (cstmt->c_break)
+		reached = true;
 	rchflg = false;
 
 	popctrl(T_DO);
@@ -877,12 +886,11 @@ for1(tnode_t *tn1, tnode_t *tn2, tnode_t *tn3)
 	if (tn2 != NULL)
 		expr(tn2, false, true, true, false);
 
-	cstmt->c_infinite =
-	    tn2 == NULL || (tn2->tn_op == CON && constant_is_nonzero(tn2));
+	cstmt->c_maybe_endless = tn2 == NULL || is_nonzero(tn2);
 
 	/* Checking the reinitialization expression is done in for2() */
 
-	reached = true;
+	reached = !is_zero(tn2);
 }
 
 /*
@@ -895,7 +903,7 @@ for2(void)
 	pos_t	cpos, cspos;
 	tnode_t	*tn3;
 
-	if (cstmt->c_cont)
+	if (cstmt->c_continue)
 		reached = true;
 
 	cpos = curr_pos;
@@ -924,7 +932,8 @@ for2(void)
 	csrc_pos = cspos;
 
 	/* An endless loop without break will never terminate */
-	reached = cstmt->c_break || !cstmt->c_infinite;
+	/* TODO: What if the loop contains a 'return'? */
+	reached = cstmt->c_break || !cstmt->c_maybe_endless;
 	rchflg = false;
 
 	popctrl(T_FOR);
@@ -934,7 +943,7 @@ for2(void)
  * T_GOTO identifier T_SEMI
  */
 void
-dogoto(sym_t *lab)
+do_goto(sym_t *lab)
 {
 
 	mark_as_used(lab, false, false);
@@ -948,7 +957,7 @@ dogoto(sym_t *lab)
  * T_BREAK T_SEMI
  */
 void
-dobreak(void)
+do_break(void)
 {
 	cstk_t	*ci;
 
@@ -974,7 +983,7 @@ dobreak(void)
  * T_CONTINUE T_SEMI
  */
 void
-docont(void)
+do_continue(void)
 {
 	cstk_t	*ci;
 
@@ -985,7 +994,8 @@ docont(void)
 		/* continue outside loop */
 		error(209);
 	} else {
-		ci->c_cont = true;
+		/* TODO: only if reachable, for symmetry with c_break */
+		ci->c_continue = true;
 	}
 
 	check_statement_reachable();
@@ -998,7 +1008,7 @@ docont(void)
  * T_RETURN expr T_SEMI
  */
 void
-doreturn(tnode_t *tn)
+do_return(tnode_t *tn)
 {
 	tnode_t	*ln, *rn;
 	cstk_t	*ci;
@@ -1007,11 +1017,10 @@ doreturn(tnode_t *tn)
 	for (ci = cstmt; ci->c_surrounding != NULL; ci = ci->c_surrounding)
 		continue;
 
-	if (tn != NULL) {
+	if (tn != NULL)
 		ci->c_had_return_value = true;
-	} else {
+	else
 		ci->c_had_return_noval = true;
-	}
 
 	if (tn != NULL && funcsym->s_type->t_subt->t_tspec == VOID) {
 		/* void function %s cannot return value */
@@ -1245,7 +1254,7 @@ fallthru(int n)
  */
 /* ARGSUSED */
 void
-notreach(int n)
+not_reached(int n)
 {
 
 	reached = false;
