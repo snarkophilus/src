@@ -1,4 +1,4 @@
-/*	$NetBSD: msg_193.c,v 1.7 2021/03/21 15:44:57 rillig Exp $	*/
+/*	$NetBSD: msg_193.c,v 1.11 2021/03/21 20:08:21 rillig Exp $	*/
 # 3 "msg_193.c"
 
 // Test for message: statement not reached [193]
@@ -22,10 +22,10 @@
  *	system-dependent constant expression
  */
 
-extern void
-reachable(void);
-extern void
-unreachable(void);
+extern void reachable(void);
+extern void unreachable(void);
+extern _Bool maybe(void);
+
 
 void
 test_statement(void)
@@ -203,7 +203,7 @@ test_for_if_break(void)
 			break;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	reachable();
 }
@@ -234,7 +234,7 @@ test_for_if_continue(void)
 			continue;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	unreachable();			/* expect: 193 */
 }
@@ -265,7 +265,7 @@ test_for_if_return(void)
 			return;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	unreachable();			/* expect: 193 */
 }
@@ -312,7 +312,7 @@ test_while_if_break(void)
 			break;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	reachable();
 }
@@ -343,7 +343,7 @@ test_while_if_continue(void)
 			continue;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	unreachable();			/* expect: 193 */
 }
@@ -374,7 +374,7 @@ test_while_if_return(void)
 			return;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	}
 	unreachable();			/* expect: 193 */
 }
@@ -423,7 +423,7 @@ test_do_while_if_break(void)
 			break;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	} while (1);
 	reachable();
 }
@@ -454,7 +454,7 @@ test_do_while_if_continue(void)
 			continue;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	} while (1);
 	unreachable();			/* expect: 193 */
 }
@@ -485,13 +485,134 @@ test_do_while_if_return(void)
 			return;
 			unreachable();	/* expect: 193 */
 		}
-		unreachable();		/* TODO: expect: 193 */
+		unreachable();		/* expect: 193 */
 	} while (1);
 	unreachable();			/* expect: 193 */
 }
 
-/* TODO: switch */
+void
+test_if_nested(void)
+{
+	if (0) {
+		if (1)			/* expect: 193 */
+			unreachable();
+		else
+			unreachable();	/* expect: 193 *//* XXX: redundant */
 
-/* TODO: goto */
+		if (0)
+			unreachable();	/* expect: 193 *//* XXX: redundant */
+		else
+			unreachable();
+
+		unreachable();
+	}
+	reachable();
+
+	if (1) {
+		if (1)
+			reachable();
+		else
+			unreachable();	/* expect: 193 */
+
+		if (0)
+			unreachable();	/* expect: 193 */
+		else
+			reachable();
+
+		reachable();
+	}
+	reachable();
+}
+
+void
+test_if_maybe(void)
+{
+	if (maybe()) {
+		if (0)
+			unreachable();	/* expect: 193 */
+		else
+			reachable();
+		reachable();
+	}
+	reachable();
+
+	if (0) {
+		if (maybe())		/* expect: 193 */
+			unreachable();
+		else
+			unreachable();
+		unreachable();
+	}
+	reachable();
+
+	if (1) {
+		if (maybe())
+			reachable();
+		else
+			reachable();
+		reachable();
+	}
+	reachable();
+}
+
+/*
+ * To compute the reachability graph of this little monster, lint would have
+ * to keep all statements and their relations from the whole function in
+ * memory.  It doesn't do that.  Therefore it does not warn about any
+ * unreachable statements in this function.
+ */
+void
+test_goto_numbers_alphabetically(void)
+{
+	goto one;
+eight:
+	goto nine;
+five:
+	return;
+four:
+	goto five;
+nine:
+	goto ten;
+one:
+	goto two;
+seven:
+	goto eight;
+six:				/* expect: warning: label six unused */
+	goto seven;
+ten:
+	return;
+three:
+	goto four;
+two:
+	goto three;
+}
+
+void
+test_while_goto(void)
+{
+	while (1) {
+		goto out;
+		break;		/* lint only warns with the -b option */
+	}
+	unreachable();		/* expect: 193 */
+out:
+	reachable();
+}
+
+void
+test_unreachable_label(void)
+{
+	if (0)
+		goto unreachable;	/* expect: 193 */
+	goto reachable;
+
+	/* named_label assumes that any label is reachable. */
+unreachable:
+	unreachable();
+reachable:
+	reachable();
+}
+
+/* TODO: switch */
 
 /* TODO: system-dependent constant expression (see tn_system_dependent) */
