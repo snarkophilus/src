@@ -1,4 +1,4 @@
-/*	$NetBSD: err.c,v 1.87 2021/03/07 19:42:54 rillig Exp $	*/
+/*	$NetBSD: err.c,v 1.91 2021/03/21 20:44:59 rillig Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Jochen Pohl
@@ -37,7 +37,7 @@
 
 #include <sys/cdefs.h>
 #if defined(__RCSID) && !defined(lint)
-__RCSID("$NetBSD: err.c,v 1.87 2021/03/07 19:42:54 rillig Exp $");
+__RCSID("$NetBSD: err.c,v 1.91 2021/03/21 20:44:59 rillig Exp $");
 #endif
 
 #include <sys/types.h>
@@ -51,11 +51,6 @@ int	nerr;
 
 /* number of syntax errors */
 int	sytxerr;
-
-
-static	const	char *lbasename(const char *);
-static	void	verror(int, va_list);
-static	void	vwarning(int, va_list);
 
 
 const	char *msgs[] = {
@@ -244,7 +239,7 @@ const	char *msgs[] = {
 	"incompatible pointer types (%s != %s)",		      /* 182 */
 	"illegal combination of %s (%s) and %s (%s)",		      /* 183 */
 	"illegal pointer combination",				      /* 184 */
-	"initialization type mismatch (%s) and (%s)",		      /* 185 */
+	"cannot initialize '%s' from '%s'",			      /* 185 */
 	"bit-field initialization is illegal in traditional C",	      /* 186 */
 	"non-null byte ignored in string initializer",		      /* 187 */
 	"no automatic aggregate initialization in traditional C",     /* 188 */
@@ -386,7 +381,7 @@ const	char *msgs[] = {
 	"suggest cast from '%s' to '%s' on op %s to avoid overflow",  /* 324 */
 	"variable declaration in for loop",			      /* 325 */
 	"%s attribute ignored for %s",				      /* 326 */
-	"declarations after statements is a C9X feature",	      /* 327 */
+	"declarations after statements is a C99 feature",	      /* 327 */
 	"union cast is a C9X feature",				      /* 328 */
 	"type '%s' is not a member of '%s'",			      /* 329 */
 	"operand of '%s' must be bool, not '%s'",		      /* 330 */
@@ -445,7 +440,7 @@ verror(int n, va_list ap)
 		return;
 
 	fn = lbasename(curr_pos.p_file);
-	(void)printf("%s(%d): ", fn, curr_pos.p_line);
+	(void)printf("%s(%d): error: ", fn, curr_pos.p_line);
 	(void)vprintf(msgs[n], ap);
 	(void)printf(" [%d]\n", n);
 	nerr++;

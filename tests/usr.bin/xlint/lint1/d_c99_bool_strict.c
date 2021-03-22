@@ -1,4 +1,4 @@
-/*	$NetBSD: d_c99_bool_strict.c,v 1.22 2021/02/27 17:16:48 rillig Exp $	*/
+/*	$NetBSD: d_c99_bool_strict.c,v 1.26 2021/03/21 14:36:59 rillig Exp $	*/
 # 3 "d_c99_bool_strict.c"
 
 /*
@@ -31,8 +31,9 @@
  *
  * strict-bool-operand-unary:
  *	Operator	bool?	scalar?
- *	!		yes	no
- *	The other binary operators do not accept bool operands.
+ *	!		yes	-
+ *	&		yes	yes
+ *	The other unary operators do not accept bool operands.
  *
  * strict-bool-operand-binary:
  *	Operator	left:	bool?	other?	right:	bool?	other?
@@ -218,7 +219,7 @@ strict_bool_bit_fields_operand_conversion(void)
 		bool bit_field: 1;
 	};
 
-	struct s s = { 0 };
+	struct s s = { 0 > 0 };
 
 	s.ordinary = s.ordinary | s.ordinary;
 	s.bit_field = s.bit_field | s.bit_field;
@@ -364,7 +365,7 @@ void
 strict_bool_controlling_expression(bool b, int i, double d, const void *p)
 {
 	if (__lint_false)	/* expect: 161 */
-		do_nothing();
+		do_nothing();	/* expect: statement not reached */
 
 	if (__lint_true)	/* expect: 161 */
 		do_nothing();
@@ -405,7 +406,7 @@ strict_bool_controlling_expression(bool b, int i, double d, const void *p)
  *	Operator	bool?	scalar?
  *	!		yes	-
  *	&		yes	yes
- *	The other binary operators do not accept bool operands.
+ *	The other unary operators do not accept bool operands.
  */
 
 void
@@ -755,4 +756,17 @@ do_while_true(void)
 	do {
 
 	} while (__lint_true);	/* expect: 161 */
+}
+
+void
+initialization(void)
+{
+	struct {
+		_Bool b;
+	} var[] = {
+	    { __lint_false },
+	    { __lint_true },
+	    { 0 },		/* expect: 107 */
+	    { 1 },		/* expect: 107 */
+	};
 }

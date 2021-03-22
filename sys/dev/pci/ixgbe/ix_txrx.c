@@ -1,4 +1,4 @@
-/* $NetBSD: ix_txrx.c,v 1.67 2021/03/09 10:03:18 msaitoh Exp $ */
+/* $NetBSD: ix_txrx.c,v 1.69 2021/03/12 01:54:29 knakahara Exp $ */
 
 /******************************************************************************
 
@@ -2079,11 +2079,7 @@ next_desc:
 
 		/* Now send to the stack or do LRO */
 		if (sendmp != NULL) {
-			rxr->next_to_check = i;
-			IXGBE_RX_UNLOCK(rxr);
 			ixgbe_rx_input(rxr, ifp, sendmp, ptype);
-			IXGBE_RX_LOCK(rxr);
-			i = rxr->next_to_check;
 		}
 
 		/* Every 8 descriptors we go to refresh mbufs */

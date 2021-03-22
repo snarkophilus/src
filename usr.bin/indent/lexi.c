@@ -1,4 +1,4 @@
-/*	$NetBSD: lexi.c,v 1.31 2021/03/09 19:23:08 rillig Exp $	*/
+/*	$NetBSD: lexi.c,v 1.41 2021/03/14 00:22:16 rillig Exp $	*/
 
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
@@ -46,7 +46,7 @@ static char sccsid[] = "@(#)lexi.c	8.1 (Berkeley) 6/6/93";
 #include <sys/cdefs.h>
 #ifndef lint
 #if defined(__NetBSD__)
-__RCSID("$NetBSD: lexi.c,v 1.31 2021/03/09 19:23:08 rillig Exp $");
+__RCSID("$NetBSD: lexi.c,v 1.41 2021/03/14 00:22:16 rillig Exp $");
 #elif defined(__FreeBSD__)
 __FBSDID("$FreeBSD: head/usr.bin/indent/lexi.c 337862 2018-08-15 18:19:45Z pstef $");
 #endif
@@ -171,19 +171,58 @@ static char const *table[] = {
     [0]   = "uuiifuufiuuiiuiiiiiuiuuuuu",
 };
 
+/* Initialize constant transition table */
+void
+init_constant_tt(void)
+{
+    table['-'] = table['+'];
+    table['8'] = table['9'];
+    table['2'] = table['3'] = table['4'] = table['5'] = table['6'] = table['7'];
+    table['A'] = table['C'] = table['D'] = table['c'] = table['d'] = table['a'];
+    table['B'] = table['b'];
+    table['E'] = table['e'];
+    table['U'] = table['u'];
+    table['X'] = table['x'];
+    table['P'] = table['p'];
+    table['F'] = table['f'];
+}
+
+static char
+inbuf_peek(void)
+{
+    return *buf_ptr;
+}
+
+static void
+inbuf_skip(void)
+{
+    buf_ptr++;
+    if (buf_ptr >= buf_end)
+	fill_buffer();
+}
+
+static char
+inbuf_next(void)
+{
+    char ch = inbuf_peek();
+    inbuf_skip();
+    return ch;
+}
+
 static void
 check_size_token(size_t desired_size)
 {
-    if (e_token + (desired_size) >= l_token) {
-	int nsize = l_token - s_token + 400 + desired_size;
-	int token_len = e_token - s_token;
-	tokenbuf = (char *)realloc(tokenbuf, nsize);
-	if (tokenbuf == NULL)
-	    err(1, NULL);
-	e_token = tokenbuf + token_len + 1;
-	l_token = tokenbuf + nsize - 5;
-	s_token = tokenbuf + 1;
-    }
+    if (e_token + (desired_size) < l_token)
+        return;
+
+    size_t nsize = l_token - s_token + 400 + desired_size;
+    size_t token_len = e_token - s_token;
+    tokenbuf = realloc(tokenbuf, nsize);
+    if (tokenbuf == NULL)
+	err(1, NULL);
+    e_token = tokenbuf + token_len + 1;
+    l_token = tokenbuf + nsize - 5;
+    s_token = tokenbuf + 1;
 }
 
 static int
@@ -222,32 +261,22 @@ token_type_name(token_type tk)
 static void
 print_buf(const char *name, const char *s, const char *e)
 {
-    if (s == e)
-	return;
-
-    printf(" %s \"", name);
-    for (const char *p = s; p < e; p++) {
-	if (isprint((unsigned char)*p) && *p != '\\' && *p != '"')
-	    printf("%c", *p);
-	else if (*p == '\n')
-	    printf("\\n");
-	else if (*p == '\t')
-	    printf("\\t");
-	else
-	    printf("\\x%02x", *p);
+    if (s < e) {
+	debug_printf(" %s ", name);
+	debug_vis_range("\"", s, e, "\"");
     }
-    printf("\"");
 }
 
 static token_type
 lexi_end(token_type code)
 {
-    printf("in line %d, lexi returns '%s'", line_no, token_type_name(code));
+    debug_printf("in line %d, lexi returns '%s'",
+	line_no, token_type_name(code));
     print_buf("token", s_token, e_token);
     print_buf("label", s_lab, e_lab);
     print_buf("code", s_code, e_code);
     print_buf("comment", s_com, e_com);
-    printf("\n");
+    debug_printf("\n");
 
     return code;
 }
@@ -273,8 +302,7 @@ lexi(struct parser_state *state)
     while (*buf_ptr == ' ' || *buf_ptr == '\t') {	/* get rid of blanks */
 	state->col_1 = false;	/* leading blanks imply token is not in column
 				 * 1 */
-	if (++buf_ptr >= buf_end)
-	    fill_buffer();
+	inbuf_skip();
     }
 
     /* Scan an alphanumeric token */
@@ -300,41 +328,34 @@ lexi(struct parser_state *state)
 		}
 		s = table[i][s - 'A'];
 		check_size_token(1);
-		*e_token++ = *buf_ptr++;
-		if (buf_ptr >= buf_end)
-		    fill_buffer();
+		*e_token++ = inbuf_next();
 	    }
 	    /* s now indicates the type: f(loating), i(integer), u(nknown) */
-	}
-	else
+	} else {
 	    while (isalnum((unsigned char)*buf_ptr) ||
-	        *buf_ptr == '\\' ||
-		*buf_ptr == '_' || *buf_ptr == '$') {
+		   *buf_ptr == '\\' ||
+		   *buf_ptr == '_' || *buf_ptr == '$') {
 		/* fill_buffer() terminates buffer with newline */
 		if (*buf_ptr == '\\') {
-		    if (*(buf_ptr + 1) == '\n') {
+		    if (buf_ptr[1] == '\n') {
 			buf_ptr += 2;
 			if (buf_ptr >= buf_end)
 			    fill_buffer();
-			} else
-			    break;
+		    } else
+			break;
 		}
 		check_size_token(1);
-		/* copy it over */
-		*e_token++ = *buf_ptr++;
-		if (buf_ptr >= buf_end)
-		    fill_buffer();
+		*e_token++ = inbuf_next();
 	    }
+	}
 	*e_token = '\0';
 
 	if (s_token[0] == 'L' && s_token[1] == '\0' &&
 	      (*buf_ptr == '"' || *buf_ptr == '\''))
 	    return lexi_end(string_prefix);
 
-	while (*buf_ptr == ' ' || *buf_ptr == '\t') {	/* get rid of blanks */
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
-	}
+	while (*buf_ptr == ' ' || *buf_ptr == '\t')	/* get rid of blanks */
+	    inbuf_next();
 	state->keyword = rw_0;
 	if (state->last_token == keyword_struct_union_enum &&
 	    !state->p_l_follow) {
@@ -440,11 +461,9 @@ lexi(struct parser_state *state)
     /* Scan a non-alphanumeric token */
 
     check_size_token(3);	/* things like "<<=" */
-    *e_token++ = *buf_ptr;	/* if it is only a one-character token, it is
+    *e_token++ = inbuf_next();	/* if it is only a one-character token, it is
 				 * moved here */
     *e_token = '\0';
-    if (++buf_ptr >= buf_end)
-	fill_buffer();
 
     switch (*token) {
     case '\n':
@@ -462,25 +481,20 @@ lexi(struct parser_state *state)
     case '"':			/* start of string */
 	qchar = *token;
 	do {			/* copy the string */
-	    while (1) {		/* move one character or [/<char>]<char> */
+	    for (;;) {		/* move one character or [/<char>]<char> */
 		if (*buf_ptr == '\n') {
 		    diag(1, "Unterminated literal");
 		    goto stop_lit;
 		}
 		check_size_token(2);
-		*e_token = *buf_ptr++;
-		if (buf_ptr >= buf_end)
-		    fill_buffer();
+		*e_token = inbuf_next();
 		if (*e_token == '\\') {		/* if escape, copy extra char */
 		    if (*buf_ptr == '\n')	/* check for escaped newline */
 			++line_no;
-		    *++e_token = *buf_ptr++;
+		    *++e_token = inbuf_next();
 		    ++e_token;	/* we must increment this again because we
 				 * copied two chars */
-		    if (buf_ptr >= buf_end)
-			fill_buffer();
-		}
-		else
+		} else
 		    break;	/* we copied one character */
 	    }			/* end of while (1) */
 	} while (*e_token++ != qchar);
@@ -488,14 +502,14 @@ stop_lit:
 	code = ident;
 	break;
 
-    case ('('):
-    case ('['):
+    case '(':
+    case '[':
 	unary_delim = true;
 	code = lparen;
 	break;
 
-    case (')'):
-    case (']'):
+    case ')':
+    case ']':
 	code = rparen;
 	break;
 
@@ -509,17 +523,17 @@ stop_lit:
 	code = question;
 	break;
 
-    case (':'):
+    case ':':
 	code = colon;
 	unary_delim = true;
 	break;
 
-    case (';'):
+    case ';':
 	unary_delim = true;
 	code = semicolon;
 	break;
 
-    case ('{'):
+    case '{':
 	unary_delim = true;
 
 	/*
@@ -529,7 +543,7 @@ stop_lit:
 	code = lbrace;
 	break;
 
-    case ('}'):
+    case '}':
 	unary_delim = true;
 	/* ?	code = state->block_init ? rparen : rbrace; */
 	code = rbrace;
@@ -542,7 +556,7 @@ stop_lit:
 	code = form_feed;
 	break;
 
-    case (','):
+    case ',':
 	unary_delim = true;
 	code = comma;
 	break;
@@ -566,8 +580,7 @@ stop_lit:
 		/* check for following ++ or -- */
 		unary_delim = false;
 	    }
-	}
-	else if (*buf_ptr == '=')
+	} else if (*buf_ptr == '=')
 	    /* check for operator += */
 	    *e_token++ = *buf_ptr++;
 	else if (*buf_ptr == '>') {
@@ -596,11 +609,8 @@ stop_lit:
     case '>':
     case '<':
     case '!':			/* ops like <, <<, <=, !=, etc */
-	if (*buf_ptr == '>' || *buf_ptr == '<' || *buf_ptr == '=') {
-	    *e_token++ = *buf_ptr;
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
-	}
+	if (*buf_ptr == '>' || *buf_ptr == '<' || *buf_ptr == '=')
+	    *e_token++ = inbuf_next();
 	if (*buf_ptr == '=')
 	    *e_token++ = *buf_ptr++;
 	code = (state->last_u_d ? unary_op : binary_op);
@@ -620,8 +630,7 @@ stop_lit:
 		check_size_token(1);
 		*e_token++ = *buf_ptr;
 	    }
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    inbuf_skip();
 	}
 	if (ps.in_decl) {
 	    char *tp = buf_ptr;
@@ -640,23 +649,18 @@ stop_lit:
     default:
 	if (token[0] == '/' && (*buf_ptr == '*' || *buf_ptr == '/')) {
 	    /* it is start of comment */
-	    *e_token++ = *buf_ptr;
-
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    *e_token++ = inbuf_next();
 
 	    code = comment;
 	    unary_delim = state->last_u_d;
 	    break;
 	}
-	while (*(e_token - 1) == *buf_ptr || *buf_ptr == '=') {
+	while (e_token[-1] == *buf_ptr || *buf_ptr == '=') {
 	    /*
 	     * handle ||, &&, etc, and also things as in int *****i
 	     */
 	    check_size_token(1);
-	    *e_token++ = *buf_ptr;
-	    if (++buf_ptr >= buf_end)
-		fill_buffer();
+	    *e_token++ = inbuf_next();
 	}
 	code = (state->last_u_d ? unary_op : binary_op);
 	unary_delim = true;
@@ -671,28 +675,11 @@ stop_lit:
     return lexi_end(code);
 }
 
-/* Initialize constant transition table */
-void
-init_constant_tt(void)
-{
-    table['-'] = table['+'];
-    table['8'] = table['9'];
-    table['2'] = table['3'] = table['4'] = table['5'] = table['6'] = table['7'];
-    table['A'] = table['C'] = table['D'] = table['c'] = table['d'] = table['a'];
-    table['B'] = table['b'];
-    table['E'] = table['e'];
-    table['U'] = table['u'];
-    table['X'] = table['x'];
-    table['P'] = table['p'];
-    table['F'] = table['f'];
-}
-
 void
 alloc_typenames(void)
 {
 
-    typenames = (const char **)malloc(sizeof(typenames[0]) *
-        (typename_count = 16));
+    typenames = malloc(sizeof(typenames[0]) * (typename_count = 16));
     if (typenames == NULL)
 	err(1, NULL);
 }
@@ -716,8 +703,7 @@ add_typename(const char *key)
 	if (comparison == 0)	/* remove duplicates */
 	    return;
 	typenames[++typename_top] = copy = strdup(key);
-    }
-    else {
+    } else {
 	int p;
 
 	for (p = 0; (comparison = strcmp(key, typenames[p])) > 0; p++)
