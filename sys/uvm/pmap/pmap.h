@@ -186,9 +186,8 @@ struct pmap {
 #define pm_count		pm_uobject.uo_refs /* pmap reference count */
 #define pm_pvp_list		pm_uobject.memq
 
-	krwlock_t		pm_obj_lock;
-
-	kmutex_t		pm_lock;
+	krwlock_t		pm_obj_lock;	/* lock for pm_uobject */
+#define pm_lock pm_uobject.vmobjlock
 
 	struct pglist		pm_ptp_list;
 #if defined(PMAP_HWPAGEWALKER)
@@ -219,6 +218,20 @@ struct pmap {
 #endif
 	struct pmap_asid_info	pm_pai[1];
 };
+
+static inline void
+pmap_lock(struct pmap *pm)
+{
+
+	rw_enter(pm->pm_lock, RW_WRITER);
+}
+
+static inline void
+pmap_unlock(struct pmap *pm)
+{
+
+	rw_exit(pm->pm_lock);
+}
 
 #ifdef	_KERNEL
 struct pmap_kernel {

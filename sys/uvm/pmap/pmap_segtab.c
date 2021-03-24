@@ -367,10 +367,11 @@ pmap_page_attach(pmap_t pmap, vaddr_t kva, struct vm_page *pg,
 
 	UVMHIST_LOG(pmapxtabhist, "kva %#jx uobj %#jx pg %#jx list %#jx",
 	    (uintptr_t)kva, (uintptr_t)uobj, (uintptr_t)pg, (uintptr_t)pglist);
-	mutex_enter(&pmap->pm_lock);
+
+	pmap_lock(pmap);
 	TAILQ_INSERT_TAIL(pglist, pg, pageq.queue);
 	uobj->uo_npages++;
-	mutex_exit(&pmap->pm_lock);
+	pmap_unlock(pmap);
 
 	/*
 	 * Now set each vm_page that maps this page to point to the
@@ -401,10 +402,10 @@ pmap_page_detach(pmap_t pmap, struct pglist *list, vaddr_t va)
 	KASSERTMSG(pg->uobject == uobj, "pg->uobject %p vs uobj %p",
 	    pg->uobject, uobj);
 
-	mutex_enter(&pmap->pm_lock);
+	pmap_lock(pmap);
 	TAILQ_REMOVE(list, pg, pageq.queue);
 	uobj->uo_npages--;
-	mutex_exit(&pmap->pm_lock);
+	pmap_unlock(pmap);
 
 	pg->uobject = NULL;
 	pg->offset = 0;
@@ -430,7 +431,6 @@ pmap_segtab_pagefree(pmap_t pmap, struct pglist *list, vaddr_t kva, size_t size)
 	}
 #endif
 	for (size_t i = 0; i < size; i += PAGE_SIZE) {
-
 		(void)pmap_page_detach(pmap, list, kva + i);
 	}
 
@@ -790,13 +790,13 @@ pmap_pdetab_release(pmap_t pmap, pmap_pdetab_t **ptp_p, bool free_ptp,
 		if (ptb == NULL)
 			continue;
 
+		UVMHIST_LOG(pmapxtabhist, " zeroing tab (%#jx)[%jd] (%#jx)",
+		    (uintptr_t)ptp->pde_pde, i, (uintptr_t)&ptp->pde_pde[i], 0);
+
 		// XXXNH pte_set - probably not as we're
 		ptp->pde_pde[i] = pte_invalid_pde();
 
 		pmap_ptpage_free(pmap, ptb, __func__);
-		UVMHIST_LOG(pmapxtabhist, " zeroing tab(%#jx)[%jd] (%#jx)", i,
-		    (uintptr_t)ptp->pde_pde, (uintptr_t)&ptp->pde_pde[i], 0);
-
 	}
 
 	if (free_ptp) {

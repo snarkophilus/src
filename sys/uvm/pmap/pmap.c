@@ -633,7 +633,6 @@ pmap_bootstrap_common(void)
 	pmap_t pm = pmap_kernel();
 
 	rw_init(&pm->pm_obj_lock);
-	mutex_init(&pm->pm_lock, MUTEX_DEFAULT, IPL_VM);
 	uvm_obj_init(&pm->pm_uobject, &pmap_pager, false, 1);
 	uvm_obj_setlock(&pm->pm_uobject, &pm->pm_obj_lock);
 
@@ -718,9 +717,6 @@ pmap_create(void)
 	pmap->pm_minaddr = VM_MIN_ADDRESS;
 	pmap->pm_maxaddr = VM_MAXUSER_ADDRESS;
 
-	/* XXXNH IPL_VM ??? */
-	mutex_init(&pmap->pm_lock, MUTEX_DEFAULT, IPL_VM);
-
 	rw_init(&pmap->pm_obj_lock);
 	uvm_obj_init(&pmap->pm_uobject, &pmap_pager, false, 1);
 	uvm_obj_setlock(&pmap->pm_uobject, &pmap->pm_obj_lock);
@@ -777,6 +773,7 @@ pmap_destroy(pmap_t pmap)
 	pmap_tlb_miss_lock_exit();
 
 	KASSERT(TAILQ_EMPTY(&pmap->pm_ptp_list));
+
 #ifdef _LP64
 #if defined(PMAP_HWPAGEWALKER)
 	KASSERT(TAILQ_EMPTY(&pmap->pm_pdetab_list));
@@ -789,7 +786,6 @@ pmap_destroy(pmap_t pmap)
 
 	uvm_obj_destroy(&pmap->pm_uobject, false);
 	rw_destroy(&pmap->pm_obj_lock);
-	mutex_destroy(&pmap->pm_lock);
 
 #ifdef MULTIPROCESSOR
 	kcpuset_destroy(pmap->pm_active);
