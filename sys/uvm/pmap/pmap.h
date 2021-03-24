@@ -267,11 +267,6 @@ extern pmap_pdetab_t pmap_kern_pdetab;
 extern pmap_segtab_t pmap_kern_segtab;
 #endif
 
-/*
- * The current top of kernel VM
- */
-extern vaddr_t pmap_curmaxkvaddr;
-
 #define	pmap_wired_count(pmap) 	((pmap)->pm_stats.wired_count)
 #define pmap_resident_count(pmap) ((pmap)->pm_stats.resident_count)
 
