@@ -87,24 +87,6 @@
 /* l3pte contains always page entries */
 
 
-// XXXNH WTF?
-#if 0
-#ifndef KASAN
-#define PMAP_MAP_POOLPAGE(pa)		AARCH64_PA_TO_KVA(pa)
-#define PMAP_UNMAP_POOLPAGE(va)		AARCH64_KVA_TO_PA(va)
-
-#define PMAP_DIRECT
-static __inline int
-pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
-    int (*process)(void *, size_t, void *), void *arg)
-{
-	vaddr_t va = AARCH64_PA_TO_KVA(pa);
-
-	return process((void *)(va + pgoff), len, arg);
-}
-#endif
-#endif
-
 pd_entry_t *pmap_l0table(struct pmap *);
 
 bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
@@ -332,9 +314,23 @@ struct vm_page_md {
 #define LX_BLKPAG_OS_WRITE		LX_BLKPAG_OS_1
 #define LX_BLKPAG_OS_RWMASK		(LX_BLKPAG_OS_WRITE|LX_BLKPAG_OS_READ)
 
-
 #define VTOPHYS_FAILED			((paddr_t)-1L)	/* POOL_PADDR_INVALID */
 #define POOL_VTOPHYS(va)		vtophys((vaddr_t) (va))
+
+#ifndef KASAN
+#define PMAP_MAP_POOLPAGE(pa)		AARCH64_PA_TO_KVA(pa)
+#define PMAP_UNMAP_POOLPAGE(va)		AARCH64_KVA_TO_PA(va)
+
+#define PMAP_DIRECT
+static __inline int
+pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
+    int (*process)(void *, size_t, void *), void *arg)
+{
+	vaddr_t va = AARCH64_PA_TO_KVA(pa);
+
+	return process((void *)(va + pgoff), len, arg);
+}
+#endif
 
 pt_entry_t *kvtopte(vaddr_t);
 

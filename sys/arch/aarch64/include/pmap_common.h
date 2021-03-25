@@ -65,8 +65,6 @@ pmap_md_tlb_asid_max(void)
 	}
 }
 
-
-
 #define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
 
 #define PMAP_PDETABSIZE	(PAGE_SIZE / sizeof(pd_entry_t))
@@ -181,6 +179,20 @@ struct pmap_md {
 #define pm_l0		pm_md.pmd_l0
 #define pm_l0_pa	pm_md.pmd_l0_pa
 
+void pmap_md_pdetab_init(struct pmap *);
+void pmap_md_pdetab_destroy(struct pmap *);
+
+vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
+paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
+struct vm_page *pmap_md_alloc_poolpage(int);
+
+bool	pmap_md_kernel_vaddr_p(vaddr_t);
+paddr_t	pmap_md_kernel_vaddr_to_paddr(vaddr_t);
+bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
+paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
+vaddr_t	pmap_md_direct_map_paddr(paddr_t);
+bool	pmap_md_io_vaddr_p(vaddr_t);
+
 #include <uvm/pmap/vmpagemd.h>
 #include <uvm/pmap/pmap.h>
 #include <uvm/pmap/pmap_pvt.h>
@@ -190,20 +202,7 @@ struct pmap_md {
 
 #include <uvm/uvm_page.h>
 
-void pmap_md_pdetab_init(struct pmap *);
-void pmap_md_pdetab_destroy(struct pmap *);
-
-vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
-paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
-struct vm_page *pmap_md_alloc_poolpage(int);
-
 #define POOL_VTOPHYS(va)	vtophys((vaddr_t)(va))
-
-bool	pmap_md_kernel_vaddr_p(vaddr_t);
-paddr_t	pmap_md_kernel_vaddr_to_paddr(vaddr_t);
-bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
-paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
-bool	pmap_md_io_vaddr_p(vaddr_t);
 
 struct pmap_page {
 	struct vm_page_md	pp_md;

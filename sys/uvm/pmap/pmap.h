@@ -101,6 +101,18 @@ paddr_t pmap_unmap_poolpage(vaddr_t);
 #define	PMAP_ALLOC_POOLPAGE(flags)	pmap_md_alloc_poolpage(flags)
 #define	PMAP_MAP_POOLPAGE(pa)		pmap_map_poolpage(pa)
 #define	PMAP_UNMAP_POOLPAGE(va)		pmap_unmap_poolpage(va)
+
+#if defined(_LP64)
+#define PMAP_DIRECT
+static __inline int
+pmap_direct_process(paddr_t pa, voff_t pgoff, size_t len,
+    int (*process)(void *, size_t, void *), void *arg)
+{
+        vaddr_t va = pmap_md_direct_map_paddr(pa);
+
+        return process((void *)(va + pgoff), len, arg);
+}
+#endif
 #endif
 
 #define PMAP_MAP_PDETABPAGE(pa)		pmap_md_map_poolpage(pa, PAGE_SIZE)

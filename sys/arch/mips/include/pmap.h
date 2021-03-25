@@ -164,6 +164,45 @@ pmap_md_xtab_deactivate(struct pmap *pm)
 
 #endif /* __PMAP_PRIVATE */
 
+/*
+ * Other hooks for the pool allocator.
+ */
+paddr_t	pmap_md_pool_vtophys(vaddr_t);
+vaddr_t	pmap_md_pool_phystov(paddr_t);
+#define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
+#define	POOL_PHYSTOV(pa)	pmap_md_pool_phystov((paddr_t)pa)
+
+// these use register_t so we can pass XKPHYS addresses to them on N32
+bool	pmap_md_direct_mapped_vaddr_p(register_t);
+paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(register_t);
+
+
+#define pmap_md_direct_map_paddr(pa)	pmap_md_pool_phystov((paddr_t)pa)
+
+bool	pmap_md_io_vaddr_p(vaddr_t);
+
+static inline bool
+pmap_md_kernel_vaddr_p(vaddr_t va)
+{
+	return false;
+}
+
+static inline paddr_t
+pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
+{
+	/* Not used due to false from pmap_md_kernel_vaddr_p */
+
+	return 0;
+}
+
+/*
+ * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
+ */
+vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
+paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
+struct vm_page *pmap_md_alloc_poolpage(int);
+
+
 struct tlbmask {
 	vaddr_t	tlb_hi;
 /* XXX register_t */
@@ -247,41 +286,6 @@ void	pmap_prefer(vaddr_t, vaddr_t *, vsize_t, int);
 #endif /* MIPS3_PLUS */
 
 #define	PMAP_ENABLE_PMAP_KMPAGE	/* enable the PMAP_KMPAGE flag */
-
-// these use register_t so we can pass XKPHYS addresses to them on N32
-bool	pmap_md_direct_mapped_vaddr_p(register_t);
-paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(register_t);
-bool	pmap_md_io_vaddr_p(vaddr_t);
-
-static inline bool
-pmap_md_kernel_vaddr_p(vaddr_t va)
-{
-	return false;
-}
-
-static inline paddr_t
-pmap_md_kernel_vaddr_to_paddr(vaddr_t vax)
-{
-	/* Not used due to false from pmap_md_kernel_vaddr_p */
-
-	return 0;
-}
-
-
-/*
- * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
- */
-vaddr_t pmap_md_map_poolpage(paddr_t, size_t);
-paddr_t pmap_md_unmap_poolpage(vaddr_t, size_t);
-struct vm_page *pmap_md_alloc_poolpage(int);
-
-/*
- * Other hooks for the pool allocator.
- */
-paddr_t	pmap_md_pool_vtophys(vaddr_t);
-vaddr_t	pmap_md_pool_phystov(paddr_t);
-#define	POOL_VTOPHYS(va)	pmap_md_pool_vtophys((vaddr_t)va)
-#define	POOL_PHYSTOV(pa)	pmap_md_pool_phystov((paddr_t)pa)
 
 #ifdef MIPS64_SB1
 /* uncached accesses are bad; all accesses should be cached (and coherent) */

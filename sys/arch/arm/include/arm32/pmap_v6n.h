@@ -192,15 +192,6 @@ struct pmap_md {
 #define	pm_l1_pa	pm_md.pmd_l1_pa
 #define	pm_l2		pm_md.pmd_l2
 
-#include <uvm/pmap/vmpagemd.h>
-#include <uvm/pmap/pmap.h>
-#include <uvm/pmap/pmap_pvt.h>
-#include <uvm/pmap/pmap_tlb.h>
-#include <uvm/pmap/pmap_synci.h>
-#include <uvm/pmap/tlb.h>
-
-#include <uvm/uvm_page.h>
-
 void pmap_md_pdetab_init(struct pmap *);
 void pmap_md_pdetab_destroy(struct pmap *);
 
@@ -220,7 +211,17 @@ bool	pmap_md_kernel_vaddr_p(vaddr_t);
 paddr_t	pmap_md_kernel_vaddr_to_paddr(vaddr_t);
 bool	pmap_md_direct_mapped_vaddr_p(vaddr_t);
 paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
+vaddr_t	pmap_md_direct_map_paddr(paddr_t);
 bool	pmap_md_io_vaddr_p(vaddr_t);
+
+#include <uvm/pmap/vmpagemd.h>
+#include <uvm/pmap/pmap.h>
+#include <uvm/pmap/pmap_pvt.h>
+#include <uvm/pmap/pmap_tlb.h>
+#include <uvm/pmap/pmap_synci.h>
+#include <uvm/pmap/tlb.h>
+
+#include <uvm/uvm_page.h>
 
 struct pmap_page {
 	struct vm_page_md pp_md;
