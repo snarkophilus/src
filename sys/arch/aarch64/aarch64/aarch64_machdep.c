@@ -1,4 +1,4 @@
-/* $NetBSD: aarch64_machdep.c,v 1.58 2021/03/21 07:32:44 skrll Exp $ */
+/* $NetBSD: aarch64_machdep.c,v 1.60 2021/03/25 07:31:56 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(1, "$NetBSD: aarch64_machdep.c,v 1.58 2021/03/21 07:32:44 skrll Exp $");
+__KERNEL_RCSID(1, "$NetBSD: aarch64_machdep.c,v 1.60 2021/03/25 07:31:56 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_cpuoptions.h"
