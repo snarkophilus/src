@@ -342,6 +342,7 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 
 	*ptep = pte;
 	dsb(ishst);
+	isb();
 }
 
 static inline pd_entry_t
