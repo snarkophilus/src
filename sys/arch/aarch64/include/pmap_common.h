@@ -342,6 +342,14 @@ pte_set(pt_entry_t *ptep, pt_entry_t pte)
 
 	*ptep = pte;
 	dsb(ishst);
+	/*
+	 * if this mapping is going to be used by userland then the eret *can* act
+	 * as the isb, but might not (apple m1).
+	 *
+	 * if this mapping is kernel then the isb is always needed (for some micro-
+	 * architectures)
+	 */
+
 	isb();
 }
 
