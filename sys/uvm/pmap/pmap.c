@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.61 2021/03/19 07:51:33 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.62 2021/04/17 01:53:58 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -67,7 +67,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.61 2021/03/19 07:51:33 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.62 2021/04/17 01:53:58 mrg Exp $");
 
 /*
  *	Manages physical address maps.
@@ -253,10 +253,10 @@ struct pmap_limits pmap_limits = {	/* VA and PA limits */
 #ifdef UVMHIST
 static struct kern_history_ent pmapexechistbuf[10000];
 static struct kern_history_ent pmaphistbuf[10000];
-static struct kern_history_ent pmapxtabhistbuf[50000];
-UVMHIST_DEFINE(pmapexechist);
-UVMHIST_DEFINE(pmaphist);
-UVMHIST_DEFINE(pmapxtabhist);
+static struct kern_history_ent pmapxtabhistbuf[5000];
+UVMHIST_DEFINE(pmapexechist) = UVMHIST_INITIALIZER(pmapexechist, pmapexechistbuf);
+UVMHIST_DEFINE(pmaphist) = UVMHIST_INITIALIZER(pmaphist, pmaphistbuf);
+UVMHIST_DEFINE(pmapxtabhist) = UVMHIST_INITIALIZER(pmapxtabhist, pmapxtabhistbuf);
 #endif
 
 /*
@@ -622,9 +622,9 @@ pmap_steal_memory(vsize_t size, vaddr_t *vstartp, vaddr_t *vendp)
 void
 pmap_bootstrap_common(void)
 {
-	UVMHIST_INIT_STATIC(pmapexechist, pmapexechistbuf);
-	UVMHIST_INIT_STATIC(pmaphist, pmaphistbuf);
-	UVMHIST_INIT_STATIC(pmapxtabhist, pmapxtabhistbuf);
+	UVMHIST_LINK_STATIC(pmapexechist);
+	UVMHIST_LINK_STATIC(pmaphist);
+	UVMHIST_LINK_STATIC(pmapxtabhist);
 
 	static const struct uvm_pagerops pmap_pager = {
 		/* nothing */
