@@ -422,6 +422,9 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 		case LX_BLKPAG_ATTR_DEVICE_MEM_SO:
 			pr(", SO");
 			break;
+		default:
+			pr(", ATTR(%lu)", __SHIFTOUT(pte, LX_BLKPAG_ATTR_INDX));
+			break;
 		}
 
 		if (pte & LX_BLKPAG_OS_0)
