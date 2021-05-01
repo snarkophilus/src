@@ -1,4 +1,4 @@
-/* $NetBSD: ix_txrx.c,v 1.70 2021/03/31 07:53:53 msaitoh Exp $ */
+/* $NetBSD: ix_txrx.c,v 1.71 2021/04/30 06:55:32 msaitoh Exp $ */
 
 /******************************************************************************
 
@@ -62,6 +62,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ix_txrx.c,v 1.71 2021/04/30 06:55:32 msaitoh Exp $");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -1873,6 +1876,34 @@ ixgbe_rxeof(struct ix_queue *que)
 			discard_multidesc = false;
 			goto next_desc;
 		}
+
+		/* pre-alloc new mbuf */
+		if (!discard_multidesc)
+			newmp = ixgbe_getjcl(&rxr->jcl_head, M_NOWAIT, MT_DATA,
+			    M_PKTHDR, rxr->mbuf_sz);
+		else
+			newmp = NULL;
+		if (newmp == NULL) {
+			rxr->no_jmbuf.ev_count++;
+			/*
+			 * Descriptor initialization is already done by the
+			 * above code (cur->wb.upper.status_error = 0).
+			 * So, we can reuse current rbuf->buf for new packet.
+			 *
+			 * Rewrite the buffer addr, see comment in
+			 * ixgbe_rx_discard().
+			 */
+			cur->read.pkt_addr = rbuf->addr;
+			m_freem(rbuf->fmp);
+			rbuf->fmp = NULL;
+			if (!eop) {
+				/* Discard the entire packet. */
+				discard_multidesc = true;
+			} else
+				discard_multidesc = false;
+			goto next_desc;
+		}
+		discard_multidesc = false;
 
 		/* pre-alloc new mbuf */
 		if (!discard_multidesc)

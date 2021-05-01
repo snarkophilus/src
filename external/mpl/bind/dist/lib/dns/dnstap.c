@@ -1,4 +1,4 @@
-/*	$NetBSD: dnstap.c,v 1.10 2021/04/05 11:27:02 rillig Exp $	*/
+/*	$NetBSD: dnstap.c,v 1.11 2021/04/29 17:26:11 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -49,6 +49,7 @@
 #error DNSTAP not configured.
 #endif /* HAVE_DNSTAP */
 
+#include <fstrm.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -983,7 +984,8 @@ dns_dt_open(const char *filename, dns_dtmode_t mode, isc_mem_t *mctx,
 		}
 		break;
 	case dns_dtmode_unix:
-		return (ISC_R_NOTIMPLEMENTED);
+		result = ISC_R_NOTIMPLEMENTED;
+		goto cleanup;
 	default:
 		INSIST(0);
 		ISC_UNREACHABLE();

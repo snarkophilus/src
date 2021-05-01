@@ -1,4 +1,4 @@
-/*	$NetBSD: notify_test.c,v 1.7 2021/02/19 16:42:22 christos Exp $	*/
+/*	$NetBSD: notify_test.c,v 1.8 2021/04/29 17:26:14 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -164,16 +164,9 @@ main(void) {
 
 int
 main(void) {
-#if __SANITIZE_ADDRESS__
-	/*
-	 * We disable this test when the address sanitizer is in
-	 * the use, as libuv will trigger errors.
-	 */
-	printf("1..0 # Skip ASAN is in use\n");
-#else  /* __SANITIZE_ADDRESS__ */
-	printf("1..0 # Skip cmocka not available\n");
-#endif /* __SANITIZE_ADDRESS__ */
-	return (0);
+	printf("1..0 # Skipped: cmocka not available\n");
+
+	return (SKIPPED_TEST_EXIT_CODE);
 }
 
-#endif /* HAVE_CMOCKA && !__SANITIZE_ADDRESS__ */
+#endif /* HAVE_CMOCKA */
