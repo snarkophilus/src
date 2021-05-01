@@ -20450,8 +20450,6 @@ dns_zone_cdscheck(dns_zone_t *zone, dns_db_t *db, dns_dbversion_t *version) {
 
 	enum { notexpected = 0, expected = 1, found = 2 };
 
-	enum { notexpected = 0, expected = 1, found = 2 };
-
 	REQUIRE(DNS_ZONE_VALID(zone));
 
 	result = dns_db_getoriginnode(db, &node);

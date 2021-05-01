@@ -630,4 +630,4 @@ main(void) {
 	return (SKIPPED_TEST_EXIT_CODE);
 }
 
-#endif /* HAVE_CMOCKA && !__SANITIZE_ADDRESS__ */
+#endif /* HAVE_CMOCKA */

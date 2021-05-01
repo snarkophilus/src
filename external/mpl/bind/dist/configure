@@ -17113,16 +17113,6 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-$as_echo "#define HAVE_OPENSSL_ED448 1" >>confdefs.h
-
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
 #
 # Check for OpenSSL SHA-1 support
 #
@@ -18359,24 +18349,7 @@ $as_echo "$as_me: WARNING: --with-libjson is DEPRECATED and will be removed in a
 else
   with_libjson="detect"
 fi
-        if test $_pkg_short_errors_supported = yes; then
-	        LIBXML2_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "libxml-2.0 >= 2.6.0" 2>&1`
-        else
-	        LIBXML2_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "libxml-2.0 >= 2.6.0" 2>&1`
-        fi
-	# Put the nasty error message in config.log where it belongs
-	echo "$LIBXML2_PKG_ERRORS" >&5
 
-	:
-elif test $pkg_failed = untried; then
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-	:
-else
-	LIBXML2_CFLAGS=$pkg_cv_LIBXML2_CFLAGS
-	LIBXML2_LIBS=$pkg_cv_LIBXML2_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
 
 #
 # was --with-json-c specified?
@@ -18576,12 +18549,9 @@ esac
 if test "${with_zlib+set}" = set; then :
   withval=$with_zlib;
 else
-	ZLIB_CFLAGS=$pkg_cv_ZLIB_CFLAGS
-	ZLIB_LIBS=$pkg_cv_ZLIB_LIBS
-        { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+  with_zlib="auto"
+fi
 
-$as_echo "#define HAVE_ZLIB 1" >>confdefs.h
 
 case $with_zlib in #(
   no) :
@@ -19258,24 +19228,6 @@ _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
 
 $as_echo "#define HAVE_LIBCTRACE 1" >>confdefs.h
-
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <stddef.h>
-int
-main ()
-{
-return _Unwind_Backtrace(NULL, NULL);
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-
-$as_echo "#define HAVE_UNWIND_BACKTRACE 1" >>confdefs.h
-
 
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -20204,85 +20156,6 @@ int
 main ()
 {
 int64_t val = 0; __atomic_fetch_add(&val, 1, __ATOMIC_RELAXED);
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-else
-  ISC_ATOMIC_LIBS="-latomic"
-
-
-  CCASFLAGS_atomic_ax_save_flags=$CCASFLAGS
-
-
-
-  CFLAGS_atomic_ax_save_flags=$CFLAGS
-
-
-
-  CPPFLAGS_atomic_ax_save_flags=$CPPFLAGS
-
-
-
-  CXXFLAGS_atomic_ax_save_flags=$CXXFLAGS
-
-
-
-  ERLCFLAGS_atomic_ax_save_flags=$ERLCFLAGS
-
-
-
-  FCFLAGS_atomic_ax_save_flags=$FCFLAGS
-
-
-
-  FCLIBS_atomic_ax_save_flags=$FCLIBS
-
-
-
-  FFLAGS_atomic_ax_save_flags=$FFLAGS
-
-
-
-  FLIBS_atomic_ax_save_flags=$FLIBS
-
-
-
-  GCJFLAGS_atomic_ax_save_flags=$GCJFLAGS
-
-
-
-  JAVACFLAGS_atomic_ax_save_flags=$JAVACFLAGS
-
-
-
-  LDFLAGS_atomic_ax_save_flags=$LDFLAGS
-
-
-
-  LIBS_atomic_ax_save_flags=$LIBS
-
-
-
-  OBJCFLAGS_atomic_ax_save_flags=$OBJCFLAGS
-
-
-
-  OBJCXXFLAGS_atomic_ax_save_flags=$OBJCXXFLAGS
-
-
-
-  UPCFLAGS_atomic_ax_save_flags=$UPCFLAGS
-
-
-
-  VALAFLAGS_atomic_ax_save_flags=$VALAFLAGS
-
-
 
   ;
   return 0;

@@ -13,7 +13,7 @@ SYSTEMTESTTOP=..
 . $SYSTEMTESTTOP/conf.sh
 
 status=0
-n=1
+n=0
 
 dig_with_opts() {
     "$DIG" +tcp +noau +noadd +nosea +nostat +nocmd +dnssec -p "$PORT" "$@"

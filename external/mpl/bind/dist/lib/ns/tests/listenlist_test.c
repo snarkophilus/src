@@ -13,7 +13,7 @@
 
 #include <isc/util.h>
 
-#if HAVE_CMOCKA && !__SANITIZE_ADDRESS__
+#if HAVE_CMOCKA
 
 #include <sched.h> /* IWYU pragma: keep */
 #include <setjmp.h>
@@ -137,4 +137,4 @@ main(void) {
 	return (SKIPPED_TEST_EXIT_CODE);
 }
 
-#endif /* HAVE_CMOCKA && !__SANITIZE_ADDRESS__ */
+#endif /* HAVE_CMOCKA */

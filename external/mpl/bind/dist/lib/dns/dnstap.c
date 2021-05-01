@@ -54,8 +54,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <protobuf-c/protobuf-c.h>
-
 #include <isc/buffer.h>
 #include <isc/file.h>
 #include <isc/log.h>

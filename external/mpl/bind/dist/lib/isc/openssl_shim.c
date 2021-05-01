@@ -221,4 +221,4 @@ OPENSSL_init_ssl(uint64_t opts, const void *settings) {
 
 	return (1);
 }
-#endif /* if !HAVE_HMAC_CTX_GET_MD */
+#endif

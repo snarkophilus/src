@@ -13,7 +13,7 @@
 
 #include <isc/util.h>
 
-#if HAVE_CMOCKA && !__SANITIZE_ADDRESS__
+#if HAVE_CMOCKA
 
 #include <sched.h> /* IWYU pragma: keep */
 #include <setjmp.h>
@@ -158,7 +158,7 @@ main(void) {
 	print_message("1..0 # Skip notify_test requires libtool or LD_WRAP\n");
 #endif /* if defined(USE_LIBTOOL) || LD_WRAP */
 }
-#else /* HAVE_CMOCKA && !__SANITIZE_ADDRESS__ */
+#else /* HAVE_CMOCKA */
 
 #include <stdio.h>
 

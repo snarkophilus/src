@@ -11417,10 +11417,8 @@ ns_query_done(query_ctx_t *qctx) {
 	 * to the AA bit if the auth-nxdomain config option
 	 * says so, then render and send the response.
 	 */
-	if (!QUERY_ANSWERED(qctx->client)) {
-		query_setup_sortlist(qctx);
-		query_glueanswer(qctx);
-	}
+	query_setup_sortlist(qctx);
+	query_glueanswer(qctx);
 
 	if (qctx->client->message->rcode == dns_rcode_nxdomain &&
 	    qctx->view->auth_nxdomain)

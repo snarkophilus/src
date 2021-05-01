@@ -8431,29 +8431,6 @@ getservestalerefresh(dns_db_t *db, uint32_t *interval) {
 	REQUIRE(VALID_RBTDB(rbtdb));
 	REQUIRE(IS_CACHE(rbtdb));
 
-	*ttl = rbtdb->serve_stale_ttl;
-	return (ISC_R_SUCCESS);
-}
-
-static isc_result_t
-setservestalerefresh(dns_db_t *db, uint32_t interval) {
-	dns_rbtdb_t *rbtdb = (dns_rbtdb_t *)db;
-
-	REQUIRE(VALID_RBTDB(rbtdb));
-	REQUIRE(IS_CACHE(rbtdb));
-
-	/* currently no bounds checking.  0 means disable. */
-	rbtdb->serve_stale_refresh = interval;
-	return (ISC_R_SUCCESS);
-}
-
-static isc_result_t
-getservestalerefresh(dns_db_t *db, uint32_t *interval) {
-	dns_rbtdb_t *rbtdb = (dns_rbtdb_t *)db;
-
-	REQUIRE(VALID_RBTDB(rbtdb));
-	REQUIRE(IS_CACHE(rbtdb));
-
 	*interval = rbtdb->serve_stale_refresh;
 	return (ISC_R_SUCCESS);
 }

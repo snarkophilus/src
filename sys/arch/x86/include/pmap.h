@@ -189,10 +189,6 @@ extern struct slotspace slotspace;
 
 #include <x86/gdt.h>
 
-#ifndef MAX_USERLDT_SIZE
-#define MAX_USERLDT_SIZE PAGE_SIZE /* XXX */
-#endif
-
 struct pcpu_entry {
 	uint8_t gdt[MAXGDTSIZ];
 	uint8_t ldt[MAX_USERLDT_SIZE];

@@ -292,9 +292,6 @@ delete_ds(dns_keytable_t *keytable, dns_rbtnode_t *node, dns_rdata_ds_t *ds) {
 			break;
 		}
 	}
-	RWUNLOCK(&knode->rwlock, isc_rwlocktype_read);
-
-	keynode_detach(keytable->mctx, &knode);
 
 	if (!found) {
 		RWUNLOCK(&knode->rwlock, isc_rwlocktype_read);

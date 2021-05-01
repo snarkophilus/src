@@ -655,10 +655,6 @@
 # if defined __BIG_ENDIAN__
 #  define WORDS_BIGENDIAN 1
 # endif
-/* Enable large inode numbers on Mac OS X 10.5.  */
-# ifndef _DARWIN_USE_64_BIT_INODE
-#  define _DARWIN_USE_64_BIT_INODE 1
-# endif
 #else
 # ifndef WORDS_BIGENDIAN
 /* #  undef WORDS_BIGENDIAN */
