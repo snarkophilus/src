@@ -1,4 +1,4 @@
-/* $NetBSD: pmap.h,v 1.46 2021/03/20 14:30:50 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.47 2021/04/30 20:07:23 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -86,17 +86,18 @@
 #define l3pte_is_page(pde)	(((pde) & LX_TYPE) == L3_TYPE_PAG)
 /* l3pte contains always page entries */
 
-
 pd_entry_t *pmap_l0table(struct pmap *);
 
 bool	pmap_extract_coherency(pmap_t, vaddr_t, paddr_t *, bool *);
+
+pd_entry_t *pmap_l0table(struct pmap *);
 
 /* change attribute of kernel segment */
 static inline pt_entry_t
 pmap_kvattr(pt_entry_t *ptep, vm_prot_t prot)
 {
 	pt_entry_t pte = *ptep;
-	pt_entry_t opte = pte;
+	const pt_entry_t opte = pte;
 
 	pte &= ~(LX_BLKPAG_AF | LX_BLKPAG_AP);
 	switch (prot & (VM_PROT_READ | VM_PROT_WRITE)) {
@@ -348,6 +349,10 @@ void	pmap_pv_untrack(paddr_t, psize_t);
 void	pmap_pv_protect(paddr_t, vm_prot_t);
 
 #define	PMAP_MAPSIZE1	L2_SIZE
+
+/* for ddb */
+void pmap_db_pmap_print(struct pmap *, void (*)(const char *, ...) __printflike(1, 2));
+void pmap_db_mdpg_print(struct vm_page *, void (*)(const char *, ...) __printflike(1, 2));
 
 #endif	/* !PMAP_COMMON */
 

@@ -1,11 +1,12 @@
-/* $NetBSD: pte.h,v 1.5 2020/11/01 19:47:46 skrll Exp $ */
+/* $NetBSD: pte.h,v 1.6 2021/05/01 07:41:24 skrll Exp $ */
 
 /*
- * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2019, 2021 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas (of 3am Software Foundry) and Maxime Villard.
+ * by Matt Thomas (of 3am Software Foundry), Maxime Villard, and
+ * Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,7 +57,7 @@ typedef __uint32_t pd_entry_t;
 #define NPDEPG		NPTEPG
 
 /* Software PTE bits. */
-#define PTE_RSW		__BITS(9,8)
+#define	PTE_RSW		__BITS(9,8)
 #define	PTE_WIRED	__BIT(9)
 
 /* Hardware PTE bits. */

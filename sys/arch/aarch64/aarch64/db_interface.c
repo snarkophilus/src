@@ -1,4 +1,4 @@
-/* $NetBSD: db_interface.c,v 1.12 2021/02/05 21:44:34 joerg Exp $ */
+/* $NetBSD: db_interface.c,v 1.13 2021/04/30 20:07:22 skrll Exp $ */
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,13 +27,17 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.12 2021/02/05 21:44:34 joerg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.13 2021/04/30 20:07:22 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
 
 #include <uvm/uvm.h>
+#include <uvm/uvm_ddb.h>
 #include <uvm/uvm_prot.h>
+#ifdef __HAVE_PMAP_PV_TRACK
+#include <uvm/pmap/pmap_pvt.h>
+#endif
 
 #include <aarch64/db_machdep.h>
 #include <aarch64/machdep.h>
@@ -68,8 +72,6 @@ db_validate_address(vaddr_t addr)
 	return (pmap_extract(pmap, addr, NULL) == false);
 }
 
-db_regs_t ddb_regs;
-
 void
 db_read_bytes(vaddr_t addr, size_t size, char *data)
 {
@@ -77,17 +79,15 @@ db_read_bytes(vaddr_t addr, size_t size, char *data)
 	const char *src;
 
 	for (src = (const char *)addr; size > 0;) {
+		const vaddr_t va = (vaddr_t)src;
 		uintptr_t tmp;
 
-		if ((lastpage != atop((vaddr_t)src)) &&
-		    db_validate_address((vaddr_t)src)) {
-#ifdef DDB
+		if (lastpage != atop(va) && db_validate_address(va)) {
 			db_printf("address %p is invalid\n", src);
-#endif
 			memset(data, 0, size);	/* stubs are filled by zero */
 			return;
 		}
-		lastpage = atop((vaddr_t)src);
+		lastpage = atop(va);
 
 		if (aarch64_pan_enabled)
 			reg_pan_write(0); /* disable PAN */
@@ -192,16 +192,14 @@ db_write_bytes(vaddr_t addr, size_t size, const char *data)
 
 	/* XXX: need to check read only block/page */
 	for (dst = (char *)addr; size > 0;) {
+		const vaddr_t va = (vaddr_t)dst;
 		uintptr_t tmp;
 
-		if ((lastpage != atop((vaddr_t)dst)) &&
-		    db_validate_address((vaddr_t)dst)) {
-#ifdef DDB
+		if (lastpage != atop(va) && db_validate_address(va)) {
 			db_printf("address %p is invalid\n", dst);
-#endif
 			return;
 		}
-		lastpage = atop((vaddr_t)dst);
+		lastpage = atop(va);
 
 		tmp = (uintptr_t)dst | (uintptr_t)data;
 		if ((size >= 8) && ((tmp & 7) == 0)) {
@@ -310,23 +308,8 @@ db_inst_unconditional_flow_transfer(db_expr_t inst)
 	return false;
 }
 
-static void
-pg_dump(struct vm_page *pg, void (*pr)(const char *, ...) __printflike(1, 2))
-{
-	pr("pg=%p\n", pg);
-	pr(" pg->uanon   = %p\n", pg->uanon);
-	pr(" pg->uobject = %p\n", pg->uobject);
-	pr(" pg->offset  = %zu\n", pg->offset);
-	pr(" pg->flags      = %u\n", pg->flags);
-	pr(" pg->loan_count = %u\n", pg->loan_count);
-	pr(" pg->wire_count = %u\n", pg->wire_count);
-	pr(" pg->pqflags    = %u\n", pg->pqflags);
-	pr(" pg->phys_addr  = %016lx\n", VM_PAGE_TO_PHYS(pg));
-}
-
-
 void
-pmap_db_pte_print(pt_entry_t pte, int level,
+db_pte_print(pt_entry_t pte, int level,
     void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	if (pte == 0) {
@@ -441,12 +424,10 @@ pmap_db_pte_print(pt_entry_t pte, int level,
 	pr("\n");
 }
 
-
 void
-pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
+db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	struct vm_page *pg;
-	struct pmap_page *pp;
 	bool user;
 	pd_entry_t *l0, *l1, *l2, *l3;
 	pd_entry_t pde;
@@ -488,7 +469,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 	pde = l0[idx];
 
 	pr("L0[%3d]=%016"PRIx64":", idx, pde);
-	pmap_db_pte_print(pde, 0, pr);
+	db_pte_print(pde, 0, pr);
 
 	if (!l0pde_valid(pde))
 		return;
@@ -498,7 +479,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 	pde = l1[idx];
 
 	pr(" L1[%3d]=%016"PRIx64":", idx, pde);
-	pmap_db_pte_print(pde, 1, pr);
+	db_pte_print(pde, 1, pr);
 
 	if (!l1pde_valid(pde) || l1pde_is_block(pde))
 		return;
@@ -508,7 +489,7 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 	pde = l2[idx];
 
 	pr("  L2[%3d]=%016"PRIx64":", idx, pde);
-	pmap_db_pte_print(pde, 2, pr);
+	db_pte_print(pde, 2, pr);
 
 	if (!l2pde_valid(pde) || l2pde_is_block(pde))
 		return;
@@ -518,19 +499,24 @@ pmap_db_pteinfo(vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 	pte = l3[idx];
 
 	pr("   L3[%3d]=%016"PRIx64":", idx, pte);
-	pmap_db_pte_print(pte, 3, pr);
+	db_pte_print(pte, 3, pr);
 
 	pa = l3pte_pa(pte);
 	pg = PHYS_TO_VM_PAGE(pa);
-	pp = NULL /*phys_to_pp(pa)*/;
-	if (pp == NULL) {
-		pr("No VM_PAGE nor PMAP_PAGE\n");
+
+	if (pg != NULL) {
+		uvm_page_printit(pg, false, pr);
+
+		pmap_db_mdpg_print(pg, pr);
 	} else {
-		if (pg != NULL)
-			pg_dump(pg, pr);
+#ifdef __HAVE_PMAP_PV_TRACK
+		if (pmap_pv_tracked(pa))
+			pr("PV tracked");
 		else
-			pr("no VM_PAGE. pv-tracked page?\n");
-//		pv_dump(pp, pr);
+			pr("No VM_PAGE or PV tracked");
+#else
+		pr("no VM_PAGE\n");
+#endif
 	}
 }
 
@@ -539,7 +525,6 @@ dump_ln_table(bool countmode, pd_entry_t *pdp, int level, int lnindex,
     vaddr_t va, void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	struct vm_page *pg;
-//	struct vm_page_md *md;
 	pd_entry_t pde;
 	paddr_t pa;
 	int i, n;
@@ -548,14 +533,11 @@ dump_ln_table(bool countmode, pd_entry_t *pdp, int level, int lnindex,
 
 	pa = AARCH64_KVA_TO_PA((vaddr_t)pdp);
 	pg = PHYS_TO_VM_PAGE(pa);
-//	md = VM_PAGE_TO_MD(pg);
 
 	if (pg == NULL) {
 		pr("%sL%d: pa=%lx pg=NULL\n", spc, level, pa);
 	} else {
-		pr("%sL%d: pa=%lx pg=%p, wire_count=%d\n",
-		    spc, level, pa, pg, pg->wire_count);
-		//, md->mdpg_ptep_parent);
+		pr("%sL%d: pa=%lx pg=%p", spc, level, pa, pg);
 	}
 
 	for (i = n = 0; i < Ln_ENTRIES; i++) {
@@ -570,17 +552,17 @@ dump_ln_table(bool countmode, pd_entry_t *pdp, int level, int lnindex,
 			    l1pde_is_block(pde)) ||
 			    ((level == 3) && l3pte_is_page(pde))) {
 				if (!countmode)
-					pmap_db_pte_print(pde, level, pr);
+					db_pte_print(pde, level, pr);
 			} else if ((level != 3) && l1pde_is_table(pde)) {
 				if (!countmode)
-					pmap_db_pte_print(pde, level, pr);
+					db_pte_print(pde, level, pr);
 				pa = l0pde_pa(pde);
 				dump_ln_table(countmode,
 				    (pd_entry_t *)AARCH64_PA_TO_KVA(pa),
 				    level + 1, i, va, pr);
 			} else {
 				if (!countmode)
-					pmap_db_pte_print(pde, level, pr);
+					db_pte_print(pde, level, pr);
 			}
 		}
 
@@ -605,18 +587,17 @@ dump_ln_table(bool countmode, pd_entry_t *pdp, int level, int lnindex,
 	else
 		pr("%sL%d[%3d] has %d L%d entries\n", spaces[level - 1],
 		    level - 1, lnindex, n, level);
-
 }
 
 static void
-pmap_db_dump_l0_table(bool countmode, pd_entry_t *pdp, vaddr_t va_base,
+db_dump_l0table(bool countmode, pd_entry_t *pdp, vaddr_t va_base,
     void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	dump_ln_table(countmode, pdp, 0, 0, va_base, pr);
 }
 
 void
-pmap_db_ttbrdump(bool countmode, vaddr_t va,
+db_ttbrdump(bool countmode, vaddr_t va,
     void (*pr)(const char *, ...) __printflike(1, 2))
 {
 	struct pmap *pm, _pm;
@@ -625,11 +606,8 @@ pmap_db_ttbrdump(bool countmode, vaddr_t va,
 	db_read_bytes((db_addr_t)va, sizeof(_pm), (char *)&_pm);
 
 	pr("pmap=%p\n", pm);
-	//pr(" pm_asid       = %d\n", _pm.pm_asid);
-	//pr(" pm_l0table    = %p\n", _pm.pm_l0table);
-	//pr(" pm_l0table_pa = %lx\n", _pm.pm_l0table_pa);
-	//pr(" pm_activated  = %d\n\n", _pm.pm_activated);
+	pmap_db_pmap_print(&_pm, pr);
 
-	pmap_db_dump_l0_table(countmode, pmap_l0table(&_pm),
+	db_dump_l0table(countmode, pmap_l0table(pm),
 	    (pm == pmap_kernel()) ? 0xffff000000000000UL : 0, pr);
 }

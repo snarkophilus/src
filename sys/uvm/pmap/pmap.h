@@ -331,6 +331,11 @@ kvtopte(vaddr_t va)
 	return pmap_pte_lookup(pmap_kernel(), va);
 }
 
+/* for ddb */
+void pmap_db_pmap_print(struct pmap *, void (*)(const char *, ...) __printflike(1, 2));
+void pmap_db_tlb_print(struct pmap *, void (*)(const char *, ...) __printflike(1, 2));
+void pmap_db_mdpg_print(struct vm_page *, void (*)(const char *, ...) __printflike(1, 2));
+
 
 #endif	/* _KERNEL */
 #endif	/* _UVM_PMAP_PMAP_H_ */

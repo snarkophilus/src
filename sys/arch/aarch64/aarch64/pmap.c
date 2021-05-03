@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.106 2021/04/29 09:27:29 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.107 2021/04/30 20:07:22 skrll Exp $	*/
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.106 2021/04/29 09:27:29 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.107 2021/04/30 20:07:22 skrll Exp $");
 
 #include "opt_arm_debug.h"
 #include "opt_ddb.h"
@@ -517,13 +517,6 @@ _pmap_adj_resident_count(struct pmap *pm, int adj)
 	}
 }
 
-pd_entry_t *
-pmap_l0table(struct pmap *pm)
-{
-
-	return pm->pm_l0table;
-}
-
 inline static int
 _pmap_color(vaddr_t addr)	/* or paddr_t */
 {
@@ -542,6 +535,13 @@ _pmap_pv_ctor(void *arg, void *v, int flags)
 {
 	memset(v, 0, sizeof(struct pv_entry));
 	return 0;
+}
+
+pd_entry_t *
+pmap_l0table(struct pmap *pm)
+{
+
+	return pm->pm_l0table;
 }
 
 void
@@ -1161,11 +1161,10 @@ str_vmflags(uint32_t flags)
 	return p;
 }
 
-void pv_dump(struct pmap_page *, void (*)(const char *, ...) __printflike(1, 2));
-
 void
-pv_dump(struct pmap_page *pp, void (*pr)(const char *, ...) __printflike(1, 2))
+pmap_db_mdpg_print(struct vm_page *pg, void (*pr)(const char *, ...) __printflike(1, 2))
 {
+	struct pmap_page *pp = VM_PAGE_TO_PP(pg);
 	struct pv_entry *pv;
 	int i, flags;
 
@@ -2628,3 +2627,16 @@ kvtopte(vaddr_t va)
 
 	return _pmap_pte_lookup_bs(pmap_kernel(), va, NULL);
 }
+
+#ifdef DDB
+void
+pmap_db_pmap_print(struct pmap *pm,
+    void (*pr)(const char *, ...) __printflike(1, 2))
+{
+
+	pr(" pm_asid       = %d\n", pm->pm_asid);
+	pr(" pm_l0table    = %p\n", pm->pm_l0table);
+	pr(" pm_l0table_pa = %lx\n", pm->pm_l0table_pa);
+	pr(" pm_activated  = %d\n\n", pm->pm_activated);
+}
+#endif /* DDB */

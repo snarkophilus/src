@@ -1,4 +1,4 @@
-/* $NetBSD: sysreg.h,v 1.11 2020/12/16 19:49:04 christos Exp $ */
+/* $NetBSD: sysreg.h,v 1.13 2021/05/01 07:09:55 skrll Exp $ */
 
 /*
  * Copyright (c) 2014 The NetBSD Foundation, Inc.

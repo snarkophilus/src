@@ -95,6 +95,7 @@ __KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.62 2021/04/17 01:53:58 mrg Exp $");
  *	and to when physical maps must be made correct.
  */
 
+#include "opt_ddb.h"
 #include "opt_modular.h"
 #include "opt_multiprocessor.h"
 #include "opt_sysv.h"
@@ -2380,3 +2381,78 @@ pmap_unmap_poolpage(vaddr_t va)
 	return pa;
 }
 #endif /* PMAP_MAP_POOLPAGE */
+
+#ifdef DDB
+void
+pmap_db_mdpg_print(struct vm_page *pg, void (*pr)(const char *, ...) __printflike(1, 2))
+{
+	struct vm_page_md * const mdpg = VM_PAGE_TO_MD(pg);
+	pv_entry_t pv = &mdpg->mdpg_first;
+
+	if (pv->pv_pmap == NULL) {
+		pr(" no mappings\n");
+		return;
+	}
+
+	int lcount = 0;
+	if (VM_PAGEMD_VMPAGE_P(mdpg)) {
+		pr(" vmpage");
+		lcount++;
+	}
+	if (VM_PAGEMD_POOLPAGE_P(mdpg)) {
+		if (lcount != 0)
+			pr(",");
+		pr(" pool");
+		lcount++;
+	}
+#ifdef PMAP_VIRTUAL_CACHE_ALIASES
+	if (VM_PAGEMD_UNCACHED_P(mdpg)) {
+		if (lcount != 0)
+			pr(",");
+		pr(" uncached\n");
+	}
+#endif
+	pr("\n");
+
+	lcount = 0;
+	if (VM_PAGEMD_REFERENCED_P(mdpg)) {
+		pr(" referened");
+		lcount++;
+	}
+	if (VM_PAGEMD_MODIFIED_P(mdpg)) {
+		if (lcount != 0)
+			pr(",");
+		pr(" modified");
+		lcount++;
+	}
+	if (VM_PAGEMD_EXECPAGE_P(mdpg)) {
+		if (lcount != 0)
+			pr(",");
+		pr(" exec");
+		lcount++;
+	}
+	pr("\n");
+
+	for (size_t i = 0; pv != NULL; pv = pv->pv_next) {
+		pr("  pv[%zu] pv=%p\n", i, pv);
+		pr("    pv[%zu].pv_pmap = %p", i, pv->pv_pmap);
+		pr("    pv[%zu].pv_va   = %" PRIxVADDR " (kenter=%s)\n",
+		    i, trunc_page(pv->pv_va), PV_ISKENTER_P(pv) ? "true" : "false");
+		i++;
+	}
+}
+
+void
+pmap_db_pmap_print(struct pmap *pm,
+    void (*pr)(const char *, ...) __printflike(1, 2))
+{
+#if defined(PMAP_HWPAGEWALKER)
+	pr(" pm_pdetab     = %p\n", pm->pm_pdetab);
+#endif
+#if !defined(PMAP_HWPAGEWALKER) || !defined(PMAP_MAP_PDETABPAGE)
+	pr(" pm_segtab     = %p\n", pm->pm_segtab);
+#endif
+
+	pmap_db_tlb_print(pm, pr);
+}
+#endif /* DDB */

@@ -1,11 +1,12 @@
-/* $NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $ */
+/* $NetBSD: pmap_machdep.c,v 1.7 2021/05/01 07:41:24 skrll Exp $ */
 
 /*
- * Copyright (c) 2014, 2019, 2020 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2019, 2021 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas (of 3am Software Foundry), Maxime Villard, and Nick Hudson.
+ * by Matt Thomas (of 3am Software Foundry), Maxime Villard, and
+ * Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +35,7 @@
 #define __PMAP_PRIVATE
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: pmap_machdep.c,v 1.6 2020/03/14 16:12:16 skrll Exp $");
+__RCSID("$NetBSD: pmap_machdep.c,v 1.7 2021/05/01 07:41:24 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/buf.h>

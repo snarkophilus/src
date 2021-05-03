@@ -1,4 +1,4 @@
-/* $NetBSD: param.h,v 1.3 2019/06/01 12:42:28 maxv Exp $ */
+/* $NetBSD: param.h,v 1.4 2021/05/01 07:06:54 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.

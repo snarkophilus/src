@@ -1161,7 +1161,10 @@ axpreg_attach(device_t parent, device_t self, void *aux)
 	else
 		aprint_normal("\n");
 
-	axpreg_get_voltage(self, &uvol);
+	int err = axpreg_get_voltage(self, &uvol);
+	if (err)
+		return;
+
 	if (of_getprop_uint32(phandle, "regulator-min-microvolt", &min_uvol) == 0 &&
 	    of_getprop_uint32(phandle, "regulator-max-microvolt", &max_uvol) == 0) {
 		if (uvol < min_uvol || uvol > max_uvol) {

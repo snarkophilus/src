@@ -1,11 +1,12 @@
-/* $NetBSD: pmap.h,v 1.8 2020/12/20 16:38:25 skrll Exp $ */
+/* $NetBSD: pmap.h,v 1.9 2021/05/01 07:41:24 skrll Exp $ */
 
 /*
- * Copyright (c) 2014, 2019 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2019, 2021 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Matt Thomas (of 3am Software Foundry) and Maxime Villard.
+ * by Matt Thomas (of 3am Software Foundry), Maxime Villard, and
+ * Nick Hudson.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

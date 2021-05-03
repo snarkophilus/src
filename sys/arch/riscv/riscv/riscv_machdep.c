@@ -1,4 +1,4 @@
-/*	$NetBSD: riscv_machdep.c,v 1.13 2020/11/04 20:05:47 skrll Exp $	*/
+/*	$NetBSD: riscv_machdep.c,v 1.14 2021/05/01 06:53:08 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2014, 2019, 2020 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 #include "opt_riscv_debug.h"
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: riscv_machdep.c,v 1.13 2020/11/04 20:05:47 skrll Exp $");
+__RCSID("$NetBSD: riscv_machdep.c,v 1.14 2021/05/01 06:53:08 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/asan.h>

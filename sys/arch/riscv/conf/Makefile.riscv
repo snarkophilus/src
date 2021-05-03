@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.riscv,v 1.6 2020/03/14 16:12:15 skrll Exp $
+#	$NetBSD: Makefile.riscv,v 1.7 2021/05/01 07:13:21 skrll Exp $
 
 # Makefile for NetBSD
 #
