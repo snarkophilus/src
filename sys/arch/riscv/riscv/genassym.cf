@@ -154,7 +154,7 @@ define	FB_SR		offsetof(struct faultbuf, fb_sr)
 define	PAGE_SIZE	PAGE_SIZE
 define	PAGE_MASK	PAGE_MASK
 define	PAGE_SHIFT	PAGE_SHIFT
-define  UPAGES          UPAGES
+define	UPAGES		UPAGES
 define	USRSTACK	USRSTACK
 
 ifdef	__HAVE_FAST_SOFTINTS
@@ -220,7 +220,7 @@ define	Ln_ADDR_MASK	Ln_ADDR_MASK
 #define	PTE_PPN2_S	PTE_PPN2_S
 #define	PTE_PPN3_S	PTE_PPN3_S
 #define	PTE_SIZE	PTE_SIZE
-define PTE_PPN_SHIFT	PTE_PPN_SHIFT
+define	PTE_PPN_SHIFT	PTE_PPN_SHIFT
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)
