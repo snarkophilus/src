@@ -2,8 +2,6 @@
 
 #include "assym.h"
 
-#include "assym.h"
-
 OUTPUT_ARCH(riscv)
 ENTRY(start)
 
