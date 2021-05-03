@@ -2,7 +2,7 @@
 
 include "arch/evbarm/conf/GENERIC64"
 
-options 	PMAP_COMMON
+options 	PMAP_MI
 #options 	PMAP_FAULTINFO
 options 	UVM_PAGE_TRKOWN
 

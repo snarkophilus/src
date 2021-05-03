@@ -53,7 +53,7 @@ defflag opt_pmapboot.h		PMAPBOOT_DEBUG
 
 # Common PMAP transition flags
 #
-defflag	opt_pmap.h		PMAP_COMMON
+defflag	opt_pmap.h		PMAP_MI
 
 # MI support
 file	dev/cons.c
@@ -113,15 +113,15 @@ file	arch/aarch64/aarch64/vectors.S
 file	arch/aarch64/aarch64/vm_machdep.c
 
 # pmap
-file	arch/aarch64/aarch64/pmap.c		!pmap_common
+file	arch/aarch64/aarch64/pmap.c		!pmap_mi
 file	arch/aarch64/aarch64/pmapboot.c
 file	arch/aarch64/aarch64/pmap_page.S
-file	arch/aarch64/aarch64/aarch64_tlb.c	pmap_common
-file	arch/aarch64/aarch64/pmap_machdep.c	pmap_common
-file	uvm/pmap/pmap.c				pmap_common
+file	arch/aarch64/aarch64/aarch64_tlb.c	pmap_mi
+file	arch/aarch64/aarch64/pmap_machdep.c	pmap_mi
+file	uvm/pmap/pmap.c				pmap_mi
 file	uvm/pmap/pmap_pvt.c
-file	uvm/pmap/pmap_segtab.c			pmap_common
-file	uvm/pmap/pmap_tlb.c			pmap_common
+file	uvm/pmap/pmap_segtab.c			pmap_mi
+file	uvm/pmap/pmap_tlb.c			pmap_mi
 
 # EFI runtime (machdep)
 file	arch/aarch64/aarch64/efi_machdep.c		efi_runtime

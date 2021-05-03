@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_AARCH64_PMAP_COMMON_H_
-#define	_AARCH64_PMAP_COMMON_H_
+#ifndef	_AARCH64_PMAP_MACHDEP_H_
+#define	_AARCH64_PMAP_MACHDEP_H_
 
 #include <arm/cpufunc.h>
 
@@ -515,5 +515,5 @@ pte_make_enter(paddr_t pa, const struct vm_page_md *mdpg, vm_prot_t prot,
 }
 #endif /* __PMAP_PRIVATE */
 
-#endif	/* _AARCH64_PMAP_COMMON_H_ */
+#endif	/* _AARCH64_PMAP_MACHDEP_H_ */
 

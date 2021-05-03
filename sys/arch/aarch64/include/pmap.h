@@ -245,8 +245,8 @@ void pmap_db_pte_print(pt_entry_t, int,
 #define LX_BLKPAG_OS_WIRED		LX_BLKPAG_OS_2
 #define LX_BLKPAG_OS_BOOT		LX_BLKPAG_OS_3
 
-#if defined(PMAP_COMMON)
-#include <aarch64/pmap_common.h>
+#if defined(PMAP_MI)
+#include <aarch64/pmap_machdep.h>
 #else
 
 #define PMAP_NEED_PROCWR
@@ -354,7 +354,7 @@ void	pmap_pv_protect(paddr_t, vm_prot_t);
 void pmap_db_pmap_print(struct pmap *, void (*)(const char *, ...) __printflike(1, 2));
 void pmap_db_mdpg_print(struct vm_page *, void (*)(const char *, ...) __printflike(1, 2));
 
-#endif	/* !PMAP_COMMON */
+#endif	/* !PMAP_MI */
 
 #endif /* _KERNEL */
 

@@ -106,7 +106,7 @@ struct cpu_info {
 	volatile u_int ci_softints;
 	volatile u_int ci_intr_depth;
 
-#if defined(PMAP_COMMON)
+#if defined(PMAP_MI)
         struct pmap_tlb_info *
                         ci_tlb_info;
         struct pmap *   ci_pmap_lastuser;
@@ -161,7 +161,7 @@ static __inline struct cpu_info *lwp_getcpu(struct lwp *);
 static __inline int
 cpu_maxproc(void)
 {
-#if defined(PMAP_COMMON)
+#if defined(PMAP_MI)
 	return 0;
 #else
 	/*
