@@ -248,7 +248,7 @@ LibGetVariableAndSize (
     OUT UINTN               *VarSize
     )
 {
-    EFI_STATUS              Status;
+    EFI_STATUS              Status = EFI_SUCCESS;
     VOID                    *Buffer;
     UINTN                   BufferSize;
 
@@ -256,7 +256,6 @@ LibGetVariableAndSize (
     // Initialize for GrowBuffer loop
     //
 
-    Status = EFI_SUCCESS;
     Buffer = NULL;
     BufferSize = 100;
 

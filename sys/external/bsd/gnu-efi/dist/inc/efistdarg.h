@@ -21,9 +21,9 @@ Revision History
 
 --*/
 
-#ifndef GNU_EFI_USE_EXTERNAL_STDARG
-#ifdef __NetBSD__
-#include <sys/stdarg.h>
+#if !defined(GNU_EFI_USE_EXTERNAL_STDARG) && !defined(_MSC_VER)
+#ifdef __NetBSD__                                                               
+#include <sys/stdarg.h>                                                         
 #else
 typedef __builtin_va_list va_list;
 

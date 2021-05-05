@@ -276,7 +276,7 @@ xtoi (
     CHAR16      c;
 
     // skip preceeding white space
-    while (*str && *str == ' ') {
+    while (*str == ' ') {
         str += 1;
     }
 

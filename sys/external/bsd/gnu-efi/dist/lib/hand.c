@@ -490,7 +490,6 @@ LibInstallProtocolInterfaces (
 
         Index += 1;
     }
-
     va_end (args);
 
     //
@@ -508,9 +507,9 @@ LibInstallProtocolInterfaces (
 
             Index -= 1;
         }        
-	va_end (args);
 
         *Handle = OldHandle;
+        va_end (args);
     }
 
     //
@@ -614,8 +613,6 @@ LibReinstallProtocolInterfaces (
         Index += 1;
     }
 
-    va_end (args);
-
     //
     // If there was an error, undo all the interfaces that were
     // reinstalled without any errors
@@ -633,7 +630,6 @@ LibReinstallProtocolInterfaces (
 
             Index -= 1;
         }        
-	va_end (args);
     }
 
     //

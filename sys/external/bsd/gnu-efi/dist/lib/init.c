@@ -185,11 +185,11 @@ EFIDebugVariable (
     }
 }
 
-#if !defined(__NetBSD__)
 /*
  * Calls to memset/memcpy may be emitted implicitly by GCC or MSVC
  * even when -ffreestanding or /NODEFAULTLIB are in effect.
  */
+#if !defined(__NetBSD__)
 
 #ifndef __SIZE_TYPE__
 #define __SIZE_TYPE__ UINTN

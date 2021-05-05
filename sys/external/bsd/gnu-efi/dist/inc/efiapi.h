@@ -578,7 +578,7 @@ EFI_STATUS
     IN EFI_TPL                  NotifyTpl,
     IN EFI_EVENT_NOTIFY         NotifyFunction OPTIONAL,
     IN const VOID               *NotifyContext OPTIONAL,
-    IN const EFI_GUID           EventGroup OPTIONAL,
+    IN const EFI_GUID           *EventGroup OPTIONAL,
     OUT EFI_EVENT               *Event
     );
 
@@ -925,9 +925,6 @@ typedef struct _EFI_BOOT_SERVICES {
 #define SAL_SYSTEM_TABLE_GUID    \
     { 0xeb9d2d32, 0x2d88, 0x11d3, {0x9a, 0x16, 0x0, 0x90, 0x27, 0x3f, 0xc1, 0x4d} }
 
-/* DIG64 Headless Console & Debug Port Table. */
-#define	HCDP_TABLE_GUID    \
-    { 0xf951938d, 0x620b, 0x42ef, {0x82, 0x79, 0xa8, 0x4b, 0x79, 0x61, 0x78, 0x98} }
 
 typedef struct _EFI_CONFIGURATION_TABLE {
     EFI_GUID                VendorGuid;

@@ -27,7 +27,7 @@ Revision History
 // Basic int types of various widths
 //
 
-#if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 199901L )
+#if !defined(__STDC_VERSION__) || (__STDC_VERSION__ < 199901L ) && !defined(__cplusplus)
 
     // No ANSI C 1999/2000 stdint.h integer width declarations 
 
@@ -77,8 +77,8 @@ Revision History
        typedef unsigned char       uint8_t;
        typedef char                int8_t;
     #endif
-#elif defined(__NetBSD__)
-    #include <sys/stdint.h>
+    typedef uint32_t            uintptr_t;
+    typedef int32_t             intptr_t;
 #elif defined(__GNUC__)
     #include <stdint.h>
 #endif
@@ -91,7 +91,6 @@ Revision History
 # define __WCHAR_TYPE__ short
 #endif
 
-#ifndef __ACTYPES_H__
 typedef uint64_t   UINT64;
 typedef int64_t    INT64;
 
@@ -104,7 +103,6 @@ typedef uint16_t   UINT16;
 typedef int16_t    INT16;
 typedef uint8_t    UINT8;
 typedef int8_t     INT8;
-#endif /* __ACTYPES_H__ */
 typedef __WCHAR_TYPE__ WCHAR;
 
 #undef VOID

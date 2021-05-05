@@ -24,9 +24,7 @@ Revision History
 
 typedef UINT16          CHAR16;
 typedef UINT8           CHAR8;
-#ifndef __ACTYPES_H__
 typedef UINT8           BOOLEAN;
-#endif /* __ACTYPES_H__ */
 #ifndef CONST
    #define CONST const
 #endif

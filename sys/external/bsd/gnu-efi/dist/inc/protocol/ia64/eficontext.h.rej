@@ -1,0 +1,8 @@
+--- sys/external/bsd/gnu-efi/dist/inc/protocol/ia64/eficontext.h
++++ sys/external/bsd/gnu-efi/dist/inc/protocol/ia64/eficontext.h
+@@ -1,3 +1,5 @@
++/*	$NetBSD: eficontext.h,v 1.1.1.1 2014/04/01 16:16:07 jakllsch Exp $	*/
++
+ /*
+  * Copyright (c) 1999, 2000
+  * Intel Corporation.

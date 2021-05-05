@@ -29,11 +29,7 @@ LibCreateProtocolNotifyEvent (
     OUT VOID                *Registration
     )
 {
-#ifdef EFI_DEBUG
     EFI_STATUS              Status;
-#else
-    EFI_STATUS              Status __unused;
-#endif
     EFI_EVENT               Event;
 
     //

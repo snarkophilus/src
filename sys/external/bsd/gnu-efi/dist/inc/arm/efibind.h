@@ -17,7 +17,7 @@
  * either version 2 of the License, or (at your option) any later version.
  */
 
-#if !defined(_MSC_VER) && (!defined(__STDC_VERSION__) || (__STDC_VERSION__ < 199901L ))
+#if !defined(_MSC_VER) && (!defined(__STDC_VERSION__) || (__STDC_VERSION__ < 199901L )) && !defined(__cplusplus)
 
 // ANSI C 1999/2000 stdint.h integer width declarations
 
@@ -29,9 +29,9 @@ typedef unsigned short      uint16_t;
 typedef short               int16_t;
 typedef unsigned char       uint8_t;
 typedef signed char         int8_t;   // unqualified 'char' is unsigned on ARM
+typedef uint32_t            uintptr_t;
+typedef int32_t             intptr_t;
 
-#elif defined(__NetBSD__)
-#include <sys/stdint.h>
 #else
 #include <stdint.h>
 #endif
