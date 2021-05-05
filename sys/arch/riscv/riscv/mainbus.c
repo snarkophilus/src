@@ -30,6 +30,7 @@
  */
 
 #include "locators.h"
+#include "opt_console.h"
 
 #include <sys/cdefs.h>
 
