@@ -96,7 +96,7 @@ ENTRY_NP(generic_bs_rm_1)
 1:
 	lbu	a0, 0(a2)		/* load 8-bit */
 	sb	a0, 0(a3)
-	add 	a3, a3, 1
+	add	a3, a3, 1
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -120,7 +120,7 @@ ENTRY_NP(generic_bs_rm_2)
 1:
 	lhu	a0, 0(a2)		/* load 16-bit */
 	sh	a0, 0(a3)		/* store 16-bit */
-	add 	a3, a3, 2
+	add	a3, a3, 2
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -143,7 +143,7 @@ ENTRY_NP(generic_bs_rm_4)
 1:
 	lw	a0, 0(a2)		/* load 32-bit */
 	sw	a0, 0(a3)		/* store 32-bit */
-	add 	a3, a3, 4
+	add	a3, a3, 4
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -166,7 +166,7 @@ ENTRY_NP(generic_bs_rm_8)
 1:
 	ld	a0, 0(a2)		/* load 64-bit */
 	sd	a0, 0(a3)		/* store 64-bit */
-	add 	a3, a3, 8
+	add	a3, a3, 8
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -192,7 +192,7 @@ ENTRY_NP(generic_bs_rr_1)
 	lbu	a0, 0(a2)		/* load 8-bit */
 	sb	a0, 0(a3)		/* *dst = value */
 	add	a2, a2, t0		/* src += delta */
-	add 	a3, a3, 1		/* dst++ */
+	add	a3, a3, 1		/* dst++ */
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -221,7 +221,7 @@ ENTRY_NP(generic_bs_rr_2)
 	lhu	a0, 0(a2)		/* load 16-bit */
 	sh	a0, 0(a3)		/* *dst = value */
 	add	a2, a2, t0		/* src += delta */
-	add 	a3, a3, 2		/* dst++ */
+	add	a3, a3, 2		/* dst++ */
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -288,7 +288,7 @@ ENTRY_NP(generic_bs_wm_1)
 1:
 	lbu	a0, 0(a3)		/* load 8-bit */
 	sb	a0, 0(a2)
-	add 	a3, a3, 1
+	add	a3, a3, 1
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -311,7 +311,7 @@ ENTRY_NP(generic_bs_wm_2)
 1:
 	lhu	a0, 0(a3)		/* load 16-bit */
 	sh	a0, 0(a2)		/* store 16-bit */
-	add 	a3, a3, 2
+	add	a3, a3, 2
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -334,7 +334,7 @@ ENTRY_NP(generic_bs_wm_4)
 1:
 	lw	a0, 0(a3)		/* load 32-bit */
 	sw	a0, 0(a2)		/* store 32-bit */
-	add 	a3, a3, 4
+	add	a3, a3, 4
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
@@ -357,7 +357,7 @@ ENTRY_NP(generic_bs_wm_8)
 1:
 	ld	a0, 0(a3)		/* load 64-bit */
 	sd	a0, 0(a2)		/* store 64-bit */
-	add 	a3, a3, 8
+	add	a3, a3, 8
 	add	a4, a4, -1		/* count-- */
 	bnez	a4, 1b
 	ret
