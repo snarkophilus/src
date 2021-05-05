@@ -29,6 +29,7 @@ maxusers	64		# estimated number of users
 options 	FDT
 
 options 	EARLYCONS=com, CONSADDR=0x10000000
+#options 	EARLYCONS=com, CONSADDR=0x12440000
 options 	VERBOSE_INIT_RISCV
 
 # Standard system options
