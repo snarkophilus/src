@@ -1,4 +1,4 @@
-/* $NetBSD: types.h,v 1.11 2021/05/01 06:45:23 skrll Exp $ */
+/* $NetBSD: types.h,v 1.12 2021/05/03 20:07:57 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -92,6 +92,8 @@ typedef __int32_t	__register_t;
 #define	__HAVE_NEW_STYLE_BUS_H
 #define	__HAVE_SYSCALL_INTERN
 #define	__HAVE_TLS_VARIANT_I
+/* XXX temporary */
+#define	__HAVE_UNLOCKED_PMAP
 #define	__HAVE___LWP_GETPRIVATE_FAST
 
 #ifdef __LP64
@@ -107,8 +109,5 @@ typedef __int32_t	__register_t;
 #define	PCU_FPU		0
 #define	PCU_UNIT_COUNT	1
 #endif
-
-/* XXX temporary */
-#define	__HAVE_UNLOCKED_PMAP
 
 #endif	/* _RISCV_TYPES_H_ */
