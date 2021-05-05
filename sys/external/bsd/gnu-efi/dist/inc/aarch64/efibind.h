@@ -32,6 +32,8 @@ typedef signed char         int8_t;   // unqualified 'char' is unsigned on ARM
 typedef uint64_t            uintptr_t;
 typedef int64_t             intptr_t;
 
+#elif defined(__NetBSD__)
+#include <sys/stdint.h>
 #else
 #include <stdint.h>
 #endif
