@@ -12,9 +12,9 @@ SUBDIR+=	arm
 SUBDIR+=	arm64
 .endif
 
-#.if !empty(MACHINE_ARCH:riscv*)
-#SUBDIR+=	riscv
-#.endif
+.if !empty(MACHINE_ARCH:Mriscv*)
+SUBDIR+=	riscv
+.endif
 
 .include <bsd.subdir.mk>
 
