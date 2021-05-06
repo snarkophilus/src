@@ -52,7 +52,7 @@ ENTRY_NP(start)
 	mv	s1, a1
 
 	/* set the stack pointer for boot */
-	PTR_LA	s8, bootstk
+	PTR_LA	s8, _C_LABEL(bootstk)
 	mv	sp, s8
 
 	PTR_LA	s11, start
@@ -61,7 +61,7 @@ ENTRY_NP(start)
 	sub	s8, s8, s11
 
 	/* address of kern_vtopdiff (relative) */
-	PTR_LA	s11, kern_vtopdiff
+	PTR_LA	s11, _C_LABEL(kern_vtopdiff)
 	PTR_S	s8, 0(s11)	/* kern_vtopdiff = start(virt) - start(phys) */
 
 	// We get loaded and starting running at or near 0, not where we
@@ -71,10 +71,8 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
-
 //	li	a0, 'X'
 //	call	_C_LABEL(com_platform_early_putchar)
-
 
 	PTR_LA	a0, _C_LABEL(__bss_start)
 	PTR_LA	s5, _C_LABEL(_end)
@@ -122,7 +120,7 @@ ENTRY_NP(start)
 
 	// We allocated the kernel first PDE page so let's insert in the
 	// page table.
-#if _LP64
+#ifdef _LP64
 	srli	t0, s2, (PGSHIFT - PTE_PPN_SHIFT)
 	or	t0, t0, t3		// Assumes s2[11:0] == 0
 #if ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
@@ -181,7 +179,7 @@ ENTRY_NP(start)
 
 	/* Set supervisor address translation and protection register */
 	srli	t1, s3, PGSHIFT
-#if _LP64
+#ifdef _LP64
 	li	t0, SATP_MODE_SV39
 #else
 	li	t0, SATP_MODE_SV32
@@ -241,17 +239,19 @@ vstart:
 END(start)
 
 .Lstart:
-#if _LP64
+#ifdef _LP64
 	.quad	start
 #else
 	.word	start
 #endif
 
+#ifdef CONSADDR
 .Lconsaddr:
-#if _LP64
+#ifdef _LP64
 	.quad	CONSADDR
 #else
 	.word	CONSADDR
+#endif
 #endif
 
 ENTRY_NP(uartputc)
@@ -676,7 +676,7 @@ bootstk:
 #if defined(RISCV_BSS_MMUTABLES)
 	.align PGSHIFT
 mmutables_start:
-#if _LP64
+#ifdef _LP64
 	.global _C_LABEL(l2_pte)
 l2_pte:
 	.space PAGE_SIZE
