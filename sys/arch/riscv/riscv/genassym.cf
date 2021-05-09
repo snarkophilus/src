@@ -48,6 +48,7 @@ include <uvm/uvm_extern.h>
 
 include <riscv/locore.h>
 include <riscv/sysreg.h>
+include <riscv/sbi.h>
 
 define	SR_SPP		SR_SPP
 define	SR_SIE		SR_SIE
@@ -224,6 +225,8 @@ define	PTE_PPN_SHIFT	PTE_PPN_SHIFT
 
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)
+
+define	SBI_CONSOLE_PUTCHAR	SBI_CONSOLE_PUTCHAR
 
 # for bus_space_asm
 define	BS_STRIDE		offsetof(struct bus_space, bs_stride)

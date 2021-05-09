@@ -30,14 +30,40 @@
  */
 
 #include "opt_console.h"
+#include "opt_riscv_debug.h"
 
 #include <machine/asm.h>
 #include "assym.h"
 
-#define RISCV_BSS_MMUTABLES
+#define RISCV_BSS_INITTABLES
 
 	.globl	_C_LABEL(exception_userexit)
 	.globl	_C_LABEL(cpu_Debugger_insn)
+
+#if defined(VERBOSE_INIT_RISCV)
+
+#define VPRINTF(string)		\
+	.option push		; \
+	.option norelax		; \
+	call	locore_prints	; \
+	.asciz string		; \
+	.option pop		; \
+	.align 3
+
+#define VPRINTX(regno)		\
+	mv	a0, regno	; \
+	call	locore_printx
+
+#define VPRINTXNL(regno)	\
+	mv	a0, regno	; \
+	call	locore_printxnl
+
+#else
+#define VPRINTF(string)		/* nothing */
+#define VPRINTX(regno)		/* nothing */
+#define VPRINTXNL(regno)	/* nothing */
+#endif
+
 
 ENTRY_NP(start)
 
@@ -47,7 +73,6 @@ ENTRY_NP(start)
 	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
 	 * Copy these to the s* registsers so they're saved.
 	 */
-
 	mv	s0, a0
 	mv	s1, a1
 
@@ -55,8 +80,17 @@ ENTRY_NP(start)
 	PTR_LA	s8, _C_LABEL(bootstk)
 	mv	sp, s8
 
+
+	VPRINTF("sp: ")
+	VPRINTXNL(sp)
+
+	VPRINTF("pc: ")
+	auipc	a0, 0
+	VPRINTXNL(a0)
+
+	VPRINTF("yay!\n\r")
 	PTR_LA	s11, start
-	LD	s8, .Lstart
+	PTR_L	s8, .Lstart
 
 	sub	s8, s8, s11
 
@@ -71,46 +105,54 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
-//	li	a0, 'X'
-//	call	_C_LABEL(com_platform_early_putchar)
-
 	PTR_LA	a0, _C_LABEL(__bss_start)
-	PTR_LA	s5, _C_LABEL(_end)
 
-#if !defined(RISCV_BSS_MMUTABLES)
-	add	s5, s5, s10		// PAGE_SIZE
-	addi	s5, s5, -1		//   -1 == PAGE_MASK
-	neg	a1, s10			// -PAGE_SIZE
-	and	s5, s5, a1		// s5 is page aligned end of kernel
-					// s5 = uarea
-	add	s2, s1, s9		// s2 = first PDE page
+	PTR_LA	s5, _C_LABEL(lwp0uspace)
+	PTR_LA	s6, _C_LABEL(bootstk)
+
+#if !defined(RISCV_BSS_INITTABLES)
+	PTR_LA	s2, _C_LABEL(_end)
+	add	s2, s2, s10		// PAGE_SIZE
+	addi	s2, s2, -1		//   -1 == PAGE_MASK
+	neg	s7, s10			// -PAGE_SIZE
+	and	s2, s2, s7		// s2 is page aligned end of kernel
+					// s2 = first PDE page
 #ifdef _LP64
 	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
-#else
-	mv	s3, s2
+	mov	s4, s3			// top level page table
+	add	a1, s3, s10		// end of memory to clear
+#ifdef notyet
+	add	s4, s3, s10		// s4 = third PDE page (RV64 only)
+	add	a1, s4, s10		// end of memory to clear
 #endif
-	add	s4, s3, s10		// s4 = first kernel PTE page
-	add	s6, s5, s9		// s5 = bootstk
-	sub	a2, s6, a0
+#else
+	mov	s4, s2			// top level page table
+	add	a1, s2, s10		// end of memory to clear
+#endif
 #else
 	li	a1, 0
 	PTR_LA	s2, _C_LABEL(l1_pte)
+	mv	s4, s2
 #ifdef _LP64
 	PTR_LA	s3, _C_LABEL(l2_pte)
-//	PTR_LA	s4, _C_LABEL(l3_pte)
+	mv	s4, s3
+#ifdef notyet
+	PTR_LA	s4, _C_LABEL(l3_pte)
 #endif
-	PTR_LA	s6, _C_LABEL(bootstk)
-	PTR_LA	s5, _C_LABEL(lwp0uspace)
-	sub	a2, s6, a0
 #endif
-					// a1 byte value is '0' from -PAGE_SIZE
-	call	memset			// zero through kernel_end
+	PTR_LA	a1, _C_LABEL(mmutables_end)
+#endif
 
 	// s2	L1 PDE (SV32:4MiB megapages, SV{39,48}: 2MiB megapages)
 	// s3	L2 PDE (_LP64 SV39 only)
-	// s4	L3 PDE (_LP64 SV48 only)
-	// s5	bootstk
-	// s6	lwp0uspace
+	// s4	L3 PDE (_LP64 SV48 only) (not yet) (or top level table)
+	// s5	lwp0uspace
+	// s6	bootstk
+
+	// a0	start of memory to clear
+	// a1	end of memory to clear
+
+	call	clear_bss		// zero through kernel_end (inc. stack)
 
 	/* Save the phys addr from the start and end of the kernel */
 //	PTR_LA	t2, _C_LABEL(start)
@@ -125,10 +167,10 @@ ENTRY_NP(start)
 	or	t0, t0, t3		// Assumes s2[11:0] == 0
 #if ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
-	add	t1, t1, s3
+	add	t1, t1, s4
 	REG_S	t0, 0(t1)
 #else
-	REG_S	t0, 0(s3)
+	REG_S	t0, 0(s4)
 #endif
 #endif
 
@@ -136,7 +178,7 @@ ENTRY_NP(start)
 #error Code assumes PGSHIFT is greater than PTE_PPN_SHIFT
 #endif
 
-	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)	// # of megapages
+	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)		// # of megapages
 	li	t3, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
 	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
 
@@ -157,20 +199,27 @@ ENTRY_NP(start)
 
 	// DTB physical address
 	mv	t0, s1
-	srli	t0, t0, PGSHIFT
-	slli	t0, t0, PTE_PPN_SHIFT
+	srli	t0, t0, SEGSHIFT
+	slli	t0, t0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
+//	srli	t0, t0, PGSHIFT
+//	slli	t0, t0, PTE_PPN_SHIFT
 	or	t0, t0, t4
 	REG_S	t0, 0(s2)
 	add	s2, s2, SZREG		// advance to next PDE slot
 
 #ifdef CONSADDR
 	ld	t0, .Lconsaddr
-	srli	t0, t0, PGSHIFT
-	slli	t0, t0, PTE_PPN_SHIFT
+	srli	t0, t0, SEGSHIFT
+	slli	t0, t0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
+//	srli	t0, t0, PGSHIFT
+//	slli	t0, t0, PTE_PPN_SHIFT
 	or	t0, t0, t4
 	REG_S	t0, 0(s2)
 	add	s2, s2, SZREG		// advance to next PDE slot
 #endif
+
+	li	a0, 'P'
+	call	_C_LABEL(uartputc)
 
 	/* Set supervisor trap vector base register */
 	PTR_LA	t0, .Lmmu_on
@@ -178,7 +227,7 @@ ENTRY_NP(start)
 	csrw	stvec, t0
 
 	/* Set supervisor address translation and protection register */
-	srli	t1, s3, PGSHIFT
+	srli	t1, s4, PGSHIFT
 #ifdef _LP64
 	li	t0, SATP_MODE_SV39
 #else
@@ -193,7 +242,15 @@ ENTRY_NP(start)
 	// MMU is on!
 	csrw	sscratch, zero		// zero in sscratch to mark kernel
 
+	li	a0, 'M'
+	call	_C_LABEL(uartputc)	// uartputs doesn't use stack
+	li	a0, '\n'
+	call	_C_LABEL(uartputc)	// uartputs doesn't use stack
+	li	a0, '\r'
+	call	_C_LABEL(uartputc)	// uartputs doesn't use stack
+
 	PTR_LA	tp, _C_LABEL(lwp0)	// put curlwp in tp
+
 	.global vstart
 vstart:
 
@@ -207,16 +264,16 @@ vstart:
 	PTR_S	sp, L_MD_UTF(tp)	// store pointer to empty trapframe
 
 	PTR_LA	t1, _C_LABEL(kernel_pmap_store)
-	add	t2, s3, s8 		// PA -> VA
-	srli	t3, s3, PGSHIFT
+	add	t2, s4, s8 		// PA -> VA
+	srli	t3, s4, PGSHIFT
 	PTR_S	t2, PM_PDETAB(t1)	// VA of kernel PDETAB
-	PTR_S	t3, PM_MD_PPN(t1)	// PA of kernel PDETAB
+	PTR_S	t3, PM_MD_PPN(t1)	// PPN of kernel PDETAB
+
 
 #if notyet
 	mv	a0, s1			// dtb
 	call	_C_LABEL(init_mmu)
 #endif
-
 
 	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
 
@@ -229,7 +286,7 @@ vstart:
 	.option pop
 #endif
 
-// Now we should ready to start initializing the kernel.
+	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
 	mv	a1, t0			// vdtb
 	//mv	a1, s1			// dtb (physical)
@@ -258,9 +315,19 @@ ENTRY_NP(uartputc)
 #ifdef EARLYCONS
 	tail	___CONCAT(EARLYCONS, _platform_early_putchar)
 #else
+	li	a7, 1			// SBI_CONSOLE_PUTCHAR
+	ecall
 	ret
 #endif
 
+ENTRY_NP(clear_bss)
+	bgeu	a0, a1, 1f
+2:
+	sb	zero, 0(a0)
+	addi	a0, a0, 1
+	bne	a1, a0, 2b
+1:
+	ret
 
 //
 // struct lwp *cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
@@ -666,6 +733,84 @@ ENTRY(mpentry)
 	j	1b
 END(mpentry)
 
+
+ENTRY_NP(locore_prints)
+	addi	sp, sp, -(SZREG * 2)
+	REG_S	s0, (0 * SZREG)(sp)
+	mv	s0, ra
+1:
+	lbu	a0, 0(s0)
+	beqz	a0, 2f
+
+	call	uartputc
+
+	addi	s0, s0, 1
+	j	1b
+2:
+	addi	s0, s0, 8	// s0 points to the null terminator
+	andi	ra, s0, -8
+
+	REG_L	s0, (0 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 2)
+	ret
+
+END(locore_prints)
+
+
+ENTRY_NP(locore_printx)
+	addi	sp, sp, -(SZREG * 4)
+	REG_S	s0, (0 * SZREG)(sp)
+	REG_S	s1, (1 * SZREG)(sp)
+	REG_S	s2, (2 * SZREG)(sp)
+	REG_S	ra, (3 * SZREG)(sp)
+
+	mv	s1, a0		// our print value
+	li	s2, 10
+
+	li	a0, '0'
+	call	uartputc
+	li	a0, 'x'
+	call	uartputc
+
+	// Word size in bits
+	li	s0, (SZREG * 8)
+1:
+	addi	s0, s0, -4	// nibble shift
+	srl	a0, s1, s0	// extract ...
+	andi	a0, a0, 0xf
+
+	bltu	a0, s2, 2f
+	addi	a0, a0, ('a' - '0' - 10)
+2:	addi	a0, a0, '0'
+
+	call	uartputc
+
+	bnez	s0, 1b
+
+	REG_L	s0, (0 * SZREG)(sp)
+	REG_L	s1, (1 * SZREG)(sp)
+	REG_L	s2, (2 * SZREG)(sp)
+	REG_L	ra, (3 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 4)
+	ret
+END(locore_printx)
+
+ENTRY_NP(locore_printxnl)
+	addi	sp, sp, -(SZREG * 2)
+	REG_S	ra, (1 * SZREG)(sp)
+
+	call	locore_printx
+	li	a0, '\n'
+	call	uartputc
+
+	li	a0, '\r'
+	call	uartputc
+
+	REG_L	ra, (1 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 2)
+
+	ret
+
 	.bss
 	.align PGSHIFT
 	.global _C_LABEL(lwp0uspace)
@@ -673,18 +818,23 @@ _C_LABEL(lwp0uspace):
 	.space	UPAGES * PAGE_SIZE
 bootstk:
 
-#if defined(RISCV_BSS_MMUTABLES)
+#if defined(RISCV_BSS_INITTABLES)
 	.align PGSHIFT
 mmutables_start:
+	.global _C_LABEL(l1_pte)
+l1_pte:
+	.space PAGE_SIZE
 #ifdef _LP64
 	.global _C_LABEL(l2_pte)
 l2_pte:
 	.space PAGE_SIZE
-#endif
-	.global _C_LABEL(l1_pte)
-l1_pte:
+#ifdef notyet
+l3_pte:
 	.space PAGE_SIZE
-	.global _C_LABEL(l21_dtb)
+#endif
+#endif
+	// XXXNH not needed as we just map in the page(s) passed?
+	.global _C_LABEL(l1_dtb)
 l1_dtb:
 	.space PAGE_SIZE
 mmutables_end:
