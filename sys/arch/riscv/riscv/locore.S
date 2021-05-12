@@ -43,12 +43,9 @@
 #if defined(VERBOSE_INIT_RISCV)
 
 #define VPRINTF(string)		\
-	.option push		; \
-	.option norelax		; \
 	call	locore_prints	; \
 	.asciz string		; \
-	.option pop		; \
-	.align 3
+	.align 3		; \
 
 #define VPRINTX(regno)		\
 	mv	a0, regno	; \
@@ -58,37 +55,59 @@
 	mv	a0, regno	; \
 	call	locore_printxnl
 
+/* Need to turn relaxation off for VPRINTF */
+	.option norelax
+
 #else
 #define VPRINTF(string)		/* nothing */
 #define VPRINTX(regno)		/* nothing */
 #define VPRINTXNL(regno)	/* nothing */
 #endif
 
+	/*
+	 * Entry point where.
+	 *    a0 is hartid
+	 *    a1 is pointer to dtb (PA)
+	 */
 
+	.align 3
 ENTRY_NP(start)
+	csrw	sie, zero		// disable interrupts
+	csrw	sip, zero		// clear any pending
+
+	li	s0, SR_FS
+	csrc	sstatus, s0		// disable FP
 
 	/*
-	 * Entry point from BBL / OpenSBI.
-	 * Here's what we get for free:
-	 * a0 is hartid, a1 is dtb_output (pointer to dtb)
-	 * Copy these to the s* registsers so they're saved.
+	 * atomically swap a non-zero value into hart_boot.  If we see zero
+	 * we won in race to become BP.
 	 */
-	mv	s0, a0
-	mv	s1, a1
+	li	s1, 1
+	la	s0, hart_boot
+
+	amoswap.w s0, s1, (s0)
+	bnez	s0, mpentry
+
+	mv	s0, a0			// copy hartid
+	mv	s1, a1			// copy dtb PA
 
 	/* set the stack pointer for boot */
 	PTR_LA	s8, _C_LABEL(bootstk)
 	mv	sp, s8
 
-
-	VPRINTF("sp: ")
+	VPRINTF("sp:   ")
 	VPRINTXNL(sp)
 
-	VPRINTF("pc: ")
+	VPRINTF("pc:   ")
 	auipc	a0, 0
 	VPRINTXNL(a0)
 
-	VPRINTF("yay!\n\r")
+	VPRINTF("hart: ")
+	VPRINTXNL(s0)
+
+	VPRINTF("dtb:  ")
+	VPRINTXNL(s1)
+
 	PTR_LA	s11, start
 	PTR_L	s8, .Lstart
 
@@ -101,7 +120,7 @@ ENTRY_NP(start)
 	// We get loaded and starting running at or near 0, not where we
 	// should be. We need to construct an initial PDETAB
 
-	li	s11, VM_MAX_KERNEL_ADDRESS
+	li	s11, VM_MAX_KERNEL_ADDRESS		// XXXNH why? - not used
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
@@ -295,6 +314,10 @@ vstart:
 	/* No return from main */
 END(start)
 
+	.align	2
+hart_boot:
+	.word	0
+
 .Lstart:
 #ifdef _LP64
 	.quad	start
@@ -315,7 +338,7 @@ ENTRY_NP(uartputc)
 #ifdef EARLYCONS
 	tail	___CONCAT(EARLYCONS, _platform_early_putchar)
 #else
-	li	a7, 1			// SBI_CONSOLE_PUTCHAR
+	li	a7, SBI_V0P1_CONSOLE_PUTCHAR
 	ecall
 	ret
 #endif

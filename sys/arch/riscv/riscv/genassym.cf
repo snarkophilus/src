@@ -52,6 +52,7 @@ include <riscv/sbi.h>
 
 define	SR_SPP		SR_SPP
 define	SR_SIE		SR_SIE
+define	SR_FS		SR_FS
 # define	SR_PS		SR_PS
 # define	SR_S		SR_S
 define	SR_SUM		SR_SUM
@@ -226,7 +227,7 @@ define	PTE_PPN_SHIFT	PTE_PPN_SHIFT
 define	PM_PDETAB	offsetof(struct pmap, pm_pdetab)
 define	PM_MD_PPN	offsetof(struct pmap, pm_md.md_ppn)
 
-define	SBI_CONSOLE_PUTCHAR	SBI_CONSOLE_PUTCHAR
+define	SBI_V0P1_CONSOLE_PUTCHAR	SBI_V0P1_CONSOLE_PUTCHAR
 
 # for bus_space_asm
 define	BS_STRIDE		offsetof(struct bus_space, bs_stride)
