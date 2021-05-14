@@ -42,7 +42,7 @@
 
 #if defined(VERBOSE_INIT_RISCV)
 
-#define VPRINTF(string)		\
+#define VPRINTS(string)		\
 	call	locore_prints	; \
 	.asciz string		; \
 	.align 3		; \
@@ -55,11 +55,11 @@
 	mv	a0, regno	; \
 	call	locore_printxnl
 
-/* Need to turn relaxation off for VPRINTF */
+/* Need to turn relaxation off for VPRINTS */
 	.option norelax
 
 #else
-#define VPRINTF(string)		/* nothing */
+#define VPRINTS(string)		/* nothing */
 #define VPRINTX(regno)		/* nothing */
 #define VPRINTXNL(regno)	/* nothing */
 #endif
@@ -95,17 +95,17 @@ ENTRY_NP(start)
 	PTR_LA	s8, _C_LABEL(bootstk)
 	mv	sp, s8
 
-	VPRINTF("sp:   ")
+	VPRINTS("sp:      ")
 	VPRINTXNL(sp)
 
-	VPRINTF("pc:   ")
+	VPRINTS("pc:      ")
 	auipc	a0, 0
 	VPRINTXNL(a0)
 
-	VPRINTF("hart: ")
+	VPRINTS("hart:    ")
 	VPRINTXNL(s0)
 
-	VPRINTF("dtb:  ")
+	VPRINTS("dtb:     ")
 	VPRINTXNL(s1)
 
 	PTR_LA	s11, start
@@ -124,8 +124,6 @@ ENTRY_NP(start)
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
-	PTR_LA	a0, _C_LABEL(__bss_start)
-
 	PTR_LA	s5, _C_LABEL(lwp0uspace)
 	PTR_LA	s6, _C_LABEL(bootstk)
 
@@ -139,15 +137,13 @@ ENTRY_NP(start)
 #ifdef _LP64
 	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
 	mov	s4, s3			// top level page table
-	add	a1, s3, s10		// end of memory to clear
 #ifdef notyet
 	add	s4, s3, s10		// s4 = third PDE page (RV64 only)
-	add	a1, s4, s10		// end of memory to clear
 #endif
 #else
 	mov	s4, s2			// top level page table
-	add	a1, s2, s10		// end of memory to clear
 #endif
+	add	s7, s4, s10		// end of memory to clear
 #else
 	li	a1, 0
 	PTR_LA	s2, _C_LABEL(l1_pte)
@@ -159,7 +155,7 @@ ENTRY_NP(start)
 	PTR_LA	s4, _C_LABEL(l3_pte)
 #endif
 #endif
-	PTR_LA	a1, _C_LABEL(mmutables_end)
+	PTR_LA	s7, _C_LABEL(mmutables_end)
 #endif
 
 	// s2	L1 PDE (SV32:4MiB megapages, SV{39,48}: 2MiB megapages)
@@ -167,9 +163,37 @@ ENTRY_NP(start)
 	// s4	L3 PDE (_LP64 SV48 only) (not yet) (or top level table)
 	// s5	lwp0uspace
 	// s6	bootstk
+	// s7   end of memory to clear
+
+	VPRINTS("l1:      ")
+	VPRINTXNL(s2)
+#ifdef _LP64
+	VPRINTS("l2:      ")
+	VPRINTXNL(s3)
+#ifdef notyet
+	VPRINTS("l3:      ")
+	VPRINTXNL(s4)
+#endif
+#endif
+	VPRINTS("uspace:  ")
+	VPRINTXNL(s5)
+	VPRINTS("bootstk: ")
+	VPRINTXNL(s6)
+
+	VPRINTS("\n\r")
+
+	VPRINTS("bss:     ")
+	PTR_LA	a0, _C_LABEL(__bss_start)
+	VPRINTX(a0)
+	VPRINTS(" - ")
+	VPRINTXNL(s7)
+
+	VPRINTS("\n\r")
 
 	// a0	start of memory to clear
 	// a1	end of memory to clear
+	PTR_LA	a0, _C_LABEL(__bss_start)
+	mv	a1, s7
 
 	call	clear_bss		// zero through kernel_end (inc. stack)
 
@@ -188,52 +212,76 @@ ENTRY_NP(start)
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
 	add	t1, t1, s4
 	REG_S	t0, 0(t1)
+
+	VPRINTX(t1)
+	VPRINTS(": ")
+	VPRINTXNL(t0)
 #else
 	REG_S	t0, 0(s4)
+
+	VPRINTX(s4)
+	VPRINTS(": ")
+	VPRINTXNL(t0)
 #endif
 #endif
+
+	VPRINTS("\n\r")
 
 #if PGSHIFT < PTE_PPN_SHIFT
 #error Code assumes PGSHIFT is greater than PTE_PPN_SHIFT
 #endif
 
-	li	a7, (VM_KERNEL_VM_SIZE >> SEGSHIFT)		// # of megapages
-	li	t3, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
-	li	t4, PTE_KERN | PTE_R | PTE_W | PTE_X
+	li	s5, (VM_KERNEL_VM_SIZE >> SEGSHIFT)		// # of megapages
+	li	s6, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
+	li	s7, PTE_KERN | PTE_HARDWIRED | PTE_R | PTE_W | PTE_X
 
 	//
 	// Fill in the PDEs for kernel.
 	//
-	PTR_LA	t0, start
-	srli	t0, t0, (PGSHIFT - PTE_PPN_SHIFT)
-	or	t0, t0, t4
+	PTR_LA	s0, start
+	srli	s0, s0, (PGSHIFT - PTE_PPN_SHIFT)
+	or	s0, s0, s7
 .Lfill:
-	REG_S	t0, 0(s2)		// store PDE
-	add	t0, t0, t3		// advance PA in PDE to next segment
-	add	s2, s2, SZREG		// advance to next PDE slot
-	addi	a7, a7, -1		// count down segment
-	bnez	a7, .Lfill		// loop if more
+	VPRINTX(s2)
+	VPRINTS(": ")
+	VPRINTXNL(s0)
 
-	li	t4, PTE_KERN | PTE_R | PTE_W
+	REG_S	s0, 0(s2)		// store PDE
+	add	s0, s0, s6		// advance PA in PDE to next segment
+	add	s2, s2, SZREG		// advance to next PDE slot
+	addi	s5, s5, -1		// count down segment
+	bnez	s5, .Lfill		// loop if more
+
+	li	s7, PTE_KERN | PTE_HARDWIRED | PTE_R | PTE_W
 
 	// DTB physical address
-	mv	t0, s1
-	srli	t0, t0, SEGSHIFT
-	slli	t0, t0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
-//	srli	t0, t0, PGSHIFT
-//	slli	t0, t0, PTE_PPN_SHIFT
-	or	t0, t0, t4
-	REG_S	t0, 0(s2)
+	mv	s0, s1
+	srli	s0, s0, SEGSHIFT
+	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
+//	srli	s0, s0, PGSHIFT
+//	slli	s0, s0, PTE_PPN_SHIFT
+	or	s0, s0, s7
+
+	VPRINTX(s2)
+	VPRINTS(": ")
+	VPRINTXNL(s0)
+
+	REG_S	s0, 0(s2)
 	add	s2, s2, SZREG		// advance to next PDE slot
 
 #ifdef CONSADDR
-	ld	t0, .Lconsaddr
-	srli	t0, t0, SEGSHIFT
-	slli	t0, t0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
-//	srli	t0, t0, PGSHIFT
-//	slli	t0, t0, PTE_PPN_SHIFT
-	or	t0, t0, t4
-	REG_S	t0, 0(s2)
+	ld	s0, .Lconsaddr
+	srli	s0, s0, SEGSHIFT
+	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
+//	srli	s0, s0, PGSHIFT
+//	slli	s0, s0, PTE_PPN_SHIFT
+	or	s0, s0, s7
+
+	VPRINTX(s2)
+	VPRINTS(": ")
+	VPRINTXNL(s0)
+
+	REG_S	s0, 0(s2)
 	add	s2, s2, SZREG		// advance to next PDE slot
 #endif
 
@@ -296,14 +344,11 @@ vstart:
 
 	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
 
-#if 1
-// XXXNH >>>--- taken from FreeBSD ---
 	/* Set the global pointer */
 	.option push
 	.option norelax
 	lla	gp, __global_pointer$
 	.option pop
-#endif
 
 	// Now we should ready to start initializing the kernel.
 	mv	a0, s0			// hartid
@@ -313,10 +358,6 @@ vstart:
 	tail	_C_LABEL(main)		// and transfer to main
 	/* No return from main */
 END(start)
-
-	.align	2
-hart_boot:
-	.word	0
 
 .Lstart:
 #ifdef _LP64
@@ -799,6 +840,7 @@ ENTRY_NP(locore_printx)
 	li	s0, (SZREG * 8)
 1:
 	addi	s0, s0, -4	// nibble shift
+
 	srl	a0, s1, s0	// extract ...
 	andi	a0, a0, 0xf
 
@@ -833,6 +875,12 @@ ENTRY_NP(locore_printxnl)
 	addi	sp, sp, (SZREG * 2)
 
 	ret
+
+	.data
+	.align	2
+hart_boot:
+	.word	0
+
 
 	.bss
 	.align PGSHIFT
