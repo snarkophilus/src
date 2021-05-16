@@ -69,7 +69,6 @@
  *    a0 is hartid
  *    a1 is pointer to dtb (PA)
  */
-
 ENTRY_NP(start)
 	csrw	sie, zero		// disable interrupts
 	csrw	sip, zero		// clear any pending
@@ -406,6 +405,7 @@ END(mpentry)
 #endif
 #endif
 
+
 ENTRY_NP(uartputc)
 #ifdef EARLYCONS
 	tail	___CONCAT(EARLYCONS, _platform_early_putchar)
@@ -414,6 +414,7 @@ ENTRY_NP(uartputc)
 	ecall
 	ret
 #endif
+
 
 ENTRY_NP(clear_bss)
 	bgeu	a0, a1, 1f
@@ -424,6 +425,7 @@ ENTRY_NP(clear_bss)
 1:
 	ret
 
+#if defined(VERBOSE_INIT_RISCV)
 
 ENTRY_NP(locore_prints)
 	addi	sp, sp, -(SZREG * 2)
@@ -510,6 +512,7 @@ ENTRY_NP(locore_printxnl)
 	addi	sp, sp, (SZREG * 2)
 
 	ret
+#endif
 
 	.data
 	.align	2
@@ -543,9 +546,12 @@ mmutables_end:
 #endif
 
 
-//
-// struct lwp *cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
-//
+/* ------------------------------------------------------------------------- */
+
+/*
+ * struct lwp *
+ * cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
+ */
 ENTRY_NP(cpu_switchto)
 	addi	sp, sp, -TF_LEN		// allocate trapframe
 
@@ -626,9 +632,10 @@ ENTRY_NP(cpu_fast_switchto_cleanup)
 #endif
 END(cpu_fast_switchto_cleanup)
 
-//
-// void cpu_fast_switchto(struct lwp *, int s);
-//
+/*
+ * void
+ * cpu_fast_switchto(struct lwp *, int s);
+*/
 ENTRY_NP(cpu_fast_switchto)
 	addi	sp, sp, -(TF_LEN + CALLFRAME_SIZ)
 	REG_S	a0, (TF_LEN + CALLFRAME_S0)(sp)
@@ -682,8 +689,10 @@ ENTRY_NP(cpu_fast_switchto)
 	ret				// return
 END(cpu_fast_switchto)
 
-// RISCV only has a simple exception handler handles both synchronous traps
-// and interrupts.
+/*
+ * RISC-V only has a simple exception handler handles both synchronous traps
+ * and interrupts.
+*/
 ENTRY_NP(cpu_exception_handler)
 	csrrw	tp, sscratch, tp	// swap scratch and thread pointer
 	beqz	tp, .Lexception_kernel	//   tp == 0, already on kernel stack
@@ -874,8 +883,10 @@ intr_handler:
 	j	exception_kernexit
 END(cpu_exception_handler)
 
-// int cpu_set_onfault(struct faultbuf *fb, register_t retval)
-//
+/*
+ * int
+ * cpu_set_onfault(struct faultbuf *fb, register_t retval)
+ */
 ENTRY(cpu_set_onfault)
 	REG_S	ra, FB_RA(a0)
 	REG_S	s0, FB_S0(a0)
@@ -897,6 +908,7 @@ ENTRY(cpu_set_onfault)
 	ret
 END(cpu_set_onfault)
 
+
 ENTRY(setjmp)
 	REG_S	ra, FB_RA(a0)
 	REG_S	s0, FB_S0(a0)
@@ -916,6 +928,7 @@ ENTRY(setjmp)
 	ret
 END(setjmp)
 
+
 ENTRY(longjmp)
 	REG_L	ra, FB_RA(a0)
 	REG_L	s0, FB_S0(a0)
@@ -934,6 +947,7 @@ ENTRY(longjmp)
 	mv	a0, a1
 	ret
 END(longjmp)
+
 
 ENTRY_NP(cpu_Debugger)
 cpu_Debugger_insn:
