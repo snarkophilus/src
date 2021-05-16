@@ -417,6 +417,132 @@ ENTRY_NP(clear_bss)
 1:
 	ret
 
+
+ENTRY(mpentry)
+1:
+	wfi
+	j	1b
+END(mpentry)
+
+
+ENTRY_NP(locore_prints)
+	addi	sp, sp, -(SZREG * 2)
+	REG_S	s0, (0 * SZREG)(sp)
+	mv	s0, ra
+1:
+	lbu	a0, 0(s0)
+	beqz	a0, 2f
+
+	call	uartputc
+
+	addi	s0, s0, 1
+	j	1b
+2:
+	addi	s0, s0, 8	// s0 points to the null terminator
+	andi	ra, s0, -8
+
+	REG_L	s0, (0 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 2)
+	ret
+
+END(locore_prints)
+
+
+ENTRY_NP(locore_printx)
+	addi	sp, sp, -(SZREG * 4)
+	REG_S	s0, (0 * SZREG)(sp)
+	REG_S	s1, (1 * SZREG)(sp)
+	REG_S	s2, (2 * SZREG)(sp)
+	REG_S	ra, (3 * SZREG)(sp)
+
+	mv	s1, a0		// our print value
+	li	s2, 10
+
+	li	a0, '0'
+	call	uartputc
+	li	a0, 'x'
+	call	uartputc
+
+	// Word size in bits
+	li	s0, (SZREG * 8)
+1:
+	addi	s0, s0, -4	// nibble shift
+
+	srl	a0, s1, s0	// extract ...
+	andi	a0, a0, 0xf
+
+	bltu	a0, s2, 2f
+	addi	a0, a0, ('a' - '0' - 10)
+2:	addi	a0, a0, '0'
+
+	call	uartputc
+	beqz	s0, 3f
+
+	and	a0, s0, (16 - 1)
+	bnez	a0, 1b
+
+	li	a0, '_'
+	call	uartputc
+
+	j	1b
+
+3:
+	REG_L	s0, (0 * SZREG)(sp)
+	REG_L	s1, (1 * SZREG)(sp)
+	REG_L	s2, (2 * SZREG)(sp)
+	REG_L	ra, (3 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 4)
+	ret
+END(locore_printx)
+
+ENTRY_NP(locore_printxnl)
+	addi	sp, sp, -(SZREG * 2)
+	REG_S	ra, (1 * SZREG)(sp)
+
+	call	locore_printx
+	li	a0, '\n'
+	call	uartputc
+
+	li	a0, '\r'
+	call	uartputc
+
+	REG_L	ra, (1 * SZREG)(sp)
+	addi	sp, sp, (SZREG * 2)
+
+	ret
+
+	.data
+	.align	2
+hart_boot:
+	.word	0
+
+
+	.bss
+	.align PGSHIFT
+	.global _C_LABEL(lwp0uspace)
+_C_LABEL(lwp0uspace):
+	.space	UPAGES * PAGE_SIZE
+bootstk:
+
+#if defined(RISCV_BSS_INITTABLES)
+	.align PGSHIFT
+mmutables_start:
+	.global _C_LABEL(l1_pte)
+l1_pte:
+	.space PAGE_SIZE
+#ifdef _LP64
+	.global _C_LABEL(l2_pte)
+l2_pte:
+	.space PAGE_SIZE
+#ifdef notyet
+l3_pte:
+	.space PAGE_SIZE
+#endif
+#endif
+mmutables_end:
+#endif
+
+
 //
 // struct lwp *cpu_switchto(struct lwp *oldl, struct lwp *newl, bool returning);
 //
@@ -814,127 +940,3 @@ cpu_Debugger_insn:
 	sbreak
 	ret
 END(cpu_Debugger)
-
-ENTRY(mpentry)
-1:
-	wfi
-	j	1b
-END(mpentry)
-
-
-ENTRY_NP(locore_prints)
-	addi	sp, sp, -(SZREG * 2)
-	REG_S	s0, (0 * SZREG)(sp)
-	mv	s0, ra
-1:
-	lbu	a0, 0(s0)
-	beqz	a0, 2f
-
-	call	uartputc
-
-	addi	s0, s0, 1
-	j	1b
-2:
-	addi	s0, s0, 8	// s0 points to the null terminator
-	andi	ra, s0, -8
-
-	REG_L	s0, (0 * SZREG)(sp)
-	addi	sp, sp, (SZREG * 2)
-	ret
-
-END(locore_prints)
-
-
-ENTRY_NP(locore_printx)
-	addi	sp, sp, -(SZREG * 4)
-	REG_S	s0, (0 * SZREG)(sp)
-	REG_S	s1, (1 * SZREG)(sp)
-	REG_S	s2, (2 * SZREG)(sp)
-	REG_S	ra, (3 * SZREG)(sp)
-
-	mv	s1, a0		// our print value
-	li	s2, 10
-
-	li	a0, '0'
-	call	uartputc
-	li	a0, 'x'
-	call	uartputc
-
-	// Word size in bits
-	li	s0, (SZREG * 8)
-1:
-	addi	s0, s0, -4	// nibble shift
-
-	srl	a0, s1, s0	// extract ...
-	andi	a0, a0, 0xf
-
-	bltu	a0, s2, 2f
-	addi	a0, a0, ('a' - '0' - 10)
-2:	addi	a0, a0, '0'
-
-	call	uartputc
-	beqz	s0, 3f
-
-	and	a0, s0, (16 - 1)
-	bnez	a0, 1b
-
-	li	a0, '_'
-	call	uartputc
-
-	j	1b
-
-3:
-	REG_L	s0, (0 * SZREG)(sp)
-	REG_L	s1, (1 * SZREG)(sp)
-	REG_L	s2, (2 * SZREG)(sp)
-	REG_L	ra, (3 * SZREG)(sp)
-	addi	sp, sp, (SZREG * 4)
-	ret
-END(locore_printx)
-
-ENTRY_NP(locore_printxnl)
-	addi	sp, sp, -(SZREG * 2)
-	REG_S	ra, (1 * SZREG)(sp)
-
-	call	locore_printx
-	li	a0, '\n'
-	call	uartputc
-
-	li	a0, '\r'
-	call	uartputc
-
-	REG_L	ra, (1 * SZREG)(sp)
-	addi	sp, sp, (SZREG * 2)
-
-	ret
-
-	.data
-	.align	2
-hart_boot:
-	.word	0
-
-
-	.bss
-	.align PGSHIFT
-	.global _C_LABEL(lwp0uspace)
-_C_LABEL(lwp0uspace):
-	.space	UPAGES * PAGE_SIZE
-bootstk:
-
-#if defined(RISCV_BSS_INITTABLES)
-	.align PGSHIFT
-mmutables_start:
-	.global _C_LABEL(l1_pte)
-l1_pte:
-	.space PAGE_SIZE
-#ifdef _LP64
-	.global _C_LABEL(l2_pte)
-l2_pte:
-	.space PAGE_SIZE
-#ifdef notyet
-l3_pte:
-	.space PAGE_SIZE
-#endif
-#endif
-mmutables_end:
-#endif
