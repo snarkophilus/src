@@ -88,6 +88,9 @@ ENTRY_NP(start)
 	amoswap.w s0, s1, (s0)
 	bnez	s0, mpentry
 
+	/*
+	 * The BP only executes from here on.
+	 */
 	mv	s0, a0			// copy hartid
 	mv	s1, a1			// copy dtb PA
 
@@ -95,6 +98,7 @@ ENTRY_NP(start)
 	PTR_LA	s8, _C_LABEL(bootstk)
 	mv	sp, s8
 
+	VPRINTS("\n------------\nNetBSD start\n\n")
 	VPRINTS("sp:      ")
 	VPRINTXNL(sp)
 
@@ -108,6 +112,10 @@ ENTRY_NP(start)
 	VPRINTS("dtb:     ")
 	VPRINTXNL(s1)
 
+	/*
+	 * Calculate the difference between the VA and PA for start and
+	 * store in kern_vtopdiff
+	 */
 	PTR_LA	s11, start
 	PTR_L	s8, .Lstart
 
@@ -117,10 +125,11 @@ ENTRY_NP(start)
 	PTR_LA	s11, _C_LABEL(kern_vtopdiff)
 	PTR_S	s8, 0(s11)	/* kern_vtopdiff = start(virt) - start(phys) */
 
-	// We get loaded and starting running at or near 0, not where we
-	// should be. We need to construct an initial PDETAB
+	/*
+	 * Our load address is not fixed, but our VA is.  We need to construct
+	 * an initial PDETAB.
+	 */
 
-	li	s11, VM_MAX_KERNEL_ADDRESS		// XXXNH why? - not used
 	li	s10, PAGE_SIZE
 	li	s9, USPACE
 
@@ -128,6 +137,8 @@ ENTRY_NP(start)
 	PTR_LA	s6, _C_LABEL(bootstk)
 
 #if !defined(RISCV_BSS_INITTABLES)
+	// We claim memory for pages tables after _end
+	// This might not be safe with efiboot.
 	PTR_LA	s2, _C_LABEL(_end)
 	add	s2, s2, s10		// PAGE_SIZE
 	addi	s2, s2, -1		//   -1 == PAGE_MASK
@@ -136,21 +147,25 @@ ENTRY_NP(start)
 					// s2 = first PDE page
 #ifdef _LP64
 	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
-	mov	s4, s3			// top level page table
+	mov	s4, s3			// last page table
 #ifdef notyet
 	add	s4, s3, s10		// s4 = third PDE page (RV64 only)
 #endif
 #else
-	mov	s4, s2			// top level page table
+	mov	s4, s2			// last page table
 #endif
 	add	s7, s4, s10		// end of memory to clear
+
 #else
+	// The space for the inital page table is included in the kernel
+	// .bss size calculation so we know the space exists.
+
 	li	a1, 0
 	PTR_LA	s2, _C_LABEL(l1_pte)
-	mv	s4, s2
+	mv	s4, s2			// last page table
 #ifdef _LP64
-	PTR_LA	s3, _C_LABEL(l2_pte)
-	mv	s4, s3
+	PTR_LA	s3, _C_LABEL(l2_pte)	// s3 = second PDE page (RV64 only)
+	mv	s4, s3			// last page table
 #ifdef notyet
 	PTR_LA	s4, _C_LABEL(l3_pte)
 #endif
@@ -160,7 +175,7 @@ ENTRY_NP(start)
 
 	// s2	L1 PDE (SV32:4MiB megapages, SV{39,48}: 2MiB megapages)
 	// s3	L2 PDE (_LP64 SV39 only)
-	// s4	L3 PDE (_LP64 SV48 only) (not yet) (or top level table)
+	// s4	L3 PDE (_LP64 SV48 only) (not yet) (or top level table) XXX why do this?
 	// s5	lwp0uspace
 	// s6	bootstk
 	// s7   end of memory to clear
@@ -197,26 +212,35 @@ ENTRY_NP(start)
 
 	call	clear_bss		// zero through kernel_end (inc. stack)
 
-	/* Save the phys addr from the start and end of the kernel */
-//	PTR_LA	t2, _C_LABEL(start)
-//	PTR_LA	t3, _C_LABEL(end)
-
-	li	t3, PTE_KERN		// for megapages
+	li	s7, PTE_KERN		// for megapages
 
 	// We allocated the kernel first PDE page so let's insert in the
 	// page table.
+
+	// Need to setup tables so that for
+	// sv32 : s2
+	// sv39 : s3 -> s2
+	// sv48 : s4 -> s3 -> s2
+
+
 #ifdef _LP64
 	srli	t0, s2, (PGSHIFT - PTE_PPN_SHIFT)
-	or	t0, t0, t3		// Assumes s2[11:0] == 0
+	or	t0, t0, s7		// Assumes s2[11:0] == 0
 #if ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
+
+#ifndef notyet
 	add	t1, t1, s4
+#else
+	add	t1, t1, s3
+#endif
 	REG_S	t0, 0(t1)
 
 	VPRINTX(t1)
 	VPRINTS(": ")
 	VPRINTXNL(t0)
 #else
+	or	t0, t0, s7		// Assumes s2[11:0] == 0
 	REG_S	t0, 0(s4)
 
 	VPRINTX(s4)
@@ -233,7 +257,7 @@ ENTRY_NP(start)
 
 	li	s5, (VM_KERNEL_VM_SIZE >> SEGSHIFT)		// # of megapages
 	li	s6, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
-	li	s7, PTE_KERN | PTE_HARDWIRED | PTE_R | PTE_W | PTE_X
+	li	s7, PTE_KERN | PTE_R | PTE_W | PTE_X
 
 	//
 	// Fill in the PDEs for kernel.
@@ -252,7 +276,7 @@ ENTRY_NP(start)
 	addi	s5, s5, -1		// count down segment
 	bnez	s5, .Lfill		// loop if more
 
-	li	s7, PTE_KERN | PTE_HARDWIRED | PTE_R | PTE_W
+	li	s7, PTE_KERN | PTE_R | PTE_W
 
 	// DTB physical address
 	mv	s0, s1
@@ -849,9 +873,17 @@ ENTRY_NP(locore_printx)
 2:	addi	a0, a0, '0'
 
 	call	uartputc
+	beqz	s0, 3f
 
-	bnez	s0, 1b
+	and	a0, s0, (16 - 1)
+	bnez	a0, 1b
 
+	li	a0, '_'
+	call	uartputc
+
+	j	1b
+
+3:
 	REG_L	s0, (0 * SZREG)(sp)
 	REG_L	s1, (1 * SZREG)(sp)
 	REG_L	s2, (2 * SZREG)(sp)
@@ -904,9 +936,5 @@ l3_pte:
 	.space PAGE_SIZE
 #endif
 #endif
-	// XXXNH not needed as we just map in the page(s) passed?
-	.global _C_LABEL(l1_dtb)
-l1_dtb:
-	.space PAGE_SIZE
 mmutables_end:
 #endif
