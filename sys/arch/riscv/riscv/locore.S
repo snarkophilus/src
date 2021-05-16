@@ -64,11 +64,11 @@
 #define VPRINTXNL(regno)	/* nothing */
 #endif
 
-	/*
-	 * Entry point where.
-	 *    a0 is hartid
-	 *    a1 is pointer to dtb (PA)
-	 */
+/*
+ * Entry point where.
+ *    a0 is hartid
+ *    a1 is pointer to dtb (PA)
+ */
 
 	.align 3
 ENTRY_NP(start)
