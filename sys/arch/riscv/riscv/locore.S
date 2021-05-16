@@ -70,7 +70,6 @@
  *    a1 is pointer to dtb (PA)
  */
 
-	.align 3
 ENTRY_NP(start)
 	csrw	sie, zero		// disable interrupts
 	csrw	sip, zero		// clear any pending
