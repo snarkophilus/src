@@ -72,7 +72,7 @@ typedef __uint32_t pd_entry_t;
 #define	PTE_V		__BIT(0)	// Valid
 
 #define PTE_HARDWIRED	(PTE_A | PTE_D)
-#define PTE_KERN	(PTE_V | PTE_G)
+#define PTE_KERN	(PTE_V | PTE_G | PTE_A | PTE_D)
 #define PTE_RW		(PTE_R | PTE_W)
 #define PTE_RX		(PTE_R | PTE_X)
 
