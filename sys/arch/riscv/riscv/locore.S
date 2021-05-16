@@ -382,6 +382,14 @@ vstart:
 	/* No return from main */
 END(start)
 
+
+ENTRY(mpentry)
+1:
+	wfi
+	j	1b
+END(mpentry)
+
+	.align 3
 .Lstart:
 #ifdef _LP64
 	.quad	start
@@ -415,13 +423,6 @@ ENTRY_NP(clear_bss)
 	bne	a1, a0, 2b
 1:
 	ret
-
-
-ENTRY(mpentry)
-1:
-	wfi
-	j	1b
-END(mpentry)
 
 
 ENTRY_NP(locore_prints)
