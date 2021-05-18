@@ -56,7 +56,6 @@ __RCSID("$NetBSD: riscv_machdep.c,v 1.14 2021/05/01 06:53:08 skrll Exp $");
 #include <riscv/locore.h>
 #include <riscv/machdep.h>
 #include <riscv/pte.h>
-#include <riscv/umprintf.h>
 
 int cpu_printfataltraps;
 char machine[] = MACHINE;
@@ -435,9 +434,9 @@ cpu_kernel_vm_init(void)
 
 	/* L2 PTE with entry for L1_DTB */
 	/* i = ((paddr_t)&l1_dtb >> L2_SHIFT) & Ln_ADDR_MASK; */
-	/* umprintf("i = %d\n", i); */
+	/* printf("i = %d\n", i); */
 	/* l2_pte[i] = (((paddr_t)&l1_dtb >> PAGE_SHIFT) << L0_SHIFT) | PTE_V; */
-	/* umprintf("l2_pte[%d]: 0x%x\n", i, l2_pte[i]); */
+	/* printf("l2_pte[%d]: 0x%x\n", i, l2_pte[i]); */
 
 	/* Build the L1 Page Table we just pointed to */
 	for (i = 0; ((phys_base_2mb_chunk + i) << 21) < end; ++i) {
@@ -445,7 +444,7 @@ cpu_kernel_vm_init(void)
 		    | l1_perms;
 	}
 
-	/* umprintf("DTB: 0x%x\n", dtb); */
+	/* printf("DTB: 0x%x\n", dtb); */
 
 	/* Put the DTB in the L1_DTB table */
 	/* i = ((paddr_t)dtb >> L2_SHIFT) & Ln_ADDR_MASK; */

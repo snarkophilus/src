@@ -17,8 +17,6 @@ file	arch/riscv/fdt/fdt_dma_machdep.c
 
 file	arch/riscv/riscv/spl.S
 
-file arch/riscv/riscv/umprintf.c
-
 file	arch/riscv/riscv/riscv_generic_dma.c
 file	arch/riscv/riscv/bus_dma_template.c
 
