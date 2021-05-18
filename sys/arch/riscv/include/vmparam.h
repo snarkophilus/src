@@ -110,6 +110,10 @@
 #define VM_MIN_ADDRESS		((vaddr_t)0x00000000)
 #ifdef _LP64	/* Sv39 */
 /*
+ * SV39 gives 1 << (39 - 1) address space to kernel and same to userland.
+ * This is 256GiB each. Split the kernel space in two and use the top half
+ * for direct map.
+ *
  * kernel virtual space layout:
  *   0xffff_ffc0_0000_0000  -   64GiB  KERNEL VM Space (inc. text/data/bss)
  *  (0xffff_ffc0_4000_0000      +1GiB) KERNEL VM start of KVA
