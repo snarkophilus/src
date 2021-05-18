@@ -1,7 +1,7 @@
 /* $NetBSD: locore.S,v 1.21 2021/05/01 07:10:34 skrll Exp $ */
 
 /*-
- * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
+ * Copyright (c) 2014, 2021 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -34,8 +34,6 @@
 
 #include <machine/asm.h>
 #include "assym.h"
-
-#define RISCV_BSS_INITTABLES
 
 	.globl	_C_LABEL(exception_userexit)
 	.globl	_C_LABEL(cpu_Debugger_insn)
@@ -85,7 +83,6 @@ ENTRY_NP(start)
 
 	amoswap.w s0, s1, (s0)
 	bnez	s0, mpentry
-
 	/*
 	 * The BP only executes from here on.
 	 */
@@ -134,27 +131,6 @@ ENTRY_NP(start)
 	PTR_LA	s5, _C_LABEL(lwp0uspace)
 	PTR_LA	s6, _C_LABEL(bootstk)
 
-#if !defined(RISCV_BSS_INITTABLES)
-	// We claim memory for pages tables after _end
-	// This might not be safe with efiboot.
-	PTR_LA	s2, _C_LABEL(_end)
-	add	s2, s2, s10		// PAGE_SIZE
-	addi	s2, s2, -1		//   -1 == PAGE_MASK
-	neg	s7, s10			// -PAGE_SIZE
-	and	s2, s2, s7		// s2 is page aligned end of kernel
-					// s2 = first PDE page
-#ifdef _LP64
-	add	s3, s2, s10		// s3 = second PDE page (RV64 only)
-	mov	s4, s3			// last page table
-#ifdef notyet
-	add	s4, s3, s10		// s4 = third PDE page (RV64 only)
-#endif
-#else
-	mov	s4, s2			// last page table
-#endif
-	add	s7, s4, s10		// end of memory to clear
-
-#else
 	// The space for the inital page table is included in the kernel
 	// .bss size calculation so we know the space exists.
 
@@ -169,7 +145,7 @@ ENTRY_NP(start)
 #endif
 #endif
 	PTR_LA	s7, _C_LABEL(mmutables_end)
-#endif
+
 
 	// s2	L1 PDE (SV32:4MiB megapages, SV{39,48}: 2MiB megapages)
 	// s3	L2 PDE (_LP64 SV39 only)
@@ -188,6 +164,7 @@ ENTRY_NP(start)
 	VPRINTXNL(s4)
 #endif
 #endif
+
 	VPRINTS("uspace:  ")
 	VPRINTXNL(s5)
 	VPRINTS("bootstk: ")
@@ -220,13 +197,11 @@ ENTRY_NP(start)
 	// sv39 : s3 -> s2
 	// sv48 : s4 -> s3 -> s2
 
-
 #ifdef _LP64
 	srli	t0, s2, (PGSHIFT - PTE_PPN_SHIFT)
 	or	t0, t0, s7		// Assumes s2[11:0] == 0
 #if ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
 	li	t1, ((VM_MIN_KERNEL_ADDRESS >> XSEGSHIFT) & (NPDEPG - 1)) * SZREG
-
 #ifndef notyet
 	add	t1, t1, s4
 #else
@@ -235,18 +210,15 @@ ENTRY_NP(start)
 	REG_S	t0, 0(t1)
 
 	VPRINTX(t1)
-	VPRINTS(": ")
-	VPRINTXNL(t0)
 #else
-	or	t0, t0, s7		// Assumes s2[11:0] == 0
-	REG_S	t0, 0(s4)
+	REG_S	t0, 0(s3)
 
-	VPRINTX(s4)
+	VPRINTX(s3)
+#endif
+#endif
+
 	VPRINTS(": ")
 	VPRINTXNL(t0)
-#endif
-#endif
-
 	VPRINTS("\n\r")
 
 #if PGSHIFT < PTE_PPN_SHIFT
@@ -278,10 +250,8 @@ ENTRY_NP(start)
 
 	// DTB physical address
 	mv	s0, s1
-	srli	s0, s0, SEGSHIFT
-	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
-//	srli	s0, s0, PGSHIFT
-//	slli	s0, s0, PTE_PPN_SHIFT
+	srli	s0, s0, SEGSHIFT	// round down to NBSEG, and shift in
+	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)	// ... to PPN
 	or	s0, s0, s7
 
 	VPRINTX(s2)
@@ -293,10 +263,8 @@ ENTRY_NP(start)
 
 #ifdef CONSADDR
 	ld	s0, .Lconsaddr
-	srli	s0, s0, SEGSHIFT
-	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)
-//	srli	s0, s0, PGSHIFT
-//	slli	s0, s0, PTE_PPN_SHIFT
+	srli	s0, s0, SEGSHIFT	// round down to NBSEG, and shift in
+	slli	s0, s0, (SEGSHIFT - PGSHIFT + PTE_PPN_SHIFT)	// ... to PPN
 	or	s0, s0, s7
 
 	VPRINTX(s2)
@@ -426,7 +394,6 @@ ENTRY_NP(clear_bss)
 	ret
 
 #if defined(VERBOSE_INIT_RISCV)
-
 ENTRY_NP(locore_prints)
 	addi	sp, sp, -(SZREG * 2)
 	REG_S	s0, (0 * SZREG)(sp)
@@ -497,6 +464,7 @@ ENTRY_NP(locore_printx)
 	ret
 END(locore_printx)
 
+
 ENTRY_NP(locore_printxnl)
 	addi	sp, sp, -(SZREG * 2)
 	REG_S	ra, (1 * SZREG)(sp)
@@ -512,22 +480,21 @@ ENTRY_NP(locore_printxnl)
 	addi	sp, sp, (SZREG * 2)
 
 	ret
-#endif
+#endif	/* VERBOSE_INIT_RISCV */
 
 	.data
 	.align	2
 hart_boot:
 	.word	0
 
-
-	.bss
+	.section "_init_memory", "aw", %nobits
 	.align PGSHIFT
 	.global _C_LABEL(lwp0uspace)
 _C_LABEL(lwp0uspace):
 	.space	UPAGES * PAGE_SIZE
 bootstk:
 
-#if defined(RISCV_BSS_INITTABLES)
+	.section "_init_memory", "aw", %nobits
 	.align PGSHIFT
 mmutables_start:
 	.global _C_LABEL(l1_pte)
@@ -543,7 +510,6 @@ l3_pte:
 #endif
 #endif
 mmutables_end:
-#endif
 
 
 /* ------------------------------------------------------------------------- */
@@ -608,6 +574,7 @@ ENTRY_NP(cpu_switchto)
 	ret
 END(cpu_switchto)
 
+
 ENTRY_NP(cpu_lwp_trampoline)
 	mv	a1, tp			// get new lwp
 	call	_C_LABEL(lwp_startup)	// call lwp startup
@@ -618,6 +585,7 @@ ENTRY_NP(cpu_lwp_trampoline)
 	// If the saved func returns, we are returning to user land.
 	j	_C_LABEL(exception_userexit)
 END(cpu_lwp_trampoline)
+
 
 ENTRY_NP(cpu_fast_switchto_cleanup)
 //	PTR_L	t0, L_CPU(tp)		// Get curcpu()
@@ -631,6 +599,7 @@ ENTRY_NP(cpu_fast_switchto_cleanup)
 	ret				// just return
 #endif
 END(cpu_fast_switchto_cleanup)
+
 
 /*
  * void
@@ -688,6 +657,7 @@ ENTRY_NP(cpu_fast_switchto)
 	addi	sp, sp, TF_LEN+CALLFRAME_SIZ	// drop trapframe/callframe
 	ret				// return
 END(cpu_fast_switchto)
+
 
 /*
  * RISC-V only has a simple exception handler handles both synchronous traps
@@ -882,6 +852,7 @@ intr_handler:
 	call	_C_LABEL(cpu_intr)
 	j	exception_kernexit
 END(cpu_exception_handler)
+
 
 /*
  * int
