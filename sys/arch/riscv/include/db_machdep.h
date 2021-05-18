@@ -87,7 +87,7 @@ db_addr_t	db_disasm_insn(uint32_t, db_addr_t, bool);
  * Entrypoints to DDB for kernel, keyboard drivers, init hook
  */
 void 	kdb_kbd_trap(db_regs_t *);
-int 	kdb_trap(int, struct trapframe *);
+int 	kdb_trap(int, db_regs_t *);
 
 static inline void
 db_set_ddb_regs(int type, struct trapframe *tf)

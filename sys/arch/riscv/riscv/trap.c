@@ -50,6 +50,17 @@ __RCSID("$NetBSD: trap.c,v 1.15 2020/12/20 16:38:26 skrll Exp $");
 
 #include <riscv/locore.h>
 
+#define	MACHINE_ECALL_TRAP_MASK	(__BIT(CAUSE_MACHINE_ECALL))
+
+#define	SUPERVISOR_ECALL_TRAP_MASK	\
+				(__BIT(CAUSE_SUPERVISOR_ECALL))
+
+#define	USER_ECALL_TRAP_MASK	(__BIT(CAUSE_USER_ECALL))
+
+#define	SYSCALL_TRAP_MASK	(__BIT(CAUSE_SYSCALL))
+
+#define	BREAKPOINT_TRAP_MASK	(__BIT(CAUSE_BREAKPOINT))
+
 #define	INSTRUCTION_TRAP_MASK	(__BIT(CAUSE_ILLEGAL_INSTRUCTION))
 
 #define	FAULT_TRAP_MASK		(__BIT(CAUSE_FETCH_ACCESS) \
@@ -422,12 +433,19 @@ cpu_trap(struct trapframe *tf, register_t epc, register_t status,
 		}
 		fpu_load();
 #endif
+	} else if (fault_mask & SYSCALL_TRAP_MASK) {
 	} else if (fault_mask & MISALIGNED_TRAP_MASK) {
 		ok = trap_misalignment(tf, epc, status, cause, addr,
 		    usertrap_p, &ksi);
-	} else {
-		dump_trapframe(tf, printf);
-		panic("%s: unknown kernel trap", __func__);
+	} else if (fault_mask & BREAKPOINT_TRAP_MASK) {
+		if (!usertrap_p) {
+			dump_trapframe(tf, printf);
+#if defined(DDB)
+			kdb_trap(cause, tf);
+			return;	/* KERN */
+#endif
+			panic("%s: unknown kernel trap", __func__);
+		}
 	}
 
 	if (usertrap_p) {

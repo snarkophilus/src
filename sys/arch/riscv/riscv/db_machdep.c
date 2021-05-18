@@ -43,8 +43,6 @@ __RCSID("$NetBSD: db_machdep.c,v 1.7 2021/04/14 06:32:20 dholland Exp $");
 #include <ddb/db_extern.h>
 #include <ddb/db_variables.h>
 
-int db_active = 0;
-
 static int db_rw_ddbreg(const struct db_variable *, db_expr_t *, int);
 
 const struct db_variable db_regs[] = {
@@ -85,9 +83,6 @@ const struct db_variable db_regs[] = {
 	{ "tval", (void *)offsetof(struct trapframe, tf_tval), db_rw_ddbreg, NULL },
 };
 const struct db_variable * const db_eregs = db_regs + __arraycount(db_regs);
-
-int db_active;
-db_regs_t ddb_regs;
 
 int
 db_rw_ddbreg(const struct db_variable *vp, db_expr_t *valp, int rw)

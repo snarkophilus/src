@@ -31,6 +31,7 @@ file	arch/riscv/riscv/bus_stubs.c
 
 file	arch/riscv/riscv/autoconf.c
 file	arch/riscv/riscv/cpu_subr.c
+file	arch/riscv/riscv/db_interface.c		ddb
 file	arch/riscv/riscv/db_disasm.c		ddb
 file	arch/riscv/riscv/db_trace.c		ddb
 file	arch/riscv/riscv/fixup.c
