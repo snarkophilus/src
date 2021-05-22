@@ -2397,7 +2397,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	}
 
 	/* get prot by pmap_enter() (stored in software use bit in pte) */
-	switch (pte & (LX_BLKPAG_OS_READ|LX_BLKPAG_OS_WRITE)) {
+	switch (pte & (LX_BLKPAG_OS_READ | LX_BLKPAG_OS_WRITE)) {
 	case 0:
 	default:
 		pmap_prot = 0;
@@ -2406,8 +2406,8 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 		pmap_prot = VM_PROT_READ;
 		break;
 	case LX_BLKPAG_OS_WRITE:
-	case LX_BLKPAG_OS_READ|LX_BLKPAG_OS_WRITE:
-		pmap_prot = (VM_PROT_READ|VM_PROT_WRITE);
+	case LX_BLKPAG_OS_READ | LX_BLKPAG_OS_WRITE:
+		pmap_prot = (VM_PROT_READ | VM_PROT_WRITE);
 		break;
 	}
 	if (l3pte_executable(pte, pm != pmap_kernel()))
@@ -2417,7 +2417,7 @@ pmap_fault_fixup(struct pmap *pm, vaddr_t va, vm_prot_t accessprot, bool user)
 	    va, pmap_prot, accessprot, 0);
 
 	/* ignore except read/write */
-	accessprot &= (VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
+	accessprot &= (VM_PROT_READ | VM_PROT_WRITE | VM_PROT_EXECUTE);
 
 	/* PROT_EXEC requires implicit PROT_READ */
 	if (accessprot & VM_PROT_EXECUTE)

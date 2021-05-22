@@ -1,4 +1,4 @@
-/* $NetBSD: locore.S,v 1.21 2021/05/01 07:10:34 skrll Exp $ */
+/* $NetBSD: locore.S,v 1.22 2021/05/16 09:02:04 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014, 2021 The NetBSD Foundation, Inc.
@@ -858,7 +858,7 @@ END(cpu_exception_handler)
  * int
  * cpu_set_onfault(struct faultbuf *fb, register_t retval)
  */
-ENTRY(cpu_set_onfault)
+ENTRY_NP(cpu_set_onfault)
 	REG_S	ra, FB_RA(a0)
 	REG_S	s0, FB_S0(a0)
 	REG_S	s1, FB_S1(a0)
@@ -880,7 +880,7 @@ ENTRY(cpu_set_onfault)
 END(cpu_set_onfault)
 
 
-ENTRY(setjmp)
+ENTRY_NP(setjmp)
 	REG_S	ra, FB_RA(a0)
 	REG_S	s0, FB_S0(a0)
 	REG_S	s1, FB_S1(a0)
@@ -900,7 +900,7 @@ ENTRY(setjmp)
 END(setjmp)
 
 
-ENTRY(longjmp)
+ENTRY_NP(longjmp)
 	REG_L	ra, FB_RA(a0)
 	REG_L	s0, FB_S0(a0)
 	REG_L	s1, FB_S1(a0)

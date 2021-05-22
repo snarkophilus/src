@@ -1,4 +1,4 @@
-/* $NetBSD: db_interface.c,v 1.14 2021/05/03 19:33:09 skrll Exp $ */
+/* $NetBSD: db_interface.c,v 1.16 2021/05/19 12:16:01 skrll Exp $ */
 
 /*
  * Copyright (c) 2017 Ryo Shimizu <ryo@nerv.org>
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.14 2021/05/03 19:33:09 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: db_interface.c,v 1.16 2021/05/19 12:16:01 skrll Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -360,13 +360,13 @@ db_pte_print(pt_entry_t pte, int level,
 
 		pr(", PA=%lx", l3pte_pa(pte));
 
-		pr(", %s", (pte & LX_BLKPAG_UXN) ? "UXN" : "UX ");
-		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" : "PX ");
+		pr(", %s", (pte & LX_BLKPAG_UXN) ? "UXN" : "UX");
+		pr(", %s", (pte & LX_BLKPAG_PXN) ? "PXN" : "PX");
 
 		if (pte & LX_BLKPAG_CONTIG)
 			pr(", CONTIG");
 
-		pr(", %s", (pte & LX_BLKPAG_NG) ? "NG" : "global");
+		pr(", %s", (pte & LX_BLKPAG_NG) ? "nG" : "G");
 		pr(", %s", (pte & LX_BLKPAG_AF) ?
 		    "accessible" :
 		    "**fault** ");
@@ -402,8 +402,9 @@ db_pte_print(pt_entry_t pte, int level,
 			break;
 		case LX_BLKPAG_ATTR_DEVICE_MEM:
 			pr(", DEV");
+			break;
 		case LX_BLKPAG_ATTR_DEVICE_MEM_SO:
-			pr(", SO");
+			pr(", DEV(SO)");
 			break;
 		default:
 			pr(", ATTR(%lu)", __SHIFTOUT(pte, LX_BLKPAG_ATTR_INDX));
@@ -411,13 +412,13 @@ db_pte_print(pt_entry_t pte, int level,
 		}
 
 		if (pte & LX_BLKPAG_OS_0)
-			pr(", OS0");
+			pr(", " PMAP_PTE_OS0);
 		if (pte & LX_BLKPAG_OS_1)
-			pr(", OS1");
+			pr(", " PMAP_PTE_OS1);
 		if (pte & LX_BLKPAG_OS_2)
-			pr(", OS2");
+			pr(", " PMAP_PTE_OS2);
 		if (pte & LX_BLKPAG_OS_3)
-			pr(", OS3");
+			pr(", " PMAP_PTE_OS3);
 	} else {
 		pr(" **ILLEGAL TYPE**");
 	}

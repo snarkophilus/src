@@ -208,9 +208,14 @@ struct pmap_page {
 	struct vm_page_md	pp_md;
 };
 
-#define PMAP_PAGE_TO_MD(ppage)	(&((ppage)->pp_md))
+#define	PMAP_PAGE_TO_MD(ppage)	(&((ppage)->pp_md))
 
 #define	PVLIST_EMPTY_P(pg)	VM_PAGEMD_PVLIST_EMPTY_P(VM_PAGE_TO_MD(pg))
+
+#define	LX_BLKPAG_OS_MODIFIED	LX_BLKPAG_OS_0
+
+#define	PMAP_PTE_OS0	"modified"
+#define	PMAP_PTE_OS1	"(unk)"
 
 static __inline paddr_t
 pte_to_paddr(pt_entry_t pte)
@@ -251,14 +256,14 @@ static inline bool
 pte_modified_p(pt_entry_t pte)
 {
 
-	return (pte & LX_BLKPAG_OS_0) != 0;
+	return (pte & LX_BLKPAG_OS_MODIFIED) != 0;
 }
 
 static inline bool
 pte_wired_p(pt_entry_t pte)
 {
 
-        return (pte & LX_BLKPAG_OS_2) != 0;
+        return (pte & LX_BLKPAG_OS_WIRED) != 0;
 }
 
 
@@ -266,14 +271,14 @@ static inline pt_entry_t
 pte_wire_entry(pt_entry_t pte)
 {
 
-        return pte | LX_BLKPAG_OS_2;
+        return pte | LX_BLKPAG_OS_WIRED;
 }
 
 static inline pt_entry_t
 pte_unwire_entry(pt_entry_t pte)
 {
 
-        return pte & ~LX_BLKPAG_OS_2;
+        return pte & ~LX_BLKPAG_OS_WIRED;
 }
 
 static inline uint64_t
