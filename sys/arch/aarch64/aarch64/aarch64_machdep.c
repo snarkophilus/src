@@ -842,6 +842,7 @@ err:
 	delay(5000000);
 }
 
+
 /*
  * cpu_dumpsize: calculate size of machine-dependent kernel core dump headers.
  */
