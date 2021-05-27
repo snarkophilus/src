@@ -356,6 +356,7 @@ ENTRY(mpentry)
 	j	1b
 END(mpentry)
 
+
 	.align 3
 .Lstart:
 #ifdef _LP64
@@ -364,7 +365,9 @@ END(mpentry)
 	.word	start
 #endif
 
+
 #ifdef CONSADDR
+	.align 3
 .Lconsaddr:
 #ifdef _LP64
 	.quad	CONSADDR
@@ -382,6 +385,7 @@ ENTRY_NP(uartputc)
 	ecall
 	ret
 #endif
+END(uartputc)
 
 
 ENTRY_NP(clear_bss)
@@ -392,6 +396,8 @@ ENTRY_NP(clear_bss)
 	bne	a1, a0, 2b
 1:
 	ret
+END(clear_bss)
+
 
 #if defined(VERBOSE_INIT_RISCV)
 ENTRY_NP(locore_prints)
@@ -445,6 +451,7 @@ ENTRY_NP(locore_printx)
 2:	addi	a0, a0, '0'
 
 	call	uartputc
+
 	beqz	s0, 3f
 
 	and	a0, s0, (16 - 1)
@@ -480,7 +487,9 @@ ENTRY_NP(locore_printxnl)
 	addi	sp, sp, (SZREG * 2)
 
 	ret
+END(locore_printxnl)
 #endif	/* VERBOSE_INIT_RISCV */
+
 
 	.data
 	.align	2
@@ -493,6 +502,21 @@ hart_boot:
 _C_LABEL(lwp0uspace):
 	.space	UPAGES * PAGE_SIZE
 bootstk:
+
+
+	/*
+	 * Allocate some memory after the kernel image for stacks and
+	 * bootstrap L1PT
+	 */
+	.align PGSHIFT
+#if 0
+.global start_stacks_bottom
+	.global start_stacks_top
+start_stacks_bottom:
+	.space	INIT_ARM_TOTAL_STACK
+start_stacks_top:
+#endif
+
 
 	.section "_init_memory", "aw", %nobits
 	.align PGSHIFT
