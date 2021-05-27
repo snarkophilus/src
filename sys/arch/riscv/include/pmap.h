@@ -130,7 +130,6 @@ bool	pmap_md_io_vaddr_p(vaddr_t);
 paddr_t	pmap_md_direct_mapped_vaddr_to_paddr(vaddr_t);
 vaddr_t	pmap_md_direct_map_paddr(paddr_t);
 void	pmap_md_init(void);
-bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
 void	pmap_md_xtab_activate(struct pmap *, struct lwp *);
 void	pmap_md_xtab_deactivate(struct pmap *);
@@ -148,6 +147,14 @@ extern vaddr_t pmap_direct_end;
 #define MEGAPAGE_ROUND(x)	MEGAPAGE_TRUNC((x) + SEGOFSET)
 
 #ifdef __PMAP_PRIVATE
+
+static inline bool
+pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
+{
+        // TLB not walked and so not called.
+        return false;
+}
+
 static inline void
 pmap_md_page_syncicache(struct vm_page_md *mdpg, const kcpuset_t *kc)
 {

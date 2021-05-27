@@ -65,8 +65,6 @@ pmap_md_tlb_asid_max(void)
 	}
 }
 
-#define pmap_md_tlb_asid_max()		(PMAP_TLB_NUM_PIDS - 1)
-
 #define PMAP_PDETABSIZE	(PAGE_SIZE / sizeof(pd_entry_t))
 #define PMAP_SEGTABSIZE	NSEGPG
 
@@ -114,7 +112,6 @@ bool	pmap_md_vca_add(struct vm_page_md *, vaddr_t, pt_entry_t *);
 void	pmap_md_vca_clean(struct vm_page_md *, int);
 void	pmap_md_vca_remove(struct vm_page_md *, vaddr_t, bool, bool);
 bool	pmap_md_ok_to_steal_p(const uvm_physseg_t, size_t);
-bool	pmap_md_tlb_check_entry(void *, vaddr_t, tlb_asid_t, pt_entry_t);
 
 void	pmap_md_xtab_activate(pmap_t, struct lwp *);
 void	pmap_md_xtab_deactivate(pmap_t);
@@ -128,6 +125,13 @@ vaddr_t pmap_md_direct_map_paddr(paddr_t);
 #ifdef MULTIPROCESSOR
 #define PMAP_NO_PV_UNCACHED
 #endif
+
+static inline bool
+pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
+{
+	// TLB not walked and so not called.
+	return false;
+}
 
 static inline bool
 pmap_md_virtual_cache_aliasing_p(void)

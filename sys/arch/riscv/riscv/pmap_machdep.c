@@ -139,11 +139,6 @@ pmap_md_ok_to_steal_p(const uvm_physseg_t bank, size_t npgs)
 	return true;
 }
 
-bool
-pmap_md_tlb_check_entry(void *ctx, vaddr_t va, tlb_asid_t asid, pt_entry_t pte)
-{
-	return false;
-}
 
 void
 pmap_md_xtab_activate(struct pmap *pmap, struct lwp *l)
@@ -341,7 +336,8 @@ u_int
 tlb_record_asids(u_long *ptr, tlb_asid_t asid_max)
 {
 	memset(ptr, 0xff, PMAP_TLB_NUM_PIDS / (8 * sizeof(u_long)));
-	ptr[0] = -2UL;
+	ptr[0] ^= __BITS(0, KERNEL_PID);
+
 	return PMAP_TLB_NUM_PIDS - 1;
 }
 

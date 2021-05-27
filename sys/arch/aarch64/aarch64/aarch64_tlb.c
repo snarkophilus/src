@@ -103,18 +103,13 @@ tlb_update_addr(vaddr_t va, tlb_asid_t asid, pt_entry_t pte, bool insert_p)
 u_int
 tlb_record_asids(u_long *mapp, tlb_asid_t asid_max)
 {
-#ifdef DIAGNOSTIC
-	mapp[0] = 0xfffffffe;
-	mapp[1] = 0xffffffff;
-	mapp[2] = 0xffffffff;
-	mapp[3] = 0xffffffff;
-	mapp[4] = 0xffffffff;
-	mapp[5] = 0xffffffff;
-	mapp[6] = 0xffffffff;
-	mapp[7] = 0xffffffff;
+	KASSERT(asid_max == pmap_md_tlb_asid_max());
+
+#if DIAGNOSTIC
+	memset(mapp, 0xff, (asid_max + 1) / (NBBY * sizeof(u_long)));
+	mapp[0] ^= __BITS(0, KERNEL_PID);
 #endif
-	// XXXNH
-	return 255;
+	return asid_max;
 }
 
 void
