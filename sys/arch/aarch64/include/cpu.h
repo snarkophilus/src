@@ -162,11 +162,13 @@ static __inline int
 cpu_maxproc(void)
 {
 #if defined(PMAP_MI)
-	return 0;
+	/*
+	 * The MI PMAP doesn't limit the number of processes in any way.
+	 */
+	return INT_MAX;
 #else
 	/*
-	 * XXX: due to the current implementation of pmap depends on 16bit
-	 * ASID
+	 * the original (ryo@) pmap uses PID for ASID.
 	 */
 	return 1U << 16;
 
