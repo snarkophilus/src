@@ -1,0 +1,16 @@
+# $NetBSD$
+
+include	"dev/pckbport/files.pckbport"
+
+device	riscvfdt { }: fdt
+attach	riscvfdt at root with risc_fdt
+#file	arch/arm/fdt/arm_fdt.c			arm_fdt
+#file	arch/arm/fdt/arm_platform.c		arm_fdt & gtmr_fdt & psci_fdt
+#file	arch/arm/fdt/arm_simplefb.c		arm_fdt & wsdisplay & genfb
+
+#attach	cpu at fdt with cpu_fdt
+#file	arch/arm/fdt/cpu_fdt.c			cpu_fdt
+
+#device	cpufreqdt
+#attach	cpufreqdt at cpu with cpufreq_dt
+#file	dev/fdt/cpufreq_dt.c			cpufreq_dt
