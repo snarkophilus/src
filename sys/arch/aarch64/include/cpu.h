@@ -1,4 +1,4 @@
-/* $NetBSD: cpu.h,v 1.34 2021/03/27 12:15:09 jmcneill Exp $ */
+/* $NetBSD: cpu.h,v 1.36 2021/05/29 06:54:20 skrll Exp $ */
 
 /*-
  * Copyright (c) 2014, 2020 The NetBSD Foundation, Inc.
@@ -158,7 +158,7 @@ static __inline struct cpu_info *lwp_getcpu(struct lwp *);
 #define	curlwp			(aarch64_curlwp())
 #define	curpcb			((struct pcb *)lwp_getpcb(curlwp))
 
-static __inline int
+static inline int
 cpu_maxproc(void)
 {
 #if defined(PMAP_MI)
@@ -168,10 +168,16 @@ cpu_maxproc(void)
 	return INT_MAX;
 #else
 	/*
-	 * the original (ryo@) pmap uses PID for ASID.
+	 * the pmap uses PID for ASID.
 	 */
-	return 1U << 16;
-
+	switch (__SHIFTOUT(reg_id_aa64mmfr0_el1_read(), ID_AA64MMFR0_EL1_ASIDBITS)) {
+	case ID_AA64MMFR0_EL1_ASIDBITS_8BIT:
+		return (1U << 8) - 1;
+	case ID_AA64MMFR0_EL1_ASIDBITS_16BIT:
+		return (1U << 16) - 1;
+	default:
+		return 0;
+	}
 #endif
 }
 
