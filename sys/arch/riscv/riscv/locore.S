@@ -333,6 +333,9 @@ vstart:
 #endif
 
 	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
+	li	t1, NBSEG - 1
+	and	t1, s1, t1
+	or	t0, t0, t1
 
 	/* Set the global pointer */
 	.option push
