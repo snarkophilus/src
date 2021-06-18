@@ -62,6 +62,10 @@
 #define VPRINTXNL(regno)	/* nothing */
 #endif
 
+#if VM_MIN_KERNEL_ADDRESS != VM_KERNEL_BASE
+#error VM_MIN_KERNEL_ADDRESS assumed to match VM_KERNEL_BASE
+#endif
+
 /*
  * Entry point where.
  *    a0 is hartid
@@ -225,7 +229,7 @@ ENTRY_NP(start)
 #error Code assumes PGSHIFT is greater than PTE_PPN_SHIFT
 #endif
 
-	li	s5, (VM_KERNEL_VM_SIZE >> SEGSHIFT)		// # of megapages
+	li	s5, (VM_KERNEL_SIZE >> SEGSHIFT)		// # of megapages
 	li	s6, (NBSEG >> (PGSHIFT - PTE_PPN_SHIFT))	// load for ease
 	li	s7, PTE_KERN | PTE_R | PTE_W | PTE_X
 
@@ -332,7 +336,7 @@ vstart:
 	call	_C_LABEL(init_mmu)
 #endif
 
-	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_VM_SIZE
+	li	t0, VM_MIN_KERNEL_ADDRESS + VM_KERNEL_SIZE
 	li	t1, NBSEG - 1
 	and	t1, s1, t1
 	or	t0, t0, t1
