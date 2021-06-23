@@ -423,8 +423,8 @@ cpu_kernel_vm_init(void)
 
 	paddr_t end = (phys_base + VM_KERNEL_VM_SIZE + 0x200000 - 1) & -0x200000;
 
-	/* L2 PTE with entry for Kernel VA, pointing to L2 PTE */
-	l2_pte[i] = PA_TO_PTE((paddr_t)&l1_pte) | PTE_V;
+	/* L2 PTE with entry for Kernel VA, pointing to L1 PTE */
+	l2_pte[i] = PA_TO_PTE(KERN_VTOPHYS((paddr_t)&l1_pte)) | PTE_V;
 
 	/* L2 PTE with entry for Kernel PA, pointing to L1 PTE */
 	/* i = ((paddr_t)&start >> L2_SHIFT) & Ln_ADDR_MASK; */
