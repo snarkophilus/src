@@ -55,8 +55,8 @@ riscv_kern_phystov(paddr_t pa)
 	return pa + kern_vtopdiff;
 }
 
-#define KERN_VTOPHYS(va)	riscv_kern_vtophys(va)
-#define KERN_PHYSTOV(pa)	riscv_kern_phystov(pa)
+#define KERN_VTOPHYS(va)	riscv_kern_vtophys((vaddr_t)va)
+#define KERN_PHYSTOV(pa)	riscv_kern_phystov((paddr_t)pa)
 
 
 void	uartputc(int);
